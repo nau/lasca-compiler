@@ -1,213 +1,223 @@
+{-# LANGUAGE QuasiQuotes, OverloadedStrings #-}
 module Main where
 
-import Control.Monad
-import Control.Monad.Trans
 import Data.Char
-import System.Console.Haskeline
-import System.Process
-import Text.Parsec
-import Text.Parsec.Expr
+import Text.Parsec hiding (State)
+import qualified Text.Parsec.Expr as Ex
+import qualified Text.Parsec.Token as Tok
 import Text.Parsec.Prim
 import Text.Parsec.String
 import Text.Parsec.Language
+import Text.Parsec.Indent
+import qualified Data.Text as T
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import qualified Data.List as List
-import qualified Text.Parsec.Token as Token
+import NeatInterpolation
 import Syntax
+{-# ANN module ("HLint: ignore Eta reduce"::String) #-}
+{-# ANN module ("HLint: ignore Redundant bracket"::String) #-}
 
 
+-- Lexer
+reservedOps :: [String]
+reservedOps = [
+    "->",
+    "\\",
+    "+",
+    "*",
+    "-",
+    "="
+  ]
 
-fisDef = Token.LanguageDef
-     { Token.commentStart   = "#"
-     , Token.commentEnd     = ""
-     , Token.commentLine    = "#"
-     , Token.nestedComments = False
-     , Token.identStart     = letter <|> char '_'
-     , Token.identLetter    = alphaNum <|> oneOf "_'"
-     , Token.opStart        = Token.opLetter fisDef
-     , Token.opLetter       = oneOf ":!#$%&*+./<=>?@\\^|-~"
-     , Token.reservedOpNames= ["+", "-", "*", "/", "<", ">", "|"]
-     , Token.reservedNames  = ["let"]
-     , Token.caseSensitive  = True
+reservedNames :: [String]
+reservedNames = [
+   "def", "extern"
+  ]
+
+langDef :: Tok.LanguageDef ()
+langDef = Tok.LanguageDef
+     { Tok.commentStart    = "{-"
+     , Tok.commentEnd      = "-}"
+     , Tok.commentLine     = "--"
+     , Tok.nestedComments = False
+     , Tok.identStart     = letter
+     , Tok.identLetter    = alphaNum
+     , Tok.opStart        = Tok.opLetter langDef
+     , Tok.opLetter       = oneOf ":!#$%&*+./<=>?@\\^|-~"
+     , Tok.reservedOpNames= reservedOps
+     , Tok.reservedNames  = reservedNames
+     , Tok.caseSensitive  = True
      }
 
-lexer           = Token.makeTokenParser fisDef
-lexeme           = Token.lexeme lexer
-whiteSpace      = Token.whiteSpace lexer
-stringLiteral   = Token.stringLiteral    lexer
-integer         = Token.integer    lexer
-parens          = Token.parens     lexer
-brackets        = Token.brackets   lexer
-braces        = Token.braces   lexer
-reservedOp      = Token.reservedOp lexer
-reserved        = Token.reserved   lexer
-semi            = Token.semi   lexer
-comma            = Token.comma   lexer
-identifier      = Token.identifier lexer
-symbol      = Token.symbol lexer
-stringLetter    = (satisfy (\c -> (c > '\026') && not (c `elem` "\"\\=;<>|"))) -- (c /= '"') && (c /= '\\') && (c > '\026') && (c /= '='))
+lexer :: Tok.TokenParser ()
+lexer = Tok.makeTokenParser langDef
 
---whileParser :: Parser Stmt
-whileParser = do
-            whiteSpace
-            s <- program
-            eof
-            return s
+integerLexem    = Tok.integer lexer
+parens     = Tok.parens lexer
+commaSep   = Tok.commaSep lexer
+semiSep    = Tok.semiSep lexer
+identifierLexem = Tok.identifier lexer
+whitespace = Tok.whiteSpace lexer
+reserved   = Tok.reserved lexer
+reservedOp = Tok.reservedOp lexer
 
-program = statements
+-- Parser
+integer :: Parser Integer
+integer = do
+        f <- Tok.lexeme lexer sign
+        n <- decimal
+        return (f n)
+    where
 
-statements = sequenceOfStmt
+        sign         =  (char '-' >> return negate)
+                    <|> (char '+' >> return id)
+                    <|> return id
 
-sequenceOfStmt =
-    do list <- many1 statement
-       return (Seq list)
+        decimal         = number 10 digit
+        number base baseDigit
+                = do{ digits <- many1 baseDigit
+                    ; let n = foldl (\x d -> base*x + toInteger (digitToInt d)) 0 digits
+                    ; seq n (return n)
+                    }
 
-statement = do
-            s <- statement'
-            semi
-            return s
+intLit :: Parser Expr
+intLit = do
+    i <- integer
+    return (IntLit i)
 
---statement' :: Parser Stmt
-statement' =  try funDecl
-        <|> try assignStmt
-        <|> command <?> "command"
+intLitLexem :: Parser Expr
+intLitLexem = do
+    i <- integerLexem
+    return (IntLit i)
 
-funDecl = do
+identifier :: Parser String
+identifier = do{ c <- Tok.identStart langDef
+            ; cs <- many (Tok.identLetter langDef)
+            ; return (c:cs)
+            }
+        <?> "identifier"
+
+ident :: Parser Expr
+ident = do i <- identifier; return (Ident i)
+
+identLexem :: Parser Expr
+identLexem = do i <- identifierLexem; return (Ident i)
+
+aexp :: Parser Expr
+aexp = parens expr
+   <|> intLitLexem
+   <|> identLexem
+
+callExpr :: Parser Expr
+callExpr = between (Tok.symbol lexer "(") (string ")") expr
+    <|> ident
+    <|> intLit
+
+methodCall :: Parser Expr
+methodCall =
+  do
+    e <- callExpr
+    reservedOp "."
+    func <- identLexem
+    es <- many aexp
+    return (foldl1 App (func : e : es))
+
+apply :: Parser Expr
+apply = do
+  es <- many1 aexp
+  return (foldl1 App es)
+
+expr :: Parser Expr
+expr = try methodCall
+    <|> apply
+
+extern :: Parser Expr
+extern = do
+  reserved "extern"
+  name <- identifier
+  args <- parens $ many identifier
+  return $ Extern name args
+
+function :: Parser Expr
+function = do
+    reserved "def"
     name <- identifier
-    args <- parens (many identifier)
-    body <- braces statements
-    return $ Fun name args body
+    args <- parens $ commaSep identifier
+    reservedOp "="
+    body <- expr
+    return $ Def name args body
 
---assignStmt :: Parser Stmt
-assignStmt =
-   do
-      reserved "let"
-      var  <- identifier
-      reservedOp "="
-      expr <- assignExpr
-      vars <- getState
-      pos <- getPosition
-      let assign = Assign var expr
-      let update o _ = error ("constant '" ++ var ++ "' already defined '" ++ (translateToBash assign) ++ "' at " ++ (show o))
-      modifyState (Map.insertWith' update var pos)
-      return assign
-
-assignExpr = listTerm <|> stringTerm <|> aExpression
-
-stringTerm = liftM StrLit stringLiteral
-
---aExpression :: Parser AExpr
-aExpression = buildExpressionParser aOperators aTerm
-
-aOperators =  [ [Prefix (reservedOp "-"   >> return (Neg             ))          ]
-              , [Infix  (reservedOp "*"   >> return (ABinary Multiply)) AssocLeft,
-                 Infix  (reservedOp "/"   >> return (ABinary Divide  )) AssocLeft]
-              , [Infix  (reservedOp "+"   >> return (ABinary Add     )) AssocLeft,
-                 Infix  (reservedOp "-"   >> return (ABinary Subtract)) AssocLeft]
-              ]
-
-aTerm =  parens aExpression
-      <|> liftM Ident identifier
-      <|> int
-
-int = liftM IntConst integer
-
-listTerm = brackets listDef
-
-listDef = (listType aExpression) <|> (listType stringTerm)
-
-listType e = do
-        list <- sepBy1 e comma
-        return $ NList list
-
---command :: Parser Stmt
-command = do
-          cmd <- identifier <?> "command name"
-          as <- args <?> "args"
-          return $ Cmd cmd as --red
-
---args :: Parser [CmdArg]
-args = many cmdArgument
-
---cmdArgument :: Parser CmdArg
-cmdArgument =  strArg <|> arg
-
---strArg :: Parser CmdArg
-strArg = liftM StrArg stringLiteral
-
---arg :: Parser CmdArg
-arg = lexeme $ try $
-        do
-        mm <- many1 (stringLetter)
-        return (Arg mm)
-
---redir = string ">" >> arg
-
-parseString :: String -> Stmt
-parseString str =
-   case runParser whileParser Map.empty "" str of
-   Left e  -> error $ show e
-   Right r -> r
-
-execShellScript :: String -> IO ()
-execShellScript = callCommand
+defn :: Parser Expr
+defn = try extern
+    <|> try function
+    <|> expr
 
 
-translateToBash :: Stmt -> String
-translateToBash (Seq []) = ""
-translateToBash (Seq [s]) = translateToBash s
-translateToBash (Seq (s:ss)) = left ++ ";\n" ++ right
+contents :: Parser a -> Parser a
+contents p = do
+  Tok.whiteSpace lexer
+  r <- p
+  eof
+  return r
+
+toplevel :: Parser [Expr]
+toplevel = many $ do
+    def <- defn
+    reservedOp ";"
+    return def
+
+-- parseExpr :: String -> Either ParseError Expr
+-- parseExpr s = parse (contents expr) "<stdin>" s
+
+parseToplevel :: String -> Either ParseError [Expr]
+parseToplevel s = parse (contents toplevel) "<stdin>" s
+
+toJs :: Expr -> String
+toJs (IntLit i) = show i
+toJs (Ident n) = n
+toJs (Def name args body) = "function " ++ name ++ "(" ++ (List.intercalate ", " args) ++ ") { return " ++ (toJs body) ++ ";}"
+toJs app@(App _ _) =
+        obj ++ "." ++ fn ++ "(" ++ (List.intercalate ", " ars) ++ ")"
     where
-        left = translateToBash s
-        right = translateToBash $ Seq ss
-translateToBash (Fun name args body) = name ++ "() {\n" ++ genargs ++ (translateToBash body) ++ "\n}"
-    where
-        genargs = List.concat lines
-        lines = map localargs (zip args [1..])
+        (fn : obj : ars) = args app []
 
-        localargs :: (String, Int) -> String
-        localargs (name, i) = "local " ++ name ++ "=$" ++ (show i) ++ "\n"
-translateToBash (Assign ident value) = ident ++ "=" ++ exprToBash value
-translateToBash (Cmd cmd args) = cmd ++ " " ++ aaa -- ++ red
-    where
-        subst :: [CmdArg] -> [String]
-        subst [] = []
-        subst (a:aa) = (arg2str a) : subst aa
-        aaa = unwords $ subst args
-
---        red = foldl join " " redir
---        join a (Redir s f) = a ++ s ++ f
-
-arg2str :: CmdArg -> String
-arg2str (Arg a) = a
-arg2str (StrArg a) = show a
-
-exprToBash :: AExpr -> String
-exprToBash (Ident s) = s
-exprToBash (IntConst i) = show i
-exprToBash (StrLit i) = "\"" ++ i ++ "\""
-exprToBash (NList []) = "()"
-exprToBash (NList ls) = "(" ++ elems ++ ")"
-    where
-        elems = (List.intercalate "," (asdf ls))
-        asdf ls = case ls of
-            [] -> []
-            (e:ee) -> (exprToBash e) : (asdf ee)
-exprToBash (Neg expr) = "-(" ++ (exprToBash expr) ++ ")"
-exprToBash (ABinary Add lhs rhs) = exprToBash lhs ++ "+" ++ exprToBash rhs
-exprToBash (ABinary Subtract lhs rhs) = exprToBash lhs ++ "-" ++ exprToBash rhs
-exprToBash (ABinary Multiply lhs rhs) = exprToBash lhs ++ "*" ++ exprToBash rhs
-exprToBash (ABinary Divide lhs rhs) = exprToBash lhs ++ "/" ++ exprToBash rhs
+        args :: Expr -> [String] -> [String]
+        args (App l r) xs =  args l ((toJs r) : xs)
+        args e xs =  toJs e : xs
 
 
+genLL :: T.Text
+genLL = [text|
+    ; ModuleID = 'simple'
+
+    declare i32 @getchar()
+
+    declare i32 @putchar(i32)
+
+    define i32 @add(i32 %a, i32 %b) {
+      %1 = add i32 %a, %b
+      ret i32 %1
+    }
+
+    define void @main() {
+      %1 = call i32 @add(i32 0, i32 98)
+      call i32 @putchar(i32 %1)
+      ret void
+    }
+|]
 
 main :: IO ()
 main = do
-  f <- (readFile "test.txt")
---  r <- parseFile f
---  print r
-  let tree = parseString f
-  print $ tree
-  putStr $ translateToBash $ parseString f
-  (execShellScript . translateToBash . parseString) f
+  let filename = "example1.nl"
+  f <- (readFile filename)
+  let tree = parseToplevel f
+  print tree
+  case tree of
+    Right defs -> do
+        let js = List.unlines [toJs x | x <- defs]
+        print js
+        writeFile (filename ++ ".js") js
+        writeFile (filename ++ ".ll") (T.unpack genLL)
+
+
