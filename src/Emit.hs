@@ -19,34 +19,8 @@ import qualified Data.Map as Map
 import Codegen
 import qualified Syntax as S
 
-toSig :: [String] -> [(AST.Type, AST.Name)]
-toSig = map (\x -> (int32, AST.Name x))
-
-codegenTop :: S.Expr -> LLVM ()
-codegenTop (S.Def name args body) = do
-  define int32 name fnargs bls
-  where
-    fnargs = toSig args
-    bls = createBlocks $ execCodegen $ do
-      entry <- addBlock entryBlockName
-      setBlock entry
-      forM args $ \a -> do
-        var <- alloca int32
-        store var (local (AST.Name a))
-        assign a var
-      cgen body >>= ret
-
-codegenTop (S.Extern name args) = do
-  external int32 name fnargs
-  where fnargs = toSig args
-
 codegenTop exp = do
-  define int32 "main" [] blks
-  where
-    blks = createBlocks $ execCodegen $ do
-      entry <- addBlock entryBlockName
-      setBlock entry
-      cgen exp >>= ret
+  define double "main" [] []
 
 -------------------------------------------------------------------------------
 -- Operations
@@ -55,7 +29,7 @@ codegenTop exp = do
 lt :: AST.Operand -> AST.Operand -> Codegen AST.Operand
 lt a b = do
   test <- fcmp FP.ULT a b
-  uitofp int32 test
+  uitofp double test
 
 binops = Map.fromList [
       ("+", fadd)
@@ -66,10 +40,8 @@ binops = Map.fromList [
   ]
 
 cgen :: S.Expr -> Codegen AST.Operand
-cgen (S.Float n) = return $ cons $ C.Float (F.int32 n)
-cgen (S.App fn args) = do
-  largs <- mapM cgen args
-  call (externf (AST.Name fn)) largs
+cgen (S.IntLit n) = return (cons (C.Float (F.Double 1.0)))
+
 
 -------------------------------------------------------------------------------
 -- Compilation

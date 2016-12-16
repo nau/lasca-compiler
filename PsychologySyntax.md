@@ -35,6 +35,13 @@ Programme Lifecycle
   
 # Critical Software
  Refinement types proofs, Effects proofs. 
+ 
+# Maintenance
+ Navigation support is crucial. Readability is crucial.
+ Avoid complex concepts: HKT, implicits, operators.
+  
+# Refactoring
+ IDE support! 
 
 Entropy
 --
@@ -60,9 +67,11 @@ def foldLeft[A, B](col: List[A], z: B, f: (B, A) => B): B =
 
 Optimal?
 ```scala
-def foldl(col: Seq a, zero: b, f: (b -> a -> b)): a = match
+type a = forall a. 
+def foldl(col: Seq a, zero: b, f: (b -> a -> b)): a = match {
   nil zero f        => zero                  
   (x cons xs) zero f => xs.foldl zero (f z x)
+}
 ```
 
 

@@ -23,7 +23,7 @@ import qualified Data.Map as Map
 import Control.Monad.State
 import Control.Applicative
 
--- import LLVM.General.AST
+import LLVM.General.AST
 import LLVM.General.AST.Global
 import qualified LLVM.General.AST as AST
 

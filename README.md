@@ -649,3 +649,7 @@ FAQ
     
 ##Will there be support for Unicode characters for operators?
 No.    
+
+Build
+===
+cabal install llvm-general -fshared-llvm

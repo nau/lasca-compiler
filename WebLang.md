@@ -6,7 +6,6 @@ WebLang
 - Type classes/traits, Go/Rust-like
 - Method syntax
 - Any type (Scala Dynamic alike, Go interface{})
-- Indentation based syntax 
 - Future/Promise API
 - Continuation Passing Style, CPS        
 - Communicating Sequential Processes, CSP

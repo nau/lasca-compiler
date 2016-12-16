@@ -13,8 +13,17 @@ import qualified Data.Text as T
 import qualified Data.Set as Set
 import qualified Data.Map as Map
 import qualified Data.List as List
-import NeatInterpolation
+import qualified LLVM.General.AST as AST
+
+import Control.Monad.Trans
+
+import System.IO
+import System.Environment
+import System.Console.Haskeline
+-- import NeatInterpolation
 import Syntax
+import Emit
+import Codegen
 {-# ANN module ("HLint: ignore Eta reduce"::String) #-}
 {-# ANN module ("HLint: ignore Redundant bracket"::String) #-}
 
@@ -173,9 +182,12 @@ toplevel = many $ do
 parseToplevel :: String -> Either ParseError [Expr]
 parseToplevel s = parse (contents toplevel) "<stdin>" s
 
+
+
 toJs :: Expr -> String
 toJs (IntLit i) = show i
 toJs (Ident n) = n
+toJs (Extern fn args) = ""
 toJs (Def name args body) = "function " ++ name ++ "(" ++ (List.intercalate ", " args) ++ ") { return " ++ (toJs body) ++ ";}"
 toJs app@(App _ _) =
         obj ++ "." ++ fn ++ "(" ++ (List.intercalate ", " ars) ++ ")"
@@ -187,37 +199,50 @@ toJs app@(App _ _) =
         args e xs =  toJs e : xs
 
 
-genLL :: T.Text
-genLL = [text|
-    ; ModuleID = 'simple'
+initModule :: AST.Module
+initModule = emptyModule "my cool jit"
 
-    declare i32 @getchar()
+process :: AST.Module -> String -> IO (Maybe AST.Module)
+process modo source = do
+  let res = parseToplevel source
+  case res of
+    Left err -> print err >> return Nothing
+    Right ex -> do
+      ast <- codegen modo ex
 
-    declare i32 @putchar(i32)
+      return $ Just ast
 
-    define i32 @add(i32 %a, i32 %b) {
-      %1 = add i32 %a, %b
-      ret i32 %1
-    }
+processFile :: String -> IO (Maybe AST.Module)
+processFile fname = readFile fname >>= process initModule
 
-    define void @main() {
-      %1 = call i32 @add(i32 0, i32 98)
-      call i32 @putchar(i32 %1)
-      ret void
-    }
-|]
+repl :: IO ()
+repl = runInputT defaultSettings (loop initModule)
+  where
+  loop mod = do
+    minput <- getInputLine "ready> "
+    case minput of
+      Nothing -> outputStrLn "Goodbye."
+      Just input -> do
+        modn <- liftIO $ process mod input
+        case modn of
+          Just modn -> loop modn
+          Nothing -> loop mod
+
+readInput = loop
+    where
+    loop = do
+        line <- getLine
+        let res = parseToplevel line
+        case res of
+            Left err ->
+                loop
+            Right r -> do
+                putStrLn $ show (length (show r))
+                loop
 
 main :: IO ()
 main = do
-  let filename = "example1.nl"
-  f <- (readFile filename)
-  let tree = parseToplevel f
-  print tree
-  case tree of
-    Right defs -> do
-        let js = List.unlines [toJs x | x <- defs]
-        print js
-        writeFile (filename ++ ".js") js
-        writeFile (filename ++ ".ll") (T.unpack genLL)
-
-
+  args <- getArgs
+  case args of
+    []      -> readInput
+    [fname] -> processFile fname >> return ()
