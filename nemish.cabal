@@ -19,7 +19,6 @@ executable nemish
                         parsec >=3.1.2,
                         vector,
                         indents,
-                        neat-interpolation,
                         llvm-general-pure >= 3.5.1.0,
                         llvm-general >= 3.5.1.2,
                         mtl
@@ -38,7 +37,6 @@ executable gencode
                         parsec >=3.1.2,
                         vector,
                         indents,
-                        neat-interpolation,
                         llvm-general-pure >= 3.5.1.0,
                         llvm-general >= 3.5.1.2,
                         mtl

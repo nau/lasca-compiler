@@ -76,10 +76,6 @@ external retty label argtys = addDefn $
 double :: Type
 double = FloatingPointType 64 IEEE
 
--- IEEE 754 double
-int32 :: Type
-int32 = IntegerType 32
-
 -------------------------------------------------------------------------------
 -- Names
 -------------------------------------------------------------------------------

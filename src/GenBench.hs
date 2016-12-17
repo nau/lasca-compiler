@@ -1,28 +1,37 @@
 module Main where
 
 import System.IO
+import System.Exit
+import System.Environment
 
-data Code = Code { codelines::String, bytes::Int }
+genTopLevel idx = "def test" ++ (show idx) ++ "() = var x = 1+1 in x;"
 
-genTopLevel idx = Code c bytes
+genNLines :: Integer -> IO ()
+genNLines n = loop "" 0 0
     where
-        c = "def test" ++ (show idx) ++ "() = 1;"
-        bytes = length c
+      loop code lastPrintedLines idx = do
+          let newline = genTopLevel idx
+          let updatedCode = code ++ newline
+          putStrLn newline
+          if (idx) >= n
+          then hPutStrLn stderr ("Generated " ++ (show idx) ++ " lines")
+          else if (idx - lastPrintedLines) > 1000
+               then do
+                  let kloc = idx `div` 1000
+                  hPutStrLn stderr ("Generated " ++ (show kloc) ++ " klocs")
+                  loop updatedCode idx (idx + 1)
+               else loop updatedCode lastPrintedLines (idx + 1)
 
 main :: IO ()
-main = loop (Code "" 0) 0 0
-    where
-        loop code lastPrintedBytes idx = do
-            let (Code newlines newbytes) = genTopLevel idx
-            let updatedBytes = bytes code + newbytes
-            let updatedCode = Code (codelines code ++ newlines) updatedBytes
-            putStrLn newlines
-            if (updatedBytes - lastPrintedBytes) > 1000000
-            then do
-                let kb = updatedBytes `div` 1000000
-                hPutStrLn stderr ("Generated " ++ (show kb) ++ " Mb")
-                loop updatedCode updatedBytes (idx + 1)
-            else loop updatedCode lastPrintedBytes (idx + 1)
+main = do
+    args <- getArgs
+
+    putStrLn "def main() = 123;"
+
+    let numLines = case args of
+            []      -> 1000
+            [count] -> read count :: Integer
+    genNLines numLines
 
 
 

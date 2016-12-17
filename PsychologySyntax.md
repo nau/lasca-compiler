@@ -67,7 +67,7 @@ def foldLeft[A, B](col: List[A], z: B, f: (B, A) => B): B =
 
 Optimal?
 ```scala
-type a = forall a. 
+type a = forall a. {a | len} 
 def foldl(col: Seq a, zero: b, f: (b -> a -> b)): a = match {
   nil zero f        => zero                  
   (x cons xs) zero f => xs.foldl zero (f z x)
