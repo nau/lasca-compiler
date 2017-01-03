@@ -48,29 +48,32 @@ Ideas
 ---
 - Concurrency Oriented Programming (Erlang). Objects are out. Concurrency is in.
 - Gradual Typing (http://homes.soic.indiana.edu/jsiek/what-is-gradual-typing/)
-- Deferred Type Errors (runtime compilation mode)
+- Deferred Type Errors (runtime compilation mode, Haskell)
 - Liquid Type system (refinement types) + Dependent Type system 
   https://github.com/pleiad/Refinements
   
   Require research. Can be PhD dissertation.
+  Consider optional refinement typing. Z3 (commercial license?), CVC4
   
 - light, non-symbol-polluted syntax
-- indentation-based
+- indentation-based? 
+	- no, curly braces: merge conficts! easier to copy-paste from SO 
 - readability first
 - fast development cycle
 - presentation compiler (JSON compiler API?)
-- IDE-friendly ('dot-autocomplete', compiler API) 
+- IDE-friendly ('dot-autocomplete', auto-formatting compiler API) 
 - type-safe
 - strict functional
 - expression-based
 - practical first, but as clean and concise as possible
 - type-level immutability
+- var are local by default
 - prefer things done one way
 - make it host language: allow simple creation of external DSLs, configs, etc via compiler API.
 - LLVM backend
 - JVM backend?
 - JavaScript backend via compiler API
-- no OOP and data subclassing/inheritance!
+- no OOP and data subclassing/inheritance?
 - syntactic sugar is ok
 - annotations (Java-style)
 - annotation-based extensions, like visibility (@private, public by default)
@@ -93,6 +96,7 @@ Ideas
 - https://en.wikipedia.org/wiki/Algebra_of_Communicating_Processes
 - CSP?
 - CPS, non-blocking IO.
+- import of a package must not introduce any side effects! (hello Go)
 
 Package System
 ---
@@ -109,6 +113,7 @@ Practical things that matter
 - simplicity
 - familiarity/intuitiveness
 - principle of least surprise
+- caches/memoization out of the box (annotations?)
 
 Performance (need research)
 ---
@@ -643,6 +648,14 @@ Pros: it terminates :) What else?
 Why dependent types matter? What we get?
 Sized collections.
 
+Thoughts on Subtyping
+======
+Implementing data Subtyping implies:
+- variance
+- complex typer
+- protected visibility
+
+
     
 FAQ
 ===
@@ -653,3 +666,8 @@ No.
 Build
 ===
 cabal install llvm-general -fshared-llvm
+
+
+Resources
+====
+https://www.youtube.com/watch?v=U_LNo_cSc70 Github, statistics, languages

@@ -66,7 +66,7 @@ Context Bounds Syntax
 
 ```scala
     
-    data Person a
+    data Person a = 
       id: a
       name: String
     derive (ToString, Hash)  
@@ -85,4 +85,149 @@ Context Bounds Syntax
     impl Sort f a <=  
      
 ```
+
+
+asdf
+
+
+```scala
+	Unit, UInt32, Float32
+	type Float = Float32
+	type Point = {
+	 x: Float;
+	 y: Float; <-- semicolon, to simplify copy/paste and reordering
+	}
+	
+	def areaDyn(p) = p.x * p.y
+	
+	def area(p: Point): Float32 = p.x * p.y
+	
+	val p = Point(1, 2)
+	p.area
+	
+	type Point = Point(x: FLoat, y: Float)
+	
+	type Bool = True | False
+	type Expr = Val(name: String) | Func(name: String, args: List String, type: Type)
+	
+	trait Closable {
+		def close(): Unit
+	}
+	
+	trait ToString a {
+	  def toString(self: a): String
+	}
+	
+	trait FromString a {
+	  def fromString(s: String): a
+	}
+	
+	trait StringIso a : ToString a, FromString a 
+	trait StringIso a : (ToString a, FromString a)
+	 
+	trait StringIso a <= ToString a, FromString a 
+	trait StringIso a <= (ToString a, FromString a)
+	 
+	trait StringIso a where ToString a, FromString a 
+	trait StringIso a where (ToString a, FromString a) 
+	
+	trait Resource a <= Closable a, ToString a { // class (Closable a, ToString a) => Resource a where
+		def aquire(r: a): a
+		def withResource(r: a, f: a -> b): b  
+	}
+	
+	type Lock = Lock(lock: Mutex)
+	
+	def aquire = lockMutex
+	 
+	 
+	trait Functor f {
+	  def map(self: f, f: a -> b): f b 
+	}
+	
+	trait FlatMappable f {
+	  def flatMap(self: f, f: a -> f b): f b 
+	}
+	
+	trait Monad m <= (Functor f a, FlatMappable f a) {
+	  def pure(a): m a
+	}
+	
+	type List a = Nil | ::(a, List a)
+	
+	@infixr(5) def (::)(ls: List a, el: a): List a = ::(a, ls)
+	
+	def map(self: List a, f: a -> b): b = match self {
+		Nil -> Nil
+		Cons(a, xs) -> Cons(f a, map xs f)
+	}
+	
+	
+	val Pi = 3.14
+	
+	def parse(input: String): Expr = 
+
+```
+
+```scala
+	import cats._
+    
+    val intToString: Int => String = _.toString
+    val double: Int => Int = _ * 2
+    val addTwo: Int => Int = _ + 2
+    
+    implicit val optionApply: Apply[Option] = new Apply[Option] {
+      def ap[A, B](f: Option[A => B])(fa: Option[A]): Option[B] =
+        fa.flatMap (a => f.map (ff => ff(a)))
+    
+      def map[A,B](fa: Option[A])(f: A => B): Option[B] = fa map f
+    }
+    
+    implicit val listApply: Apply[List] = new Apply[List] {
+      def ap[A, B](f: List[A => B])(fa: List[A]): List[B] =
+        fa.flatMap (a => f.map (ff => ff(a)))
+    
+      def map[A,B](fa: List[A])(f: A => B): List[B] = fa map f
+    }
+    
+    
+    import cats._
+    val intToString: Int => String = _.toString
+    val double: Int => Int = _ * 2
+    val addTwo: Int => Int = _ + 2
+    
+    instance Apply Option {
+      def ap(fa Option a, f  List (a => b)) Option b = fa.flatMap (\a => f.map (\ff => ff a))
+    }
+    
+    def slice (ls: State[(a, Int) => z])
+    type State = forall a. State a => Int|String => z having Sum + Show a, Show z, 
+    def slice (ls: State) = 
+    
+```
+
+//before 2017
+class Person implements Dao {
+	val name
+	val age
+	def save(db, self) = db.execute("insert into person value(${self.name}, ${self.age})")  
+}
+
+desugared
+
+struct Person {
+  name: String
+  age: Int // { age > 0 }	
+}
+
+instance Dao[Person] {
+  def save(db, self: Person) = db.execute("insert into person value(${self.name}, ${self.age})")  
+}
+
+def main(args: [String]) = {
+  val person = Person()
+}
+
+
+
 
