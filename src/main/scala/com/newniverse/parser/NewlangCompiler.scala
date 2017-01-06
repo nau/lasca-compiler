@@ -3,10 +3,9 @@ package com.newniverse.parser
 import javax.script.ScriptEngineManager
 
 import com.newniverse.parser.NewlangParser._
-import org.antlr.v4.runtime.tree.TerminalNode
 import org.antlr.v4.runtime.{ANTLRInputStream, CommonTokenStream}
 
-import collection.JavaConverters._
+import scala.collection.JavaConverters._
 
 /**
   * Created by Alexander Nemish on 12/26/16.
@@ -16,20 +15,30 @@ object NewlangCompiler {
 
   sealed trait Tree
   case object EmptyTree extends Tree
+  case class Ident(name: String) extends Tree
   case class Val(name: String, tpe: Type = AnyType, rhs: Tree = EmptyTree) extends Tree
   case class Params(params: List[Val]) extends Tree
   case class Def(name: String, tpe: Type = AnyType, params: List[Val], rhs: Tree) extends Tree
   case class Lit(value: Any, tpe: Type) extends Tree
   case class Block(stats: List[Tree], expr: Tree) extends Tree
+  case class Apply(fun: Tree, args: List[Tree]) extends Tree
   case class Package(name: String, stats: List[Tree]) extends Tree
 
   sealed trait Type extends Tree
   case object AnyType extends Type
   case object IntType extends Type
+  case object StringType extends Type
   case object BoolType extends Type
 
 
   class Visitor extends NewlangBaseVisitor[Tree] {
+    override def visitIdent(ctx: IdentContext): Tree = Ident(ctx.Id.getText)
+
+    override def visitStringLit(ctx: StringLitContext): Tree = {
+      println(s"Found Lit ${ctx.getText}")
+      Lit(ctx.getText, StringType)
+    }
+
     override def visitInteger(ctx: IntegerContext): Tree = {
       println(s"Found Lit ${ctx.getText}")
       Lit(ctx.getText.toInt, IntType)
@@ -60,21 +69,33 @@ object NewlangCompiler {
 
     override def visitParam(ctx: ParamContext): Tree = {
       val id = ctx.Id().getText
-      val tpe = ctx.`type`().getText
+      val tpe = Option(ctx.`type`()).map(_.getText).getOrElse(AnyType)
       println(s"Found param $id: $tpe")
       Val(id, AnyType, EmptyTree)
     }
 
     override def visitExpr(ctx: ExprContext): Tree = {
-      visitChildren(ctx)
+      if (ctx.argumentExprs() != null) {
+        val args = ctx.argumentExprs().exprs().expr().asScala.map(visit).toList
+        Apply(visit(ctx.expr()), args)
+      } else visitChildren(ctx)
     }
 
     override def visitBlockExpr(ctx: BlockExprContext): Tree = visit(ctx.block())
 
     override def visitBlock(ctx: BlockContext): Tree = {
+      val statLen = ctx.blockStat().size()
       val stats = ctx.blockStat().asScala.map(visit).toList
-      val expr = Option(ctx.expr()).map(visit) getOrElse EmptyTree
-      Block(stats, expr)
+      val expr = ctx.expr()
+      if (expr == null && statLen == 0) {
+        Block(Nil, EmptyTree)
+      } else if (expr == null && statLen > 0) {
+        val (init, last) = stats.splitAt(statLen - 1)
+        Block(init, last.head)
+      } else {
+        val e = visit(expr)
+        Block(stats, e)
+      }
     }
 
     override def visitBlockStat(ctx: BlockStatContext): Tree = {
@@ -84,6 +105,10 @@ object NewlangCompiler {
     }
 
     override def visitType(ctx: TypeContext): Tree = AnyType
+
+    override def visitArgumentExprs(ctx: ArgumentExprsContext): Tree = super.visitArgumentExprs(ctx)
+
+    override def visitExprs(ctx: ExprsContext): Tree = super.visitExprs(ctx)
 
     override def visitCompilationUnit(ctx: CompilationUnitContext): Tree = {
       println("AAA")
@@ -126,9 +151,6 @@ object NewlangCompiler {
     parser.setBuildParseTree(true)
 
     val visitor = new Visitor
-
-
-//    ParseTreeWalker.DEFAULT.walk(extractor, tree);
     val tree = parser.compilationUnit() // begin parsing at init rule
     val ast = tree.accept(visitor)
     println(tree.toStringTree(parser))
@@ -139,21 +161,24 @@ object NewlangCompiler {
   def toJs(tree: Tree): String = tree match {
     case Package(name, stats) =>
       val ss = stats.map(toJs).mkString(";\n")
-      s"(function package_$name(){$ss})();\n"
+      s"(function package_$name() {$ss})();\n"
     case Def(name, _, params, body) =>
       val ps = params.map(_.name).mkString(",")
 
       val b = body match {
-        case e: Lit => s"{ return ${toJs(e)}; }\n"
+        case e: Lit => s"{ return ${toJs(e)}; }"
         case Block(stats, expr) =>
           val ss = stats.map(toJs).mkString(";\n")
           s"{ $ss;\nreturn ${toJs(expr)}; }"
       }
-      s"function $name($ps)$b"
+      s"function $name($ps) $b"
+    case Apply(fun, args) =>
+      val as = args.map(toJs).mkString(", ")
+      s"(${toJs(fun)})($as)"
+    case Ident(name) => name
     case Lit(v: Int, IntType) => v.toString
     case Lit(v: Boolean, BoolType) => v.toString
+    case Lit(v: String, StringType) => v.toString
     case EmptyTree => ""
   }
-
-
 }

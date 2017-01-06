@@ -1,5 +1,8 @@
 
 def main(arg: Array) = {
   def inner = 1;
-  false
+  def string(i) = "ololo";
+  string(inner);
+  false;
+  inner
 }

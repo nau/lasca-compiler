@@ -34,7 +34,10 @@ grammar Newlang;
 literal:
       IntegerLiteral # integer
 	| BooleanLiteral # boolean
+	| StringLiteral  # stringLit
    ;
+
+ident: Id;
 
 defDef
    : 'def' Id paramClause? '=' expr ';'?
@@ -53,8 +56,18 @@ param
    ;
 
 expr:
-   literal
+     ident
+   | literal
+   | expr argumentExprs
    | blockExpr
+   ;
+
+argumentExprs
+   : '(' exprs? ')'
+   ;
+
+exprs
+   : expr (',' expr)*
    ;
 
 blockExpr:
@@ -82,6 +95,10 @@ compilationUnit
 
 BooleanLiteral
    : 'true' | 'false'
+   ;
+
+StringLiteral
+   : '"' StringElement* '"'
    ;
 
 IntegerLiteral
@@ -147,6 +164,18 @@ fragment Lower
 
 fragment Letter
    : Upper | Lower
+   ;
+
+fragment StringElement
+   : '\u0020' | '\u0021' | '\u0023' .. '\u007F' | CharEscapeSeq
+   ;
+
+fragment CharEscapeSeq
+   : '\\' ('b' | 't' | 'n' | 'f' | 'r' | '"' | '\'' | '\\')
+   ;
+
+fragment PrintableChar
+   : '\u0020' .. '\u007F'
    ;
 
 fragment DecimalNumeral
