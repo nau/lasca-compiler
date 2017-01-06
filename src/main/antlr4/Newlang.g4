@@ -31,9 +31,51 @@
 
 grammar Newlang;
 
+literal:
+      IntegerLiteral # integer
+	| BooleanLiteral # boolean
+   ;
+
+defDef
+   : 'def' Id paramClause? '=' expr ';'?
+   ;
+
+paramClause
+   : '(' params? ')'
+   ;
+
+params
+   : param (',' param)*
+   ;
+
+param
+   : Id (':' type)?
+   ;
+
+expr:
+   literal
+   | blockExpr
+   ;
+
+blockExpr:
+	'{' block '}'
+   ;
+
+block
+   : blockStat (Semi blockStat)* expr?
+   ;
+
+blockStat
+   : defDef
+   | expr
+   |
+   ;
+
+type: TypeId
+   ;
 
 compilationUnit
-   : 'def' 'test' EOF
+   : defDef*
    ;
 
 // Lexer
@@ -42,34 +84,21 @@ BooleanLiteral
    : 'true' | 'false'
    ;
 
-
-CharacterLiteral
-   : '\'' (PrintableChar | CharEscapeSeq) '\''
-   ;
-
-
-StringLiteral
-   : '"' StringElement* '"' | '"""' MultiLineChars '"""'
-   ;
-
-
 IntegerLiteral
-   : (DecimalNumeral | HexNumeral) ('L' | 'l')
+   : DecimalNumeral
    ;
 
-
-FloatingPointLiteral
-   : Digit + '.' Digit + ExponentPart? FloatType? | '.' Digit + ExponentPart? FloatType? | Digit ExponentPart FloatType? | Digit + ExponentPart? FloatType
+TypeId
+   : Upper Id
    ;
-
 
 Id
-   : Plainid | '`' StringLiteral '`'
+   : (Lower | Upper)+
    ;
 
 
 Varid
-   : Lower Idrest
+   : Lower+
    ;
 
 
@@ -99,58 +128,13 @@ Comment
 
 // fragments
 
-fragment UnicodeEscape
-   : '\\' 'u' 'u'? HexDigit HexDigit HexDigit HexDigit
-   ;
-
-
 fragment WhiteSpace
    : '\u0020' | '\u0009' | '\u000D' | '\u000A'
    ;
 
 
-fragment Opchar
-   : PrintableChar
-   ;
-
-
-fragment Op
-   : Opchar +
-   ;
-
-
-fragment Plainid
-   : Upper Idrest | Varid | Op
-   ;
-
-
-fragment Idrest
-   : (Letter | Digit)* ('_' Op)?
-   ;
-
-
-fragment StringElement
-   : '\u0020' | '\u0021' | '\u0023' .. '\u007F' | CharEscapeSeq
-   ;
-
-
-fragment MultiLineChars
-   : ('"'? '"'? .*?)* '"'*
-   ;
-
-
-fragment HexDigit
-   : '0' .. '9' | 'A' .. 'F' | 'a' .. 'f'
-   ;
-
-
-fragment FloatType
-   : 'F' | 'f' | 'D' | 'd'
-   ;
-
-
 fragment Upper
-   : 'A' .. 'Z' | '$' | '_'
+   : 'A' .. 'Z' | '$'
    ;
 
 // and Unicode category Lu
@@ -165,32 +149,18 @@ fragment Letter
    : Upper | Lower
    ;
 
-// and Unicode categories Lo, Lt, Nl
-
-fragment ExponentPart
-   : ('E' | 'e') ('+' | '-')? Digit +
-   ;
-
-
-fragment PrintableChar
-   : '\u0020' .. '\u007F'
-   ;
-
-
-fragment CharEscapeSeq
-   : '\\' ('b' | 't' | 'n' | 'f' | 'r' | '"' | '\'' | '\\')
-   ;
-
-
 fragment DecimalNumeral
    : '0' | NonZeroDigit Digit*
    ;
 
 
+fragment HexDigit
+   : '0' .. '9' | 'A' .. 'F' | 'a' .. 'f'
+   ;
+
 fragment HexNumeral
    : '0' 'x' HexDigit HexDigit +
    ;
-
 
 fragment Digit
    : '0' | NonZeroDigit

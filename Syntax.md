@@ -228,6 +228,82 @@ def main(args: [String]) = {
   val person = Person()
 }
 
+// untyped
+data Person(name, age)
+def save(p, db) = db.execute "insert into person value(${self.name}, ${self.age})"
+
+trait Dao {
+  def save(p, db)
+}
+
+//typed
+data Person(name: String, age: Int) <=> data Person = Person(String, Int) <=>
+data Person {
+  name: String
+  age: Int
+}
+
+trait Dao(a) {
+  def save(a, db: Database): Unit
+}
+
+instance Dao(Person) {
+  def save(a: Person, db: Database): Unit = db.execute "insert into person value(${self.name}, ${self.age})"
+}
+
+def main(args: Array(String)): Unit = {
+  
+  def getDataFromServer() = {
+    var data = ""
+    server.onReceive((str) => { data += str }) // won't compile! var leaves function scope!
+  }
+  
+  
+}
+
+// ADT
+
+data Expr(a: Type) = Add(lhs: Expr(Int), rhs: Expr(Int)): Expr(Int)
+	| I(n: Int): Expr(Int)
+	| B(b: Bool): Expr(Bool)
+
+data Bool = True | False
 
 
 
+// Service, Container, mock
+
+
+val defaultService = data Service {
+  def save(db, datum): Unit = ()
+  def load(db, id): String = ""   
+}
+
+val container = data Container {
+  service = defaultService  
+}
+
+generates
+
+data Service = Service(save: (db: Any, datum: Any) => Unit, load: (db: Any, id: Any) => String)
+
+val defaultService = Service((_, _) => (), (_, _) => "")
+
+data Container = Container(service: Service)
+
+container = Container {
+	service = defaultService
+}
+
+val mockService = mock Service
+
+def mock(t: Type): t = 
+
+container.service <=> Container.service(container)
+
+container.service.save db "test"
+container.service.save db, "test"
+container.service.save(db, "test")
+
+import container.service._
+db.save "test"
