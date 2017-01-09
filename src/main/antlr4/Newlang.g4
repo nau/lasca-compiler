@@ -31,6 +31,8 @@
 
 grammar Newlang;
 
+valDef: 'val' Id (':' type)? '=' expr;
+
 literal:
       IntegerLiteral # integer
 	| BooleanLiteral # boolean
@@ -107,7 +109,8 @@ block
    ;
 
 blockStat
-   : defDef
+   : valDef
+   | defDef
    | expr
    |
    ;
@@ -127,18 +130,6 @@ BooleanLiteral
 
 StringLiteral
    : '"' StringElement* '"'
-   ;
-
-
-Operator: 'or'
-	| 'and'
-	| ('==' | '!=' | '<' | '<=' | '>' | '>=')
-	| ('+' | '-')
-	| '|'
-	| 'xor'
-	| ('*' | '/')
-	| '%'
-	| ('<<' | '>>')
    ;
 
 UnaryOp: ('-' | '+' | '~' | '!');

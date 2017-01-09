@@ -51,6 +51,9 @@ object NewlangCompiler {
     }
 
 
+    override def visitValDef(ctx: ValDefContext): Tree = {
+      Val(ctx.Id().getText, AnyType, visit(ctx.expr()))
+    }
 
     override def visitDefDef(ctx: DefDefContext): Tree = {
       println("Here")
@@ -142,9 +145,10 @@ object NewlangCompiler {
     }
 
     override def visitBlockStat(ctx: BlockStatContext): Tree = {
+      val valdef = Option(ctx.valDef()).map(visit)
       val defdef = Option(ctx.defDef()).map(visit)
       def expr = Option(ctx.expr()).map(visit)
-      defdef orElse expr getOrElse EmptyTree
+      valdef orElse defdef orElse expr getOrElse EmptyTree
     }
 
     override def visitType(ctx: TypeContext): Tree = AnyType
@@ -203,6 +207,13 @@ object NewlangCompiler {
   }
 
   val jsoperators = Map("or" -> "||", "and" -> "&&", "xor" -> "^") ++ List("==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/", "<<", ">>").map(o => (o, o))
+  val jsUnaryOps = Set("-" , "+" , "~" , "!")
+  object JsRuntime {
+    val globalFunctions =
+      """
+        |function callOrIdent(param) { return (typeof param === 'function') ? param() : param; }
+      """.stripMargin
+  }
 
   def toJs(tree: Tree): String = tree match {
     case Package(name, stats) =>
@@ -223,11 +234,16 @@ object NewlangCompiler {
       s"{ $ss; }"
     case If(cond, thenp, EmptyTree) => s"if (${toJs(cond)}) { ${toJs(thenp)} } "
     case If(cond, thenp, elsep) => s"(${toJs(cond)}) ? ( ${toJs(thenp)} ) : ( ${toJs(elsep)} )"
+    case Val(name, _, body) => s"var $name = ${toJs(body)}"
+    case Apply(Ident(op), List(rhs)) if jsUnaryOps contains op => s"$op(${toJs(rhs)})"
     case Apply(Ident(op), List(lhs, rhs)) if jsoperators contains op => s"(${toJs(lhs)} ${jsoperators(op)} ${toJs(rhs)})"
+    case Apply(Ident(fun), args) =>
+      val as = args.map(toJs).mkString(", ")
+      s"$fun($as)"
     case Apply(fun, args) =>
       val as = args.map(toJs).mkString(", ")
       s"${toJs(fun)}($as)"
-    case Ident(name) => name
+    case Ident(name) => s"callOrIdent($name)"
     case Lit(v: Int, IntType) => v.toString
     case Lit(v: Boolean, BoolType) => v.toString
     case Lit(v: String, StringType) => v.toString
