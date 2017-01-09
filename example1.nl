@@ -1,4 +1,4 @@
-
+val pi = 314
 
 def main(arg: Array) = {
   def inner = 1_000;
@@ -9,7 +9,7 @@ def main(arg: Array) = {
   else !(2_000 + 1);
   val lo = string(5 - 4 * 2 + 3 * 7);
   val eq = (max 2 3) == max(2, 3);
-  max inner 3
+  max inner 3;
   val f = false;
-  inner
+  f
 }

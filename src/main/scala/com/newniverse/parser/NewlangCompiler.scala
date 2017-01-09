@@ -36,17 +36,14 @@ object NewlangCompiler {
     override def visitIdent(ctx: IdentContext): Tree = Ident(ctx.Id.getText)
 
     override def visitStringLit(ctx: StringLitContext): Tree = {
-      println(s"Found Lit ${ctx.getText}")
       Lit(ctx.getText, StringType)
     }
 
     override def visitInteger(ctx: IntegerContext): Tree = {
-      println(s"Found Lit ${ctx.getText}")
       Lit(ctx.getText.replace("_", "").toInt, IntType)
     }
 
     override def visitBoolean(ctx: BooleanContext): Tree = {
-      println(s"Found Lit ${ctx.getText}")
       Lit(ctx.getText.toBoolean, BoolType)
     }
 
@@ -56,11 +53,9 @@ object NewlangCompiler {
     }
 
     override def visitDefDef(ctx: DefDefContext): Tree = {
-      println("Here")
       val name = ctx.Id().getText
       val params = Option(ctx.paramClause()).toList.flatMap(p => visit(p).asInstanceOf[Params].params)
       val body = visit(ctx.expr())
-      println(s"Found Def ${name}")
       Def(name, AnyType, params, body)
     }
 
@@ -76,7 +71,6 @@ object NewlangCompiler {
     override def visitParam(ctx: ParamContext): Tree = {
       val id = ctx.Id().getText
       val tpe = Option(ctx.`type`()).map(_.getText).getOrElse(AnyType)
-      println(s"Found param $id: $tpe")
       Val(id, AnyType, EmptyTree)
     }
 
@@ -158,9 +152,9 @@ object NewlangCompiler {
     override def visitExprs(ctx: ExprsContext): Tree = super.visitExprs(ctx)
 
     override def visitCompilationUnit(ctx: CompilationUnitContext): Tree = {
-      println("AAA")
+      val vals = ctx.valDef().asScala.map(dd => this.visit(dd))
       val defs = ctx.defDef().asScala.map(dd => this.visit(dd))
-      Package("main", defs.toList)
+      Package("main", (vals ++ defs).toList)
     }
   }
 
@@ -174,8 +168,8 @@ object NewlangCompiler {
     val code = readFile("example1.nl")
     val tree = parse(code)
     val js = toJs(tree)
-    println(js) // print LISP-style tree
-    runJs(js)
+    println(js)
+    runJs(JsRuntime.globalFunctions + js)
   }
 
   def runJs(js: String) = {
@@ -215,6 +209,15 @@ object NewlangCompiler {
       """.stripMargin
   }
 
+  private def flattenApply(t: Apply): Apply = {
+    t match {
+      case Apply(ap: Apply, List(arg)) =>
+        val inner = flattenApply(ap)
+        inner.copy(args = inner.args :+ arg)
+      case ap@Apply(Ident(name), List(arg)) => ap
+    }
+  }
+
   def toJs(tree: Tree): String = tree match {
     case Package(name, stats) =>
       val ss = stats.map(toJs).mkString(";\n")
@@ -235,6 +238,7 @@ object NewlangCompiler {
     case If(cond, thenp, EmptyTree) => s"if (${toJs(cond)}) { ${toJs(thenp)} } "
     case If(cond, thenp, elsep) => s"(${toJs(cond)}) ? ( ${toJs(thenp)} ) : ( ${toJs(elsep)} )"
     case Val(name, _, body) => s"var $name = ${toJs(body)}"
+    case ap@Apply(_:Apply, List(arg)) => toJs(flattenApply(ap))
     case Apply(Ident(op), List(rhs)) if jsUnaryOps contains op => s"$op(${toJs(rhs)})"
     case Apply(Ident(op), List(lhs, rhs)) if jsoperators contains op => s"(${toJs(lhs)} ${jsoperators(op)} ${toJs(rhs)})"
     case Apply(Ident(fun), args) =>

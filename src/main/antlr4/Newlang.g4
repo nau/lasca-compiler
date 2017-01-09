@@ -119,7 +119,7 @@ type: TypeId
    ;
 
 compilationUnit
-   : defDef*
+   : (defDef | valDef)*
    ;
 
 // Lexer
