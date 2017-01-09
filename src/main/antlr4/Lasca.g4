@@ -29,7 +29,7 @@
    Derived from http://www.scala-lang.org/files/archive/spec/2.11/13-syntax-summary.html
  */
 
-grammar Newlang;
+grammar Lasca;
 
 valDef: 'val' Id (':' type)? '=' expr;
 

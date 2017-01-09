@@ -2,7 +2,7 @@ package com.newniverse.parser
 
 import javax.script.ScriptEngineManager
 
-import com.newniverse.parser.NewlangParser._
+import com.newniverse.parser.LascaParser._
 import org.antlr.v4.runtime.{ANTLRInputStream, CommonTokenStream}
 
 import scala.collection.JavaConverters._
@@ -10,7 +10,7 @@ import scala.collection.JavaConverters._
 /**
   * Created by Alexander Nemish on 12/26/16.
   */
-object NewlangCompiler {
+object LascaCompiler {
 
 
   sealed trait Tree
@@ -32,7 +32,7 @@ object NewlangCompiler {
   case object BoolType extends Type
 
 
-  class Visitor extends NewlangBaseVisitor[Tree] {
+  class Visitor extends LascaBaseVisitor[Tree] {
     override def visitIdent(ctx: IdentContext): Tree = Ident(ctx.Id.getText)
 
     override def visitStringLit(ctx: StringLitContext): Tree = {
@@ -182,13 +182,13 @@ object NewlangCompiler {
     val input = new ANTLRInputStream(code)
 
     // create a lexer that feeds off of input CharStream
-    val lexer = new NewlangLexer(input)
+    val lexer = new LascaLexer(input)
 
     // create a buffer of tokens pulled from the lexer
     val tokens = new CommonTokenStream(lexer)
 
     // create a parser that feeds off the tokens buffer
-    val parser = new NewlangParser(tokens)
+    val parser = new LascaParser(tokens)
     parser.setBuildParseTree(true)
 
     val visitor = new Visitor
