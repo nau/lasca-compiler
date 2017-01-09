@@ -55,9 +55,12 @@ param
    : Id (':' type)?
    ;
 
+ifExpr: 'if' expr 'then' expr ('else' expr)?;
+
 expr:
      ident
    | literal
+   | ifExpr
    | expr argumentExprs
    | blockExpr
    ;
@@ -179,7 +182,7 @@ fragment PrintableChar
    ;
 
 fragment DecimalNumeral
-   : '0' | NonZeroDigit Digit*
+   : '0' | NonZeroDigit (Digit | '_')*
    ;
 
 

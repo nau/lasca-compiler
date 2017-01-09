@@ -1,8 +1,8 @@
 
 def main(arg: Array) = {
-  def inner = 1;
+  def inner = 1_000;
   def string(i) = "ololo";
-  string(inner);
+  if eq(string(inner), "ololo") then inner else 2_000;
   false;
   inner
 }

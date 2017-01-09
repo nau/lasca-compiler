@@ -22,6 +22,7 @@ object NewlangCompiler {
   case class Lit(value: Any, tpe: Type) extends Tree
   case class Block(stats: List[Tree], expr: Tree) extends Tree
   case class Apply(fun: Tree, args: List[Tree]) extends Tree
+  case class If(cond: Tree, thenp: Tree, elsep: Tree) extends Tree
   case class Package(name: String, stats: List[Tree]) extends Tree
 
   sealed trait Type extends Tree
@@ -41,13 +42,15 @@ object NewlangCompiler {
 
     override def visitInteger(ctx: IntegerContext): Tree = {
       println(s"Found Lit ${ctx.getText}")
-      Lit(ctx.getText.toInt, IntType)
+      Lit(ctx.getText.replace("_", "").toInt, IntType)
     }
 
     override def visitBoolean(ctx: BooleanContext): Tree = {
       println(s"Found Lit ${ctx.getText}")
       Lit(ctx.getText.toBoolean, BoolType)
     }
+
+
 
     override def visitDefDef(ctx: DefDefContext): Tree = {
       println("Here")
@@ -72,6 +75,15 @@ object NewlangCompiler {
       val tpe = Option(ctx.`type`()).map(_.getText).getOrElse(AnyType)
       println(s"Found param $id: $tpe")
       Val(id, AnyType, EmptyTree)
+    }
+
+
+    override def visitIfExpr(ctx: IfExprContext): Tree = {
+      val exprs = ctx.expr().asScala.collect {case e if e != null => visit(e) }
+      val cond = exprs.head
+      val thenp = exprs(1)
+      val elsep = exprs.drop(2).headOption getOrElse EmptyTree
+      If(cond, thenp, elsep)
     }
 
     override def visitExpr(ctx: ExprContext): Tree = {
@@ -172,6 +184,7 @@ object NewlangCompiler {
           s"{ $ss;\nreturn ${toJs(expr)}; }"
       }
       s"function $name($ps) $b"
+    case If(cond, thenp, elsep) => s"if (${toJs(cond)}) { ${toJs(thenp)} } " + (if (elsep != EmptyTree) s"else { ${toJs(elsep)} }")
     case Apply(fun, args) =>
       val as = args.map(toJs).mkString(", ")
       s"(${toJs(fun)})($as)"
