@@ -58,15 +58,40 @@ param
 ifExpr: 'if' expr 'then' expr ('else' expr)?;
 
 expr:
-     ident
-   | literal
-   | ifExpr
-   | expr argumentExprs
-   | blockExpr
+     ifExpr
+   | infixExpr
    ;
+
+infixExpr
+   : prefixExpr
+   | infixExpr op=('<<' | '>>') infixExpr
+   | infixExpr op='%' infixExpr
+   | infixExpr op=('*' | '/') infixExpr
+   | infixExpr op='xor' infixExpr
+   | infixExpr op=('+' | '-') infixExpr
+   | infixExpr op=('==' | '!=' | '<' | '<=' | '>' | '>=') infixExpr
+   | infixExpr op='and' infixExpr
+   | infixExpr op='or' infixExpr
+   ;
+
+prefixExpr
+   : UnaryOp? (blockExpr | simpleExpr1)
+   ;
+
+simpleExpr1:
+     simpleExpr2
+   | simpleExpr1 argumentExprs
+   ;
+
+simpleExpr2
+   : ident
+  | literal
+  | '(' ex=expr ')'
+  ;
 
 argumentExprs
    : '(' exprs? ')'
+   | simpleExpr2
    ;
 
 exprs
@@ -104,6 +129,20 @@ StringLiteral
    : '"' StringElement* '"'
    ;
 
+
+Operator: 'or'
+	| 'and'
+	| ('==' | '!=' | '<' | '<=' | '>' | '>=')
+	| ('+' | '-')
+	| '|'
+	| 'xor'
+	| ('*' | '/')
+	| '%'
+	| ('<<' | '>>')
+   ;
+
+UnaryOp: ('-' | '+' | '~' | '!');
+
 IntegerLiteral
    : DecimalNumeral
    ;
@@ -140,7 +179,6 @@ Paren
 Delim
    : '`' | '\'' | '"' | '.' | ';' | ','
    ;
-
 
 Comment
    : '/*' .*? '*/' | '//' .*?

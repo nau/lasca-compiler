@@ -79,18 +79,49 @@ object NewlangCompiler {
 
 
     override def visitIfExpr(ctx: IfExprContext): Tree = {
-      val exprs = ctx.expr().asScala.collect {case e if e != null => visit(e) }
-      val cond = exprs.head
-      val thenp = exprs(1)
-      val elsep = exprs.drop(2).headOption getOrElse EmptyTree
+      val exprs = ctx.expr()
+      val cond = visit(exprs.get(0))
+      val thenp = visit(exprs.get(1))
+      val elsep = if (exprs.size > 2) visit(exprs.get(2)) else EmptyTree
       If(cond, thenp, elsep)
     }
 
-    override def visitExpr(ctx: ExprContext): Tree = {
-      if (ctx.argumentExprs() != null) {
-        val args = ctx.argumentExprs().exprs().expr().asScala.map(visit).toList
-        Apply(visit(ctx.expr()), args)
-      } else visitChildren(ctx)
+    override def visitExpr(ctx: ExprContext): Tree = super.visitExpr(ctx)
+
+    override def visitInfixExpr(ctx: InfixExprContext): Tree = {
+      if (ctx.prefixExpr() != null) visit(ctx.prefixExpr())
+      else {
+
+        ctx.infixExpr().asScala.foreach(e => println(e.getText))
+
+        val lhs = visit(ctx.infixExpr(0))
+        val op = Ident(ctx.op.getText)
+        val rhs = visit(ctx.infixExpr(1))
+        Apply(op, List(lhs, rhs))
+      }
+    }
+
+    override def visitPrefixExpr(ctx: PrefixExprContext): Tree = {
+      val expr = if (ctx.blockExpr != null) visit(ctx.blockExpr()) else visit(ctx.simpleExpr1())
+      if (ctx.UnaryOp() != null)
+        Apply(Ident(ctx.UnaryOp().getText), List(expr))
+      else expr
+    }
+
+
+    override def visitSimpleExpr1(ctx: SimpleExpr1Context): Tree = {
+      if (ctx.simpleExpr1() != null) {
+        val fun = visit(ctx.simpleExpr1())
+        val argExp = ctx.argumentExprs()
+        val args = if (argExp.exprs() != null) ctx.argumentExprs().exprs().expr().asScala.map(visit).toList
+        else List(visit(argExp.simpleExpr2()))
+        Apply(fun, args)
+      } else visit(ctx.simpleExpr2())
+    }
+
+    override def visitSimpleExpr2(ctx: SimpleExpr2Context): Tree = {
+      if (ctx.ex != null) visit(ctx.ex)
+       else super.visitSimpleExpr2(ctx)
     }
 
     override def visitBlockExpr(ctx: BlockExprContext): Tree = visit(ctx.block())
@@ -166,9 +197,12 @@ object NewlangCompiler {
     val tree = parser.compilationUnit() // begin parsing at init rule
     val ast = tree.accept(visitor)
     println(tree.toStringTree(parser))
+    println(code)
     println(ast)
     ast
   }
+
+  val jsoperators = Map("or" -> "||", "and" -> "&&", "xor" -> "^") ++ List("==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/", "<<", ">>").map(o => (o, o))
 
   def toJs(tree: Tree): String = tree match {
     case Package(name, stats) =>
@@ -178,16 +212,21 @@ object NewlangCompiler {
       val ps = params.map(_.name).mkString(",")
 
       val b = body match {
-        case e: Lit => s"{ return ${toJs(e)}; }"
         case Block(stats, expr) =>
           val ss = stats.map(toJs).mkString(";\n")
           s"{ $ss;\nreturn ${toJs(expr)}; }"
+        case e => s"{ return ${toJs(e)}; }"
       }
       s"function $name($ps) $b"
-    case If(cond, thenp, elsep) => s"if (${toJs(cond)}) { ${toJs(thenp)} } " + (if (elsep != EmptyTree) s"else { ${toJs(elsep)} }")
+    case Block(stats, expr) =>
+      val ss = (stats :+ expr).map(toJs).mkString(";\n")
+      s"{ $ss; }"
+    case If(cond, thenp, EmptyTree) => s"if (${toJs(cond)}) { ${toJs(thenp)} } "
+    case If(cond, thenp, elsep) => s"(${toJs(cond)}) ? ( ${toJs(thenp)} ) : ( ${toJs(elsep)} )"
+    case Apply(Ident(op), List(lhs, rhs)) if jsoperators contains op => s"(${toJs(lhs)} ${jsoperators(op)} ${toJs(rhs)})"
     case Apply(fun, args) =>
       val as = args.map(toJs).mkString(", ")
-      s"(${toJs(fun)})($as)"
+      s"${toJs(fun)}($as)"
     case Ident(name) => name
     case Lit(v: Int, IntType) => v.toString
     case Lit(v: Boolean, BoolType) => v.toString
