@@ -168,20 +168,24 @@ object LascaCompiler {
   }
 
   def toLlvm(tree: Tree) = {
-    val fresh = Fresh("tx")
+    implicit val fresh = Fresh("tx")
     val MainName = Global.Top("main")
     val MainSig  = Type.Function(Seq(Arg(Type.I32), Arg(Type.Ptr)), Type.I32)
     val argc   = Val.Local(fresh(), Type.I32)
     val argv   = Val.Local(fresh(), Type.Ptr)
+    val putsTy = Type.Function(Seq(Arg(Type.Ptr)), Type.I32)
+    val putsDeclare = Defn.Declare(Attrs.None, Global.Top("puts"), putsTy)
+    val hello = Defn.Const(Attrs.None, Global.Top("hello.world"), Type.Array(Type.I8, 12), Val.Array(Type.I8, "Hello world".getBytes("UTF-8").map(Val.I8) :+ Val.I8(0)))
     val main = Defn.Define(
       Attrs.None,
       MainName,
       MainSig,
       Seq(
         Inst.Label(fresh(), Seq(argc, argv)),
+        Inst.Let(Op.Call(putsTy, Val.Global(Global.Top("puts"), putsTy), Seq(Val.Global(Global.Top("hello.world"), Type.Ptr)))),
         Inst.Ret(Val.I32(0))
       ))
-    CodeGen.apply(Seq(main)).genIrString
+    CodeGen.apply(Seq(putsDeclare, hello, main)).genIrString
   }
 
   def compile(llvm: String) = {

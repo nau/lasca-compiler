@@ -44,6 +44,7 @@ object CodeGen {
       sh"declare i32 @__gxx_personality_v0(...)",
       sh"declare i8* @__cxa_begin_catch(i8*)",
       sh"declare void @__cxa_end_catch()",
+//      sh"declare i32 @puts(i8* nocapture) nounwind",
       sh"@_ZTIN11scalanative16ExceptionWrapperE = external constant { i8*, i8*, i8* }"
     )
     private val gxxpersonality =
