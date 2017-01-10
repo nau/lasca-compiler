@@ -3,6 +3,7 @@ New Lang (Idris/Scala w/o OOP)
 Inspired by:
 - Scala
 - Haskell, LiquidHaskell
+- Closure
 - Idris/Agda
 - Go
 - Rust
@@ -49,7 +50,7 @@ Ideas
 - Concurrency Oriented Programming (Erlang). Objects are out. Concurrency is in.
 - Gradual Typing (http://homes.soic.indiana.edu/jsiek/what-is-gradual-typing/)
 - Deferred Type Errors (runtime compilation mode, Haskell)
-- Liquid Type system (refinement types) + Dependent Type system 
+- Liquid Type system (refinement types) + Dependent Type system? 
   https://github.com/pleiad/Refinements
   
   Require research. Can be PhD dissertation.
@@ -77,8 +78,9 @@ Ideas
 - syntactic sugar is ok
 - annotations (Java-style)
 - annotation-based extensions, like visibility (@private, public by default)
-  Consider private by default, bc adding public function to a package may require full source recompilation. If it is.
-- macro-based extensions.
+	- nope
+    - Consider private by default, bc adding public function to a package may require full source recompilation. If it is.
+- macro-based extensions?
 - implicits? (Scala/Haskell/Idris)
 - implicit macro? (Scala)  
 - import features (Scala-like)
@@ -87,26 +89,25 @@ Ideas
 - dependent types? (Idris)
 - totality? (Idris)
 - mixfix syntax? (Agda)
-- save AST after compilation for reflection
+- save/distribute AST (Scala TASTY). Full program optimization/reflection
 - ABI
 - important things must be greppable and googlable, call it searchability :)
 - prefer offensive programming style
 - compiler as a service (like Scala sbt)
-- markdown comments
-- https://en.wikipedia.org/wiki/Algebra_of_Communicating_Processes
-- CSP?
-- CPS, non-blocking IO.
-- import of a package must not introduce any side effects! (hello Go)
+- markdown comments/docs
+- CPS/Actors/π-calculus/STM?, non-blocking IO, reactive
+- import of a package must not introduce any side effects?! (hello Go)
 
 Package System
 ---
 Consider IPFS
 P2P systems
-Blockchain for 
 
 Practical things that matter
 ----
 - immutability as concurrently shared data
+- https://www.infoq.com/presentations/Value-Identity-State-Rich-Hickey
+- Persisted Data Structures!
 - sized collections in some cases
 - pure functions for concurrency and caching
 - readability

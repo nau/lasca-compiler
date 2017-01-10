@@ -1,11 +1,14 @@
 package com.newniverse.parser
 
+import java.io.{File, PrintWriter}
 import javax.script.ScriptEngineManager
 
 import com.newniverse.parser.LascaParser._
 import org.antlr.v4.runtime.{ANTLRInputStream, CommonTokenStream}
 
 import scala.collection.JavaConverters._
+import scala.scalanative.nir._
+import scala.sys.process.ProcessBuilder
 
 /**
   * Created by Alexander Nemish on 12/26/16.
@@ -16,9 +19,9 @@ object LascaCompiler {
   sealed trait Tree
   case object EmptyTree extends Tree
   case class Ident(name: String) extends Tree
-  case class Val(name: String, tpe: Type = AnyType, rhs: Tree = EmptyTree) extends Tree
-  case class Params(params: List[Val]) extends Tree
-  case class Def(name: String, tpe: Type = AnyType, params: List[Val], rhs: Tree) extends Tree
+  case class ValDef(name: String, tpe: Type = AnyType, rhs: Tree = EmptyTree) extends Tree
+  case class Params(params: List[ValDef]) extends Tree
+  case class Def(name: String, tpe: Type = AnyType, params: List[ValDef], rhs: Tree) extends Tree
   case class Lit(value: Any, tpe: Type) extends Tree
   case class Block(stats: List[Tree], expr: Tree) extends Tree
   case class Apply(fun: Tree, args: List[Tree]) extends Tree
@@ -49,7 +52,7 @@ object LascaCompiler {
 
 
     override def visitValDef(ctx: ValDefContext): Tree = {
-      Val(ctx.Id().getText, AnyType, visit(ctx.expr()))
+      ValDef(ctx.Id().getText, AnyType, visit(ctx.expr()))
     }
 
     override def visitDefDef(ctx: DefDefContext): Tree = {
@@ -64,14 +67,14 @@ object LascaCompiler {
     }
 
     override def visitParams(ctx: ParamsContext): Tree = {
-      val params = ctx.param().asScala.map(p => visit(p).asInstanceOf[Val]).toList
+      val params = ctx.param().asScala.map(p => visit(p).asInstanceOf[ValDef]).toList
       Params(params)
     }
 
     override def visitParam(ctx: ParamContext): Tree = {
       val id = ctx.Id().getText
       val tpe = Option(ctx.`type`()).map(_.getText).getOrElse(AnyType)
-      Val(id, AnyType, EmptyTree)
+      ValDef(id, AnyType, EmptyTree)
     }
 
 
@@ -164,12 +167,49 @@ object LascaCompiler {
     lines
   }
 
+  def toLlvm(tree: Tree) = {
+    val fresh = Fresh("tx")
+    val MainName = Global.Top("main")
+    val MainSig  = Type.Function(Seq(Arg(Type.I32), Arg(Type.Ptr)), Type.I32)
+    val argc   = Val.Local(fresh(), Type.I32)
+    val argv   = Val.Local(fresh(), Type.Ptr)
+    val main = Defn.Define(
+      Attrs.None,
+      MainName,
+      MainSig,
+      Seq(
+        Inst.Label(fresh(), Seq(argc, argv)),
+        Inst.Ret(Val.I32(0))
+      ))
+    CodeGen.apply(Seq(main)).genIrString
+  }
+
+  def compile(llvm: String) = {
+    import scala.sys.process._
+    val clangpp   = "clang++"
+    val clangOpts = Seq.empty[String]
+    val clang     = "clang"
+    val fname = "filename.ll"
+    new PrintWriter(fname) { write(llvm); close }
+    Process(clang, Seq("-o", "test.out", "filename.ll")).!
+    new File("test.out").getAbsolutePath
+  }
+
+  def exec(path: String): Unit = {
+    import scala.sys.process._
+    path.!
+  }
+
   def main(args: Array[String]): Unit = {
     val code = readFile("example1.nl")
     val tree = parse(code)
     val js = toJs(tree)
     println(js)
     runJs(JsRuntime.globalFunctions + js)
+    val llvm = toLlvm(tree)
+    println(llvm)
+    val path = compile(llvm)
+    println(exec(path))
   }
 
   def runJs(js: String) = {
@@ -237,7 +277,7 @@ object LascaCompiler {
       s"{ $ss; }"
     case If(cond, thenp, EmptyTree) => s"if (${toJs(cond)}) { ${toJs(thenp)} } "
     case If(cond, thenp, elsep) => s"(${toJs(cond)}) ? ( ${toJs(thenp)} ) : ( ${toJs(elsep)} )"
-    case Val(name, _, body) => s"var $name = ${toJs(body)}"
+    case ValDef(name, _, body) => s"var $name = ${toJs(body)}"
     case ap@Apply(_:Apply, List(arg)) => toJs(flattenApply(ap))
     case Apply(Ident(op), List(rhs)) if jsUnaryOps contains op => s"$op(${toJs(rhs)})"
     case Apply(Ident(op), List(lhs, rhs)) if jsoperators contains op => s"(${toJs(lhs)} ${jsoperators(op)} ${toJs(rhs)})"
