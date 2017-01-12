@@ -1,4 +1,4 @@
-New Lang (Idris/Scala w/o OOP)
+Lasca Language (Scala w/o OOP bullshit)
 =======
 Inspired by:
 - Scala
@@ -11,6 +11,7 @@ Inspired by:
 - Python
 - Swift
 - D
+- Pony
 
 Motivation
 ---
@@ -38,8 +39,8 @@ Right balance between expressiveness and readability is the essence.
 
 Axis
 
-Time spent developing a programm
-Money spent developing a programm 
+Time spent developing a program
+Money spent developing a program 
 Cost of an error
 Performance
  
@@ -68,11 +69,11 @@ Ideas
 - expression-based
 - practical first, but as clean and concise as possible
 - type-level immutability
-- var are local by default
+- var are local by default (investigate if usable)
 - prefer things done one way
-- make it host language: allow simple creation of external DSLs, configs, etc via compiler API.
+- make it host language: allow simple creation of external DSLs, configs, etc via compiler API ??
 - LLVM backend
-- JVM backend?
+- JVM backend? (hope not)
 - JavaScript backend via compiler API
 - no OOP and data subclassing/inheritance?
 - syntactic sugar is ok

@@ -1,14 +1,12 @@
 package com.newniverse.parser
 
 import java.io.{File, PrintWriter}
-import javax.script.ScriptEngineManager
 
 import com.newniverse.parser.LascaParser._
 import org.antlr.v4.runtime.{ANTLRInputStream, CommonTokenStream}
 
 import scala.collection.JavaConverters._
-import scala.scalanative.nir._
-import scala.sys.process.ProcessBuilder
+import scala.util.Try
 
 /**
   * Created by Alexander Nemish on 12/26/16.
@@ -168,24 +166,9 @@ object LascaCompiler {
   }
 
   def toLlvm(tree: Tree) = {
-    implicit val fresh = Fresh("tx")
-    val MainName = Global.Top("main")
-    val MainSig  = Type.Function(Seq(Arg(Type.I32), Arg(Type.Ptr)), Type.I32)
-    val argc   = Val.Local(fresh(), Type.I32)
-    val argv   = Val.Local(fresh(), Type.Ptr)
-    val putsTy = Type.Function(Seq(Arg(Type.Ptr)), Type.I32)
-    val putsDeclare = Defn.Declare(Attrs.None, Global.Top("puts"), putsTy)
-    val hello = Defn.Const(Attrs.None, Global.Top("hello.world"), Type.Array(Type.I8, 12), Val.Array(Type.I8, "Hello world".getBytes("UTF-8").map(Val.I8) :+ Val.I8(0)))
-    val main = Defn.Define(
-      Attrs.None,
-      MainName,
-      MainSig,
-      Seq(
-        Inst.Label(fresh(), Seq(argc, argv)),
-        Inst.Let(Op.Call(putsTy, Val.Global(Global.Top("puts"), putsTy), Seq(Val.Global(Global.Top("hello.world"), Type.Ptr)))),
-        Inst.Ret(Val.I32(0))
-      ))
-    CodeGen.apply(Seq(putsDeclare, hello, main)).genIrString
+
+    val module = NirGen.genNir(tree)
+    CodeGen.apply(module).genIrString
   }
 
   def compile(llvm: String) = {
@@ -194,8 +177,22 @@ object LascaCompiler {
     val clangOpts = Seq.empty[String]
     val clang     = "clang"
     val fname = "filename.ll"
+    val includes = {
+      val includedir =
+        Try(Process("llvm-config --includedir").lineStream_!.toSeq)
+          .getOrElse(Seq.empty)
+      ("/usr/local/include" +: includedir).map(s => s"-I$s")
+    }
+    val libs = {
+      val libdir =
+        Try(Process("llvm-config --libdir").lineStream_!.toSeq).getOrElse(Seq.empty)
+      ("/usr/local/lib" +: libdir).map(s => s"-L$s")
+    }
+
     new PrintWriter(fname) { write(llvm); close }
-    Process(clang, Seq("-o", "test.out", "filename.ll")).!
+    val opts = (includes ++ libs ++ Seq("-lgc", "-o", "test.out", "filename.ll")).toList
+    println(opts)
+    Process(clang, opts).!
     new File("test.out").getAbsolutePath
   }
 
@@ -205,21 +202,15 @@ object LascaCompiler {
   }
 
   def main(args: Array[String]): Unit = {
-    val code = readFile("example1.nl")
+    val code = readFile("hello.ls")
     val tree = parse(code)
-    val js = toJs(tree)
+    val js = JsGen.toJs(tree)
     println(js)
-    runJs(JsRuntime.globalFunctions + js)
+    JsGen.runJs(js)
     val llvm = toLlvm(tree)
     println(llvm)
     val path = compile(llvm)
     println(exec(path))
-  }
-
-  def runJs(js: String) = {
-    val factory = new ScriptEngineManager(null)
-    val engine = factory.getEngineByName("nashorn")
-    engine.eval(js)
   }
 
   def parse(code: String): Tree = {
@@ -244,57 +235,5 @@ object LascaCompiler {
     ast
   }
 
-  val jsoperators = Map("or" -> "||", "and" -> "&&", "xor" -> "^") ++ List("==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/", "<<", ">>").map(o => (o, o))
-  val jsUnaryOps = Set("-" , "+" , "~" , "!")
-  object JsRuntime {
-    val globalFunctions =
-      """
-        |function callOrIdent(param) { return (typeof param === 'function') ? param() : param; }
-      """.stripMargin
-  }
 
-  private def flattenApply(t: Apply): Apply = {
-    t match {
-      case Apply(ap: Apply, List(arg)) =>
-        val inner = flattenApply(ap)
-        inner.copy(args = inner.args :+ arg)
-      case ap@Apply(Ident(name), List(arg)) => ap
-    }
-  }
-
-  def toJs(tree: Tree): String = tree match {
-    case Package(name, stats) =>
-      val ss = stats.map(toJs).mkString(";\n")
-      s"(function package_$name() {$ss})();\n"
-    case Def(name, _, params, body) =>
-      val ps = params.map(_.name).mkString(",")
-
-      val b = body match {
-        case Block(stats, expr) =>
-          val ss = stats.map(toJs).mkString(";\n")
-          s"{ $ss;\nreturn ${toJs(expr)}; }"
-        case e => s"{ return ${toJs(e)}; }"
-      }
-      s"function $name($ps) $b"
-    case Block(stats, expr) =>
-      val ss = (stats :+ expr).map(toJs).mkString(";\n")
-      s"{ $ss; }"
-    case If(cond, thenp, EmptyTree) => s"if (${toJs(cond)}) { ${toJs(thenp)} } "
-    case If(cond, thenp, elsep) => s"(${toJs(cond)}) ? ( ${toJs(thenp)} ) : ( ${toJs(elsep)} )"
-    case ValDef(name, _, body) => s"var $name = ${toJs(body)}"
-    case ap@Apply(_:Apply, List(arg)) => toJs(flattenApply(ap))
-    case Apply(Ident(op), List(rhs)) if jsUnaryOps contains op => s"$op(${toJs(rhs)})"
-    case Apply(Ident(op), List(lhs, rhs)) if jsoperators contains op => s"(${toJs(lhs)} ${jsoperators(op)} ${toJs(rhs)})"
-    case Apply(Ident(fun), args) =>
-      val as = args.map(toJs).mkString(", ")
-      s"$fun($as)"
-    case Apply(fun, args) =>
-      val as = args.map(toJs).mkString(", ")
-      s"${toJs(fun)}($as)"
-    case Ident(name) => s"callOrIdent($name)"
-    case Lit(v: Int, IntType) => v.toString
-    case Lit(v: Boolean, BoolType) => v.toString
-    case Lit(v: String, StringType) => v.toString
-    case EmptyTree => ""
-  }
 }
