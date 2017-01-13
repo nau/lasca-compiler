@@ -19,6 +19,7 @@ object LascaCompiler {
   case class Ident(name: String) extends Tree
   case class ValDef(name: String, tpe: Type = AnyType, rhs: Tree = EmptyTree) extends Tree
   case class Params(params: List[ValDef]) extends Tree
+  case class ExternDef(name: String, tpe: Type = AnyType, params: List[ValDef]) extends Tree
   case class Def(name: String, tpe: Type = AnyType, params: List[ValDef], rhs: Tree) extends Tree
   case class Lit(value: Any, tpe: Type) extends Tree
   case class Block(stats: List[Tree], expr: Tree) extends Tree
@@ -31,6 +32,7 @@ object LascaCompiler {
   case object IntType extends Type
   case object StringType extends Type
   case object BoolType extends Type
+  case object UnitType extends Type
 
 
   class Visitor extends LascaBaseVisitor[Tree] {
@@ -48,9 +50,29 @@ object LascaCompiler {
       Lit(ctx.getText.toBoolean, BoolType)
     }
 
-
+    private def typeMapping(s: String) = {
+      println(s)
+      s match {
+        case "Int" => IntType
+        case "Bool" => BoolType
+        case "String" => StringType
+        case "Unit" => UnitType
+        case _ => AnyType
+      }
+    }
     override def visitValDef(ctx: ValDefContext): Tree = {
-      ValDef(ctx.Id().getText, AnyType, visit(ctx.expr()))
+      val tpe = Option(ctx.`type`()).map(t => typeMapping(t.TypeId().getText)).getOrElse(AnyType)
+      ValDef(ctx.Id().getText, tpe, visit(ctx.expr()))
+    }
+
+    override def visitExternDef(ctx: ExternDefContext): Tree = {
+      val name = ctx.Id().getText
+      val params = Option(ctx.paramClause()).toList.flatMap(p => visitParamClause(p).asInstanceOf[Params].params)
+      val retty = Option(ctx.`type`()).map { t =>
+        println(t.TypeId().getText)
+        typeMapping(t.TypeId().getText)
+      } getOrElse AnyType
+      ExternDef(name, retty, params)
     }
 
     override def visitDefDef(ctx: DefDefContext): Tree = {
@@ -71,8 +93,8 @@ object LascaCompiler {
 
     override def visitParam(ctx: ParamContext): Tree = {
       val id = ctx.Id().getText
-      val tpe = Option(ctx.`type`()).map(_.getText).getOrElse(AnyType)
-      ValDef(id, AnyType, EmptyTree)
+      val tpe = Option(ctx.`type`()).map(t => typeMapping(t.getText)).getOrElse(AnyType)
+      ValDef(id, tpe, EmptyTree)
     }
 
 
@@ -155,7 +177,8 @@ object LascaCompiler {
     override def visitCompilationUnit(ctx: CompilationUnitContext): Tree = {
       val vals = ctx.valDef().asScala.map(dd => this.visit(dd))
       val defs = ctx.defDef().asScala.map(dd => this.visit(dd))
-      Package("main", (vals ++ defs).toList)
+      val externs = ctx.externDef().asScala.map(dd => this.visit(dd))
+      Package("main", (externs ++ vals ++ defs).toList)
     }
   }
 

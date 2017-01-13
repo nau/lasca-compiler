@@ -58,7 +58,7 @@ object NirGen {
   def genNir(tree: Tree): Seq[Defn] = {
     //    val env = mutable.HashMap[String, Defn]
 
-    scoped(curMethodEnv := new MethodEnv(Fresh("global"))) {
+    scoped(curMethodEnv := new MethodEnv(Fresh("main"))) {
       val MainName = Global.Top("main")
       val MainSig = Type.Function(Seq(Arg(Type.I32), Arg(Type.Ptr)), Type.I32)
       val InitSig = Type.Function(Seq(), Type.Void)
@@ -68,10 +68,6 @@ object NirGen {
       val argv = Val.Local(fresh(), Type.Ptr)
       val putsTy = Type.Function(Seq(Arg(Type.Ptr)), Type.I32)
       val putsDeclare = Defn.Declare(Attrs.None, Global.Top("puts"), putsTy)
-      val sleepTy = Type.Function(Seq(Arg(Type.I32)), Type.I32)
-      val sleepDeclare = Defn.Declare(Attrs.None, Global.Top("sleep"), sleepTy)
-      val putCharTy = Type.Function(Seq(Arg(Type.I32)), Type.I32)
-      val putCharDeclare = Defn.Declare(Attrs.None, Global.Top("putchar"), putCharTy)
       val lascaMainSig = Type.Function(Seq(), Type.I32)
 
       val (id, helloDefn) = stringConst("Hello World")
@@ -86,13 +82,24 @@ object NirGen {
           Inst.Ret(Val.I32(0))
         ))
       val lasca = genNir1(tree)
-      Seq(InitDecl, putsDeclare, sleepDeclare, putCharDeclare, helloDefn, main) ++ lasca
+      Seq(InitDecl, putsDeclare, helloDefn, main) ++ lasca
     }
+  }
+
+  private def typeMapping(lascaType: LascaCompiler.Type): nir.Type = lascaType match {
+    case IntType => Type.I32
+    case BoolType => Type.Bool
+    case StringType => Type.Ptr
+    case UnitType => Type.Void
+    case AnyType => Type.Ptr
   }
 
   private def genNir1(tree: Tree): Seq[Defn] = {
     tree match {
       case Package(name, stats) => stats.flatMap(genNir1)
+      case t@ExternDef(name, tpe, params) =>
+        val ty = Type.Function(params.map(p => Arg(typeMapping(p.tpe))), typeMapping(tpe))
+        Seq(Defn.Declare(Attrs.None, Global.Top(name), ty))
       case t@Def(name, tpe, params, rhs) =>
         val f = new Fresh("src")
         val env = new MethodEnv(f)

@@ -41,8 +41,12 @@ literal:
 
 ident: Id;
 
+externDef:
+	 'extern' 'def' Id paramClause? (':' type)? ';'?
+   ;
+
 defDef
-   : 'def' Id paramClause? '=' expr ';'?
+   : 'def' Id paramClause? (':' type)? '=' expr ';'?
    ;
 
 paramClause
@@ -119,7 +123,7 @@ type: TypeId
    ;
 
 compilationUnit
-   : (defDef | valDef)*
+   : (externDef | defDef | valDef)*
    ;
 
 // Lexer
