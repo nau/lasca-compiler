@@ -5,6 +5,26 @@ Literals:
 "": String
 True | False or true | false...
 
+
+Comments
+----
+
+##Inline comment:
+- consider '--' or '#' or '//'
+  I prefer '--' because it's less visually noisy. 
+When used after a code line it looks like a hyphen.
+ 
+```scala
+doStuff() -- this call does stuff
+doStuff() # this call does stuff
+doStuff() // this call does stuff
+```
+
+##Block comment
+
+- Consider: /* */, {- -}, """ """
+- Must be nestable! It's much easier to comment a code with comments.
+
 Keywords
 ----
 alias?

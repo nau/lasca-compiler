@@ -128,6 +128,13 @@ compilationUnit
 
 // Lexer
 
+BlockComment
+   : '{-' .*? '-}' -> skip
+   ;
+
+InlineComment : '--' .*? '\n' -> skip
+   ;
+
 BooleanLiteral
    : 'true' | 'false'
    ;
@@ -173,10 +180,6 @@ Paren
 
 Delim
    : '`' | '\'' | '"' | '.' | ';' | ','
-   ;
-
-Comment
-   : '/*' .*? '*/' | '//' .*?
    ;
 
 // fragments

@@ -61,8 +61,15 @@ object LascaCompiler {
       }
     }
     override def visitValDef(ctx: ValDefContext): Tree = {
-      val tpe = Option(ctx.`type`()).map(t => typeMapping(t.TypeId().getText)).getOrElse(AnyType)
-      ValDef(ctx.Id().getText, tpe, visit(ctx.expr()))
+      val explicitTpe = Option(ctx.`type`()).map(t => typeMapping(t.TypeId().getText))
+      val rhs = visit(ctx.expr())
+      val infered = (explicitTpe, rhs) match {
+        case (Some(tpe), _) => tpe
+        case (None, ValDef(_, tpe, _)) => tpe
+        case (None, Lit(_, tpe)) => tpe
+        case _ => AnyType
+      }
+      ValDef(ctx.Id().getText, infered, rhs)
     }
 
     override def visitExternDef(ctx: ExternDefContext): Tree = {
