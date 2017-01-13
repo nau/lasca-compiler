@@ -48,7 +48,7 @@ object JsGen {
       s"function $name($ps) $b"
     case Block(stats, expr) =>
       val ss = (stats :+ expr).map(toJs).mkString(";\n")
-      s"{ $ss; }"
+      s"(function (){ $ss; })()"
     case If(cond, thenp, EmptyTree) => s"if (${toJs(cond)}) { ${toJs(thenp)} } "
     case If(cond, thenp, elsep) => s"(${toJs(cond)}) ? ( ${toJs(thenp)} ) : ( ${toJs(elsep)} )"
     case ValDef(name, _, body) => s"var $name = ${toJs(body)}"

@@ -1,7 +1,13 @@
+#include <stdio.h>
+#include <unistd.h>
 #include <gc.h>
 
-// At the moment we rely on the conservative
-// mode of Boehm GC as our garbage collector.
+struct type_info {
+  char type;
+  void* value;
+};
+
+void* lascaAllocAny();
 
 void lasca_init() {
     GC_init();

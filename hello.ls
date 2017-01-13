@@ -1,10 +1,13 @@
-def test(i) = {
-  val a = 1 + i;
-  val b = a - 3;
-  b
+def lascamain = {
+  test(60);
 }
 
-def testtt = {
-  val a = test(2) + 1;
-  a
+def test(i) = {
+  if (i == 30) then {
+    putchar(99);
+  } else {
+    putchar(i);
+    putchar(10);
+    test(i - 1);
+  }
 }

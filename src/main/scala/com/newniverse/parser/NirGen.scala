@@ -7,6 +7,7 @@ import scala.scalanative.nir._
 import scala.scalanative.util.ScopedVar.scoped
 import scala.scalanative.util._
 import scala.scalanative.{nir, util}
+import Focus._
 
 
 /**
@@ -67,6 +68,12 @@ object NirGen {
       val argv = Val.Local(fresh(), Type.Ptr)
       val putsTy = Type.Function(Seq(Arg(Type.Ptr)), Type.I32)
       val putsDeclare = Defn.Declare(Attrs.None, Global.Top("puts"), putsTy)
+      val sleepTy = Type.Function(Seq(Arg(Type.I32)), Type.I32)
+      val sleepDeclare = Defn.Declare(Attrs.None, Global.Top("sleep"), sleepTy)
+      val putCharTy = Type.Function(Seq(Arg(Type.I32)), Type.I32)
+      val putCharDeclare = Defn.Declare(Attrs.None, Global.Top("putchar"), putCharTy)
+      val lascaMainSig = Type.Function(Seq(), Type.I32)
+
       val (id, helloDefn) = stringConst("Hello World")
       val main = Defn.Define(
         Attrs.None,
@@ -75,11 +82,11 @@ object NirGen {
         Seq(
           Inst.Label(fresh(), Seq(argc, argv)),
           Inst.Let(Op.Call(InitSig, Init, Seq())),
-          Inst.Let(Op.Call(putsTy, Val.Global(Global.Top("puts"), putsTy), Seq(Val.Global(Global.Top(id), Type.Ptr)))),
+          Inst.Let(Op.Call(lascaMainSig, Val.Global(Global.Top("lascamain"), lascaMainSig), Seq())),
           Inst.Ret(Val.I32(0))
         ))
       val lasca = genNir1(tree)
-      Seq(InitDecl, putsDeclare, helloDefn, main) ++ lasca
+      Seq(InitDecl, putsDeclare, sleepDeclare, putCharDeclare, helloDefn, main) ++ lasca
     }
   }
 
@@ -123,24 +130,12 @@ object NirGen {
         val rhs = genExpr(vd.rhs, focus)
         curMethodEnv.enter(vd.name, rhs.value)
         rhs withValue Val.None
-        //        case If(cond, thenp, elsep) =>
-        //          val retty = genType(tree.tpe, box = false)
-        //          genIf(retty, cond, thenp, elsep, focus)
-
-        //        case app: Apply =>
-        //          genApply(app, focus)
-
-        //        case id: Ident =>
-        /*val sym = id.symbol
-        if (curMethodInfo.mutableVars.contains(sym)) {
-          val ty = genType(sym.tpe, box = false)
-          focus withOp Op.Load(ty, curMethodEnv.resolve(sym))
-        } else if (sym.isModule) {
-          focus withOp Op.Module(genTypeName(sym))
-        } else {
-          focus withValue (curMethodEnv.resolve(sym))
-        }*/
         rhs
+
+      case If(cond, thenp, elsep) =>
+        val retty = Type.I32 //genType(tree.tpe, box = false)
+        genIf(retty, cond, thenp, elsep, focus)
+
 
       case app: Apply => genApply(app, focus)
 
@@ -166,7 +161,7 @@ object NirGen {
     }
   }
 
-  /* def genIf(retty: nir.Type,
+  def genIf(retty: nir.Type,
     condp: Tree,
     thenp: Tree,
     elsep: Tree,
@@ -180,7 +175,7 @@ object NirGen {
       focus => genExpr(thenp, focus.withLabel(thenn)),
       focus => genExpr(elsep, focus.withLabel(elsen))
     ))
-  }*/
+  }
 
   def genBlock(block: Block, focus: Focus) = {
     val Block(stats, last) = block
@@ -200,6 +195,7 @@ object NirGen {
       case Ident("-") if args.size == 2 => genSimpleOp(app, LascaPrimitives.SUB, focus)
       case Ident("*") if args.size == 2 => genSimpleOp(app, LascaPrimitives.MUL, focus)
       case Ident("/") if args.size == 2 => genSimpleOp(app, LascaPrimitives.DIV, focus)
+      case Ident("==") if args.size == 2 => genSimpleOp(app, LascaPrimitives.EQ, focus)
       case Ident(name) =>
         val (as, last) = genSimpleArgs(args, focus)
         val func = last withValue Val.Global(Global.Top(name), Type.Ptr)
