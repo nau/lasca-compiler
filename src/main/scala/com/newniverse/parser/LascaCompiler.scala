@@ -190,9 +190,30 @@ object LascaCompiler {
       ("/usr/local/lib" +: libdir).map(s => s"-L$s")
     }
 
+    def abs(file: File): String = file.getAbsolutePath
+
+    /** Compiles *.c[pp] in `srcPath`. */
+    def compileCSources(clang: String, srcPath: File, outPath: File): Boolean = {
+      val cpaths = srcPath.listFiles().collect { case f if f.getName.endsWith(".c") => abs(f) }
+      val compilec   = clang +: (includes ++ ("-c" +: cpaths)) toList
+//      val compilecpp = abs(clangpp) +: (includes ++ ("-c" +: cpppaths))
+
+      println(s"Compiling Runtime ${compilec.mkString(" ")}")
+      val cExit = Process(compilec, outPath).lineStream.toList.map(println)
+
+//      val cppExit = Process(compilecpp, srcPath) ! logger
+      true
+    }
+
+    val runtimeOPath = new File("target/runtime")
+    runtimeOPath.mkdir()
+    compileCSources(clang, new File("src/main/c"), runtimeOPath)
+
+    val runtimeOFiles = runtimeOPath.listFiles().collect { case f if f.getName.endsWith(".o") => abs(f) }
+
     new PrintWriter(fname) { write(llvm); close }
     (s"opt -O2 $fname" #| "llvm-dis").lineStream.toList.map(println)
-    val opts = (includes ++ libs ++ Seq("-lgc", "-o", "test.out", "filename.ll")).toList
+    val opts = (includes ++ libs ++ Seq("-lgc", "-o", "test.out", "filename.ll") ++ runtimeOFiles).toList
     println(opts)
     Process(clang, opts).!
     new File("test.out").getAbsolutePath

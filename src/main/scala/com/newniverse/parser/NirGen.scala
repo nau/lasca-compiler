@@ -3,10 +3,10 @@ package com.newniverse.parser
 import com.newniverse.parser.LascaCompiler._
 
 import scala.collection.mutable
-import scala.scalanative.nir.Defn.Const
 import scala.scalanative.nir._
+import scala.scalanative.util.ScopedVar.scoped
+import scala.scalanative.util._
 import scala.scalanative.{nir, util}
-import util._, util.ScopedVar.scoped
 
 
 /**
@@ -61,7 +61,7 @@ object NirGen {
       val MainName = Global.Top("main")
       val MainSig = Type.Function(Seq(Arg(Type.I32), Arg(Type.Ptr)), Type.I32)
       val InitSig = Type.Function(Seq(), Type.Void)
-      val Init = Val.Global(Global.Top("GC_init"), Type.Ptr)
+      val Init = Val.Global(Global.Top("lasca_init"), Type.Ptr)
       val InitDecl = Defn.Declare(Attrs.None, Init.name, InitSig)
       val argc = Val.Local(fresh(), Type.I32)
       val argv = Val.Local(fresh(), Type.Ptr)
