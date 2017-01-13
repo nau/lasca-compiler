@@ -23,7 +23,7 @@ object NirGen {
       env += ((sym, value))
 
     def resolve(sym: Symbol): Val = env(sym)
-
+    def resolveOpt(sym: Symbol): Option[Val] = env.get(sym)
   }
 
   def traverse[S](tree: Tree, state: S, f: (S, Tree) => S): S = tree match {
@@ -87,16 +87,35 @@ object NirGen {
     tree match {
       case Package(name, stats) => stats.flatMap(genNir1)
       case t@Def(name, tpe, params, rhs) =>
-        val fresh = new Fresh("src")
-        val env   = new MethodEnv(fresh)
+        val f = new Fresh("src")
+        val env = new MethodEnv(f)
         scoped(curMethodEnv := env) {
-          val body = genExpr(rhs, Focus.start()(this.fresh))
+          val params   = genParams(t)
+          val sig = Type.Function(Seq.fill(params.size)(Arg(Type.I32)), Type.I32)
+          val body = genExpr(rhs, Focus.start()(fresh).withLabel(fresh(), params: _*))
           val inst = body.finish(Inst.Ret(body.value))
-          Seq(Defn.Define(Attrs.None, Global.Top(name), Type.Function(Seq(), Type.I32), inst))
+          Seq(Defn.Define(Attrs.None, Global.Top(name), sig, inst))
         }
       case t => println(t); Seq()
     }
   }
+
+  def genParams(dd: Def): Seq[Val.Local] = {
+    val paramSyms = {
+      val vp = dd.params
+      if (vp.isEmpty) Nil else vp.map(_.name)
+    }
+    val params = paramSyms.map { sym =>
+      val name  = fresh()
+      val ty    = Type.I32  // TODO type
+      val param = Val.Local(name, ty)
+      curMethodEnv.enter(sym, param)
+      param
+    }
+
+    params
+  }
+
 
   private def genExpr(tree: Tree, focus: Focus): Focus = {
     tree match {
@@ -125,8 +144,13 @@ object NirGen {
 
       case app: Apply => genApply(app, focus)
 
-      case Ident(name) => focus withValue (curMethodEnv.resolve(name))
-
+      case Ident(name) =>
+        curMethodEnv.resolveOpt(name) match {
+          case Some(v) => focus withValue v
+          case None =>
+            val func = focus withValue Val.Global(Global.Top(name), Type.Ptr)
+            func withOp Op.Call(Type.Function(Seq(), Type.I32), func.value, Seq())
+        }
       case lit: Lit =>
         genLiteral(lit, focus)
 
@@ -176,7 +200,19 @@ object NirGen {
       case Ident("-") if args.size == 2 => genSimpleOp(app, LascaPrimitives.SUB, focus)
       case Ident("*") if args.size == 2 => genSimpleOp(app, LascaPrimitives.MUL, focus)
       case Ident("/") if args.size == 2 => genSimpleOp(app, LascaPrimitives.DIV, focus)
+      case Ident(name) =>
+        val (as, last) = genSimpleArgs(args, focus)
+        val func = last withValue Val.Global(Global.Top(name), Type.Ptr)
+        func withOp Op.Call(Type.Function(Seq(Arg(Type.I32)), Type.I32), func.value, as)
     }
+  }
+
+  def genSimpleArgs(argsp: Seq[Tree], focus: Focus): (Seq[Val], Focus) = {
+    val args      = Focus.sequenced(argsp, focus)(genExpr(_, _))
+    val argvalues = args.map(_.value)
+    val last      = args.lastOption.getOrElse(focus)
+
+    (argvalues, last)
   }
 
   def genSimpleOp(app: Apply, code: Int, focus: Focus): Focus = {
