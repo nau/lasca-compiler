@@ -168,6 +168,7 @@ object LascaCompiler {
   def toLlvm(tree: Tree) = {
 
     val module = NirGen.genNir(tree)
+    println(module)
     CodeGen.apply(module).genIrString
   }
 
@@ -190,6 +191,7 @@ object LascaCompiler {
     }
 
     new PrintWriter(fname) { write(llvm); close }
+    (s"opt -O2 $fname" #| "llvm-dis").lineStream.toList.map(println)
     val opts = (includes ++ libs ++ Seq("-lgc", "-o", "test.out", "filename.ll")).toList
     println(opts)
     Process(clang, opts).!

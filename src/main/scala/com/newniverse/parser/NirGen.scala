@@ -6,6 +6,7 @@ import scala.collection.mutable
 import scala.scalanative.nir.Defn.Const
 import scala.scalanative.nir._
 import scala.scalanative.{nir, util}
+import util._
 
 /**
   * Created by nau on 1/11/17.
@@ -114,6 +115,8 @@ object NirGen {
         }*/
         focus
 
+      case app: Apply => genApply(app, focus)
+
       case lit: Lit =>
         genLiteral(lit, focus)
 
@@ -173,40 +176,212 @@ object NirGen {
         genExpr(last, lastfocus)
     }
   }
+  */
   def genApply(app: Apply, focus: Focus): Focus = {
     val Apply(fun, args) = app
 
     fun match {
-      case _: TypeApply =>
-        genApplyTypeApply(app, focus)
-      case Select(Super(_, _), _) =>
-        genMethodCall(fun.symbol,
-          statically = true,
-          curMethodThis.get.get,
-          args,
-          focus)
-      case Select(New(_), nme.CONSTRUCTOR) =>
-        genApplyNew(app, focus)
-      case _ =>
-        val sym = fun.symbol
-
-        if (sym.isLabel) {
-          genApplyLabel(app, focus)
-        } else if (scalaPrimitives.isPrimitive(sym)) {
-          genPrimitiveOp(app, focus)
-        } else if (currentRun.runDefinitions.isBox(sym)) {
-          val arg = args.head
-          genPrimitiveBox(arg.tpe, arg, focus)
-        } else if (currentRun.runDefinitions.isUnbox(sym)) {
-          genPrimitiveUnbox(app.tpe, args.head, focus)
-        } else {
-          val Select(receiverp, _) = fun
-          genMethodCall(
-            fun.symbol, statically = false, receiverp, args, focus)
-        }
+      case Ident("+") if args.size == 1 => genSimpleOp(app, LascaPrimitives.POS, focus)
+      case Ident("-") if args.size == 1 => genSimpleOp(app, LascaPrimitives.NEG, focus)
+      case Ident("+") if args.size == 2 => genSimpleOp(app, LascaPrimitives.ADD, focus)
+      case Ident("-") if args.size == 2 => genSimpleOp(app, LascaPrimitives.SUB, focus)
+      case Ident("*") if args.size == 2 => genSimpleOp(app, LascaPrimitives.MUL, focus)
+      case Ident("/") if args.size == 2 => genSimpleOp(app, LascaPrimitives.DIV, focus)
     }
   }
+
+  def genSimpleOp(app: Apply, code: Int, focus: Focus): Focus = {
+    val retty = Type.I32 //genType(app.tpe, box = false)
+    val Apply(_, args: List[Tree]) = app
+
+    args match {
+      case List(right)       => genUnaryOp(code, right, retty, focus)
+      case List(left, right) => genBinaryOp(code, left, right, retty, focus)
+      case _                 => abort("Too many arguments for primitive function: " + app)
+    }
+  }
+
+  def abort(s: String) = sys.error(s)
+
+  def genUnaryOp(code: Int, rightp: Tree, opty: nir.Type, focus: Focus) = {
+    import LascaPrimitives._
+    val right = genExpr(rightp, focus)
+
+    (opty, code) match {
+      case (Type.I(_) | Type.F(_), POS) => right
+      case (Type.F(_), NEG)             => negateFloat(right.value, right)
+      case (Type.I(_), NEG)             => negateInt(right.value, right)
+      case (Type.I(_), NOT)             => negateBits(right.value, right)
+      case (Type.I(_), ZNOT)            => negateBool(right.value, right)
+      case _                            => abort("Unknown unary operation code: " + code)
+    }
+  }
+
+  def numOfType(num: Int, ty: nir.Type) = ty match {
+    case Type.I8  => Val.I8(num.toByte)
+    case Type.I16 => Val.I16(num.toShort)
+    case Type.I32 => Val.I32(num)
+    case Type.I64 => Val.I64(num.toLong)
+    case Type.F32 => Val.F32(num.toFloat)
+    case Type.F64 => Val.F64(num.toDouble)
+    case _        => unreachable
+  }
+
+
+  def negateInt(value: nir.Val, focus: Focus): Focus =
+    focus withOp Op.Bin(Bin.Isub, value.ty, numOfType(0, value.ty), value)
+  def negateFloat(value: nir.Val, focus: Focus): Focus =
+    focus withOp Op.Bin(Bin.Fsub, value.ty, numOfType(0, value.ty), value)
+  def negateBits(value: nir.Val, focus: Focus): Focus =
+    focus withOp Op.Bin(Bin.Xor, value.ty, numOfType(-1, value.ty), value)
+  def negateBool(value: nir.Val, focus: Focus): Focus =
+    focus withOp Op.Bin(Bin.Xor, Type.Bool, Val.True, value)
+
+  def genBinaryOp(code: Int,
+    left: Tree,
+    right: Tree,
+    retty: nir.Type,
+    focus: Focus): Focus = {
+    import LascaPrimitives._
+
+    val lty  = Type.I32 //genType(left.tpe, box = false)
+    val rty  = Type.I32 //genType(right.tpe, box = false)
+    val opty = Type.I32 //binaryOperationType(lty, rty)
+
+    val binres = opty match {
+/*
+      case Type.F(_) =>
+        code match {
+          case ADD =>
+            genBinaryOp(Op.Bin(Bin.Fadd, _, _, _), left, right, opty, focus)
+          case SUB =>
+            genBinaryOp(Op.Bin(Bin.Fsub, _, _, _), left, right, opty, focus)
+          case MUL =>
+            genBinaryOp(Op.Bin(Bin.Fmul, _, _, _), left, right, opty, focus)
+          case DIV =>
+            genBinaryOp(Op.Bin(Bin.Fdiv, _, _, _), left, right, opty, focus)
+          case MOD =>
+            genBinaryOp(Op.Bin(Bin.Frem, _, _, _), left, right, opty, focus)
+
+          case EQ =>
+            genBinaryOp(Op.Comp(Comp.Feq, _, _, _), left, right, opty, focus)
+          case NE =>
+            genBinaryOp(Op.Comp(Comp.Fne, _, _, _), left, right, opty, focus)
+          case LT =>
+            genBinaryOp(Op.Comp(Comp.Flt, _, _, _), left, right, opty, focus)
+          case LE =>
+            genBinaryOp(Op.Comp(Comp.Fle, _, _, _), left, right, opty, focus)
+          case GT =>
+            genBinaryOp(Op.Comp(Comp.Fgt, _, _, _), left, right, opty, focus)
+          case GE =>
+            genBinaryOp(Op.Comp(Comp.Fge, _, _, _), left, right, opty, focus)
+
+          case _ =>
+            abort(
+              "Unknown floating point type binary operation code: " + code)
+        }
 */
+
+//      case Type.I(_) =>
+      case Type.I32 =>
+        code match {
+          case ADD =>
+            genBinaryOp(Op.Bin(Bin.Iadd, _, _, _), left, right, opty, focus)
+          case SUB =>
+            genBinaryOp(Op.Bin(Bin.Isub, _, _, _), left, right, opty, focus)
+          case MUL =>
+            genBinaryOp(Op.Bin(Bin.Imul, _, _, _), left, right, opty, focus)
+          case DIV =>
+            genBinaryOp(Op.Bin(Bin.Sdiv, _, _, _), left, right, opty, focus)
+          case MOD =>
+            genBinaryOp(Op.Bin(Bin.Srem, _, _, _), left, right, opty, focus)
+
+          case OR =>
+            genBinaryOp(Op.Bin(Bin.Or, _, _, _), left, right, opty, focus)
+          case XOR =>
+            genBinaryOp(Op.Bin(Bin.Xor, _, _, _), left, right, opty, focus)
+          case AND =>
+            genBinaryOp(Op.Bin(Bin.And, _, _, _), left, right, opty, focus)
+          case LSL =>
+            genBinaryOp(Op.Bin(Bin.Shl, _, _, _), left, right, opty, focus)
+          case LSR =>
+            genBinaryOp(Op.Bin(Bin.Lshr, _, _, _), left, right, opty, focus)
+          case ASR =>
+            genBinaryOp(Op.Bin(Bin.Ashr, _, _, _), left, right, opty, focus)
+
+          case EQ =>
+            genBinaryOp(Op.Comp(Comp.Ieq, _, _, _), left, right, opty, focus)
+          case NE =>
+            genBinaryOp(Op.Comp(Comp.Ine, _, _, _), left, right, opty, focus)
+          case LT =>
+            genBinaryOp(Op.Comp(Comp.Slt, _, _, _), left, right, opty, focus)
+          case LE =>
+            genBinaryOp(Op.Comp(Comp.Sle, _, _, _), left, right, opty, focus)
+          case GT =>
+            genBinaryOp(Op.Comp(Comp.Sgt, _, _, _), left, right, opty, focus)
+          case GE =>
+            genBinaryOp(Op.Comp(Comp.Sge, _, _, _), left, right, opty, focus)
+
+//          case ZOR =>
+//            genIf(retty, left, Literal(Constant(true)), right, focus)
+//          case ZAND =>
+//            genIf(retty, left, right, Literal(Constant(false)), focus)
+
+          case _ =>
+            abort("Unknown integer type binary operation code: " + code)
+        }
+
+/*
+      case _: Type.RefKind =>
+        code match {
+          case EQ =>
+            genClassEquality(
+              left, right, ref = false, negated = false, focus)
+          case NE =>
+            genClassEquality(left, right, ref = false, negated = true, focus)
+          case ID =>
+            genClassEquality(left, right, ref = true, negated = false, focus)
+          case NI =>
+            genClassEquality(left, right, ref = true, negated = true, focus)
+
+          case _ => abort("Unknown reference type operation code: " + code)
+        }
+*/
+
+/*
+      case Type.Ptr =>
+        code match {
+          case EQ | ID =>
+            genBinaryOp(Op.Comp(Comp.Ieq, _, _, _), left, right, opty, focus)
+          case NE | NI =>
+            genBinaryOp(Op.Comp(Comp.Ine, _, _, _), left, right, opty, focus)
+        }
+*/
+
+      case ty =>
+        abort("Uknown binary operation type: " + ty)
+    }
+
+    binres // genCoercion(binres.value, binres.value.ty, retty, binres)
+  }
+
+  def genBinaryOp(op: (nir.Type, Val, Val) => Op,
+    leftp: Tree,
+    rightp: Tree,
+    opty: nir.Type,
+    focus: Focus): Focus = {
+    val leftty       = Type.I32 //genType(leftp.tpe, box = false)
+    val left         = genExpr(leftp, focus)
+    val leftcoerced  = left //genCoercion(left.value, leftty, opty, left)
+    val rightty      = Type.I32 //genType(rightp.tpe, box = false)
+    val right        = genExpr(rightp, leftcoerced)
+    val rightcoerced = right //genCoercion(right.value, rightty, opty, right)
+
+    rightcoerced withOp op(opty, leftcoerced.value, rightcoerced.value)
+  }
+
+
+
   def genLiteral(lit: Lit, focus: Focus): Focus = {
     val v = lit.value match {
       case i: Int => Val.I32(i)
