@@ -1,4 +1,4 @@
-name := "newlang"
+name := "lasca"
 
 organization := "com.newniverse"
 

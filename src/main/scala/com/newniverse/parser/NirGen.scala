@@ -192,10 +192,21 @@ object NirGen {
     genExpr(last, lastfocus)
   }
 
+
+  private def flattenApply(t: Apply): Apply = {
+    t match {
+      case Apply(ap: Apply, List(arg)) =>
+        val inner = flattenApply(ap)
+        inner.copy(args = inner.args :+ arg)
+      case ap@Apply(Ident(name), List(arg)) => ap
+    }
+  }
+
   def genApply(app: Apply, focus: Focus): Focus = {
     val Apply(fun, args) = app
 
     fun match {
+      case _:Apply   => genApply(flattenApply(app), focus)
       case Ident("+") if args.size == 1 => genSimpleOp(app, LascaPrimitives.POS, focus)
       case Ident("-") if args.size == 1 => genSimpleOp(app, LascaPrimitives.NEG, focus)
       case Ident("+") if args.size == 2 => genSimpleOp(app, LascaPrimitives.ADD, focus)
@@ -203,6 +214,11 @@ object NirGen {
       case Ident("*") if args.size == 2 => genSimpleOp(app, LascaPrimitives.MUL, focus)
       case Ident("/") if args.size == 2 => genSimpleOp(app, LascaPrimitives.DIV, focus)
       case Ident("==") if args.size == 2 => genSimpleOp(app, LascaPrimitives.EQ, focus)
+      case Ident("!=") if args.size == 2 => genSimpleOp(app, LascaPrimitives.NE, focus)
+      case Ident(">") if args.size == 2 => genSimpleOp(app, LascaPrimitives.GT, focus)
+      case Ident(">=") if args.size == 2 => genSimpleOp(app, LascaPrimitives.GE, focus)
+      case Ident("<") if args.size == 2 => genSimpleOp(app, LascaPrimitives.LT, focus)
+      case Ident("<=") if args.size == 2 => genSimpleOp(app, LascaPrimitives.LE, focus)
       case Ident(name) =>
         val (as, last) = genSimpleArgs(args, focus)
         val func = last withValue Val.Global(Global.Top(name), Type.Ptr)

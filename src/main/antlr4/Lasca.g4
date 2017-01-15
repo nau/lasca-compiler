@@ -31,7 +31,7 @@
 
 grammar Lasca;
 
-valDef: 'val' Id (':' type)? '=' expr;
+valDef: VAL Id (':' type)? '=' expr;
 
 literal:
       IntegerLiteral # integer
@@ -42,11 +42,11 @@ literal:
 ident: Id;
 
 externDef:
-	 'extern' 'def' Id paramClause? (':' type)? ';'?
+	 EXTERN DEF Id paramClause? (':' type)? ';'?
    ;
 
 defDef
-   : 'def' Id paramClause? (':' type)? '=' expr ';'?
+   : DEF Id paramClause? (':' type)? '=' expr ';'?
    ;
 
 paramClause
@@ -61,7 +61,7 @@ param
    : Id (':' type)?
    ;
 
-ifExpr: 'if' expr 'then' expr ('else' expr)?;
+ifExpr: IF expr THEN expr (ELSE expr)?;
 
 expr:
      ifExpr
@@ -127,13 +127,44 @@ compilationUnit
    ;
 
 // Lexer
-
 BlockComment
-   : '{-' .*? '-}' -> skip
+   : LBRACE_MINUS .*? MINUS_RBRACE -> channel(HIDDEN)
    ;
 
-InlineComment : '--' .*? '\n' -> skip
+InlineComment : MINUS_MINUS .*? '\n' -> channel(HIDDEN)
    ;
+MINUS_MINUS: '--';
+LBRACE_MINUS: '{-';
+MINUS_RBRACE: '-}';
+VAL : 'val' ;
+COLON : ':' ;
+EQUAL : '=' ;
+EXTERN : 'extern' ;
+DEF : 'def' ;
+LPAREN : '(' ;
+RPAREN : ')' ;
+COMMA : ',' ;
+IF : 'if' ;
+THEN : 'then' ;
+ELSE : 'else' ;
+T__3 : '<<' ;
+T__4 : '>>' ;
+MOD : '%' ;
+MUL : '*' ;
+DIV : '/' ;
+XOR : 'xor' ;
+ADD : '+' ;
+SUB : '-' ;
+EQUAL_EQUAL : '==' ;
+NOT_EQUAL : '!=' ;
+LT : '<' ;
+LE : '<=' ;
+GT : '>' ;
+GE : '>=' ;
+AND : 'and' ;
+OR : 'or' ;
+LBRACE : '{' ;
+RBRACE : '}' ;
 
 BooleanLiteral
    : 'true' | 'false'
@@ -164,7 +195,7 @@ Varid
 
 
 WS
-   : [ \r\n\t] -> skip
+   : [ \r\n\t] -> channel(HIDDEN)
    ;
 
 

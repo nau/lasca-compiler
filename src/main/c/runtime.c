@@ -7,7 +7,6 @@ struct type_info {
   void* value;
 };
 
-void* lascaAllocAny();
 
 void lasca_init() {
     GC_init();

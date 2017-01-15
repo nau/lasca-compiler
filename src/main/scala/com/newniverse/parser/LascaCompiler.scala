@@ -255,7 +255,7 @@ object LascaCompiler {
   }
 
   def main(args: Array[String]): Unit = {
-    val code = readFile("hello.ls")
+    val code = readFile("hello.lasca")
     val tree = parse(code)
     val js = JsGen.toJs(tree)
     println(js)
