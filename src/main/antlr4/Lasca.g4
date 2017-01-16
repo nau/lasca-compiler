@@ -70,12 +70,12 @@ expr:
 
 infixExpr
    : prefixExpr
-   | infixExpr op=('<<' | '>>') infixExpr
+   | infixExpr op=(LSHIFT | RSHIFT) infixExpr
    | infixExpr op='%' infixExpr
    | infixExpr op=('*' | '/') infixExpr
    | infixExpr op='xor' infixExpr
    | infixExpr op=('+' | '-') infixExpr
-   | infixExpr op=('==' | '!=' | '<' | '<=' | '>' | '>=') infixExpr
+   | infixExpr op=(EQUAL_EQUAL | '!=' | '<' | '<=' | '>' | '>=') infixExpr
    | infixExpr op='and' infixExpr
    | infixExpr op='or' infixExpr
    ;
@@ -147,8 +147,8 @@ COMMA : ',' ;
 IF : 'if' ;
 THEN : 'then' ;
 ELSE : 'else' ;
-T__3 : '<<' ;
-T__4 : '>>' ;
+LSHIFT : '<<' ;
+RSHIFT : '>>' ;
 MOD : '%' ;
 MUL : '*' ;
 DIV : '/' ;
@@ -181,16 +181,16 @@ IntegerLiteral
    ;
 
 TypeId
-   : Upper Id
+   : Upper Idrest
    ;
 
 Id
-   : (Lower | Upper)+
+   : Varid
    ;
 
 
 Varid
-   : Lower+
+   : Lower Idrest
    ;
 
 
@@ -217,6 +217,10 @@ Delim
 
 fragment WhiteSpace
    : '\u0020' | '\u0009' | '\u000D' | '\u000A'
+   ;
+
+fragment Idrest
+   : (Letter | Digit)*
    ;
 
 

@@ -2,16 +2,16 @@ Lasca Language (Scala w/o OOP bullshit)
 =======
 Inspired by:
 - Scala
-- Haskell, LiquidHaskell
-- Closure
-- Idris/Agda
-- Go
-- Rust
-- Erlang
-- Python
-- Swift
-- D
-- Pony
+- Haskell, LiquidHaskell (calls, if/then/else, proofs in comments)
+- Closure (persisted data structures)
+- Idris/Agda (dependent types?)
+- Go (simplicity, Any interface?, all-in-one compiler)
+- Rust (borrowing?, method syntax)
+- Erlang (actors)
+- Python (???)
+- Swift (???)
+- D (unified method syntax) 
+- Pony (refs?, behaviours?)
 
 Motivation
 ---
@@ -28,7 +28,7 @@ Compilation time matters. A lot.
 To speed-up prototyping I suggest simplify disable/simplify typechecking during prototyping.
 This can be done by compiler option with per source file, or even per definition granularity
 
-    bfc -dynamic *.bf // compile in dynamic typing mode
+    lasca -dynamic *.bf // compile in dynamic typing mode
     
     import lang.dynamic
     
@@ -58,6 +58,10 @@ Ideas
   Consider optional refinement typing. Z3 (commercial license?), CVC4
   
 - light, non-symbol-polluted syntax
+- Uniqueness type (inplace write, no gc)
+  See Pony, Idris Unique type
+  http://lampwww.epfl.ch/~phaller/doc/capabilities-uniqueness2.pdf
+- Linear types?   
 - indentation-based? 
 	- no, curly braces: merge conficts! easier to copy-paste from SO 
 - readability first
@@ -98,11 +102,14 @@ Ideas
 - markdown comments/docs
 - CPS/Actors/π-calculus/STM?, non-blocking IO, reactive
 - import of a package must not introduce any side effects?! (hello Go)
+- JSON ready, included
+- grades for code by the compiler (A+, A, B, C, D, E, F). From untyped undocumented F-code, to proven, documented with examples A+ code
 
 Package System
 ---
 Consider IPFS
-P2P systems
+P2P systems, bittorrent for package sharing
+Basically, package hosing site is a torrent tracker.
 
 Practical things that matter
 ----
@@ -177,6 +184,9 @@ Type System
 Memory Management
 ----
 GC, concurrent mark and sweep
+per actor/green thread GC
+
+for now, use Boehm conservative GC
 
 Evaluation
 ---
@@ -663,7 +673,7 @@ FAQ
 ===
     
 ##Will there be support for Unicode characters for operators?
-No.    
+No?    
 
 Build
 ===

@@ -29,7 +29,7 @@ object NirGen {
 
   def traverse[S](tree: Tree, state: S, f: (S, Tree) => S): S = tree match {
     case t@Package(_, stats) => stats.foldLeft(f(state, t)) { case (s, t) => traverse(t, s, f) }
-    case t@Def(name, tpe, params, rhs) => traverse(rhs, f(state, t), f)
+    case t@DefDef(name, tpe, params, rhs) => traverse(rhs, f(state, t), f)
     case t@Block(stats, expr) =>
       val s = stats.foldLeft(state) { case (s, t) => traverse(t, s, f) }
       traverse(expr, s, f)
@@ -55,9 +55,9 @@ object NirGen {
   //  implicit val fresh = Fresh("tx")
   private implicit def fresh: Fresh = curMethodEnv.fresh
 
-  def genNir(tree: Tree): Seq[Defn] = {
+  def genNir(ctx: Context): Seq[Defn] = {
     //    val env = mutable.HashMap[String, Defn]
-
+    val tree = ctx.compilationUnit.untpdTree
     scoped(curMethodEnv := new MethodEnv(Fresh("main"))) {
       val MainName = Global.Top("main")
       val MainSig = Type.Function(Seq(Arg(Type.I32), Arg(Type.Ptr)), Type.I32)
@@ -81,7 +81,7 @@ object NirGen {
           Inst.Let(Op.Call(lascaMainSig, Val.Global(Global.Top("lascamain"), lascaMainSig), Seq())),
           Inst.Ret(Val.I32(0))
         ))
-      val lasca = genNir1(tree)
+      val lasca = genNir1(ctx.compilationUnit.untpdTree)(ctx)
       Seq(InitDecl, putsDeclare, helloDefn, main) ++ lasca
     }
   }
@@ -94,13 +94,13 @@ object NirGen {
     case AnyType => Type.Ptr
   }
 
-  private def genNir1(tree: Tree): Seq[Defn] = {
+  private def genNir1(tree: Tree)(implicit ctx: Context): Seq[Defn] = {
     tree match {
       case Package(name, stats) => stats.flatMap(genNir1)
       case t@ExternDef(name, tpe, params) =>
         val ty = Type.Function(params.map(p => Arg(typeMapping(p.tpe))), typeMapping(tpe))
         Seq(Defn.Declare(Attrs.None, Global.Top(name), ty))
-      case t@Def(name, tpe, params, rhs) =>
+      case t@DefDef(name, tpe, params, rhs) =>
         val f = new Fresh("src")
         val env = new MethodEnv(f)
         scoped(curMethodEnv := env) {
@@ -114,7 +114,7 @@ object NirGen {
     }
   }
 
-  def genParams(dd: Def): Seq[Val.Local] = {
+  def genParams(dd: DefDef): Seq[Val.Local] = {
     val paramSyms = {
       val vp = dd.params
       if (vp.isEmpty) Nil else vp.map(_.name)
@@ -131,7 +131,7 @@ object NirGen {
   }
 
 
-  private def genExpr(tree: Tree, focus: Focus): Focus = {
+  private def genExpr(tree: Tree, focus: Focus)(implicit ctx: Context): Focus = {
     tree match {
       case vd: ValDef =>
         val rhs = genExpr(vd.rhs, focus)
@@ -172,7 +172,7 @@ object NirGen {
     condp: Tree,
     thenp: Tree,
     elsep: Tree,
-    focus: Focus) = {
+    focus: Focus)(implicit ctx: Context) = {
     val thenn, elsen = fresh()
 
     val cond  = genExpr(condp, focus)
@@ -184,7 +184,7 @@ object NirGen {
     ))
   }
 
-  def genBlock(block: Block, focus: Focus) = {
+  def genBlock(block: Block, focus: Focus)(implicit ctx: Context) = {
     val Block(stats, last) = block
 
     val focs = Focus.sequenced(stats, focus)(genExpr(_, _))
@@ -202,7 +202,7 @@ object NirGen {
     }
   }
 
-  def genApply(app: Apply, focus: Focus): Focus = {
+  def genApply(app: Apply, focus: Focus)(implicit ctx: Context): Focus = {
     val Apply(fun, args) = app
 
     fun match {
@@ -222,11 +222,22 @@ object NirGen {
       case Ident(name) =>
         val (as, last) = genSimpleArgs(args, focus)
         val func = last withValue Val.Global(Global.Top(name), Type.Ptr)
-        func withOp Op.Call(Type.Function(Seq(Arg(Type.I32)), Type.I32), func.value, as)
+        func withOp Op.Call(genFuncType(name), func.value, as)
     }
   }
 
-  def genSimpleArgs(argsp: Seq[Tree], focus: Focus): (Seq[Val], Focus) = {
+  def genFuncType(name: String)(implicit ctx: Context): Type.Function = {
+    val defDef = ctx.scope(Symbol(name))
+    val (params, dtpe) = defDef match {
+      case d: ExternDef => (d.params, d.tpe)
+      case d: DefDef => (d.params, d.tpe)
+    }
+    val args = params.map(p => Arg(Type.I32))
+    val tpe = Type.I32
+    Type.Function(args, tpe)
+  }
+
+  def genSimpleArgs(argsp: Seq[Tree], focus: Focus)(implicit ctx: Context): (Seq[Val], Focus) = {
     val args      = Focus.sequenced(argsp, focus)(genExpr(_, _))
     val argvalues = args.map(_.value)
     val last      = args.lastOption.getOrElse(focus)
@@ -234,7 +245,7 @@ object NirGen {
     (argvalues, last)
   }
 
-  def genSimpleOp(app: Apply, code: Int, focus: Focus): Focus = {
+  def genSimpleOp(app: Apply, code: Int, focus: Focus)(implicit ctx: Context): Focus = {
     val retty = Type.I32 //genType(app.tpe, box = false)
     val Apply(_, args: List[Tree]) = app
 
@@ -247,7 +258,7 @@ object NirGen {
 
   def abort(s: String) = sys.error(s)
 
-  def genUnaryOp(code: Int, rightp: Tree, opty: nir.Type, focus: Focus) = {
+  def genUnaryOp(code: Int, rightp: Tree, opty: nir.Type, focus: Focus)(implicit ctx: Context) = {
     import LascaPrimitives._
     val right = genExpr(rightp, focus)
 
@@ -288,7 +299,7 @@ object NirGen {
     left: Tree,
     right: Tree,
     retty: nir.Type,
-    focus: Focus): Focus = {
+    focus: Focus)(implicit ctx: Context): Focus = {
     import LascaPrimitives._
 
     val lty = Type.I32 //genType(left.tpe, box = false)
@@ -416,7 +427,7 @@ object NirGen {
     leftp: Tree,
     rightp: Tree,
     opty: nir.Type,
-    focus: Focus): Focus = {
+    focus: Focus)(implicit ctx: Context): Focus = {
     val leftty = Type.I32 //genType(leftp.tpe, box = false)
     val left = genExpr(leftp, focus)
     val leftcoerced = left //genCoercion(left.value, leftty, opty, left)

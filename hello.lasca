@@ -1,13 +1,10 @@
-extern def sleep(s: Int): Int;
-extern def putchar(c: Int): Int;
+extern def sleep(s: Int): Int
+extern def putchar(c: Int): Int
 
---def lascamain = print (fact 4)
---def lascamain = test 60
-def lascamain = print 60
+def lascamain = print (fact 8)
 
-{-
-  Documentation.
-
+{- Documentation
+-}
 def test(i) = {
   if i == 30 then {
     putchar 10
@@ -17,21 +14,20 @@ def test(i) = {
   }
 }
 
-def fact(n) = if n == 1 then 1 else n * fact (n - 1);
+def fact(n) = if n == 1 then 1 else n * fact (n - 1)
 
--}
 def print(x) = {
   val d = depth x;
   printrec x d;
 }
 
-def printrec(x, d) = if x < 10 then putchar (x + 48) else {
- 	val dd = sqr(d);
+def printrec(x, d) = if d == 0 then 0 else {
+ 	val dd = sqr(d - 1);
  	val digit = x / dd;
- 	printrec(digit, 1);
- 	printrec(x - dd, d - 1);
+ 	putchar (digit + 48);
+ 	printrec(x - digit * dd, d - 1);
 }
 
-def sqr(x) = if x == 1 then 10 else 10 * sqr(x - 1);
+def sqr(x) = if x == 0 then 1 else 10 * sqr(x - 1)
 
-def depth(x) = if x < 10 then 1 else 1 + depth(x / 10);
+def depth(x) = if x < 10 then 1 else 1 + depth(x / 10)

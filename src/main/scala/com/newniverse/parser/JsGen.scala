@@ -37,7 +37,7 @@ object JsGen {
       val ss = stats.map(toJs).mkString(";\n")
       s"(function package_$name() {$ss})();\n"
     case _: ExternDef => ""
-    case Def(name, _, params, body) =>
+    case DefDef(name, _, params, body) =>
       val ps = params.map(_.name).mkString(",")
 
       val b = body match {
