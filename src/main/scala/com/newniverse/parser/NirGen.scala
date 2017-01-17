@@ -105,23 +105,21 @@ object NirGen {
         val env = new MethodEnv(f)
         scoped(curMethodEnv := env) {
           val params   = genParams(t)
-          val sig = Type.Function(Seq.fill(params.size)(Arg(Type.I32)), Type.I32)
+          val sig = Type.Function(params.map(p => Arg(p.valty)), typeMapping(tpe))
           val body = genExpr(rhs, Focus.start()(fresh).withLabel(fresh(), params: _*))
           val inst = body.finish(Inst.Ret(body.value))
           Seq(Defn.Define(Attrs.None, Global.Top(name), sig, inst))
         }
+      case t@ValDef(name, _, Lit(v: Int, _)) => Seq(Defn.Const(Attrs.None, Global.Top(name), Type.I32, Val.I32(v)))
+      case t@ValDef(name, _, Lit(v: String, _)) => Seq(Defn.Const(Attrs.None, Global.Top(name), Rt.String, Val.String(v)))
       case t => println(t); Seq()
     }
   }
 
   def genParams(dd: DefDef): Seq[Val.Local] = {
-    val paramSyms = {
-      val vp = dd.params
-      if (vp.isEmpty) Nil else vp.map(_.name)
-    }
-    val params = paramSyms.map { sym =>
+    val params = dd.params.map { case ValDef(sym, tpe, _) =>
       val name  = fresh()
-      val ty    = Type.I32  // TODO type
+      val ty    = typeMapping(tpe)
       val param = Val.Local(name, ty)
       curMethodEnv.enter(sym, param)
       param
