@@ -1,20 +1,27 @@
 Lasca Language (Scala w/o OOP bullshit)
 =======
+
+Lasca is Scala shifted towards Haskell. 
+
 Inspired by:
 - Scala
-- Haskell, LiquidHaskell (calls, if/then/else, proofs in comments)
+- Haskell, LiquidHaskell
 - Closure (persisted data structures)
 - Idris/Agda (dependent types?)
 - Go (simplicity, Any interface?, all-in-one compiler)
 - Rust (borrowing?, method syntax)
-- Erlang (actors)
-- Python (???)
+- Erlang (actors, distributed)
+- Python (docstrings, ???)
 - Swift (???)
-- D (unified method syntax) 
-- Pony (refs?, behaviours?)
+- D (unified method syntax, macros?) 
+- Pony (ref caps?, behaviours?)
+- Julia (docs, comparison promotions?, macros, concurrency?)
+- Unison
+- Cloud Haskell 
 
 Motivation
 ---
+
 You write code once and read it hundred times. 
 Hence, readability and simplicity but expressivity and conciseness is the essence.
 One of the goal is to speed-up and partition a usual development cycle:
@@ -27,8 +34,9 @@ Compilation time matters. A lot.
  
 To speed-up prototyping I suggest simplify disable/simplify typechecking during prototyping.
 This can be done by compiler option with per source file, or even per definition granularity
+See Haskell Deffered type checking.
 
-    lasca -dynamic *.bf // compile in dynamic typing mode
+    lasca -dynamic *.lasca // compile in dynamic typing mode
     
     import lang.dynamic
     
@@ -44,13 +52,21 @@ Money spent developing a program
 Cost of an error
 Performance
  
- 
+# Future of software development
+
+We're getting closer to pure math every year.
+Immutable data, pure functions simplify reasoning, optimizations and distribution.
+
+In future, programs will be created by AI.
+We need to help it manipulate programs.
+
 
 Ideas
 ---
 - Concurrency Oriented Programming (Erlang). Objects are out. Concurrency is in.
 - Gradual Typing (http://homes.soic.indiana.edu/jsiek/what-is-gradual-typing/)
 - Deferred Type Errors (runtime compilation mode, Haskell)
+- Linear types?
 - Liquid Type system (refinement types) + Dependent Type system? 
   https://github.com/pleiad/Refinements
   
@@ -87,7 +103,7 @@ Ideas
     - Consider private by default, bc adding public function to a package may require full source recompilation. If it is.
 - macro-based extensions?
 - implicits? (Scala/Haskell/Idris)
-- implicit macro? (Scala)  
+- implicit macro? (Scala). No, if possible.  
 - import features (Scala-like)
 - compile-time and runtime reflection
 - theorem prover? (Idris)
@@ -99,17 +115,22 @@ Ideas
 - important things must be greppable and googlable, call it searchability :)
 - prefer offensive programming style
 - compiler as a service (like Scala sbt)
-- markdown comments/docs
+- markdown comments/docs, doctest (Julia, Python)
 - CPS/Actors/π-calculus/STM?, non-blocking IO, reactive
 - import of a package must not introduce any side effects?! (hello Go)
 - JSON ready, included
 - grades for code by the compiler (A+, A, B, C, D, E, F). From untyped undocumented F-code, to proven, documented with examples A+ code
+- libuv for async I/O
+- https://www.youtube.com/watch?v=buQNgW-voAg (future functional programming language
+- blockchain based storage of proven software
+
 
 Package System
 ---
 Consider IPFS
 P2P systems, bittorrent for package sharing
 Basically, package hosing site is a torrent tracker.
+Distributed blockchain-based storage of proven software libraries
 
 Practical things that matter
 ----
@@ -612,36 +633,6 @@ or
       (==)(self, rhs: a)
       (!=)(self, rhs: a) = !(self == rhs)
       
-Program Example
----
-data Magic = 
-  | Main 0xD9B4BEF
-  | TestNet 0xDAB5BFFA
-
-data Message = 
-  magic: Magic
-  command: [Byte] 12
-  length: Int
-  checksum: Int
-  payload: Payload
-  
-data Payload = 
-  | Version = 
-      version: Int
-      services: Int 64
-      timestamp: Int 64
-      addr_recv: NetAddr
-  | VerAck
-  | Addr = 
-      count: VarInt
-      addlList: [Byte]
-      
-val msg = Message (magic = Main, 
-    command = [1 2 3 4 5 6 7 8 9 10 11 12],
-    length = 15
-    checksum = sha1 VerAck 
-    )     
-
 
 Dependent Types
 ----
@@ -667,6 +658,24 @@ Implementing data Subtyping implies:
 - complex typer
 - protected visibility
 
+
+Orthogonal type systems
+=====
+Consider having several orthogonal type systems.
+
+One is a standard System F, or System Fw, or Dependent Type system
+
+Another for side effect tracking. Consider annotations or inside comments annotations
+ 
+Another for, say, O-complexity tracking.
+ 
+```scala
+	-- @O(1), @pure, @total 
+	def toString(a): String =
+	-- String -> IO ()
+	-- String -> IO ()
+	def println(s: String): Unit
+``` 
 
     
 FAQ

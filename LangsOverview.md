@@ -66,7 +66,48 @@ https://github.com/scalaz/scalaz/blob/series/7.3.x/core/src/main/scala/scalaz/Mo
     }
 ```
     
-Haskell/Agda/Idris
+Haskell
+---
+
+Great language. But it has 25 years of legacy none could improve.
+Laziness may cause performance uncertainties.
+There are 5 types for strings: String, Text, Text.Lazy, ByteString, ByteString.Lazy.
+And String is the worst one, and is not recommended to use in a real program.
+And it's a default String. It's in Prelude.
+You can't do a shit without enabling at least 5 language extensions. 
+And you have to know about them. 
+And there are about 70 of those.
+ 	
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns #-}
+etc
+
+And there is $ operator. 
+I guess people use it because it's hard to introduce another name in you perfect 120 character long one-liner
+And people hate parens.
+
+SML/Ocaml
+----
+
+Module system is weird. I'd consider type classes instead.
+Also, there is a paper "ML Modules and Haskell Type Classes: A Constructive Comparison", so looks those are interchangable.
+
+    This article demonstrates how to translate essential features of ML modules to
+    Haskell type classes and vice versa.
+    
+https://www.cse.unsw.edu.au/~chak/papers/modules-classes.pdf
+
+Agda/Idris
 ---
 ##Pros
 Great languages. Good type systems, nice and mostly clean syntax
@@ -75,7 +116,6 @@ Dependent types
 
 ##Cons
 Quite hard to grok for an average programmer
-Laziness may cause performance uncertainties.
 Complicated (compared to "usual" imperative lang) effect system with monads/do notations
 Data immutability implies complications for an average programmer
 Unusual syntax
@@ -215,11 +255,11 @@ Not good. Idris is better, but sucks too.
   
 C/C++
 ---
-Don't even get me started on that old crap.
+Don't even get me started on those.
 
 D
 ---
-Its author was permanently harmed by C++ expirience
+Its author was permanently harmed by C++ experience
 
 ##Pros
 Uniform Function Call Syntax
@@ -235,15 +275,13 @@ defer
 
 ##Cons
 Primitiveness. It's to simple. It can't do a shit.
-Weak and cumbersome type system. No generics.
-Goroutines are bullshit. You can't be reactive with it. Future/Promis (Scala-like) are much more powerfull and useful.
-Duck-typing. Not sure if it's too bad, though.
-Slices are bullshit.
 Nil
+Weak and cumbersome type system. No generics.
+Duck-typing. Not sure if it's too bad, though.
 
 Rust
 ---
-It looked as a decent language, until they threw away all the good stuff :(
+Interesting usage of kind of linear types.
 
 ##Pros
 No OOP bullshit, just type-classes, ADTs and structs
@@ -252,11 +290,11 @@ Method-based syntax
 Generics
 
 ##Cons
-No GC. That's all. You can't develop quickly w/o GC. Period.
+No GC. That's all. You can't develop fast w/o GC.
 No higher-kind types, not even mentioning dependent types.
-Semicolons, for gods sake! Com'on, it's 21st century already, hello! Even JavaScript works w/o semicolons.
+Semicolons, for gods sake! Com'on, it's 21st century already! Even JavaScript works w/o semicolons.
 <> for generics is just wrong.
-Overall, syntax is very polluted with all that std::io::;.,()<>{}'a&* crap.
+Overall, syntax is very polluted with all that std::io::;.,()<>{}'a&* symbolism. It's unpleasant to read.
 
 Swift
 ---
@@ -265,31 +303,51 @@ Not bad. But it's just boring and vanilla. To explicit.
 ARC
 
 ##Cons
-Still cumbersome syntax, polluted with <Generic>{}(). Better that C++, though, everything is better than C++.
+Still cumbersome syntax, polluted with <Generic>{}(). Better that C++, though, anything is better than C++.
 Weird string interpolation
 return
 No real patter-matching
-OOP with inheritance etc. I consider it bad design.
+OOP with inheritance etc.
 
-Any dynamic language
+
+Julia
 ---
-Bullshit. Except Erlang, which is half-bullshit.
-Writting code is the easiest part of software development.
-The most interesting part comes after the code is written. 
-Its maintenance, changing, and refactoring – that is complex, and must be addressed.
-Dynamic languages complicate productive IDE support.
- 
+Interesting. But dynamically typed.
+
+Clojure
+----
+Interesting. But dynamically typed. And it's a lisp. 
+People tend to not like working with bare AST. Compilers do.
+
+#Pros
+- JVM
+- core.async
+
+#Cons
+- JVM
+- Lisp
+
 Erlang
 ----
 ##Pros
 - actors as first class citizen
 - simple
+- large infrastructure
+- widely used
 
 ##Cons
 - primitive, unexpressive?
 - no type safety (duh)
 - slow
+- weak documentation
 
+
+Any dynamic language
+---
+Writing code is the easiest part of software development.
+The most interesting part comes after the code is written. 
+Its maintenance, changing, and refactoring – that is complex, and must be addressed.
+Dynamic languages complicate productive IDE support.
 
 Any Java
 ---
@@ -297,7 +355,6 @@ You no longer can fix that pile of crap. It's too late, Java, it's too late.
 
 Any .NET
 ---
-None cares about any language/platform bound to a single OS. And Mono doesn't count.
-And it's too late, Microsoft, to make it cross-platform. 
-Fuck you.
+I don't care about any language/platform bound to a single OS. And Mono doesn't count.
+And it's too late, Microsoft, to make it cross-platform. Fuck you.
 F# is ok, though. C# is legit too.

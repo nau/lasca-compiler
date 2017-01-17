@@ -53,7 +53,7 @@ object LascaCompiler {
 
   def toLlvm(ctx: Context) = {
 
-    val module = NirGen.genNir(ctx)
+    val module = (new DynamicNirGen).genNir(ctx)
     println(module)
     CodeGen.apply(module).genIrString
   }
@@ -98,8 +98,8 @@ object LascaCompiler {
     val runtimeOFiles = runtimeOPath.listFiles().collect { case f if f.getName.endsWith(".o") => abs(f) }
 
     new PrintWriter(fname) { write(llvm); close }
-    (s"opt -O2 $fname" #| "llvm-dis").lineStream.toList.map(println)
-    val opts = (includes ++ libs ++ Seq("-lgc", "-o", "test.out", "filename.ll") ++ runtimeOFiles).toList
+//    (s"opt -O2 $fname" #| "llvm-dis").lineStream.toList.map(println)
+    val opts = (includes ++ libs ++ Seq(/*"-O2",*/ "-lgc", "-o", "test.out", "filename.ll") ++ runtimeOFiles).toList
     println(opts)
     Process(clang, opts).!
     new File("test.out").getAbsolutePath
@@ -134,7 +134,7 @@ object LascaCompiler {
     var compUnit = CompilationUnit(source)
     compUnit = parse(compUnit)
     val ctx = new Context(compUnit)
-    namer(ctx)
+    identToApply(namer(ctx))
     val js = JsGen.toJs(compUnit.untpdTree)
     println(js)
     JsGen.runJs(js)
@@ -142,6 +142,20 @@ object LascaCompiler {
     println(llvm)
     val path = compile(llvm)
     println(exec(path))
+  }
+
+  def identToApply(ctx: Context): Context = {
+    val tree = ctx.compilationUnit.untpdTree
+    val newTree = transform(tree, ctx) {
+      case (_, id@Ident(name)) =>
+        val ident = ctx.scope.get(Symbol(name)).collect {
+          case DefDef(n, _, Nil, _) => Apply(id, Nil)
+        }
+        ident.getOrElse(id)
+      case (_, t) => t
+    }
+    ctx.compilationUnit.untpdTree = newTree
+    ctx
   }
 
   def parse(compilationUnit: CompilationUnit): CompilationUnit = {
@@ -168,5 +182,37 @@ object LascaCompiler {
     compilationUnit
   }
 
+  def traverse[S](tree: Tree, state: S, f: (S, Tree) => S): S = tree match {
+    case t@Package(_, stats) => stats.foldLeft(f(state, t)) { case (s, t) => traverse(t, s, f) }
+    case t@DefDef(name, tpe, params, rhs) => traverse(rhs, f(state, t), f)
+    case t@Block(stats, expr) =>
+      val s = stats.foldLeft(state) { case (s, t) => traverse(t, s, f) }
+      traverse(expr, s, f)
+    case t@If(cond: Tree, thenp: Tree, elsep: Tree) =>
+      traverse(elsep, traverse(thenp, traverse(cond, f(state, t), f), f), f)
+    case t@Apply(fun, args: List[Tree]) =>
+      val s = traverse(fun, f(state, t), f)
+      args.foldLeft(s) { case (s, t) => traverse(t, s, f) }
+    case t => f(state, t)
+  }
 
+  def traversePF[S](tree: Tree, state: S, f: PartialFunction[(S, Tree), S]): S = {
+    def ff(state: S, tree: Tree) = if (f.isDefinedAt((state, tree))) f.apply((state, tree)) else state
+    traverse(tree, state, ff)
+  }
+
+  def transform(tree: Tree, ctx: Context)(f: (Context, Tree) => Tree): Tree = tree match {
+    case t@Package(_, stats) => t.copy(stats = stats.map { case (t) => transform(t, ctx)(f) })
+    case t@DefDef(name, tpe, params, rhs) => t.copy(rhs = transform(rhs, ctx)(f))
+    case t@Block(stats, expr) =>
+      val ss = stats.map { case (t) => transform(t, ctx)(f) }
+      Block(ss, transform(expr, ctx)(f))
+    case t@If(cond: Tree, thenp: Tree, elsep: Tree) =>
+      If(transform(cond, ctx)(f), transform(thenp, ctx)(f), transform(elsep, ctx)(f))
+    case t@Apply(fun, args: List[Tree]) =>
+      val s = transform(fun, ctx)(f)
+      val as = args.map { case (t) => transform(t, ctx)(f) }
+      Apply(s, as)
+    case t => f(ctx, t)
+  }
 }

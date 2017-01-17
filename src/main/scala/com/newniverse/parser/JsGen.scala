@@ -62,7 +62,7 @@ object JsGen {
     case Apply(fun, args) =>
       val as = args.map(toJs).mkString(", ")
       s"${toJs(fun)}($as)"
-    case Ident(name) => s"callOrIdent($name)"
+    case Ident(name) => name
     case Lit(v: Int, IntType) => v.toString
     case Lit(v: Boolean, BoolType) => v.toString
     case Lit(v: String, StringType) => v.toString

@@ -7,9 +7,10 @@ def lascamain = print (fact 8)
 -}
 def test(i) = {
   if i == 30 then {
-    putchar 10
+--    putchar 10
+   1
   } else {
-    putchar i; -- comment
+--    putchar i; -- comment
     test (i - 1);
   }
 }

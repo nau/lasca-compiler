@@ -13,3 +13,7 @@ antlr4Settings
 antlr4GenVisitor in Antlr4 := true
 
 antlr4PackageName in Antlr4 := Some("com.newniverse.parser")
+
+//resolvers += Resolver.sonatypeRepo("snapshots")
+
+//enablePlugins(ScalaNativePlugin)

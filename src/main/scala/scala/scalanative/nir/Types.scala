@@ -23,7 +23,6 @@ object Type {
   // low-level types
   final case object None   extends Type
   final case object Void   extends Type
-  final case object Vararg extends Type
   final case object Ptr    extends Type
 
   sealed abstract case class I(width: Int) extends Type
@@ -47,8 +46,6 @@ object Type {
   sealed abstract class RefKind         extends Type
   final case object Unit                extends RefKind
   final case class Class(name: Global)  extends RefKind with Named
-  final case class Trait(name: Global)  extends RefKind with Named
-  final case class Module(name: Global) extends RefKind with Named
 
   val unbox = Map[Type, Type](
     Type.Class(Global.Top("java.lang.Boolean"))               -> Type.Bool,

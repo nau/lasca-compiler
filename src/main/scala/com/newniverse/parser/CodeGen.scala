@@ -221,7 +221,6 @@ object CodeGen {
 
     implicit val showType: Show[Type] = Show {
       case Type.Void                     => "void"
-      case Type.Vararg                   => "..."
       case Type.Ptr                      => "i8*"
       case Type.Bool                     => "i1"
       case Type.I8                       => "i8"

@@ -29,7 +29,7 @@ def encode(be: Bencoding): [Byte] = {
     val bytes = xs.flatMap encode
     l ++ bytes ++ e
   BDict xs => 
-    val bytes = xs.flatMap((k, v) => k.encode ++ v.encode)
+    val bytes = xs.flatMap { (k, v) => k.encode ++ v.encode }
     d ++ bytes ++ e
 }
 

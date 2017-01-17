@@ -122,12 +122,6 @@ object Shows {
 
     case Op.Classalloc(name) =>
       sh"classalloc $name"
-    case Op.Field(value, name) =>
-      sh"field $value, $name"
-    case Op.Method(value, name) =>
-      sh"method $value, $name"
-    case Op.Module(name) =>
-      sh"module $name"
     case Op.As(ty, value) =>
       sh"as[$ty] $value"
     case Op.Is(ty, value) =>
@@ -269,7 +263,6 @@ object Shows {
   implicit val showType: Show[Type] = Show {
     case Type.None                     => "none"
     case Type.Void                     => "void"
-    case Type.Vararg                   => "..."
     case Type.Ptr                      => "ptr"
     case Type.Bool                     => "bool"
     case Type.I8                       => "i8"
@@ -286,8 +279,6 @@ object Shows {
     case Type.Unit         => "unit"
     case Type.Nothing      => "nothing"
     case Type.Class(name)  => sh"class $name"
-    case Type.Trait(name)  => sh"trait $name"
-    case Type.Module(name) => sh"module $name"
   }
 
   implicit val showArg: Show[Arg] = Show {
