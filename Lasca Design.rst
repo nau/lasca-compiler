@@ -14,7 +14,7 @@ Overview
 - strict
 - functional
 - expression based
-- strongly statically typed with gradual typing and dynamic modes
+- strongly statically typed with type inference, gradual typing, and dynamic modes
 - System F with liquid types (`Liquid Haskell`_)
 - type inference (Hindley-Milner alike)
 - type classes (Haskell), or implicit instances (Idris)
@@ -27,17 +27,19 @@ Overview
 - JS backend
 - REPL
 
-Inspired by: Scala, Haskell, Idris, Clojure, Erlang, Julia, Haxe, Go, Rust, D, Pony
+
+Inspired by: Scala, Haskell, Idris, Clojure, Erlang, Julia, Haxe, Go, Rust, D, Pony_
 
 
 Domain
 ======
 
+* Highly concurrent applications (P2P, blockchain)
 * Distributed server side applications development
 * Machine learning tasks
 * Web development
 
-Goals – substitute Erlang, Scala/Scala.js, Python, Julia and JavaScript/Node.js for server-side development.
+Goals – substitute Go, Erlang, Scala/Scala.js, Python, Julia and JavaScript/Node.js for server-side development.
 
 
 Motivation
@@ -181,7 +183,7 @@ Our goal is to get the best from type system while not making it too complex and
 
 Switchable gradual/static typing. Both are strong.
 
-System F with Liquid Types. (see `Liquid Haskell`_)
+System F with Liquid Types. (see `Liquid Haskell`_, Leon_)
 
 Type classes (Haskell or Idris like implicits).
 
@@ -219,7 +221,7 @@ Syntax
 
 Keywords
 --------
-``alias``?, ``as``?, ``break``?, ``case``?, ``continue``?, ``data``
+``alias``?, ``as``?, ``break``?, ``case``?, ``continue``?, ``data``,
 ``def``,
 ``extend``?,
 ``extern``,
@@ -262,8 +264,9 @@ Type names start with uppercase letter. Same rules apply.
 
 .. code:: haskell
 
-	`arbitrary ident_name with keywords import` = 1
-    type OptString = Option String
+	let `arbitrary ident_name with keywords import` = 1
+
+	type OptString = Option String
 
 
 Basic Types
@@ -276,10 +279,10 @@ Numbers
 
 Not sure about naming. Either
 
-- ``I8``/``U8``/``Byte``, I16/U16/Short, I32/U32/Int, I64/U64/Long, F32, F64
-- Byte/UByte, Short/UShort, Int/UInt, Long/ULong, Float32, Float64/Double
-- Integer/BigInt/Decimal/whatever for unlimited precision numerals
-- maybe have Int be the size of target machine word?
+- ``I8``/``U8``/``Byte``, ``I16``/``U16``/``Short``, ``I32``/``U32``/``Int``, ``I64``/``U64``/``Long``, ``F32``, ``F64``
+- ``Byte``/``UByte``, ``Short``/``UShort``, ``Int``/``UInt``, ``Long``/``ULong``, ``Float32``, ``Float64``/``Double``
+- ``Integer``/``BigInt``/``Decimal``/whatever for unlimited precision numerals
+- maybe have ``Int`` be the size of target machine word?
 
 Do we need unsigned types?
 
@@ -379,10 +382,29 @@ It's more familiar and intuitive for a programmer. May simplify adoption.
 Pattern Matching
 ----------------
 
-Discourage point-less expressions
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Discourage point-free expressions!
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Those are hard to read.
+From https://wiki.haskell.org/Pointfree
+
+
+	Pointfree Style
+		It is very common for functional programmers to write functions as a composition of other functions, never mentioning the actual arguments they will be applied to. For example, compare:
+
+		 .. code:: haskell
+
+			sum = foldr (+) 0
+
+		with:
+
+		 .. code:: haskell
+
+			 sum' xs = foldr (+) 0 xs
+
+		These functions perform the same operation, however, the former is more compact, and is considered cleaner. This is closely related to function pipelines (and to unix shell scripting): it is clearer to write let fn = f . g . h than to write let fn x = f (g (h x)).
+
+
+I find this style extremely non-intuitive, hard to read, understand, and maintain. Saving few characters doesn't worth it.
 
 Operators
 ---------
@@ -436,7 +458,7 @@ Ideas
 
 	def main = {
 	-- if
-		if 0 <= idx < 10 and array(idx) > 0 then a else b
+		if 0 <= idx < 10 and array(idx) > 0 then a else b -- Chaining comparisons (Julia, Python)
 		if true then dostuff() <=> if true then { dostuff(); () } else ()
 	-- Streams, Lists, List comprehension
 		list = [1, 2, 3]
@@ -452,7 +474,7 @@ Ideas
 		func = { (x, y) -> x + y }
 		hof = list.map { _ + 1 } <=> map list { x => x + 1}
 		hof = list.map { x => x + 1 }
-		hof = list.collect { (x, y) => x + y }
+		hof = list.collect { (x, y) if x > 0  => x + y } -- like Scala case, but without ``case`` keyword
 		func = x => { x + 1 }
 	-- Map literal
 		a = "a"
@@ -586,7 +608,7 @@ FFI (Foreign Functions Interface)
 =================================
 
 Must be as straightforward and simple as possible.
-See `Pony <https://tutorial.ponylang.org/c-ffi/calling-c.html>`_
+See `Pony FFI <https://tutorial.ponylang.org/c-ffi/calling-c.html>`_
 or `Rust FFI <https://doc.rust-lang.org/book/ffi.html>`_.
 
 Exception Handling
@@ -608,7 +630,8 @@ See:
 .. _Haskell Defered type checking: https://ghc.haskell.org/trac/ghc/wiki/DeferErrorsToRuntime
 .. _Akka: http://akka.io
 .. _Erlang: https://www.erlang.org
-.. _Pony: https://www.ponylang.org
 .. _Boehm: https://www.hboehm.info/gc/
+.. _Pony: https://www.ponylang.org
+.. _Leon: https://github.com/epfl-lara/leon
 .. [1] https://en.wikipedia.org/wiki/Persistent_data_structure
 .. [2] https://www.infoq.com/presentations/Value-Identity-State-Rich-Hickey
