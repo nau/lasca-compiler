@@ -27,6 +27,8 @@ lasca:
 compile_example: %.s
 	$(CC) -fPIC *.s -o compiled
 
+designpdf:
+	rst2pdf -b 1 Lasca\ Design.rst
 
 .PHONY: clean
 

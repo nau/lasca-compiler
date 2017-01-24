@@ -39,12 +39,10 @@ op = do
   whitespace
   return o
 
-binops = [[binary "=" Ex.AssocLeft]
-        ,[binary "*" Ex.AssocLeft,
-          binary "/" Ex.AssocLeft]
-        ,[binary "+" Ex.AssocLeft,
-          binary "-" Ex.AssocLeft]
-        ,[binary "<" Ex.AssocLeft]]
+binops = [[binary "=" Ex.AssocLeft],
+          [binary "*" Ex.AssocLeft, binary "/" Ex.AssocLeft],
+          [binary "+" Ex.AssocLeft, binary "-" Ex.AssocLeft],
+          [binary "<" Ex.AssocLeft]]
 
 expr :: Parser Expr
 expr =  Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
@@ -71,20 +69,20 @@ function = do
   args <- parens $ commaSep funcArgument
   reservedOp "="
   body <- expr
-  return $ Function name args body
+  return (Function name args body)
 
 extern :: Parser Expr
 extern = do
   reserved "extern"
   name <- identifier
   args <- parens $ many identifier
-  return $ Extern name args
+  return (Extern name args)
 
 call :: Parser Expr
 call = do
   name <- identifier
   args <- parens $ commaSep expr
-  return $ Call name args
+  return (Call name args)
 
 ifthen :: Parser Expr
 ifthen = do
@@ -94,7 +92,7 @@ ifthen = do
   tr <- expr
   reserved "else"
   fl <- expr
-  return $ If cond tr fl
+  return (If cond tr fl)
 
 for :: Parser Expr
 for = do
