@@ -1,7 +1,7 @@
 ==========================
 Lasca Programming Language
 ==========================
-
+.. class:: center
 
 Lasca Programming Language Design Draft v0.0.1
 
@@ -14,11 +14,12 @@ Overview
 - strict
 - functional
 - expression based
+- pattern matching
 - strongly statically typed with type inference, gradual typing, and dynamic modes
 - System F with liquid types (`Liquid Haskell`_)
 - type inference (Hindley-Milner alike)
 - type classes (Haskell), or implicit instances (Idris)
-- several type checking passes (types, big O checks, side-effects/purity checks, totality checks)
+- several optional type checking passes (types, big O checks, side-effects/purity checks, totality checks)
 - immutable data by default
 - persisted data structures (see [1]_, [2]_)
 - message passing concurrency (see Erlang_ actors, Akka_) (or CPS like in Go?)
@@ -28,7 +29,7 @@ Overview
 - REPL
 
 
-Inspired by: Scala, Haskell, Idris, Clojure, Erlang, Julia, Haxe, Go, Rust, D, Pony_
+Inspired by: Scala, Haskell, Idris, Clojure, Erlang, Julia, Ruby, Python, Haxe, Go, Rust, D, Pony_
 
 
 Domain
@@ -61,6 +62,29 @@ This can be done by compiler option with per source file, or even per definition
 
 See `Haskell Defered type checking`_.
 
+Future of Programming by Uncle Bob Martin
+https://www.youtube.com/watch?v=ecIWPzGEbFc
+
+Resume
+- Lisp for the rescue
+
+
+
+https://www.quorumlanguage.com/evidence.html
+
+The Programming Language Wars
+https://www.youtube.com/watch?v=bvtD8Bg8Dv0
+
+http://web.cs.unlv.edu/stefika/research.html
+
+Resume
+- static typing is generally better
+- documentations matters
+- ide doesn't matter o_O
+
+
+https://www.quorumlanguage.com/evidence.html
+
 Human perception driven approach for a programming language syntax design
 -------------------------------------------------------------------------
 
@@ -68,6 +92,7 @@ Lambda-calculus, and Haskell are great for a compiler. Not so much for a human.
 People are not computers. Yet, at least.
 
 We must consider human perceptive characteristic designing the language syntax.
+
 For example, at least for me, it's very important to get some working result as quick as possible.
 That means I would rather not wait for compilation/type checking/tests/system startup.
 Hence, either all of that happen very quickly, or we need to postpone/disable some of that.
@@ -137,11 +162,10 @@ Optimal?
 
 .. code:: scala
 
-	type a = forall a. {a | len}
-	def foldl(col: Seq a, zero: z, f: (z -> a -> z)): a = {
+	def foldl(col: Seq a, zero: z, f: z -> a -> z): a = match
 	  [] zero _        -> zero
 	  (x :: xs) zero f -> xs.foldl zero (f zero x)
-	}
+	end
 
 Vision
 ======
@@ -221,7 +245,7 @@ Syntax
 
 Keywords
 --------
-``alias``?, ``as``?, ``break``?, ``case``?, ``continue``?, ``data``,
+``alias``?, ``and``, ``as``?, ``break``?, ``case``?, ``continue``?, ``data``,
 ``def``,
 ``extend``?,
 ``extern``,
@@ -233,6 +257,8 @@ Keywords
 ``let``?,
 ``macro``?,
 ``match``?,
+``not``
+``or``
 ``package``,
 ``private``?,
 ``struct``?,
@@ -244,6 +270,7 @@ Keywords
 ``var``,
 ``while``,
 ``where``?,
+``xor``
 ``yield``?,
 
 ``implicit``? (better with annotation if needed)
@@ -264,7 +291,7 @@ Type names start with uppercase letter. Same rules apply.
 
 .. code:: haskell
 
-	let `arbitrary ident_name with keywords import` = 1
+	`arbitrary ident_name with keywords import` = 1
 
 	type OptString = Option String
 
@@ -340,9 +367,16 @@ Compound Types
 		age: Nat
 	}
 
+    val p = Person "Alex" "Nemish" 33
+    val p = Person("Alex", "Nemish", 33)
+    val p = Person(firstName = "Alex", secondName = "Nemish", age = 33)
+    val p = Person { firstName = "Alex", secondName = "Nemish", age = 33 }
+
+    Person.firstName p == p.firstName
+
 	-- ADTs/GADTs
 	data List(a) = Nil | Cons(head: a, tail: List(a))
-	type List(a) = Nil | Cons(head: a, tail: List(a))
+	type List(a) = Nil | Cons (head: a, tail: List(a))
 	type List(a) = Nil | Cons { head: a, tail: List(a) }
 
 	-- GADT
@@ -379,8 +413,54 @@ It's more familiar and intuitive for a programmer. May simplify adoption.
 #. ``1.plus 2`` <=> ``plus 1 2``
 #. ``a.b.c.d e f.g`` <=> ``d (c (b a)) e (g f)``
 
+Call syntax
+-----------
+
+I'm thinking on mixing applicative function call syntax with argument list call syntax, and method syntax calls.
+And make it possible to use implicitly tupled functions, like
+
+
+
+.. code:: haskell
+
+	def foo(a: Int, b: String = "zero"): Bool
+
+    foo 1 "one"
+    foo(1, "one")
+    foo(1) -- foo 1 "zero"
+    foo(b = "one", a = 1) -- foo 1 "one"
+    foo 1 -- partial application
+    1.foo -- foo 1 "zero"
+    1.foo "one" -- foo 1 "one"
+    1.foo("one") -- foo 1 "one"
+    1.foo(b = "one") -- foo 1 "one"
+
+
 Pattern Matching
 ----------------
+
+def test: (Person, Point) = ??? end
+
+test match
+    (Person "Alex sn age, Point x y) if age > 30 =>
+    (Person fn sn age, Point 0 0) =>
+end
+
+
+Lens And Immutable Data Structures
+----------------------------------
+.. code:: ruby
+
+	data Vector(a: Point, b: Point, c: Point)
+
+    v = Vector Point(0, 0) Point(1, 1) Point(2, 2)
+    v1 = v.a.x := 1 --> Vector(Point(1, 0), Point(1, 1), Point(2, 2))
+    v1 = v.a.x ~= { _ + 1 } --> Vector(Point(1, 0), Point(1, 1), Point(2, 2))
+
+
+
+Donts
+-----
 
 Discourage point-free expressions!
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -415,7 +495,6 @@ Provide a limited set of redefinable operator with forced laws to satisfy.
 - ``-``, ``/`` – associative binary operation
 - ``++`` – associative binary operation ``append``
 - ``::`` – list cons
-- ``!`` – unary not
 - ``!`` – binary operation (actors?)
 - ``?`` – binary operation
 

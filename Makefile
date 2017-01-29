@@ -21,6 +21,9 @@ medium.s: medium.ll
 medium: medium.s
 	time $(CC) -fPIC medium.s -o medium
 
+rts:
+	$(CC) -shared -fPIC -O2 -I/usr/local/include -L/usr/local/lib -lgc src/main/c/*.c -o lascart.so
+
 lasca:
 	stack build
 

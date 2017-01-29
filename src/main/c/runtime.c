@@ -59,11 +59,11 @@ const int LE = 45;                            // x <= y
 const int GE = 46;                            // x >= y
 const int GT = 47;                            // x > y
   // Boolean unary operations
-const int ZNOT = 50                          // !x
+const int ZNOT = 50;                          // !x
 
   // Boolean binary operations
-const int ZOR = 60                           // x || y
-const int ZAND = 61                          // x && y
+const int ZOR = 60;                           // x || y
+const int ZAND = 61;                          // x && y
 
 void *runtimeBinOp(int code, struct type_info* lhs, struct type_info* rhs) {
   if (lhs->type != rhs->type) {

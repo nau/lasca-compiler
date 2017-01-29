@@ -2,8 +2,14 @@ package scala.scalanative.util
 
 import language.implicitConversions
 
+
+
 class ScopedVar[A] {
   import ScopedVar.Assignment
+
+  def reverse(l: List[Int]): List[Int] = {
+    List(1, 2).foldLeft(List.empty[Int]) { case (reversed, element) => element :: reversed }
+  }
 
   private var init     = false
   private var value: A = _
