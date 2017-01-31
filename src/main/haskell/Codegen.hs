@@ -76,6 +76,8 @@ external retty label argtys = addDefn $
 double :: Type
 double = FloatingPointType 64 IEEE
 
+int :: Type
+int = IntegerType 32
 -------------------------------------------------------------------------------
 -- Names
 -------------------------------------------------------------------------------

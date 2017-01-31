@@ -35,11 +35,11 @@ def encode(be: Bencoding): [Byte] = {
 
 type Result = Result(String, Bencoding)    
 
-private readInt(xs: [Byte]): Result(String, (Int, [Byte]) = {
+private readInt(xs: [Byte]): Result(String, (Int, [Byte])) = {
   val len = xs.length
   var i = 0
-  while i < len and xs(i) >= '0'.getByte and xs(i) <= 9.getByte {
-    i :+= 1
+  while i < len and xs(i) >= '0'.getByte and xs(i) <= '9'.getByte {
+    i := i + 1
   }
   val bytes = xs.take(i).toString
   if bytes.isNumeric then Ok (Int.read bytes, xs.drop i) 

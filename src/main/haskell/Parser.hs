@@ -22,10 +22,10 @@ import Lexer
 import Syntax
 
 int :: Parser Expr
-int = Int <$> integer
+int = Literal . IntLit . fromIntegral <$> integer
 
 floating :: Parser Expr
-floating = Float <$> float
+floating = Literal . FloatLit <$> float
 
 binop = Ex.Infix (BinaryOp <$> op) Ex.AssocLeft
 unop = Ex.Prefix (UnaryOp <$> op)
@@ -112,7 +112,7 @@ for = do
 
 letins :: Parser Expr
 letins = do
-  reserved "var"
+  reserved "let"
   defs <- commaSep $ do
     var <- identifier
     reservedOp "="

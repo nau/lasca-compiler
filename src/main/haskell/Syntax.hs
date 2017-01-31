@@ -14,8 +14,7 @@ module Syntax where
 type Name = String
 
 data Expr
-  = Int Integer
-  | Float Double
+  = Literal Lit
   | Var String
   | Apply Name [Expr]
   | Function Name [Name] Expr
@@ -30,3 +29,4 @@ data Expr
   deriving (Eq, Ord, Show)
 
 data Type = Type Name
+data Lit = IntLit Int | FloatLit Double deriving (Eq, Ord, Show)
