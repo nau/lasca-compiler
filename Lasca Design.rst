@@ -82,8 +82,11 @@ Resume
 - documentations matters
 - ide doesn't matter o_O
 
-
 https://www.quorumlanguage.com/evidence.html
+
+http://dl.acm.org/citation.cfm?id=2962592
+
+TDD is bullshit
 
 Human perception driven approach for a programming language syntax design
 -------------------------------------------------------------------------
@@ -177,6 +180,27 @@ When you need to write a shell script or quickly prototype an idea – use gradu
 When you need speed – compile before use, types are inferred
 
 When you need speed and correctness – compile and validate your liquid types with CVC4/Z3 solvers.
+
+
+Probelms And Solutions
+======================
+
+Undetermined Control Flow With Existence of Exceptions
+	Lasca don't have exception.
+
+Dimond Problme of Multiple Inheritance
+	Lasca don't have multiple inheritance of data
+
+If-branching complexities
+	Lasca have a pattern matching and/or Applicative/Monad comprehensions (do-blocks)
+
+Lasca don't have overloading
+	Instead it has name and default arguments, and ADTs which solve the problem quite well
+
+Immutable data is slow to modify
+	Lasca will try to find places where immutable data is local and is linear and will modify data in-place.
+    ???
+
 
 
 Type System

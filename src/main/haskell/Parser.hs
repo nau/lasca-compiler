@@ -69,6 +69,7 @@ function = do
   args <- parens $ commaSep funcArgument
   reservedOp "="
   body <- expr
+  reserved "end"
   return (Function name args body)
 
 extern :: Parser Expr
@@ -82,7 +83,7 @@ call :: Parser Expr
 call = do
   name <- identifier
   args <- parens $ commaSep expr
-  return (Call name args)
+  return (Apply name args)
 
 ifthen :: Parser Expr
 ifthen = do
@@ -92,6 +93,7 @@ ifthen = do
   tr <- expr
   reserved "else"
   fl <- expr
+  reserved "end"
   return (If cond tr fl)
 
 for :: Parser Expr
@@ -166,7 +168,6 @@ contents p = do
 toplevel :: Parser [Expr]
 toplevel = many $ do
     def <- defn
-    reservedOp ";"
     return def
 
 parseExpr :: String -> Either ParseError Expr

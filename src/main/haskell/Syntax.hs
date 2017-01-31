@@ -17,7 +17,7 @@ data Expr
   = Int Integer
   | Float Double
   | Var String
-  | Call Name [Expr]
+  | Apply Name [Expr]
   | Function Name [Name] Expr
   | Extern Name [Name]
   | BinaryOp Name Expr Expr

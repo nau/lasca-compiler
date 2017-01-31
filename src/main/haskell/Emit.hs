@@ -94,7 +94,7 @@ binops = Map.fromList [
 
 cgen :: S.Expr -> Codegen AST.Operand
 cgen (S.UnaryOp op a) = do
-  cgen $ S.Call ("unary" ++ op) [a]
+  cgen $ S.Apply ("unary" ++ op) [a]
 cgen (S.Let a b c) = do
   i <- alloca double
   val <- cgen b
@@ -112,11 +112,11 @@ cgen (S.BinaryOp op a b) = do
       ca <- cgen a
       cb <- cgen b
       f ca cb
-    Nothing -> cgen (S.Call ("binary" ++ op) [a,b])
+    Nothing -> cgen (S.Apply ("binary" ++ op) [a,b])
 cgen (S.Var x) = getvar x >>= load
 cgen (S.Int n) = return $ cons $ C.Float (F.Double (fromIntegral n))
 cgen (S.Float n) = return $ cons $ C.Float (F.Double n)
-cgen (S.Call fn args) = do
+cgen (S.Apply fn args) = do
   largs <- mapM cgen args
   call (externf (AST.Name fn)) largs
 cgen (S.If cond tr fl) = do
