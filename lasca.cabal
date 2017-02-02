@@ -21,6 +21,7 @@ executable lasca
                         indents,
                         llvm-general-pure >= 3.5.1.0,
                         llvm-general >= 3.5.1.2,
+                        optparse-applicative,
                         mtl
   Extra-libraries:      lascart
   default-language:    Haskell2010
