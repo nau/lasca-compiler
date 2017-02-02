@@ -67,7 +67,7 @@ function = do
   reserved "def"
   name <- identifier
   args <- parens $ commaSep funcArgument
---   reservedOp "="
+  reservedOp "="
   body <- expr
   reserved "end"
   return (Function name args body)
