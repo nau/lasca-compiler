@@ -21,12 +21,13 @@ import Control.Monad.Trans
 
 import System.IO
 import System.Environment
+import System.Process
 import System.Console.Haskeline
 
 import qualified LLVM.General.AST as AST
 
-initModule :: AST.Module
-initModule = emptyModule "my cool jit"
+initModule :: String -> AST.Module
+initModule name = emptyModule name
 
 process :: AST.Module -> String -> IO (Maybe AST.Module)
 process modo source = do
@@ -37,10 +38,14 @@ process modo source = do
       ast <- codegen modo ex
       return $ Just ast
 
-genModule :: AST.Module -> String -> Maybe AST.Module
+genModule :: AST.Module -> String -> IO (Maybe AST.Module)
 genModule modo source = case parseToplevel source of
-    Left err -> Nothing
-    Right ex -> Just (codegenModule modo ex)
+    Left err -> do
+        putStrLn $ show err
+        return Nothing
+    Right ex -> do
+        putStrLn "Parsed OK"
+        return (Just (codegenModule modo ex))
 
 
 
@@ -48,19 +53,26 @@ genModule modo source = case parseToplevel source of
 readMod :: String -> IO (Maybe AST.Module)
 readMod fname = do
   file <- readFile fname
-  return $ genModule initModule file
+  genModule (initModule fname) file
 
-processFile1 :: Maybe AST.Module -> IO (Maybe String)
-processFile1 (Just mod) = getLLAsString mod
-
-
-processFile :: String -> IO (Maybe String)
+processFile :: String -> IO ()
 processFile fname = do
   mod <- readMod fname
-  processFile1 mod
+  putStrLn "Read module OK"
+  case mod of
+    Just mod -> do
+        runJIT mod
+--         Just(asm) <- getLLAsString mod
+--         writeFile (fname ++ ".ll") asm
+--         let name = dropWhile (/= '.') fname
+--         callProcess "gcc" ["-o", name, fname ++ ".ll"]
+        return ()
+    Nothing -> do
+        putStrLn "Couldn't compile a module"
+
 
 repl :: IO ()
-repl = runInputT defaultSettings (loop initModule)
+repl = runInputT defaultSettings (loop (initModule "Lasca JIT"))
   where
   loop :: AST.Module -> InputT IO ()
   loop mod = do
@@ -79,8 +91,4 @@ main = do
   case args of
     []      -> repl
     [fname] -> do
-        result <- processFile fname
-        case result of
-            Just (s) -> putStrLn(s)
-            Nothing -> return ()
-        return ()
+        processFile fname

@@ -22,7 +22,6 @@ data Expr
   | BinaryOp Name Expr Expr
   | UnaryOp Name Expr
   | If Expr Expr Expr
-  | For Name Expr Expr Expr Expr
   | BinaryDef Name [Name] Expr
   | UnaryDef Name [Name] Expr
   | Let Name Expr Expr

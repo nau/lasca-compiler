@@ -48,7 +48,9 @@ emptyModule label = defaultModule { moduleName = label }
 addDefn :: Definition -> LLVM ()
 addDefn d = do
   defs <- gets moduleDefinitions
-  modify $ \s -> s { moduleDefinitions = defs ++ [d] }
+  if d `elem` defs
+  then modify id
+  else modify $ \s -> s { moduleDefinitions = defs ++ [d] }
 
 define ::  Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
 define retty label argtys body = addDefn $

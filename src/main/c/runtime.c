@@ -90,3 +90,9 @@ void *runtimeBinOp(int code, struct type_info* lhs, struct type_info* rhs) {
   }
   return result;
 }
+
+double putchard(double X) {
+  putchar((char)X);
+  fflush(stdout);
+  return 0;
+}

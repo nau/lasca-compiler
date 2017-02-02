@@ -21,8 +21,8 @@ import qualified Text.Parsec.Token as Tok
 import Lexer
 import Syntax
 
-int :: Parser Expr
-int = Literal . IntLit . fromIntegral <$> integer
+integerLit :: Parser Expr
+integerLit = Literal . IntLit . fromIntegral <$> integer
 
 floating :: Parser Expr
 floating = Literal . FloatLit <$> float
@@ -42,7 +42,7 @@ op = do
 binops = [[binary "=" Ex.AssocLeft],
           [binary "*" Ex.AssocLeft, binary "/" Ex.AssocLeft],
           [binary "+" Ex.AssocLeft, binary "-" Ex.AssocLeft],
-          [binary "<" Ex.AssocLeft]]
+          [binary "<" Ex.AssocLeft], [binary "==" Ex.AssocLeft]]
 
 expr :: Parser Expr
 expr =  Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
@@ -67,7 +67,7 @@ function = do
   reserved "def"
   name <- identifier
   args <- parens $ commaSep funcArgument
-  reservedOp "="
+--   reservedOp "="
   body <- expr
   reserved "end"
   return (Function name args body)
@@ -75,6 +75,7 @@ function = do
 extern :: Parser Expr
 extern = do
   reserved "extern"
+  reserved "def"
   name <- identifier
   args <- parens $ many identifier
   return (Extern name args)
@@ -95,20 +96,6 @@ ifthen = do
   fl <- expr
   reserved "end"
   return (If cond tr fl)
-
-for :: Parser Expr
-for = do
-  reserved "for"
-  var <- identifier
-  reservedOp "="
-  start <- expr
-  reservedOp ","
-  cond <- expr
-  reservedOp ","
-  step <- expr
-  reserved "in"
-  body <- expr
-  return $ For var start cond step body
 
 letins :: Parser Expr
 letins = do
@@ -136,19 +123,18 @@ binarydef = do
   reserved "def"
   reserved "binary"
   o <- op
-  prec <- int
+  prec <- integerLit
   args <- parens $ many identifier
   body <- expr
   return $ BinaryDef o args body
 
 factor :: Parser Expr
 factor = try floating
-      <|> try int
+      <|> try letins
+      <|> try integerLit
       <|> try call
       <|> try variable
       <|> ifthen
-      <|> try letins
-      <|> for
       <|> (parens expr)
 
 defn :: Parser Expr

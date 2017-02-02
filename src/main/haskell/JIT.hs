@@ -73,6 +73,8 @@ getLLAsString mod = do
     eith <- withContext $ \context ->
                 runExceptT $ withModuleFromAST context mod $ \m -> moduleLLVMAssembly m
     case eith of
-        Left _ -> return Nothing
+        Left err -> do
+            putStrLn err
+            return Nothing
         Right s -> return $ Just s
 

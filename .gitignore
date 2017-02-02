@@ -1,4 +1,8 @@
 .idea/*
+.stack*
+.cabal*
+.liquid/
 dist/*
 *.iml
 target/
+cabal.sandbox.config
