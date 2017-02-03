@@ -1,6 +1,6 @@
 --extern def sleep(s: Int): Int
 --extern def putchar(c: Int): Int
-extern def putchard(d)
+extern def putchard(d: Float64): Float64
 
 def main() =
 	let r = print(fact(8)) in putchard(10)

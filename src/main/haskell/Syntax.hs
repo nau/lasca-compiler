@@ -18,14 +18,17 @@ data Expr
   | Var String
   | Apply Name [Expr]
   | Function Name [Name] Expr
-  | Extern Name [Name]
+  | Extern Name Type [Arg]
   | BinaryOp Name Expr Expr
   | UnaryOp Name Expr
   | If Expr Expr Expr
-  | BinaryDef Name [Name] Expr
-  | UnaryDef Name [Name] Expr
   | Let Name Expr Expr
   deriving (Eq, Ord, Show)
 
-data Type = Type Name
+data Type = Type Name | UnitType | AnyType deriving (Eq, Ord, Show)
 data Lit = IntLit Int | FloatLit Double | BoolLit Bool deriving (Eq, Ord, Show)
+data Arg = Arg Name Type deriving (Eq, Ord, Show)
+
+boolType = Type "Bool"
+intType = Type "Int"
+float64Type = Type "Float64"

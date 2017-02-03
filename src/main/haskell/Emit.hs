@@ -19,6 +19,7 @@ import LLVM.General.Analysis
 import LLVM.General.PassManager
 
 import qualified LLVM.General.AST as AST
+import qualified LLVM.General.AST.Type as T
 import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Float as F
 import qualified LLVM.General.AST.FloatingPointPredicate as FP
@@ -40,8 +41,8 @@ zero = cons $ C.Float (F.Double 0.0)
 false = zero
 true = one
 
-toSig :: [String] -> [(AST.Type, AST.Name)]
-toSig = map (\x -> (double, AST.Name x))
+toSig :: [S.Arg] -> [(AST.Type, AST.Name)]
+toSig = map (\(S.Arg name tpe) -> (typeMapping tpe, AST.Name name))
 
 codegenTop :: S.Expr -> LLVM ()
 codegenTop (S.Function name args body) = do
@@ -57,15 +58,11 @@ codegenTop (S.Function name args body) = do
         assign a var
       cgen body >>= ret
 
-codegenTop (S.Extern name args) = do
-  external double name fnargs
-  where fnargs = toSig args
-
-codegenTop (S.BinaryDef name args body) =
-  codegenTop $ S.Function ("binary" ++ name) args body
-
-codegenTop (S.UnaryDef name args body) =
-  codegenTop $ S.Function ("unary" ++ name) args body
+codegenTop (S.Extern name tpe args) = do
+  external llvmType name fnargs
+  where
+    llvmType = typeMapping tpe
+    fnargs = toSig args
 
 codegenTop exp = do
   define double "main" [] bls
@@ -74,6 +71,15 @@ codegenTop exp = do
       entry <- addBlock entryBlockName
       setBlock entry
       cgen exp >>= ret
+
+typeMapping :: S.Type -> AST.Type
+typeMapping S.AnyType = typeInfoType
+typeMapping S.UnitType = T.void
+typeMapping (S.Type "Bool") = T.i1
+typeMapping (S.Type "Int") = T.i32
+typeMapping (S.Type "Float64") = T.double
+
+typeInfoType = T.StructureType False [T.i32, T.ptr T.void]
 
 -------------------------------------------------------------------------------
 -- Operations
@@ -108,11 +114,6 @@ cgen (S.Let a b c) = do
   store i val
   assign a i
   cgen c
-cgen (S.BinaryOp "=" (S.Var var) val) = do
-  a <- getvar var
-  cval <- cgen val
-  store a cval
-  return cval
 cgen (S.BinaryOp op a b) = do
   case Map.lookup op binops of
     Just f  -> do
@@ -121,7 +122,7 @@ cgen (S.BinaryOp op a b) = do
       f ca cb
     Nothing -> cgen (S.Apply ("binary" ++ op) [a,b])
 cgen (S.Var x) = getvar x >>= load
-cgen (S.Literal (S.BoolLit b)) = return $ cons $ C.Float (F.Double (fromIntegral n))
+-- cgen (S.Literal (S.BoolLit n)) = return $ cons $ C.Float (F.Double (fromIntegral n))
 cgen (S.Literal (S.IntLit n)) = return $ cons $ C.Float (F.Double (fromIntegral n))
 cgen (S.Literal (S.FloatLit n)) = return $ cons $ C.Float (F.Double n)
 cgen (S.Apply fn args) = do

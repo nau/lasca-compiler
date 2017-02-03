@@ -46,7 +46,7 @@ op = do
   whitespace
   return o
 
-binops = [[binary "=" Ex.AssocLeft],
+binops = [
           [binary "*" Ex.AssocLeft, binary "/" Ex.AssocLeft],
           [binary "+" Ex.AssocLeft, binary "-" Ex.AssocLeft],
           [binary "<" Ex.AssocLeft, binary "==" Ex.AssocLeft],
@@ -69,7 +69,7 @@ typeAscription = do
 funcArgument :: Parser Name
 funcArgument = do
   name <- identifier
-  typeAsc <- option (Type "Any") typeAscription
+  typeAsc <- option AnyType typeAscription
   return name
 
 function :: Parser Expr
@@ -87,8 +87,16 @@ extern = do
   reserved "extern"
   reserved "def"
   name <- identifier
-  args <- parens $ many identifier
-  return (Extern name args)
+  args <- parens $ many arg
+  reservedOp ":"
+  tpe <- identifier
+  return (Extern name (Type tpe) args)
+
+arg :: Parser Arg
+arg = do
+  name <- identifier
+  tpe <- option AnyType typeAscription
+  return (Arg name tpe)
 
 call :: Parser Expr
 call = do
@@ -119,25 +127,6 @@ letins = do
   body <- expr
   return $ foldr (uncurry Let) body defs
 
-unarydef :: Parser Expr
-unarydef = do
-  reserved "def"
-  reserved "unary"
-  o <- op
-  args <- parens $ many identifier
-  body <- expr
-  return $ UnaryDef o args body
-
-binarydef :: Parser Expr
-binarydef = do
-  reserved "def"
-  reserved "binary"
-  o <- op
-  prec <- integerLit
-  args <- parens $ many identifier
-  body <- expr
-  return $ BinaryDef o args body
-
 factor :: Parser Expr
 factor = try floating
       <|> try letins
@@ -150,8 +139,6 @@ factor = try floating
 defn :: Parser Expr
 defn = try extern
     <|> try function
-    <|> try unarydef
-    <|> try binarydef
     <|> expr
 
 contents :: Parser a -> Parser a
