@@ -20,8 +20,10 @@ import LLVM.General.PassManager
 
 import qualified LLVM.General.AST as AST
 import qualified LLVM.General.AST.Type as T
+import qualified LLVM.General.AST.Instruction as I
 import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Float as F
+import qualified LLVM.General.AST.IntegerPredicate as IP
 import qualified LLVM.General.AST.FloatingPointPredicate as FP
 
 import LLVM.General.ExecutionEngine ( withMCJIT, withModuleInEngine, getFunction )
@@ -36,33 +38,34 @@ import Codegen
 import JIT (runJIT)
 import qualified Syntax as S
 
-one = cons $ C.Float (F.Double 1.0)
-zero = cons $ C.Float (F.Double 0.0)
+one = constant $ C.Float (F.Double 1.0)
+zero = constant $ C.Float (F.Double 0.0)
 false = zero
 true = one
 
+externArgsToSig :: [S.Arg] -> [(AST.Type, AST.Name)]
+externArgsToSig = map (\(S.Arg name tpe) -> (typeMapping tpe, AST.Name name))
+
 toSig :: [S.Arg] -> [(AST.Type, AST.Name)]
-toSig = map (\(S.Arg name tpe) -> (typeMapping tpe, AST.Name name))
+toSig = map (\(S.Arg name tpe) -> (typeInfoType, AST.Name name))
+
 
 codegenTop :: S.Expr -> LLVM ()
-codegenTop (S.Function name args body) = do
-  define double name largs bls
+codegenTop (S.Function name tpe args body) = do
+  define retType name largs bls
   where
-    largs = map (\x -> (double, AST.Name x)) args
+    largs = toSig args
+    retType = typeInfoType --typeMapping tpe
     bls = createBlocks $ execCodegen [] $ do
       entry <- addBlock entryBlockName
       setBlock entry
-      forM args $ \a -> do
-        var <- alloca double
-        store var (local (AST.Name a))
-        assign a var
       cgen body >>= ret
 
 codegenTop (S.Extern name tpe args) = do
   external llvmType name fnargs
   where
     llvmType = typeMapping tpe
-    fnargs = toSig args
+    fnargs = externArgsToSig args
 
 codegenTop exp = do
   define double "main" [] bls
@@ -72,6 +75,8 @@ codegenTop exp = do
       setBlock entry
       cgen exp >>= ret
 
+
+-- Static mode
 typeMapping :: S.Type -> AST.Type
 typeMapping S.AnyType = typeInfoType
 typeMapping S.UnitType = T.void
@@ -79,55 +84,36 @@ typeMapping (S.Type "Bool") = T.i1
 typeMapping (S.Type "Int") = T.i32
 typeMapping (S.Type "Float64") = T.double
 
-typeInfoType = T.StructureType False [T.i32, T.ptr T.void]
-
+-- Dynamic mode
+-- typeMapping _ = typeInfoType
 -------------------------------------------------------------------------------
 -- Operations
 -------------------------------------------------------------------------------
-
-lt :: AST.Operand -> AST.Operand -> Codegen AST.Operand
-lt a b = do
-  test <- fcmp FP.ULT a b
-  uitofp double test
-
-eq :: AST.Operand -> AST.Operand -> Codegen AST.Operand
-eq a b = do
-  test <- fcmp FP.UEQ a b
-  uitofp double test
-
-
-binops = Map.fromList [
-      ("+", fadd)
-    , ("-", fsub)
-    , ("*", fmul)
-    , ("/", fdiv)
-    , ("<", lt)
-    , ("==", eq)
-  ]
 
 cgen :: S.Expr -> Codegen AST.Operand
 cgen (S.UnaryOp op a) = do
   cgen $ S.Apply ("unary" ++ op) [a]
 cgen (S.Let a b c) = do
-  i <- alloca double
+  i <- alloca (T.ptr T.i8)
   val <- cgen b
   store i val
   assign a i
   cgen c
 cgen (S.BinaryOp op a b) = do
-  case Map.lookup op binops of
-    Just f  -> do
-      ca <- cgen a
-      cb <- cgen b
-      f ca cb
-    Nothing -> cgen (S.Apply ("binary" ++ op) [a,b])
+  lhs <- cgen a
+  rhs <- cgen b
+  let codeNum = case op of
+              "+" -> 10
+              "-" -> 11
+              "*" -> 12
+              "/" -> 13
+  let code = constInt codeNum
+  call (global runtimeBinOpFuncType (AST.Name "runtimeBinOp")) [code, lhs, rhs]
 cgen (S.Var x) = getvar x >>= load
--- cgen (S.Literal (S.BoolLit n)) = return $ cons $ C.Float (F.Double (fromIntegral n))
-cgen (S.Literal (S.IntLit n)) = return $ cons $ C.Float (F.Double (fromIntegral n))
-cgen (S.Literal (S.FloatLit n)) = return $ cons $ C.Float (F.Double n)
+cgen (S.Literal l) = box l
 cgen (S.Apply fn args) = do
   largs <- mapM cgen args
-  call (externf (AST.Name fn)) largs
+  call (global typeInfoType (AST.Name fn)) largs
 cgen (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
@@ -136,7 +122,11 @@ cgen (S.If cond tr fl) = do
   -- %entry
   ------------------
   cond <- cgen cond
-  test <- fcmp FP.ONE false cond
+  -- unbox Bool
+  voidPtrCond <- call (global unboxFuncType (AST.Name "unbox")) [cond, constInt 0]
+  bool <- bitcast voidPtrCond T.i1
+
+  test <- instr2 T.i1 (I.ICmp IP.EQ cond (constInt 1) [])
   cbr test ifthen ifelse -- Branch based on the condition
 
   -- if.then
@@ -161,6 +151,18 @@ cgen (S.If cond tr fl) = do
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------
+funcType retTy args = T.FunctionType retTy args False
+
+boxFuncType = funcType typeInfoType [T.i32]
+runtimeBinOpFuncType = funcType typeInfoType [T.i32, typeInfoType, typeInfoType]
+unboxFuncType = funcType (T.ptr T.i8) [typeInfoType, T.i32]
+
+box :: S.Lit -> Codegen AST.Operand
+box (S.BoolLit b) = call (global boxFuncType (AST.Name "boxBool")) [constInt (boolToInt b)]
+box (S.IntLit  n) = call (global boxFuncType (AST.Name "boxInt")) [constInt (toInteger n)]
+
+boolToInt True = 1
+boolToInt False = 0
 
 codegen :: AST.Module -> [S.Expr] -> IO AST.Module
 codegen modo fns = do

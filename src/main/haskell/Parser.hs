@@ -76,11 +76,12 @@ function :: Parser Expr
 function = do
   reserved "def"
   name <- identifier
-  args <- parens $ commaSep funcArgument
+  args <- parens $ commaSep arg
+  tpe <- option AnyType typeAscription
   reservedOp "="
   body <- expr
   reserved "end"
-  return (Function name args body)
+  return (Function name tpe args body)
 
 extern :: Parser Expr
 extern = do

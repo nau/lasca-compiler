@@ -26,6 +26,7 @@ import Control.Applicative
 import LLVM.General.AST
 import LLVM.General.AST.Global
 import qualified LLVM.General.AST as AST
+import qualified LLVM.General.AST.Type as T
 
 import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Attribute as A
@@ -78,8 +79,14 @@ external retty label argtys = addDefn $
 double :: Type
 double = FloatingPointType 64 IEEE
 
-int :: Type
-int = IntegerType 32
+intType :: Type
+intType = IntegerType 32
+
+boolType :: Type
+boolType = IntegerType 1
+
+typeInfoStructType = T.StructureType False [T.i32, T.ptr T.void]
+typeInfoType = T.ptr typeInfoStructType
 -------------------------------------------------------------------------------
 -- Names
 -------------------------------------------------------------------------------
@@ -172,6 +179,15 @@ instr ins = do
   modifyBlock (blk { stack = i ++ [ref := ins] } )
   return $ local ref
 
+instr2 :: Type -> Instruction -> Codegen (Operand)
+instr2 tpe ins = do
+  n <- fresh
+  let ref = (UnName n)
+  blk <- current
+  let i = stack blk
+  modifyBlock (blk { stack = i ++ [ref := ins] } )
+  return $ LocalReference tpe ref
+
 terminator :: Named Terminator -> Codegen (Named Terminator)
 terminator trm = do
   blk <- current
@@ -185,6 +201,9 @@ named iname m = m >> do
       (_ := x) = last (stack blk)
   modifyBlock $ blk { stack = init (stack blk) ++ [b := x] }
   return $ local b
+
+-- icmp :: Operand -> Operand -> Codegen (Operand)
+-- icmp lhs rhs = instr2 T.i1 (ICmp)
 
 -------------------------------------------------------------------------------
 -- Block Stack
@@ -239,38 +258,24 @@ getvar var = do
 
 -- References
 local ::  Name -> Operand
-local = LocalReference double
+local = LocalReference typeInfoType
 
-global ::  Name -> C.Constant
-global = C.GlobalReference double
+global :: Type -> Name -> Operand
+global tpe name = constant (C.GlobalReference tpe name)
 
-externf :: Name -> Operand
-externf = ConstantOperand . C.GlobalReference double
+constant :: C.Constant -> Operand
+constant = ConstantOperand
 
--- Arithmetic and Constants
-fadd :: Operand -> Operand -> Codegen Operand
-fadd a b = instr $ FAdd NoFastMathFlags a b []
-
-fsub :: Operand -> Operand -> Codegen Operand
-fsub a b = instr $ FSub NoFastMathFlags a b []
-
-fmul :: Operand -> Operand -> Codegen Operand
-fmul a b = instr $ FMul NoFastMathFlags a b []
-
-fdiv :: Operand -> Operand -> Codegen Operand
-fdiv a b = instr $ FDiv NoFastMathFlags a b []
-
-fcmp :: FP.FloatingPointPredicate -> Operand -> Operand -> Codegen Operand
-fcmp cond a b = instr $ FCmp cond a b []
-
-cons :: C.Constant -> Operand
-cons = ConstantOperand
+constInt i = constant (C.Int 32 i)
 
 uitofp :: Type -> Operand -> Codegen Operand
 uitofp ty a = instr $ UIToFP a ty []
 
 toArgs :: [Operand] -> [(Operand, [A.ParameterAttribute])]
 toArgs = map (\x -> (x, []))
+
+
+bitcast op toTpe= instr2 toTpe (BitCast op toTpe [])
 
 -- Effects
 call :: Operand -> [Operand] -> Codegen Operand

@@ -17,7 +17,7 @@ data Expr
   = Literal Lit
   | Var String
   | Apply Name [Expr]
-  | Function Name [Name] Expr
+  | Function Name Type [Arg] Expr
   | Extern Name Type [Arg]
   | BinaryOp Name Expr Expr
   | UnaryOp Name Expr

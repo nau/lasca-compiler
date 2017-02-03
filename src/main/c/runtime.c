@@ -11,7 +11,7 @@ struct type_info {
 
 void lasca_init() {
     GC_init();
-    puts("Init Lasca 0.0.0.1 runtime :)");
+    puts("Init Lasca 0.0.0.1 runtime. Enjoy :)");
 }
 
 void *gcMalloc(size_t s) {
@@ -19,23 +19,24 @@ void *gcMalloc(size_t s) {
 }
 
 struct type_info *box(int type_id, void *value) {
-  struct type_info* ti = (struct type_info*) gcMalloc(8);
+  struct type_info* ti = (struct type_info*) gcMalloc(sizeof(struct type_info));
   ti->type = type_id;
   ti->value = value;
   return ti;
 }
 
 struct type_info * boxBool(int i) {
-  int* result = (int *) gcMalloc(sizeof(i));
-  *result = i;
-  return box(0, result);
+  return box(0, (void *) (long) i);
 }
 
 struct type_info * boxInt(int i) {
-  int* result = (int *) gcMalloc(sizeof(i));
-  *result = i;
-  return box(1, result);
+  return box(1, (void *) (long) i);
 }
+
+struct type_info * boxFloat64(double i) {
+  return box(2, (void *) (long) i);
+}
+
 
 void *unbox(struct type_info* ti, int expected) {
   if (ti->type == expected) {
@@ -65,14 +66,14 @@ const int ZNOT = 50;                          // !x
 const int ZOR = 60;                           // x || y
 const int ZAND = 61;                          // x && y
 
-void *runtimeBinOp(int code, struct type_info* lhs, struct type_info* rhs) {
+struct type_info* runtimeBinOp(int code, struct type_info* lhs, struct type_info* rhs) {
   if (lhs->type != rhs->type) {
   	printf("AAAA!!! Type missmatch! lhs = %i, rhs = %i", lhs->type, rhs->type);
   	exit(1);
   }
-  int left = *(int*)lhs->value;
-  int right = *(int*)rhs->value;
-  void* result = NULL;
+  int left = (int) lhs->value;
+  int right = (int) rhs->value;
+  struct type_info* result = NULL;
 
   switch (code) {
   case ADD: result = boxInt(left + right); break;
