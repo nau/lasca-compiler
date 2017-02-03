@@ -28,4 +28,4 @@ data Expr
   deriving (Eq, Ord, Show)
 
 data Type = Type Name
-data Lit = IntLit Int | FloatLit Double deriving (Eq, Ord, Show)
+data Lit = IntLit Int | FloatLit Double | BoolLit Bool deriving (Eq, Ord, Show)

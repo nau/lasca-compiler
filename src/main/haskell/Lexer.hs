@@ -20,12 +20,15 @@ import qualified Text.Parsec.Token as Tok
 lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser style
   where
-    ops = ["+","*","-","/",";","=",",","<",">","|",":"]
-    names = ["def","extern","if","then","else","in","for"
-            ,"binary", "unary", "var", "end"
+    ops = ["+","*","-","/",";", "==", "=",",","<",">","|",":"]
+    names = ["def","extern","if","then","else", "end", "in",
+            "binary", "unary", "let", "true", "false"
             ]
     style = emptyDef {
-               Tok.commentLine = "--"
+               Tok.commentStart   = "{-"
+             , Tok.commentEnd     = "-}"
+             , Tok.commentLine = "--"
+             , Tok.nestedComments = True
              , Tok.reservedOpNames = ops
              , Tok.reservedNames = names
              }

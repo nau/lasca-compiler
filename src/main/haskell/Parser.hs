@@ -27,6 +27,13 @@ integerLit = Literal . IntLit . fromIntegral <$> integer
 floating :: Parser Expr
 floating = Literal . FloatLit <$> float
 
+strToBool :: String -> Bool
+strToBool "true" = True
+strToBool _ = False
+
+boolLit :: Parser Expr
+boolLit = Literal . BoolLit . strToBool <$> (string "true" <|> string "false")
+
 binop = Ex.Infix (BinaryOp <$> op) Ex.AssocLeft
 unop = Ex.Prefix (UnaryOp <$> op)
 
@@ -42,7 +49,10 @@ op = do
 binops = [[binary "=" Ex.AssocLeft],
           [binary "*" Ex.AssocLeft, binary "/" Ex.AssocLeft],
           [binary "+" Ex.AssocLeft, binary "-" Ex.AssocLeft],
-          [binary "<" Ex.AssocLeft], [binary "==" Ex.AssocLeft]]
+          [binary "<" Ex.AssocLeft, binary "==" Ex.AssocLeft],
+          [binary "and" Ex.AssocLeft],
+          [binary "or" Ex.AssocLeft]
+          ]
 
 expr :: Parser Expr
 expr =  Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
