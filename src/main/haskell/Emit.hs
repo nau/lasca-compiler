@@ -55,7 +55,7 @@ codegenTop (S.Function name tpe args body) = do
   define retType name largs bls
   where
     largs = toSig args
-    retType = typeInfoType --typeMapping tpe
+    retType = typeMapping tpe
     bls = createBlocks $ execCodegen [] $ do
       entry <- addBlock entryBlockName
       setBlock entry
@@ -79,7 +79,8 @@ codegenTop exp = do
 -- Static mode
 typeMapping :: S.Type -> AST.Type
 typeMapping S.AnyType = typeInfoType
-typeMapping S.UnitType = T.void
+typeMapping (S.Type "Any") = typeInfoType
+typeMapping (S.Type "Unit") = T.void
 typeMapping (S.Type "Bool") = T.i1
 typeMapping (S.Type "Int") = T.i32
 typeMapping (S.Type "Float64") = T.double
@@ -153,7 +154,7 @@ cgen (S.If cond tr fl) = do
 -------------------------------------------------------------------------------
 funcType retTy args = T.FunctionType retTy args False
 
-boxFuncType = funcType typeInfoType [T.i32]
+boxFuncType = funcType (T.ptr T.i8) [T.i32]
 runtimeBinOpFuncType = funcType typeInfoType [T.i32, typeInfoType, typeInfoType]
 unboxFuncType = funcType (T.ptr T.i8) [typeInfoType, T.i32]
 

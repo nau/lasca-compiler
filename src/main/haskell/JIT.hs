@@ -30,6 +30,7 @@ import LLVM.General.Analysis
 import qualified LLVM.General.ExecutionEngine as EE
 
 foreign import ccall "dynamic" haskFun :: FunPtr (IO Double) -> (IO Double)
+foreign import ccall "dynamic" initFun :: FunPtr (IO ()) -> (IO ())
 
 run :: FunPtr a -> IO Double
 run fn = haskFun (castFunPtr fn :: FunPtr (IO Double))
@@ -52,13 +53,17 @@ runJIT mod = do
       runExceptT $ withModuleFromAST context mod $ \m ->
         withPassManager passes $ \pm -> do
           -- Optimization Pass
-          runPassManager pm m
+          -- runPassManager pm m
           optmod <- moduleAST m
           s <- moduleLLVMAssembly m
           putStrLn s
 
           EE.withModuleInEngine executionEngine m $ \ee -> do
+            initLascaRuntime <- EE.getFunction ee (AST.Name "initLascaRuntime")
             mainfn <- EE.getFunction ee (AST.Name "main")
+            case initLascaRuntime of
+              Just fn -> initFun (castFunPtr fn :: FunPtr (IO ()))
+              Nothing -> putStrLn "Couldn't find initLascaRuntime!"
             case mainfn of
               Just fn -> do
                 res <- run fn

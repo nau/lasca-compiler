@@ -70,6 +70,7 @@ genModule modo source = case parseToplevel source of
         return Nothing
     Right ex -> do
         putStrLn "Parsed OK"
+        putStrLn (show ex)
         return (Just (codegenModule modo ex))
 
 
@@ -86,7 +87,10 @@ execFile fname = do
   putStrLn "Read module OK"
   case mod of
     Just mod -> do
-        runJIT mod
+        res <- runJIT mod
+        case res of
+          Left err -> putStrLn err
+          Right m -> return ()
         return ()
     Nothing -> do
         putStrLn "Couldn't compile a module"

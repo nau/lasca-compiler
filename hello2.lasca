@@ -1,8 +1,11 @@
 --extern def sleep(s: Int): Int
 --extern def putchar(c: Int): Int
 extern def putchard(d: Float64): Float64
+extern def boxInt(d: Int): Any
+extern def runtimeBinOp(code: Int, lhs: Any, rhs: Any): Any
+extern def initLascaRuntime(): Unit
 
 def main() =
-	1
+	1 + 2
 end
 

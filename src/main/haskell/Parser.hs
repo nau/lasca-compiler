@@ -88,7 +88,7 @@ extern = do
   reserved "extern"
   reserved "def"
   name <- identifier
-  args <- parens $ many arg
+  args <- parens $ commaSep arg
   reservedOp ":"
   tpe <- identifier
   return (Extern name (Type tpe) args)
@@ -131,6 +131,7 @@ letins = do
 factor :: Parser Expr
 factor = try floating
       <|> try letins
+      <|> try boolLit
       <|> try integerLit
       <|> try call
       <|> try variable

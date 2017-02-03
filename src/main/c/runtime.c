@@ -9,7 +9,7 @@ struct type_info {
 };
 
 
-void lasca_init() {
+void initLascaRuntime() {
     GC_init();
     puts("Init Lasca 0.0.0.1 runtime. Enjoy :)");
 }
@@ -26,10 +26,12 @@ struct type_info *box(int type_id, void *value) {
 }
 
 struct type_info * boxBool(int i) {
+  printf("boxBool %d", i);
   return box(0, (void *) (long) i);
 }
 
 struct type_info * boxInt(int i) {
+  printf("boxInt %d", i);
   return box(1, (void *) (long) i);
 }
 
@@ -39,6 +41,7 @@ struct type_info * boxFloat64(double i) {
 
 
 void *unbox(struct type_info* ti, int expected) {
+  printf("unbox %d when expected %d", ti->type, expected);
   if (ti->type == expected) {
   	return ti->value;
   } else {
