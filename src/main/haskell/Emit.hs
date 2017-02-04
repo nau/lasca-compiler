@@ -47,7 +47,7 @@ externArgsToSig :: [S.Arg] -> [(AST.Type, AST.Name)]
 externArgsToSig = map (\(S.Arg name tpe) -> (typeMapping tpe, AST.Name name))
 
 toSig :: [S.Arg] -> [(AST.Type, AST.Name)]
-toSig = map (\(S.Arg name tpe) -> (typeInfoType, AST.Name name))
+toSig = map (\(S.Arg name tpe) -> (ptrType, AST.Name name))
 
 
 codegenTop :: S.Expr -> LLVM ()
@@ -59,6 +59,10 @@ codegenTop (S.Function name tpe args body) = do
     bls = createBlocks $ execCodegen [] $ do
       entry <- addBlock entryBlockName
       setBlock entry
+      forM args $ \(S.Arg n t) -> do
+        var <- alloca (typeMapping t)   -- FIXME: this shouldn't be necessary
+        store var (local (AST.Name n))
+        assign n var
       cgen body >>= ret
 
 codegenTop (S.Extern name tpe args) = do
@@ -78,8 +82,8 @@ codegenTop exp = do
 
 -- Static mode
 typeMapping :: S.Type -> AST.Type
-typeMapping S.AnyType = typeInfoType
-typeMapping (S.Type "Any") = typeInfoType
+typeMapping S.AnyType = ptrType
+typeMapping (S.Type "Any") = ptrType
 typeMapping (S.Type "Unit") = T.void
 typeMapping (S.Type "Bool") = T.i1
 typeMapping (S.Type "Int") = T.i32
@@ -104,6 +108,8 @@ cgen (S.BinaryOp op a b) = do
   lhs <- cgen a
   rhs <- cgen b
   let codeNum = case op of
+              "==" -> 42
+              "<" -> 44
               "+" -> 10
               "-" -> 11
               "*" -> 12
@@ -114,7 +120,7 @@ cgen (S.Var x) = getvar x >>= load
 cgen (S.Literal l) = box l
 cgen (S.Apply fn args) = do
   largs <- mapM cgen args
-  call (global typeInfoType (AST.Name fn)) largs
+  call (global ptrType (AST.Name fn)) largs
 cgen (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
@@ -125,9 +131,10 @@ cgen (S.If cond tr fl) = do
   cond <- cgen cond
   -- unbox Bool
   voidPtrCond <- call (global unboxFuncType (AST.Name "unbox")) [cond, constInt 0]
-  bool <- bitcast voidPtrCond T.i1
+  bool <- ptrtoint voidPtrCond T.i1
 
-  test <- instr2 T.i1 (I.ICmp IP.EQ cond (constInt 1) [])
+  test <- instr2 T.i1 (I.ICmp IP.EQ bool constTrue [])
+--   let test = constTrue
   cbr test ifthen ifelse -- Branch based on the condition
 
   -- if.then
@@ -147,16 +154,16 @@ cgen (S.If cond tr fl) = do
   -- if.exit
   ------------------
   setBlock ifexit
-  phi double [(trval, ifthen), (flval, ifelse)]
+  phi ptrType [(trval, ifthen), (flval, ifelse)]
 
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------
 funcType retTy args = T.FunctionType retTy args False
 
-boxFuncType = funcType (T.ptr T.i8) [T.i32]
-runtimeBinOpFuncType = funcType typeInfoType [T.i32, typeInfoType, typeInfoType]
-unboxFuncType = funcType (T.ptr T.i8) [typeInfoType, T.i32]
+boxFuncType = funcType ptrType [T.i32]
+runtimeBinOpFuncType = funcType ptrType [T.i32, ptrType, ptrType]
+unboxFuncType = funcType ptrType [ptrType, T.i32]
 
 box :: S.Lit -> Codegen AST.Operand
 box (S.BoolLit b) = call (global boxFuncType (AST.Name "boxBool")) [constInt (boolToInt b)]

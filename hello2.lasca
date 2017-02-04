@@ -1,11 +1,40 @@
 --extern def sleep(s: Int): Int
 --extern def putchar(c: Int): Int
-extern def putchard(d: Float64): Float64
+extern def runtimePutchar(d: Any): Any
 extern def boxInt(d: Int): Any
 extern def runtimeBinOp(code: Int, lhs: Any, rhs: Any): Any
 extern def initLascaRuntime(): Unit
+extern def unbox(ptr: Any, d: Int): Any
 
 def main() =
-	1 + 2
+	let r = print(fact(8)) in runtimePutchar(10)
 end
 
+def test(i) =
+	if i == 30 then 1 else test(i - 1) end
+end
+
+def fact(n) =
+  if n == 1 then 1 else n * fact(n - 1) end
+end
+
+def print(x) =
+  let d = depth(x) in printrec(x, d)
+end
+
+def printrec(x, d) =
+  if d == 0 then 0 else
+    let dd = sqr(d - 1),
+      digit = x / dd,
+      ch = runtimePutchar(digit + 48)
+    in printrec(x - digit * dd, d - 1)
+  end
+end
+
+def sqr(x) =
+  if x == 0 then 1 else 10 * sqr(x - 1) end
+end
+
+def depth(x) =
+  if x < 10 then 1 else 1 + depth(x / 10) end
+end

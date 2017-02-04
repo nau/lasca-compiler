@@ -11,7 +11,7 @@ struct type_info {
 
 void initLascaRuntime() {
     GC_init();
-    puts("Init Lasca 0.0.0.1 runtime. Enjoy :)");
+    puts("Init Lasca 0.0.0.1 runtime. Enjoy :)\n");
 }
 
 void *gcMalloc(size_t s) {
@@ -26,12 +26,12 @@ struct type_info *box(int type_id, void *value) {
 }
 
 struct type_info * boxBool(int i) {
-  printf("boxBool %d", i);
+//  printf("boxBool(%d) ", i);
   return box(0, (void *) (long) i);
 }
 
 struct type_info * boxInt(int i) {
-  printf("boxInt %d", i);
+//  printf("boxInt(%d) ", i);
   return box(1, (void *) (long) i);
 }
 
@@ -41,7 +41,7 @@ struct type_info * boxFloat64(double i) {
 
 
 void *unbox(struct type_info* ti, int expected) {
-  printf("unbox %d when expected %d", ti->type, expected);
+//  printf("unbox(%d, %d) ", ti->type, (int) ti->value);
   if (ti->type == expected) {
   	return ti->value;
   } else {
@@ -71,7 +71,7 @@ const int ZAND = 61;                          // x && y
 
 struct type_info* runtimeBinOp(int code, struct type_info* lhs, struct type_info* rhs) {
   if (lhs->type != rhs->type) {
-  	printf("AAAA!!! Type missmatch! lhs = %i, rhs = %i", lhs->type, rhs->type);
+  	printf("AAAA!!! Type mismatch! lhs = %i, rhs = %i", lhs->type, rhs->type);
   	exit(1);
   }
   int left = (int) lhs->value;
@@ -97,6 +97,13 @@ struct type_info* runtimeBinOp(int code, struct type_info* lhs, struct type_info
 
 double putchard(double X) {
   putchar((char)X);
+  fflush(stdout);
+  return 0;
+}
+
+void * runtimePutchar(struct type_info* ch) {
+  char c = (char) unbox(ch, 1);
+  putchar(c);
   fflush(stdout);
   return 0;
 }

@@ -86,7 +86,7 @@ boolType :: Type
 boolType = IntegerType 1
 
 typeInfoStructType = T.StructureType False [T.i32, T.ptr T.void]
-typeInfoType = T.ptr T.i8
+ptrType = T.ptr T.i8
 -------------------------------------------------------------------------------
 -- Names
 -------------------------------------------------------------------------------
@@ -258,7 +258,7 @@ getvar var = do
 
 -- References
 local ::  Name -> Operand
-local = LocalReference typeInfoType
+local = LocalReference ptrType
 
 global :: Type -> Name -> Operand
 global tpe name = constant (C.GlobalReference tpe name)
@@ -267,6 +267,8 @@ constant :: C.Constant -> Operand
 constant = ConstantOperand
 
 constInt i = constant (C.Int 32 i)
+constTrue = constant (C.Int 1 1)
+constFalse = constant (C.Int 1 0)
 
 uitofp :: Type -> Operand -> Codegen Operand
 uitofp ty a = instr $ UIToFP a ty []
@@ -276,6 +278,7 @@ toArgs = map (\x -> (x, []))
 
 
 bitcast op toTpe= instr2 toTpe (BitCast op toTpe [])
+ptrtoint op toTpe= instr2 toTpe (PtrToInt op toTpe [])
 
 -- Effects
 call :: Operand -> [Operand] -> Codegen Operand
