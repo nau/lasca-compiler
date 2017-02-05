@@ -71,6 +71,7 @@ genModule modo source = case parseToplevel source of
     Right ex -> do
         putStrLn "Parsed OK"
         putStrLn (show ex)
+
         return (Just (codegenModule modo ex))
 
 
@@ -103,7 +104,7 @@ processFile fname = do
     Just mod -> do
         Just(asm) <- getLLAsString mod
         writeFile (fname ++ ".ll") asm
-        let name = dropWhile (/= '.') fname
+        let name = takeWhile (/= '.') fname
         callProcess "clang-3.5" ["-o", name, "-L.", "-llascart", fname ++ ".ll"]
         return ()
     Nothing -> do

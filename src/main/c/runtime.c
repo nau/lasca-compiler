@@ -1,11 +1,18 @@
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <gc.h>
 
 struct type_info {
   int type;
   void* value;
+};
+
+struct string {
+  int length;
+  char bytes[];
 };
 
 
@@ -106,4 +113,11 @@ void * runtimePutchar(struct type_info* ch) {
   putchar(c);
   fflush(stdout);
   return 0;
+}
+
+void * println(struct type_info* val) {
+  assert(val->type == 3); // it's a string
+  struct string * str = (struct string *) val->value;
+  printf("%.*s\n", str->length, str->bytes);
+  return NULL;
 }

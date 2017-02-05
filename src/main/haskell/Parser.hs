@@ -8,11 +8,13 @@
 -- Portability: non-portable
 --
 --------------------------------------------------------------------
+{-# LANGUAGE OverloadedStrings #-}
 
 module Parser where
 
 import Text.Parsec
 import Text.Parsec.String (Parser)
+import qualified Data.Text as T
 import Control.Applicative ((<$>))
 
 import qualified Text.Parsec.Expr as Ex
@@ -33,6 +35,9 @@ strToBool _ = False
 
 boolLit :: Parser Expr
 boolLit = Literal . BoolLit . strToBool <$> (string "true" <|> string "false")
+
+stringLit :: Parser Expr
+stringLit = Literal . StringLit <$> stringLiteral
 
 binop = Ex.Infix (BinaryOp <$> op) Ex.AssocLeft
 unop = Ex.Prefix (UnaryOp <$> op)
@@ -132,6 +137,7 @@ factor :: Parser Expr
 factor = try floating
       <|> try letins
       <|> try boolLit
+      <|> try stringLit
       <|> try integerLit
       <|> try call
       <|> try variable

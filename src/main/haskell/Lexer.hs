@@ -34,6 +34,7 @@ lexer = Tok.makeTokenParser style
              }
 
 integer    = Tok.integer lexer
+stringLiteral     = Tok.stringLiteral lexer
 float      = Tok.float lexer
 parens     = Tok.parens lexer
 commaSep   = Tok.commaSep lexer

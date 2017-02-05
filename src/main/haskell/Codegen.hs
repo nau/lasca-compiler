@@ -19,6 +19,10 @@ import Data.String
 import Data.List
 import Data.Function
 import qualified Data.Map as Map
+-- import qualified Data.Text as Text
+import qualified Data.ByteString as ByteString
+-- import qualified Data.Text.Encoding as Encoding
+import qualified Data.ByteString.Char8 as Char8
 
 import Control.Monad.State
 import Control.Applicative
@@ -32,6 +36,8 @@ import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Attribute as A
 import qualified LLVM.General.AST.CallingConvention as CC
 import qualified LLVM.General.AST.FloatingPointPredicate as FP
+
+
 
 -------------------------------------------------------------------------------
 -- Module Level
@@ -267,6 +273,7 @@ constant :: C.Constant -> Operand
 constant = ConstantOperand
 
 constInt i = constant (C.Int 32 i)
+constByte b = constant (C.Int 8 b)
 constTrue = constant (C.Int 1 1)
 constFalse = constant (C.Int 1 0)
 
@@ -279,6 +286,7 @@ toArgs = map (\x -> (x, []))
 
 bitcast op toTpe= instr2 toTpe (BitCast op toTpe [])
 ptrtoint op toTpe= instr2 toTpe (PtrToInt op toTpe [])
+inttoptr op toTpe= instr2 toTpe (IntToPtr op toTpe [])
 
 -- Effects
 call :: Operand -> [Operand] -> Codegen Operand

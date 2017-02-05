@@ -11,6 +11,8 @@
 
 module Syntax where
 
+import Data.Text
+
 type Name = String
 
 data Expr
@@ -26,7 +28,12 @@ data Expr
   deriving (Eq, Ord, Show)
 
 data Type = Type Name | UnitType | AnyType deriving (Eq, Ord, Show)
-data Lit = IntLit Int | FloatLit Double | BoolLit Bool deriving (Eq, Ord, Show)
+data Lit = IntLit Int
+  | FloatLit Double
+  | BoolLit Bool
+  | StringLit String
+  deriving (Eq, Ord, Show)
+
 data Arg = Arg Name Type deriving (Eq, Ord, Show)
 
 boolType = Type "Bool"
