@@ -37,11 +37,12 @@ import LLVM.General.ExecutionEngine ( withMCJIT, withModuleInEngine, getFunction
 import qualified Data.Text
 import qualified Data.ByteString
 import qualified Data.Text.Encoding
+import Data.Maybe
 import Data.Word
 import Data.Int
 import Control.Monad.Except
 import Control.Applicative
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 
 import Codegen
 import JIT (runJIT)
@@ -149,6 +150,9 @@ typeMapping (S.Type "Float64") = T.double
 -- Operations
 -------------------------------------------------------------------------------
 
+binops :: Map.Map String Integer
+binops = Map.fromList [("+", 10), ("-", 11), ("*", 12), ("/", 13), ("==", 42), ("<", 44)]
+
 cgen :: S.Expr -> Codegen AST.Operand
 cgen (S.Let a b c) = do
   i <- alloca (T.ptr T.i8)
@@ -158,23 +162,16 @@ cgen (S.Let a b c) = do
   cgen c
 cgen (S.Var x) = getvar x >>= load
 cgen (S.Literal l) = box l
+cgen (S.Apply "or" [lhs, rhs]) = cgen (S.If lhs (S.Literal (S.BoolLit True)) rhs)
+cgen (S.Apply "and" [lhs, rhs]) = cgen (S.If lhs rhs (S.Literal (S.BoolLit False)))
+cgen (S.Apply fn [lhs, rhs]) | fn `Map.member` binops = do
+  llhs <- cgen lhs
+  lrhs <- cgen rhs
+  let code = constInt (binops Map.! fn)
+  call (global runtimeBinOpFuncType (AST.Name "runtimeBinOp")) [code, llhs, lrhs]
 cgen (S.Apply fn args) = do
-  let codeNum = case fn of
-                "==" -> 42
-                "<" -> 44
-                "+" -> 10
-                "-" -> 11
-                "*" -> 12
-                "/" -> 13
-                _   -> 0
   largs <- mapM cgen args
-  let code = constInt codeNum
-  let lhs = head largs
-  let rhs = head (tail largs)
-  let binop = call (global runtimeBinOpFuncType (AST.Name "runtimeBinOp")) [code, lhs, rhs]
-  let apply = call (global ptrType (AST.Name fn)) largs
-  if codeNum > 0 then binop else apply
-
+  call (global ptrType (AST.Name fn)) largs
 cgen (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"

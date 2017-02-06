@@ -91,7 +91,7 @@ intType = IntegerType 32
 boolType :: Type
 boolType = IntegerType 1
 
-typeInfoStructType = T.StructureType False [T.i32, T.ptr T.void]
+typeInfoStructType = T.StructureType False [T.i32, ptrType]
 ptrType = T.ptr T.i8
 -------------------------------------------------------------------------------
 -- Names
