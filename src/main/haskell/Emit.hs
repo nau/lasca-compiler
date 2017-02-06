@@ -83,10 +83,6 @@ defineStringConstants (S.If cond true false) = do
   defineStringConstants true
   defineStringConstants false
   return ()
-defineStringConstants (S.BinaryOp _ lhs rhs) = do
-  defineStringConstants lhs
-  defineStringConstants rhs
-  return ()
 defineStringConstants (S.Apply _ exprs) = do
   mapM defineStringConstants exprs
   return ()
@@ -143,31 +139,31 @@ typeMapping (S.Type "Float64") = T.double
 -------------------------------------------------------------------------------
 
 cgen :: S.Expr -> Codegen AST.Operand
-cgen (S.UnaryOp op a) = do
-  cgen $ S.Apply ("unary" ++ op) [a]
 cgen (S.Let a b c) = do
   i <- alloca (T.ptr T.i8)
   val <- cgen b
   store i val
   assign a i
   cgen c
-cgen (S.BinaryOp op a b) = do
-  lhs <- cgen a
-  rhs <- cgen b
-  let codeNum = case op of
-              "==" -> 42
-              "<" -> 44
-              "+" -> 10
-              "-" -> 11
-              "*" -> 12
-              "/" -> 13
-  let code = constInt codeNum
-  call (global runtimeBinOpFuncType (AST.Name "runtimeBinOp")) [code, lhs, rhs]
 cgen (S.Var x) = getvar x >>= load
 cgen (S.Literal l) = box l
 cgen (S.Apply fn args) = do
+  let codeNum = case fn of
+                "==" -> 42
+                "<" -> 44
+                "+" -> 10
+                "-" -> 11
+                "*" -> 12
+                "/" -> 13
+                _   -> 0
   largs <- mapM cgen args
-  call (global ptrType (AST.Name fn)) largs
+  let code = constInt codeNum
+  let lhs = head largs
+  let rhs = head (tail largs)
+  let binop = call (global runtimeBinOpFuncType (AST.Name "runtimeBinOp")) [code, lhs, rhs]
+  let apply = call (global ptrType (AST.Name fn)) largs
+  if codeNum > 0 then binop else apply
+
 cgen (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"

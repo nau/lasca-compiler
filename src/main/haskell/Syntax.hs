@@ -21,8 +21,6 @@ data Expr
   | Apply Name [Expr]
   | Function Name Type [Arg] Expr
   | Extern Name Type [Arg]
-  | BinaryOp Name Expr Expr
-  | UnaryOp Name Expr
   | If Expr Expr Expr
   | Let Name Expr Expr
   deriving (Eq, Ord, Show)

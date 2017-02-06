@@ -39,10 +39,13 @@ boolLit = Literal . BoolLit . strToBool <$> (string "true" <|> string "false")
 stringLit :: Parser Expr
 stringLit = Literal . StringLit <$> stringLiteral
 
-binop = Ex.Infix (BinaryOp <$> op) Ex.AssocLeft
-unop = Ex.Prefix (UnaryOp <$> op)
+binop = Ex.Infix parser Ex.AssocLeft
+  where parser = (\op lhs rhs -> Apply op [lhs, rhs]) <$> op
+unop = Ex.Prefix parser
+  where parser = (\op expr -> Apply ("unary" ++ op) [expr]) <$> op
 
-binary s assoc = Ex.Infix (reservedOp s >> return (BinaryOp s)) assoc
+binary s assoc = Ex.Infix parser assoc
+  where parser = reservedOp s >> return (\lhs rhs -> Apply s [lhs, rhs])
 
 op :: Parser String
 op = do
@@ -59,8 +62,10 @@ binops = [
           [binary "or" Ex.AssocLeft]
           ]
 
+operatorTable = binops ++ [[unop], [binop]]
+
 expr :: Parser Expr
-expr =  Ex.buildExpressionParser (binops ++ [[unop], [binop]]) factor
+expr =  Ex.buildExpressionParser operatorTable factor
 
 variable :: Parser Expr
 variable = Var <$> identifier
