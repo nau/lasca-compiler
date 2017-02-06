@@ -34,7 +34,10 @@ strToBool "true" = True
 strToBool _ = False
 
 boolLit :: Parser Expr
-boolLit = Literal . BoolLit . strToBool <$> (string "true" <|> string "false")
+boolLit = Literal . BoolLit . strToBool <$> (true <|> false)
+  where
+    true = reserved "true" >> return "true"
+    false = reserved "false" >> return "false"
 
 stringLit :: Parser Expr
 stringLit = Literal . StringLit <$> stringLiteral
@@ -140,8 +143,8 @@ letins = do
 
 factor :: Parser Expr
 factor = try floating
-      <|> try letins
       <|> try boolLit
+      <|> try letins
       <|> try stringLit
       <|> try integerLit
       <|> try call

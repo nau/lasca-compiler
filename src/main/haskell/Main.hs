@@ -75,12 +75,13 @@ genModule modo source = case parseToplevel source of
         return (Just (codegenModule modo ex))
 
 
-
+prelude = readFile "Prelude.lasca"
 
 readMod :: String -> IO (Maybe AST.Module)
 readMod fname = do
+  pre  <- prelude
   file <- readFile fname
-  genModule (initModule fname) file
+  genModule (initModule fname) (pre ++ file)
 
 execFile :: String -> IO ()
 execFile fname = do

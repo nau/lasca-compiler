@@ -1,12 +1,6 @@
 --extern def sleep(s: Int): Int
 --extern def putchar(c: Int): Int
-extern def runtimePutchar(d: Any): Any
-extern def box(t: Int, ptr: Any): Any
-extern def boxInt(d: Int): Any
-extern def runtimeBinOp(code: Int, lhs: Any, rhs: Any): Any
-extern def initLascaRuntime(): Unit
-extern def unbox(ptr: Any, d: Int): Any
-extern def println(s: Any): Any
+
 
 def main() =
 	let a = println("Hello World!"),
@@ -16,7 +10,7 @@ def main() =
 end
 
 def test(i) =
-	if i == 30 then 1 else test(i - 1) end
+	if true then 1 else test(i - 1) end
 end
 
 def fact(n) =
