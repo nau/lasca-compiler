@@ -95,7 +95,8 @@ struct type_info* runtimeBinOp(int code, struct type_info* lhs, struct type_info
   case NE:  result = boxBool(left != right); break;
   case LT:  result = boxBool(left < right); break;
   case LE:  result = boxBool(left <= right); break;
-  case GE:  result = boxBool(left > right); break;
+  case GE:  result = boxBool(left >= right); break;
+  case GT:  result = boxBool(left > right); break;
   default:
   	printf("AAAA!!! Unsupported binary operation %i", code);
     exit(1);

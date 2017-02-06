@@ -151,7 +151,8 @@ typeMapping (S.Type "Float64") = T.double
 -------------------------------------------------------------------------------
 
 binops :: Map.Map String Integer
-binops = Map.fromList [("+", 10), ("-", 11), ("*", 12), ("/", 13), ("==", 42), ("<", 44)]
+binops = Map.fromList [("+", 10), ("-", 11), ("*", 12), ("/", 13),
+  ("==", 42), ("!=", 43), ("<", 44), ("<=", 45), (">=", 46), (">", 47)]
 
 cgen :: S.Expr -> Codegen AST.Operand
 cgen (S.Let a b c) = do

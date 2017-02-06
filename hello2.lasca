@@ -1,16 +1,13 @@
---extern def sleep(s: Int): Int
---extern def putchar(c: Int): Int
-
 
 def main() =
 	let a = println("Hello World!"),
 	    b = println("Factorial of 8 is:"),
-	    c= print(fact(8))
+	    c= print(fact(10))
 	in println("")
 end
 
 def test(i) =
-	if true then 1 else test(i - 1) end
+	if 1 < i then 1 else test(i - 1) end
 end
 
 def fact(n) =
