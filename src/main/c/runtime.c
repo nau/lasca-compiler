@@ -16,9 +16,10 @@ struct string {
 };
 
 
-void initLascaRuntime() {
+void initLascaRuntime(/*void* (*main)()*/) {
     GC_init();
     puts("Init Lasca 0.0.0.1 runtime. Enjoy :)\n");
+//    main();
 }
 
 void *gcMalloc(size_t s) {

@@ -122,6 +122,17 @@ codegenTop exp = do
       setBlock entry
       cgen exp >>= ret
 
+codegenInit = do
+  define T.void "start" [] bls
+  where
+    bls = createBlocks $ execCodegen [] $ do
+        entry <- addBlock entryBlockName
+        setBlock entry
+        call (global initLascaRuntimeFuncType (AST.Name "initLascaRuntime")) []
+        call (global mainFuncType (AST.Name "main")) []
+        terminator $ I.Do $ I.Ret (Nothing) []
+        return ()
+
 
 -- Static mode
 typeMapping :: S.Type -> AST.Type
@@ -203,6 +214,8 @@ cgen (S.If cond tr fl) = do
 -------------------------------------------------------------------------------
 funcType retTy args = T.FunctionType retTy args False
 
+initLascaRuntimeFuncType = funcType T.void []
+mainFuncType = funcType ptrType []
 boxFuncType = funcType ptrType [T.i32]
 runtimeBinOpFuncType = funcType ptrType [T.i32, ptrType, ptrType]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
@@ -230,7 +243,8 @@ codegen modo fns = do
   return ast
 
 codegenModule :: AST.Module -> [S.Expr] -> AST.Module
-codegenModule modo fns = ast
+codegenModule modo fns = ast2
     where
         modn = mapM codegenTop fns
         ast = runLLVM modo modn
+        ast2 = runLLVM ast codegenInit

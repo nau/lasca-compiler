@@ -38,10 +38,10 @@ sample = LascaOpts
   <$> some (argument str (metavar "FILES..."))
   <*> switch
       ( long "exec"
-     <> help "Execute immediatly" )
+     <> help "Execute immediately" )
   <*> switch
       ( long "print-llvm"
-      <> help "Execute immediatly" )
+      <> help "Execute immediately" )
 
 greet :: LascaOpts -> IO ()
 greet (LascaOpts [] _ _) = repl
@@ -100,13 +100,17 @@ execFile fname = do
 processFile :: String -> IO ()
 processFile fname = do
   mod <- readMod fname
+
   putStrLn "Read module OK"
   case mod of
     Just mod -> do
         Just(asm) <- getLLAsString mod
         writeFile (fname ++ ".ll") asm
         let name = takeWhile (/= '.') fname
-        callProcess "clang-3.5" ["-o", name, "-L.", "-llascart", fname ++ ".ll"]
+-- Dynamic linking
+        callProcess "clang-3.5" ["-e", "_start", "-g", "-o", name, "-L.", "-llascart", fname ++ ".ll"]
+-- Static linking
+--         callProcess "clang-3.5" ["-e", "_start", "-g", "-o", name, "-L.", {-"-llascart",-} fname ++ ".ll", "/usr/local/lib/libgc.a","liblascart.a"]
         return ()
     Nothing -> do
         putStrLn "Couldn't compile a module"
@@ -135,10 +139,3 @@ main = execParser opts >>= greet
      <> progDesc "Print a greeting for TARGET"
      <> header "hello - a test for optparse-applicative" )
 
-main1 :: IO ()
-main1 = do
-  args <- getArgs
-  case args of
-    []      -> repl
-    [fname] -> do
-        processFile fname
