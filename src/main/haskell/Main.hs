@@ -33,15 +33,16 @@ data LascaOpts = LascaOpts
   , printLLVMAsm :: Bool
   }
 
-sample :: Parser LascaOpts
-sample = LascaOpts
-  <$> some (argument str (metavar "FILES..."))
+lascaOpts :: Parser LascaOpts
+lascaOpts = LascaOpts
+  <$> many (argument str (metavar "FILES..."))
   <*> switch
       ( long "exec"
+     <> short 'e'
      <> help "Execute immediately" )
   <*> switch
       ( long "print-llvm"
-      <> help "Execute immediately" )
+      <> help "Print LLVM IR" )
 
 greet :: LascaOpts -> IO ()
 greet (LascaOpts [] _ _) = repl
@@ -134,7 +135,7 @@ repl = runInputT defaultSettings (loop (initModule "Lasca JIT"))
 main :: IO ()
 main = execParser opts >>= greet
   where
-    opts = info (helper <*> sample)
+    opts = info (helper <*> lascaOpts)
       ( fullDesc
      <> progDesc "Print a greeting for TARGET"
      <> header "hello - a test for optparse-applicative" )

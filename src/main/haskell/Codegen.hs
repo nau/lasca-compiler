@@ -18,7 +18,7 @@ import Data.Word
 import Data.String
 import Data.List
 import Data.Function
-import qualified Data.Map as Map
+import qualified Data.Map.Strict as Map
 -- import qualified Data.Text as Text
 import qualified Data.ByteString as ByteString
 -- import qualified Data.Text.Encoding as Encoding
