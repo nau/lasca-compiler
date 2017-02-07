@@ -29,17 +29,19 @@ import qualified LLVM.General.AST.FloatingPointPredicate as FP
 
 -- import qualified Data.Text as Text
 import qualified Data.ByteString as ByteString
--- import qualified Data.Text.Encoding as Encoding
-import qualified Data.ByteString.Char8 as Char8
+import qualified Data.Text.Encoding as Encoding
+import qualified Data.ByteString.UTF8 as UTF8
 
 import LLVM.General.ExecutionEngine ( withMCJIT, withModuleInEngine, getFunction )
 
 import qualified Data.Text
 import qualified Data.ByteString
 import qualified Data.Text.Encoding
+import Data.Digest.Murmur32
 import Data.Maybe
 import Data.Word
 import Data.Int
+import Control.Monad.State
 import Control.Monad.Except
 import Control.Applicative
 import qualified Data.Map.Strict as Map
@@ -62,17 +64,21 @@ toSig = map (\(S.Arg name tpe) -> (ptrType, AST.Name name))
 
 stringStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
 
+
+getStringLitName s = AST.Name name
+  where
+    name = (take 15 s) ++ "." ++ (show hash)
+    hash = hash32 s
+
 defineStringLit :: String -> LLVM ()
 defineStringLit s = do  addDefn $ AST.GlobalDefinition $ AST.globalVariableDefaults {
-                          LLVM.General.AST.Global.name        = AST.Name name
+                          LLVM.General.AST.Global.name        = getStringLitName s
                         , LLVM.General.AST.Global.isConstant  = True
                         , LLVM.General.AST.Global.type' = stringStructType len
                         , LLVM.General.AST.Global.initializer = Just (C.Struct (Nothing) False [C.Int 32 (toInteger len), C.Array T.i8 bytes])
                         }
   where
-    name = take 10 s
---     bytestring = Encoding.encodeUtf8 s
-    bytestring = Char8.pack s
+    bytestring = UTF8.fromString s
     constByte b = C.Int 8 (toInteger b)
     bytes = map constByte (ByteString.unpack bytestring)
     len = ByteString.length bytestring
@@ -217,16 +223,15 @@ mainFuncType = funcType ptrType []
 boxFuncType = funcType ptrType [T.i32]
 runtimeBinOpFuncType = funcType ptrType [T.i32, ptrType, ptrType]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
-makeStringLitFuncType = funcType ptrType [ptrType, T.i32]
 
 box :: S.Lit -> Codegen AST.Operand
 box (S.BoolLit b) = call (global boxFuncType (AST.Name "boxBool")) [constInt (boolToInt b)]
 box (S.IntLit  n) = call (global boxFuncType (AST.Name "boxInt")) [constInt (toInteger n)]
 box (S.StringLit s) = do
-  let name = take 10 s
-  let len = length s
-  let ref = global (stringStructType len) (AST.Name name)
-  ref' <- bitcast ref (T.ptr T.i8)
+  let name = getStringLitName s
+  let len = ByteString.length . UTF8.fromString $ s
+  let ref = global (stringStructType len) name
+  ref' <- bitcast ref ptrType
   call (global boxFuncType (AST.Name "box")) [constInt 3, ref']
 
 

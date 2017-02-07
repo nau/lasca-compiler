@@ -12,6 +12,7 @@ executable lasca
   other-extensions:    GADTs
   build-depends:       base >=4.6,
                         text,
+                        utf8-string,
                         haskeline,
                         process,
                         containers,
@@ -23,6 +24,7 @@ executable lasca
                         llvm-general >= 3.5.1.2,
                         optparse-applicative,
                         bytestring,
+                        murmur-hash,
                         mtl
   Extra-libraries:      lascart
   default-language:    Haskell2010
