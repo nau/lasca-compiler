@@ -43,12 +43,12 @@ stringLit :: Parser Expr
 stringLit = Literal . StringLit <$> stringLiteral
 
 binop = Ex.Infix parser Ex.AssocLeft
-  where parser = (\op lhs rhs -> Apply op [lhs, rhs]) <$> op
+  where parser = (\op lhs rhs -> Apply (Var op) [lhs, rhs]) <$> op
 unop = Ex.Prefix parser
-  where parser = (\op expr -> Apply ("unary" ++ op) [expr]) <$> op
+  where parser = (\op expr -> Apply (Var ("unary" ++ op)) [expr]) <$> op
 
 binary s assoc = Ex.Infix parser assoc
-  where parser = reservedOp s >> return (\lhs rhs -> Apply s [lhs, rhs])
+  where parser = reservedOp s >> return (\lhs rhs -> Apply (Var s) [lhs, rhs])
 
 op :: Parser String
 op = do
@@ -73,11 +73,11 @@ expr =  Ex.buildExpressionParser operatorTable factor
 variable :: Parser Expr
 variable = Var <$> identifier
 
-typeAscription :: Parser Type
+typeAscription :: Parser SType
 typeAscription = do
   reservedOp ":"
   name <- identifier
-  return $ Type name
+  return $ SType name
 
 funcArgument :: Parser Name
 funcArgument = do
@@ -104,7 +104,7 @@ extern = do
   args <- parens $ commaSep arg
   reservedOp ":"
   tpe <- identifier
-  return (Extern name (Type tpe) args)
+  return (Extern name (SType tpe) args)
 
 arg :: Parser Arg
 arg = do
@@ -116,7 +116,7 @@ call :: Parser Expr
 call = do
   name <- identifier
   args <- parens $ commaSep expr
-  return (Apply name args)
+  return (Apply (Var name) args)
 
 ifthen :: Parser Expr
 ifthen = do

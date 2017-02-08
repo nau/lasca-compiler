@@ -142,13 +142,13 @@ codegenInit = do
 
 
 -- Static mode
-typeMapping :: S.Type -> AST.Type
+typeMapping :: S.SType -> AST.Type
 typeMapping S.AnyType = ptrType
-typeMapping (S.Type "Any") = ptrType
-typeMapping (S.Type "Unit") = T.void
-typeMapping (S.Type "Bool") = T.i1
-typeMapping (S.Type "Int") = T.i32
-typeMapping (S.Type "Float64") = T.double
+typeMapping (S.SType "Any") = ptrType
+typeMapping (S.SType "Unit") = T.void
+typeMapping (S.SType "Bool") = T.i1
+typeMapping (S.SType "Int") = T.i32
+typeMapping (S.SType "Float64") = T.double
 
 -- Dynamic mode
 -- typeMapping _ = typeInfoType
@@ -169,14 +169,14 @@ cgen (S.Let a b c) = do
   cgen c
 cgen (S.Var x) = getvar x >>= load
 cgen (S.Literal l) = box l
-cgen (S.Apply "or" [lhs, rhs]) = cgen (S.If lhs (S.Literal (S.BoolLit True)) rhs)
-cgen (S.Apply "and" [lhs, rhs]) = cgen (S.If lhs rhs (S.Literal (S.BoolLit False)))
-cgen (S.Apply fn [lhs, rhs]) | fn `Map.member` binops = do
+cgen (S.Apply (S.Var "or") [lhs, rhs]) = cgen (S.If lhs (S.Literal (S.BoolLit True)) rhs)
+cgen (S.Apply (S.Var "and") [lhs, rhs]) = cgen (S.If lhs rhs (S.Literal (S.BoolLit False)))
+cgen (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
   llhs <- cgen lhs
   lrhs <- cgen rhs
   let code = constInt (binops Map.! fn)
   call (global runtimeBinOpFuncType (AST.Name "runtimeBinOp")) [code, llhs, lrhs]
-cgen (S.Apply fn args) = do
+cgen (S.Apply (S.Var fn) args) = do
   largs <- mapM cgen args
   call (global ptrType (AST.Name fn)) largs
 cgen (S.If cond tr fl) = do

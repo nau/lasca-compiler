@@ -12,6 +12,7 @@ ghc-options:
     -auto-all
     -caf-all
     -fforce-recomp
+#    -fdefer-type-errors
 extra-deps:
 - llvm-general-3.5.1.2
 - llvm-general-pure-3.5.1.0

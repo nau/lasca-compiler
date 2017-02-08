@@ -15,6 +15,10 @@ import Parser
 import Codegen
 import Emit
 import JIT
+import Infer
+import Type
+import Syntax
+
 
 import Control.Monad
 import Control.Monad.Trans
@@ -72,11 +76,12 @@ genModule modo source = case parseToplevel source of
     Right ex -> do
         putStrLn "Parsed OK"
         putStrLn (show ex)
-
+        typeCheck ex
         return (Just (codegenModule modo ex))
 
 
-prelude = readFile "Prelude.lasca"
+-- prelude = readFile "Prelude.lasca"
+prelude = return ""
 
 readMod :: String -> IO (Maybe AST.Module)
 readMod fname = do
@@ -140,3 +145,13 @@ main = execParser opts >>= greet
      <> progDesc "Print a greeting for TARGET"
      <> header "hello - a test for optparse-applicative" )
 
+
+typeCheck :: [Expr] -> IO ()
+typeCheck exprs = do
+  let a = map f exprs
+  putStrLn $ show a
+  case inferTop emptyTyenv a of
+    Right env -> putStrLn $ show env
+    Left e -> putStrLn $ show e
+  where f e@(Function name _ [Arg x _] expr) = (name, e)
+        f e@(Extern name _ [Arg x _]) = (name, Literal (BoolLit True))
