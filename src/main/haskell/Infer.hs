@@ -183,11 +183,30 @@ infer env ex = case ex of
   {-Op op e1 e2 -> do
     inferPrim env [e1, e2] (ops op)
 -}
-  Function name _ [Arg arg _] e -> do
+  Extern name tpe args -> do
+    let ts = map argToType args
+    let t = foldr f tpe ts
+    return (nullSubst, t)
+    where
+          argToType (Arg _ t) = t
+          f z t = t `TArr` z
+  Function name _ [] e -> do
     tv <- fresh
-    let env' = env `extend` (arg, Forall [] tv)
+    (s1, t1) <- infer env e
+    return (s1, t1)
+  Function name _ [arg] e -> do
+    tv <- fresh
+    let (Arg name _) = arg
+    let env' = env `extend` (name, Forall [] tv)
     (s1, t1) <- infer env' e
     return (s1, apply s1 tv `TArr` t1)
+
+  Function name _ (args) e -> do
+    tvs <- mapM (const fresh) args
+    let env' = foldl (\env ((Arg arg _), tv) -> env `extend` (arg, Forall [] tv)) env (zip args tvs)
+    (s1, t1) <- infer env' e
+    let t = foldr (\t tv -> apply s1 tv `TArr` t) t1 tvs
+    return (s1, t)
   Literal (IntLit _)  -> return (nullSubst, typeInt)
   Literal (BoolLit _) -> return (nullSubst, typeBool)
 

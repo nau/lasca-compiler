@@ -19,3 +19,5 @@ typeInt  = TCon "Int"
 
 typeBool :: Type
 typeBool = TCon "Bool"
+
+typeAny = TCon "Any"

@@ -80,8 +80,8 @@ genModule modo source = case parseToplevel source of
         return (Just (codegenModule modo ex))
 
 
--- prelude = readFile "Prelude.lasca"
-prelude = return ""
+prelude = readFile "Prelude.lasca"
+-- prelude = return ""
 
 readMod :: String -> IO (Maybe AST.Module)
 readMod fname = do
@@ -153,5 +153,5 @@ typeCheck exprs = do
   case inferTop emptyTyenv a of
     Right env -> putStrLn $ show env
     Left e -> putStrLn $ show e
-  where f e@(Function name _ [Arg x _] expr) = (name, e)
-        f e@(Extern name _ [Arg x _]) = (name, Literal (BoolLit True))
+  where f e@(Function name _ _ _) = (name, e)
+        f e@(Extern name _ _) = (name, e)

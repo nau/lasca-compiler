@@ -47,6 +47,7 @@ import Control.Applicative
 import qualified Data.Map.Strict as Map
 
 import Codegen
+import Type
 import JIT (runJIT)
 import qualified Syntax as S
 
@@ -142,13 +143,12 @@ codegenInit = do
 
 
 -- Static mode
-typeMapping :: S.SType -> AST.Type
-typeMapping S.AnyType = ptrType
-typeMapping (S.SType "Any") = ptrType
-typeMapping (S.SType "Unit") = T.void
-typeMapping (S.SType "Bool") = T.i1
-typeMapping (S.SType "Int") = T.i32
-typeMapping (S.SType "Float64") = T.double
+typeMapping :: Type -> AST.Type
+typeMapping (TCon "Any") = ptrType
+typeMapping (TCon "Unit") = T.void
+typeMapping (TCon "Bool") = T.i1
+typeMapping (TCon "Int") = T.i32
+typeMapping (TCon "Float64") = T.double
 
 -- Dynamic mode
 -- typeMapping _ = typeInfoType

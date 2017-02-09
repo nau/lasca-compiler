@@ -22,6 +22,7 @@ import qualified Text.Parsec.Token as Tok
 
 import Lexer
 import Syntax
+import Type
 
 integerLit :: Parser Expr
 integerLit = Literal . IntLit . fromIntegral <$> integer
@@ -73,16 +74,16 @@ expr =  Ex.buildExpressionParser operatorTable factor
 variable :: Parser Expr
 variable = Var <$> identifier
 
-typeAscription :: Parser SType
+typeAscription :: Parser Type
 typeAscription = do
   reservedOp ":"
   name <- identifier
-  return $ SType name
+  return $ TCon name
 
 funcArgument :: Parser Name
 funcArgument = do
   name <- identifier
-  typeAsc <- option AnyType typeAscription
+  typeAsc <- option typeAny typeAscription
   return name
 
 function :: Parser Expr
@@ -90,7 +91,7 @@ function = do
   reserved "def"
   name <- identifier
   args <- parens $ commaSep arg
-  tpe <- option AnyType typeAscription
+  tpe <- option typeAny typeAscription
   reservedOp "="
   body <- expr
   reserved "end"
@@ -104,12 +105,12 @@ extern = do
   args <- parens $ commaSep arg
   reservedOp ":"
   tpe <- identifier
-  return (Extern name (SType tpe) args)
+  return (Extern name (TCon tpe) args)
 
 arg :: Parser Arg
 arg = do
   name <- identifier
-  tpe <- option AnyType typeAscription
+  tpe <- option typeAny typeAscription
   return (Arg name tpe)
 
 call :: Parser Expr

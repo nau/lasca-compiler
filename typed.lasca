@@ -1,4 +1,6 @@
 
-def main(x) =
+def main() =
 	1
 end
+
+def id(x) = x end
