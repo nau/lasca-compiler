@@ -13,13 +13,17 @@ import Control.Monad.State
 import Control.Monad.Except
 
 import Data.Monoid
-import Data.List (nub)
+import qualified Data.List as List
 import Data.Foldable (foldr)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 
 newtype TypeEnv = TypeEnv (Map.Map String Scheme)
-  deriving (Monoid, Show)
+  deriving (Monoid)
+
+instance Show TypeEnv where
+  show (TypeEnv subst) = "Γ = {\n" ++ elems ++ "}"
+    where elems = List.foldl (\s (name, scheme) -> s ++ name ++ " : " ++ show scheme ++ "\n") "" (Map.toList subst)
 
 data Unique = Unique { count :: Int }
 
@@ -72,7 +76,7 @@ instance Substitutable Scheme where
   ftv (Forall as t) = ftv t `Set.difference` Set.fromList as
 
 instance Substitutable a => Substitutable [a] where
-  apply = fmap . apply
+  apply s a = (fmap . apply) s a
   ftv   = foldr (Set.union . ftv) Set.empty
 
 instance Substitutable TypeEnv where
@@ -159,11 +163,12 @@ infer env ex = case ex of
     tv <- fresh
     (s1, t1) <- infer env e1
     (s2, t2) <- infer (apply s1 env) arg
-
---     (s2, t2) <- foldM (\(s, t) a -> infer (apply s1 env) args
-
     s3       <- unify (apply s2 t1) (TArr t2 tv)
     return (s3 `compose` s2 `compose` s1, apply s3 tv)
+
+  Apply e1 (arg:args) -> do
+     let curried = foldl (\expr arg -> Apply expr [arg]) (Apply e1 [arg]) args
+     infer env curried
 
   Let x e1 e2 -> do
     (s1, t1) <- infer env e1
@@ -189,7 +194,7 @@ infer env ex = case ex of
     return (nullSubst, t)
     where
           argToType (Arg _ t) = t
-          f z t = t `TArr` z
+          f z t = z `TArr` t
   Function name _ [] e -> do
     tv <- fresh
     (s1, t1) <- infer env e
@@ -233,7 +238,7 @@ inferTop env ((name, ex):xs) = case inferExpr env ex of
 normalize :: Scheme -> Scheme
 normalize (Forall ts body) = Forall (fmap snd ord) (normtype body)
   where
-    ord = zip (nub $ fv body) (fmap TV letters)
+    ord = zip (List.nub $ fv body) (fmap TV letters)
 
     fv (TVar a)   = [a]
     fv (TArr a b) = fv a ++ fv b

@@ -4,3 +4,12 @@ def main() =
 end
 
 def id(x) = x end
+
+-- f :: (a -> b -> c) -> a -> b -> c
+def apply(f, a, b) = f(a, b) end
+
+def foo(x) = 1 end
+
+def test(f: Int, g) = f(g(1)) end
+
+

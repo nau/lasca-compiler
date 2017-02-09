@@ -1,18 +1,36 @@
 module Type where
 
+import Data.List
+
 newtype TVar = TV String
-  deriving (Show, Eq, Ord)
+  deriving (Eq, Ord)
+
+instance Show TVar where
+  show (TV s) = s
 
 data Type
   = TVar TVar
   | TCon String
   | TArr Type Type
-  deriving (Show, Eq, Ord)
+  deriving (Eq, Ord)
+
+instance Show Type where
+  show (TVar (TV n)) = n
+  show (TCon s) = s
+  show (TArr l r) = "(" ++ show l ++ " -> " ++ show r ++ ")"
+
 
 infixr `TArr`
 
 data Scheme = Forall [TVar] Type
-  deriving (Show, Eq, Ord)
+  deriving (Eq, Ord)
+
+instance Show Scheme where
+  show (Forall [] t) = show t
+  show (Forall vars t) = "∀(" ++ intercalate "," typeVarNames ++ ") => " ++ show t
+    where
+      typeVarNames :: [String]
+      typeVarNames = (map show vars)
 
 typeInt :: Type
 typeInt  = TCon "Int"
