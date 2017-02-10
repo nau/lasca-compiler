@@ -17,6 +17,7 @@ import qualified Data.List as List
 import Data.Foldable (foldr)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Debug.Trace as Debug
 
 newtype TypeEnv = TypeEnv (Map.Map String Scheme)
   deriving (Monoid)
@@ -129,11 +130,20 @@ generalize :: TypeEnv -> Type -> Scheme
 generalize env t  = Forall as t
   where as = Set.toList $ ftv t `Set.difference` ftv env
 
-{-ops :: Apply -> Type
-ops Add = typeInt `TArr` typeInt `TArr` typeInt
-ops Mul = typeInt `TArr` typeInt `TArr` typeInt
-ops Sub = typeInt `TArr` typeInt `TArr` typeInt
-ops Eql = typeInt `TArr` typeInt `TArr` typeBool-}
+ops = Map.fromList [
+  ("+", typeInt `TArr` typeInt `TArr` typeInt),
+  ("-", typeInt `TArr` typeInt `TArr` typeInt),
+  ("*", typeInt `TArr` typeInt `TArr` typeInt),
+  ("/", typeInt `TArr` typeInt `TArr` typeInt),
+  ("==", typeInt `TArr` typeInt `TArr` typeInt),
+  ("!=", typeInt `TArr` typeInt `TArr` typeInt),
+  ("<", typeInt `TArr` typeInt `TArr` typeInt),
+  ("<=", typeInt `TArr` typeInt `TArr` typeInt),
+  (">", typeInt `TArr` typeInt `TArr` typeInt),
+  (">=", typeInt `TArr` typeInt `TArr` typeInt),
+  ("and", typeBool `TArr` typeBool `TArr` typeBool),
+  ("or", typeBool `TArr` typeBool `TArr` typeBool)
+  ]
 
 lookupEnv :: TypeEnv -> String -> Infer (Subst, Type)
 lookupEnv (TypeEnv env) x =
@@ -147,18 +157,6 @@ infer env ex = case ex of
 
   Var x -> lookupEnv env x
 
-  {-Lam x e -> do
-    tv <- fresh
-    let env' = env `extend` (x, Forall [] tv)
-    (s1, t1) <- infer env' e
-    return (s1, apply s1 tv `TArr` t1)
--}
-  {-App e1 e2 -> do
-    tv <- fresh
-    (s1, t1) <- infer env e1
-    (s2, t2) <- infer (apply s1 env) e2
-    s3       <- unify (apply s2 t1) (TArr t2 tv)
-    return (s3 `compose` s2 `compose` s1, apply s3 tv)-}
   Apply e1 [arg] -> do
     tv <- fresh
     (s1, t1) <- infer env e1
@@ -166,8 +164,15 @@ infer env ex = case ex of
     s3       <- unify (apply s2 t1) (TArr t2 tv)
     return (s3 `compose` s2 `compose` s1, apply s3 tv)
 
-  Apply e1 (arg:args) -> do
-     let curried = foldl (\expr arg -> Apply expr [arg]) (Apply e1 [arg]) args
+  Apply (Var op) [e1, e2] | op `Map.member` ops -> do
+    (s1, t1) <- infer env e1
+    (s2, t2) <- infer env e2
+    tv <- fresh
+    s3 <- unify (TArr t1 (TArr t2 tv)) (ops Map.! op)
+    return (s1 `compose` s2 `compose` s3, apply s3 tv)
+
+  Apply e1 (args) -> do
+     let curried = foldl (\expr arg -> Apply expr [arg]) e1 args
      infer env curried
 
   Let x e1 e2 -> do
@@ -181,13 +186,6 @@ infer env ex = case ex of
     tv <- fresh
     inferPrim env [cond, tr, fl] (typeBool `TArr` tv `TArr` tv `TArr` tv)
 
-  {-Fix e1 -> do
-    tv <- fresh
-    inferPrim env [e1] ((tv `TArr` tv) `TArr` tv)-}
-
-  {-Op op e1 e2 -> do
-    inferPrim env [e1, e2] (ops op)
--}
   Extern name tpe args -> do
     let ts = map argToType args
     let t = foldr f tpe ts
@@ -195,6 +193,7 @@ infer env ex = case ex of
     where
           argToType (Arg _ t) = t
           f z t = z `TArr` t
+
   Function name _ [] e -> do
     tv <- fresh
     (s1, t1) <- infer env e
@@ -206,14 +205,12 @@ infer env ex = case ex of
     (s1, t1) <- infer env' e
     return (s1, apply s1 tv `TArr` t1)
 
-  Function name _ (args) e -> do
-    tvs <- mapM (const fresh) args
-    let env' = foldl (\env ((Arg arg _), tv) -> env `extend` (arg, Forall [] tv)) env (zip args tvs)
-    (s1, t1) <- infer env' e
-    let t = foldr (\t tv -> apply s1 tv `TArr` t) t1 tvs
-    return (s1, t)
+  Function name t (args) e -> do
+    let curried = foldr (\arg expr -> Function name t [arg] expr) e args
+    infer env (Debug.trace ("Func " ++ show curried) curried)
   Literal (IntLit _)  -> return (nullSubst, typeInt)
   Literal (BoolLit _) -> return (nullSubst, typeBool)
+  Literal (StringLit _) -> return (nullSubst, typeString)
 
 inferPrim :: TypeEnv -> [Expr] -> Type -> Infer (Subst, Type)
 inferPrim env l t = do

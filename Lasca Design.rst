@@ -267,6 +267,31 @@ Syntax
 - var inside a function
 - method syntax
 
+Curly Braces vs Indentation
+---------------------------
+
+https://www.quora.com/What-are-the-downsides-to-whitespace-indentation-rather-than-requiring-curly-braces
+
+#. No auto formatting for indentation based code.
+#. Whitespace indentation makes code generation unnecessary hard.
+   It is a lot easier to generate your structural code in whatever way that is easier for machine to read and
+   let some post-processor format it nicely for human to read.
+#. While doing a merge in Perforce/SVN/CVS, it's quite easy to unintentionally remove/introduce whitespaces
+   (especially quite easy when you come from a background where whitespaces do not matter -
+   for example, a Java developer changing a small piece of Python code)
+#. Its much easier to copy code from one place to another if the whitespaces and indentation do not matter
+#. Tabs and spaces are easy to mix-up.
+   If your tab-length is 4 spaces, an indentation of 1 tab and 4 spaces will look the same.
+   However, Python distinguishes between the two. You will struggle to find where the error in your code is,
+   because the indentation "looks" uniform everywhere but isn't.
+#. Vim allows easy navigation with curly brackets.
+   Just navigate to the opening (closing) curly bracket and press '%'
+   and you will be taken to the closing (opening) curly bracket. No such thing for Python.
+#. Let's say you had a huge block of code in a try-catch. It would naturally be indented by (say) 1 tab more than the code outside it. Now if you want to remove the try statement, have fun removing the indentation on the huge block of code in it (if it were curly braces, simply commenting those out would do the job).
+#. Conversely to point 4, adding a block of code in between is also troublesome (points 4 and 5 are mentioned in the context of code development, where you might not be sticking firmly to how the code looks. Let's say you wanted to just add/modify a block of code to see what difference it made).
+#. Again, as the number of lines in the code increases, the fear that some indentation has gone wrong somewhere builds up drastically. It can also be extremely difficult to figure out where the indentation has gone wrong.
+#. As the end of a block is not defined using a non-white space character, block endings should be coded carefully, lest you mistakenly put the last statement outside the indented block. With curly braces, the chances of this are low because visually there's a concrete block-ending character.
+
 Keywords
 --------
 ``alias``?, ``and``, ``as``?, ``break``?, ``case``?, ``continue``?, ``data``,
@@ -493,7 +518,8 @@ From https://wiki.haskell.org/Pointfree
 
 
 	Pointfree Style
-		It is very common for functional programmers to write functions as a composition of other functions, never mentioning the actual arguments they will be applied to. For example, compare:
+		It is very common for functional programmers to write functions as a composition of other functions,
+		never mentioning the actual arguments they will be applied to. For example, compare:
 
 		 .. code:: haskell
 
@@ -505,10 +531,13 @@ From https://wiki.haskell.org/Pointfree
 
 			 sum' xs = foldr (+) 0 xs
 
-		These functions perform the same operation, however, the former is more compact, and is considered cleaner. This is closely related to function pipelines (and to unix shell scripting): it is clearer to write let fn = f . g . h than to write let fn x = f (g (h x)).
+		These functions perform the same operation, however, the former is more compact,
+		and is considered cleaner. This is closely related to function pipelines (and to unix shell scripting):
+		it is clearer to write let fn = f . g . h than to write let fn x = f (g (h x)).
 
 
-I find this style extremely non-intuitive, hard to read, understand, and maintain. Saving few characters doesn't worth it.
+I find this style extremely non-intuitive, hard to read, understand, and maintain.
+Saving few characters doesn't worth it.
 
 Operators
 ---------
@@ -550,9 +579,15 @@ like liquid types annotations, totality, purity, big O annotations.
 Visibility
 ----------
 
-Public by default.
+Options:
 
-Explicit private keyword or Haskell-like export mechanism.
+#. Export all/explicit export of functions and types at module definition (Haskell, Erlang etc)
+#. Name-dependent visibility. E.g if an identifier starts with lowercase/__ letter(s) that it's private. (Go, Python)
+#. Public by default, explicit ``private`` keyword to make a function/type private. (Scala)
+
+I'd like to disallow ``_`` in identifier names, and distinguish functions and types by first lowercase/uppercase letter.
+
+Public by default. Explicit ``private`` keyword.
 
 Ideas
 -----

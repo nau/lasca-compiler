@@ -1,6 +1,6 @@
 
 def main() =
-	1
+	"1"
 end
 
 def id(x) = x end
@@ -8,8 +8,9 @@ def id(x) = x end
 -- f :: (a -> b -> c) -> a -> b -> c
 def apply(f, a, b) = f(a, b) end
 
-def foo(x) = 1 end
+def foo(x: Bool): Int = 1 + x end
 
-def test(f: Int, g) = f(g(1)) end
+def test(f) = f(foo(1)) end
 
+def test1(a) = test(id) end
 

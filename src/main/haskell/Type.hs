@@ -39,3 +39,8 @@ typeBool :: Type
 typeBool = TCon "Bool"
 
 typeAny = TCon "Any"
+typeString = TCon "String"
+typeUnit = TCon "Unit"
+
+isAny (TCon "Any") = True
+isAny _ = False
