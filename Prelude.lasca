@@ -5,4 +5,4 @@ extern def boxBool(d: Int): Any
 extern def runtimeBinOp(code: Int, lhs: Any, rhs: Any): Any
 extern def initLascaRuntime(): Unit
 extern def unbox(ptr: Any, d: Int): Any
-extern def println(s: String): Unit
+extern def println(s: Any): Any

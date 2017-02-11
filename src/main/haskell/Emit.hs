@@ -149,6 +149,7 @@ typeMapping (TCon "Unit") = T.void
 typeMapping (TCon "Bool") = T.i1
 typeMapping (TCon "Int") = T.i32
 typeMapping (TCon "Float64") = T.double
+typeMapping (TCon "String") = ptrType
 
 -- Dynamic mode
 -- typeMapping _ = typeInfoType

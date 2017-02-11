@@ -99,7 +99,7 @@ unify (l `TArr` r) (l' `TArr` r')  = do
 
 unify (TVar a) t = bind a t
 unify t (TVar a) = bind a t
-unify (TCon a) (TCon b) | a == b = return nullSubst
+unify (TCon a) (TCon b) | a == b || a == "Any" || b == "Any" = return nullSubst
 unify t1 t2 = throwError $ UnificationFail t1 t2
 
 bind ::  TVar -> Type -> Infer Subst
@@ -135,12 +135,12 @@ ops = Map.fromList [
   ("-", typeInt `TArr` typeInt `TArr` typeInt),
   ("*", typeInt `TArr` typeInt `TArr` typeInt),
   ("/", typeInt `TArr` typeInt `TArr` typeInt),
-  ("==", typeInt `TArr` typeInt `TArr` typeInt),
-  ("!=", typeInt `TArr` typeInt `TArr` typeInt),
-  ("<", typeInt `TArr` typeInt `TArr` typeInt),
-  ("<=", typeInt `TArr` typeInt `TArr` typeInt),
-  (">", typeInt `TArr` typeInt `TArr` typeInt),
-  (">=", typeInt `TArr` typeInt `TArr` typeInt),
+  ("==", typeInt `TArr` typeInt `TArr` typeBool),
+  ("!=", typeInt `TArr` typeInt `TArr` typeBool),
+  ("<", typeInt `TArr` typeInt `TArr` typeBool),
+  ("<=", typeInt `TArr` typeInt `TArr` typeBool),
+  (">", typeInt `TArr` typeInt `TArr` typeBool),
+  (">=", typeInt `TArr` typeInt `TArr` typeBool),
   ("and", typeBool `TArr` typeBool `TArr` typeBool),
   ("or", typeBool `TArr` typeBool `TArr` typeBool)
   ]
@@ -186,6 +186,10 @@ infer env ex = case ex of
     tv <- fresh
     inferPrim env [cond, tr, fl] (typeBool `TArr` tv `TArr` tv `TArr` tv)
 
+  Fix e1 -> do
+      tv <- fresh
+      inferPrim env [e1] ((tv `TArr` tv) `TArr` tv)
+
   Extern name tpe args -> do
     let ts = map argToType args
     let t = foldr f tpe ts
@@ -194,20 +198,29 @@ infer env ex = case ex of
           argToType (Arg _ t) = t
           f z t = z `TArr` t
 
-  Function name _ [] e -> do
+  Lam x e -> do
+      tv <- fresh
+      let env' = env `extend` (x, Forall [] tv)
+      (s1, t1) <- infer env' e
+      return (s1, apply s1 tv `TArr` t1)
+
+{-  Function name _ [] e -> do
     tv <- fresh
     (s1, t1) <- infer env e
     return (s1, t1)
+
   Function name _ [arg] e -> do
     tv <- fresh
     let (Arg name _) = arg
     let env' = env `extend` (name, Forall [] tv)
     (s1, t1) <- infer env' e
-    return (s1, apply s1 tv `TArr` t1)
+    return (s1, apply s1 tv `TArr` t1)-}
 
   Function name t (args) e -> do
-    let curried = foldr (\arg expr -> Function name t [arg] expr) e args
+    let largs = map (\(Arg a _) -> a) args
+    let curried = Fix (foldr (\arg expr -> Lam arg expr) e (name:largs))
     infer env (Debug.trace ("Func " ++ show curried) curried)
+
   Literal (IntLit _)  -> return (nullSubst, typeInt)
   Literal (BoolLit _) -> return (nullSubst, typeBool)
   Literal (StringLit _) -> return (nullSubst, typeString)

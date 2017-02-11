@@ -9,6 +9,8 @@ data Expr
   = Literal Lit
   | Var String
   | Apply Expr [Expr]
+  | Lam String Expr -- typechecker only
+  | Fix Expr        -- typechecker only
   | Function Name Type [Arg] Expr
   | Extern Name Type [Arg]
   | If Expr Expr Expr
