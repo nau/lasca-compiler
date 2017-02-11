@@ -1,21 +1,10 @@
 
-def main() =
-	let a = println("Hello World!"),
-	    b = println("Factorial of 8 is:"),
-	    c = print(fact(10))
-	in println("")
-end
-
 def test(i) =
 	if 1 < i then 1 else test(i - 1) end
 end
 
 def fact(n) =
   if n == 1 then 1 else n * fact(n - 1) end
-end
-
-def print(x) =
-  let d = depth(x) in printrec(x, d)
 end
 
 def printrec(x, d) =
@@ -33,4 +22,15 @@ end
 
 def depth(x) =
   if x < 10 then 1 else 1 + depth(x / 10) end
+end
+
+def print(x) =
+  let d = depth(x) in printrec(x, d)
+end
+
+def main() =
+	let a = println("Hello World!"),
+	    b = println("Factorial of 8 is:"),
+	    c = print(fact(10))
+	in println("")
 end

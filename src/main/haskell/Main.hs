@@ -28,11 +28,21 @@ import System.Environment
 import System.Process
 import System.Console.Haskeline
 import Options.Applicative
+import qualified Debug.Trace as Debug
 
 import qualified LLVM.General.AST as AST
 
+data LascaMode = Dynamic | Static deriving (Show, Eq)
+
+{-
+instance Read LascaMode where
+  read "dynamic" = Dynamic
+  read "static" = Static
+
+-}
 data LascaOpts = LascaOpts
   { lascaFiles :: [String]
+  , mode :: String
   , exec :: Bool
   , printLLVMAsm :: Bool
   }
@@ -40,6 +50,12 @@ data LascaOpts = LascaOpts
 lascaOpts :: Parser LascaOpts
 lascaOpts = LascaOpts
   <$> many (argument str (metavar "FILES..."))
+  <*> strOption
+      ( long "mode"
+      <> short 'm'
+      <> value "static"
+      <> help "Compiler mode. Options are [dynamic | static]. Static by default."
+      )
   <*> switch
       ( long "exec"
      <> short 'e'
@@ -49,12 +65,10 @@ lascaOpts = LascaOpts
       <> help "Print LLVM IR" )
 
 greet :: LascaOpts -> IO ()
-greet (LascaOpts [] _ _) = repl
-greet (LascaOpts files exec printLlvm) = do
-    if exec
-    then mapM (execFile) files
-    else mapM processFile files
-    return ()
+greet opts | null (lascaFiles opts) = repl
+           | otherwise = do
+   mapM (processFile opts) (lascaFiles opts)
+   return ()
 
 initModule :: String -> AST.Module
 initModule name = emptyModule name
@@ -68,59 +82,61 @@ process modo source = do
       ast <- codegen modo ex
       return $ Just ast
 
-genModule :: AST.Module -> String -> IO (Maybe AST.Module)
-genModule modo source = case parseToplevel source of
+genModule :: LascaOpts -> AST.Module -> String -> IO (Maybe AST.Module)
+genModule opts modo source = case parseToplevel source of
     Left err -> do
         putStrLn $ show err
         return Nothing
     Right ex -> do
         putStrLn "Parsed OK"
         putStrLn (show ex)
-        typeCheck ex
-        return (Just (codegenModule modo ex))
+        putStrLn("Compiler mode is " ++ (mode opts))
+        if ((mode opts) == "static")
+        then case typeCheck ex of
+          Right env -> do
+            putStrLn $ show env
+            return (Just (codegenModule modo ex))
+          Left e -> do
+            putStrLn $ show e
+            return Nothing
+        else return (Just (codegenModule modo ex))
 
 
 prelude = readFile "Prelude.lasca"
 -- prelude = return ""
 
-readMod :: String -> IO (Maybe AST.Module)
-readMod fname = do
+readMod :: LascaOpts -> String -> IO (Maybe AST.Module)
+readMod opts fname = do
   pre  <- prelude
   file <- readFile fname
-  genModule (initModule fname) (pre ++ file)
+  genModule opts (initModule fname) (pre ++ file)
 
-execFile :: String -> IO ()
-execFile fname = do
-  mod <- readMod fname
+processFile :: LascaOpts -> String -> IO ()
+processFile opts fname = do
+  mod <- readMod opts fname
   putStrLn "Read module OK"
   case mod of
-    Just mod -> do
-        res <- runJIT mod
-        case res of
-          Left err -> putStrLn err
-          Right m -> return ()
-        return ()
-    Nothing -> do
-        putStrLn "Couldn't compile a module"
+    Just mod -> processModule opts mod fname
+    Nothing -> do putStrLn "Couldn't compile a module"
 
-processFile :: String -> IO ()
-processFile fname = do
-  mod <- readMod fname
-
-  putStrLn "Read module OK"
-  case mod of
-    Just mod -> do
-        Just(asm) <- getLLAsString mod
-        writeFile (fname ++ ".ll") asm
-        let name = takeWhile (/= '.') fname
--- Dynamic linking
-        callProcess "clang-3.5" ["-e", "_start", "-g", "-o", name, "-L.", "-llascart", fname ++ ".ll"]
--- Static linking
---         callProcess "clang-3.5" ["-e", "_start", "-g", "-o", name, "-L.", {-"-llascart",-} fname ++ ".ll", "/usr/local/lib/libgc.a","liblascart.a"]
-        return ()
-    Nothing -> do
-        putStrLn "Couldn't compile a module"
-
+processModule :: LascaOpts -> AST.Module -> String -> IO ()
+processModule opts mod fname = do
+  if (exec opts)
+  then do
+    res <- runJIT mod
+    case res of
+        Left err -> putStrLn err
+        Right m -> return ()
+    return ()
+  else do
+    Just(asm) <- getLLAsString mod
+    writeFile (fname ++ ".ll") asm
+    let name = takeWhile (/= '.') fname
+    -- Dynamic linking
+    callProcess "clang-3.5" ["-e", "_start", "-g", "-o", name, "-L.", "-llascart", fname ++ ".ll"]
+    -- Static linking
+  --         callProcess "clang-3.5" ["-e", "_start", "-g", "-o", name, "-L.", {-"-llascart",-} fname ++ ".ll", "/usr/local/lib/libgc.a","liblascart.a"]
+    return ()
 
 
 repl :: IO ()
@@ -146,12 +162,9 @@ main = execParser opts >>= greet
      <> header "hello - a test for optparse-applicative" )
 
 
-typeCheck :: [Expr] -> IO ()
-typeCheck exprs = do
-  let a = map f exprs
-  putStrLn $ show a
-  case inferTop emptyTyenv a of
-    Right env -> putStrLn $ show env
-    Left e -> putStrLn $ show e
-  where f e@(Function name _ _ _) = (name, e)
+typeCheck :: [Expr] -> Either TypeError TypeEnv
+typeCheck exprs = inferTop emptyTyenv (Debug.trace (show a) a)
+  where
+        a = map f exprs
+        f e@(Function name _ _ _) = (name, e)
         f e@(Extern name _ _) = (name, e)
