@@ -14,6 +14,7 @@ module JIT where
 import Data.Int
 import Data.Word
 import Foreign.Ptr ( FunPtr, castFunPtr )
+import Syntax
 
 import Control.Monad.Except
 
@@ -46,21 +47,22 @@ jit c = EE.withMCJIT c optlevel model ptrelim fastins
 passes :: PassSetSpec
 passes = defaultCuratedPassSetSpec { optLevel = Just 3 }
 
-runJIT :: AST.Module -> IO (Either String AST.Module)
-runJIT mod = do
+runJIT :: LascaOpts -> AST.Module -> IO (Either String AST.Module)
+runJIT opts mod = do
   withContext $ \context ->
     jit context $ \executionEngine ->
       runExceptT $ withModuleFromAST context mod $ \m ->
         withPassManager passes $ \pm -> do
           -- Optimization Pass
-          -- runPassManager pm m
+          runPassManager pm m
           optmod <- moduleAST m
           s <- moduleLLVMAssembly m
-          putStrLn s
+
+          if (printLLVMAsm opts) then putStrLn s else return ()
 
           EE.withModuleInEngine executionEngine m $ \ee -> do
             initLascaRuntime <- EE.getFunction ee (AST.Name "start")
-            mainfn <- EE.getFunction ee (AST.Name "main")
+--             mainfn <- EE.getFunction ee (AST.Name "main")
             case initLascaRuntime of
               Just fn -> startFun (castFunPtr fn :: FunPtr (IO ()))
               Nothing -> putStrLn "Couldn't find initLascaRuntime!"
@@ -71,7 +73,9 @@ runJIT mod = do
 getLLAsString :: AST.Module -> IO (Maybe String)
 getLLAsString mod = do
     eith <- withContext $ \context ->
+      jit context $ \executionEngine ->
         runExceptT $ withModuleFromAST context mod $ \m -> do
+          putStrLn "Getting LLVM assembly..."
           moduleLLVMAssembly m
     case eith of
         Left err -> do

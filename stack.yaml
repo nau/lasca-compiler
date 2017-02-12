@@ -5,13 +5,13 @@ flags:
   llvm-general:
     shared-llvm: true
 
-ghc-options:
-  lasca:
-    -rtsopts
-    -fprof-auto
-    -auto-all
-    -caf-all
-    -fforce-recomp
+#ghc-options:
+#  lasca:
+#    -rtsopts
+#    -fprof-auto
+#    -auto-all
+#    -caf-all
+#    -fforce-recomp
 #    -fdefer-type-errors
 extra-deps:
 - llvm-general-3.5.1.2

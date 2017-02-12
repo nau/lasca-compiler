@@ -239,11 +239,11 @@ box (S.StringLit s) = do
 boolToInt True = 1
 boolToInt False = 0
 
-codegen :: AST.Module -> [S.Expr] -> IO AST.Module
-codegen modo fns = do
+codegen :: S.LascaOpts -> AST.Module -> [S.Expr] -> IO AST.Module
+codegen opts modo fns = do
   let modn = mapM codegenTop fns
       ast = runLLVM modo modn
-  runJIT ast
+  runJIT opts ast
   return ast
 
 codegenModule :: AST.Module -> [S.Expr] -> AST.Module

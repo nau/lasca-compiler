@@ -5,6 +5,13 @@ import Type
 
 type Name = String
 
+data LascaOpts = LascaOpts
+  { lascaFiles :: [String]
+  , mode :: String
+  , exec :: Bool
+  , printLLVMAsm :: Bool
+  }
+
 data Expr
   = Literal Lit
   | Var String

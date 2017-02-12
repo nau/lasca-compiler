@@ -40,12 +40,7 @@ instance Read LascaMode where
   read "static" = Static
 
 -}
-data LascaOpts = LascaOpts
-  { lascaFiles :: [String]
-  , mode :: String
-  , exec :: Bool
-  , printLLVMAsm :: Bool
-  }
+
 
 lascaOpts :: Parser LascaOpts
 lascaOpts = LascaOpts
@@ -65,7 +60,7 @@ lascaOpts = LascaOpts
       <> help "Print LLVM IR" )
 
 greet :: LascaOpts -> IO ()
-greet opts | null (lascaFiles opts) = repl
+greet opts | null (lascaFiles opts) = repl opts
            | otherwise = do
    mapM (processFile opts) (lascaFiles opts)
    return ()
@@ -73,13 +68,13 @@ greet opts | null (lascaFiles opts) = repl
 initModule :: String -> AST.Module
 initModule name = emptyModule name
 
-process :: AST.Module -> String -> IO (Maybe AST.Module)
-process modo source = do
+process :: LascaOpts -> AST.Module -> String -> IO (Maybe AST.Module)
+process opts modo source = do
   let res = parseToplevel source
   case res of
     Left err -> print err >> return Nothing
     Right ex -> do
-      ast <- codegen modo ex
+      ast <- codegen opts modo ex
       return $ Just ast
 
 genModule :: LascaOpts -> AST.Module -> String -> IO (Maybe AST.Module)
@@ -89,12 +84,13 @@ genModule opts modo source = case parseToplevel source of
         return Nothing
     Right ex -> do
         putStrLn "Parsed OK"
-        putStrLn (show ex)
+--         putStrLn (show ex)
         putStrLn("Compiler mode is " ++ (mode opts))
         if ((mode opts) == "static")
         then case typeCheck ex of
           Right env -> do
-            putStrLn $ show env
+            putStrLn "typechecked OK"
+--             putStrLn $ show env
             return (Just (codegenModule modo ex))
           Left e -> do
             putStrLn $ show e
@@ -109,7 +105,7 @@ readMod :: LascaOpts -> String -> IO (Maybe AST.Module)
 readMod opts fname = do
   pre  <- prelude
   file <- readFile fname
-  genModule opts (initModule fname) (pre ++ file)
+  genModule opts (initModule fname) (pre ++ "\n" ++file)
 
 processFile :: LascaOpts -> String -> IO ()
 processFile opts fname = do
@@ -123,7 +119,8 @@ processModule :: LascaOpts -> AST.Module -> String -> IO ()
 processModule opts mod fname = do
   if (exec opts)
   then do
-    res <- runJIT mod
+    putStrLn "Running JIT"
+    res <- runJIT opts mod
     case res of
         Left err -> putStrLn err
         Right m -> return ()
@@ -139,8 +136,8 @@ processModule opts mod fname = do
     return ()
 
 
-repl :: IO ()
-repl = runInputT defaultSettings (loop (initModule "Lasca JIT"))
+repl :: LascaOpts -> IO ()
+repl opts = runInputT defaultSettings (loop (initModule "Lasca JIT"))
   where
   loop :: AST.Module -> InputT IO ()
   loop mod = do
@@ -148,7 +145,7 @@ repl = runInputT defaultSettings (loop (initModule "Lasca JIT"))
     case minput of
       Nothing -> outputStrLn "Goodbye."
       Just input -> do
-        modn <- lift $ process mod input
+        modn <- lift $ process opts mod input
         case modn of
           Just modn -> loop modn
           Nothing -> loop mod
@@ -163,7 +160,7 @@ main = execParser opts >>= greet
 
 
 typeCheck :: [Expr] -> Either TypeError TypeEnv
-typeCheck exprs = inferTop emptyTyenv (Debug.trace (show a) a)
+typeCheck exprs = inferTop emptyTyenv ({-Debug.trace (show a)-} a)
   where
         a = map f exprs
         f e@(Fix (Function name _ _ _)) = (name, e)

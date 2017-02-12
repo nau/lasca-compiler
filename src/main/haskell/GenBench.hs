@@ -4,7 +4,7 @@ import System.IO
 import System.Exit
 import System.Environment
 
-genTopLevel idx = "def test" ++ (show idx) ++ "() = var x = 1+1 in x;"
+genTopLevel idx = "def test" ++ (show idx) ++ "() = let x = 1+1 in x end"
 
 genNLines :: Integer -> IO ()
 genNLines n = loop "" 0 0
@@ -26,7 +26,7 @@ main :: IO ()
 main = do
     args <- getArgs
 
-    putStrLn "def main() = 123;"
+    putStrLn "def main() = 123 end"
 
     let numLines = case args of
             []      -> 1000

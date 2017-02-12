@@ -219,7 +219,7 @@ infer env ex = case ex of
   Function name t (args) e -> do
     let largs = map (\(Arg a _) -> a) args
     let curried = Fix (foldr (\arg expr -> Lam arg expr) e (name:largs))
-    infer env (Debug.trace ("Func " ++ show curried) curried)
+    infer env ({-Debug.trace ("Func " ++ show curried)-} curried)
 
   Literal (IntLit _)  -> return (nullSubst, typeInt)
   Literal (BoolLit _) -> return (nullSubst, typeBool)
