@@ -63,6 +63,7 @@ class Substitutable a where
   ftv   :: a -> Set.Set TVar
 
 instance Substitutable Type where
+  {-# INLINE apply #-}
   apply _ (TCon a)       = TCon a
   apply s t@(TVar a)     = Map.findWithDefault t a s
   apply s (t1 `TArr` t2) = apply s t1 `TArr` apply s t2
@@ -72,15 +73,18 @@ instance Substitutable Type where
   ftv (t1 `TArr` t2) = ftv t1 `Set.union` ftv t2
 
 instance Substitutable Scheme where
+  {-# INLINE apply #-}
   apply s (Forall as t)   = Forall as $ apply s' t
                             where s' = foldr Map.delete s as
   ftv (Forall as t) = ftv t `Set.difference` Set.fromList as
 
 instance Substitutable a => Substitutable [a] where
+  {-# INLINE apply #-}
   apply s a = (fmap . apply) s a
   ftv   = foldr (Set.union . ftv) Set.empty
 
 instance Substitutable TypeEnv where
+  {-# INLINE apply #-}
   apply s (TypeEnv env) =  TypeEnv $ Map.map (apply s) env
   ftv (TypeEnv env) = ftv $ Map.elems env
 

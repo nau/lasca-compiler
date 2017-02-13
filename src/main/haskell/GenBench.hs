@@ -4,7 +4,7 @@ import System.IO
 import System.Exit
 import System.Environment
 
-genTopLevel idx = "def test" ++ (show idx) ++ "() = let x = 1+1 in x end"
+genTopLevel idx = "def test" ++ (show idx) ++ "() = let x = 1+1 in if x > 2 then 1 else 2 end end"
 
 genNLines :: Integer -> IO ()
 genNLines n = loop "" 0 0

@@ -45,7 +45,7 @@ jit c = EE.withMCJIT c optlevel model ptrelim fastins
     fastins  = Nothing -- fast instruction selection
 
 passes :: PassSetSpec
-passes = defaultCuratedPassSetSpec { optLevel = Just 3 }
+passes = defaultCuratedPassSetSpec { optLevel = Just 2 }
 
 runJIT :: LascaOpts -> AST.Module -> IO (Either String AST.Module)
 runJIT opts mod = do
@@ -73,7 +73,6 @@ runJIT opts mod = do
 getLLAsString :: AST.Module -> IO (Maybe String)
 getLLAsString mod = do
     eith <- withContext $ \context ->
-      jit context $ \executionEngine ->
         runExceptT $ withModuleFromAST context mod $ \m -> do
           putStrLn "Getting LLVM assembly..."
           moduleLLVMAssembly m

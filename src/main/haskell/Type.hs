@@ -9,8 +9,8 @@ instance Show TVar where
   show (TV s) = s
 
 data Type
-  = TVar TVar
-  | TCon String
+  = TVar {-# UNPACK #-} !TVar
+  | TCon {-# UNPACK #-} !String
   | TArr Type Type
   deriving (Eq, Ord)
 
