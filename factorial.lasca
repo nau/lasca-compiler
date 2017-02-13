@@ -1,15 +1,9 @@
 
-def test(i) =
-	if 1 < i then 1 else test(i - 1) end
-end
+def test(i) = if 1 < i then 1 else test(i - 1)
 
-def fact(n) =
-  if n == 1 then 1 else n * fact(n - 1) end
-end
+def fact(n) = if n == 1 then 1 else n * fact(n - 1)
 
-def sqr(x) =
-  if x == 0 then 1 else 10 * sqr(x - 1) end
-end
+def sqr(x) = if x == 0 then 1 else 10 * sqr(x - 1)
 
 def printrec(x, d) =
   if d == 0 then 0 else
@@ -17,20 +11,13 @@ def printrec(x, d) =
       digit = x / dd,
       ch = runtimePutchar(digit + 48)
     in printrec(x - digit * dd, d - 1)
-  end
-end
 
-def depth(x) =
-  if x < 10 then 1 else 1 + depth(x / 10) end
-end
+def depth(x) = if x < 10 then 1 else 1 + depth(x / 10)
 
-def print(x) =
-  let d = depth(x) in printrec(x, d)
-end
+def print(x) = printrec(x, depth(x))
 
 def main() =
 	let a = println("Hello World!"),
 	    b = println("Factorial of 8 is:"),
 	    c = print(fact(10))
 	in println("")
-end

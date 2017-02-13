@@ -61,7 +61,7 @@ op = do
 binops = [
           [binary "*" Ex.AssocLeft, binary "/" Ex.AssocLeft],
           [binary "+" Ex.AssocLeft, binary "-" Ex.AssocLeft],
-          [binary "<" Ex.AssocLeft, binary "==" Ex.AssocLeft],
+          [binary "<" Ex.AssocLeft, binary "==" Ex.AssocLeft, binary "!=" Ex.AssocLeft],
           [binary "and" Ex.AssocLeft],
           [binary "or" Ex.AssocLeft]
           ]
@@ -94,7 +94,6 @@ function = do
   tpe <- option typeAny typeAscription
   reservedOp "="
   body <- expr
-  reserved "end"
   return (Function name tpe args body)
 
 extern :: Parser Expr
@@ -127,7 +126,6 @@ ifthen = do
   tr <- expr
   reserved "else"
   fl <- expr
-  reserved "end"
   return (If cond tr fl)
 
 letins :: Parser Expr
