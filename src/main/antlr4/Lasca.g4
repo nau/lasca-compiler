@@ -63,8 +63,14 @@ param
 
 ifExpr: IF expr THEN expr (ELSE expr)?;
 
+letbind: ident '=' expr ;
+
+letins:
+   'let' letbind (',' letbind)* 'in' expr;
+
 expr:
      ifExpr
+   | letins
    | infixExpr
    ;
 
@@ -133,6 +139,10 @@ BlockComment
 
 InlineComment : MINUS_MINUS .*? '\n' -> channel(HIDDEN)
    ;
+
+
+LET : 'let' ;
+IN : 'in' ;
 MINUS_MINUS: '--';
 LBRACE_MINUS: '{-';
 MINUS_RBRACE: '-}';

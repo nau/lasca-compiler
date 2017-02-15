@@ -15,6 +15,12 @@ struct string {
   char bytes[];
 };
 
+struct closure {
+  void* funcPtr;
+  int argc;
+  void* argv[];
+};
+
 
 void initLascaRuntime(/*void* (*main)()*/) {
     GC_init();
@@ -47,6 +53,9 @@ struct type_info * boxFloat64(double i) {
   return box(2, (void *) (long) i);
 }
 
+struct type_info * boxFunc(void* funcPtr) {
+  return box(4, funcPtr);
+}
 
 void *unbox(struct type_info* ti, int expected) {
 //  printf("unbox(%d, %d) ", ti->type, (int) ti->value);

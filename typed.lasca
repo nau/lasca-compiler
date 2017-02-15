@@ -1,16 +1,13 @@
 
-def main() =
-	"1"
-end
-
-def id(x) = x end
+def id(x) = x
 
 -- f :: (a -> b -> c) -> a -> b -> c
-def apply(f, a, b) = f(a, b) end
+def apply(f, a) = f(a)
 
-def foo(x: Bool): Int = 1 + x end
+def foo(x: Bool): Int = 48 + x
 
-def test(f) = f(foo(1)) end
+def test(f) = f(foo(1))
 
-def test1(a) = test(id) end
+def test1(a) = test(id)
 
+def main() = apply(runtimePutchar, test1(1))
