@@ -21,7 +21,7 @@ lexer :: Tok.TokenParser ()
 lexer = Tok.makeTokenParser style
   where
     ops = ["+","*","-","/",";", "==", "=",",","<",">","|",":"]
-    names = ["def","extern","if","then","else", "end", "in",
+    names = ["data", "def", "extern", "if", "then", "else", "end", "in",
             "binary", "unary", "let", "true", "false"
             ]
     style = emptyDef {
@@ -37,8 +37,10 @@ integer    = Tok.integer lexer
 stringLiteral     = Tok.stringLiteral lexer
 float      = Tok.float lexer
 parens     = Tok.parens lexer
+braces     = Tok.braces lexer
 commaSep   = Tok.commaSep lexer
 semiSep    = Tok.semiSep lexer
+semi       = Tok.semi lexer
 identifier = Tok.identifier lexer
 whitespace = Tok.whiteSpace lexer
 reserved   = Tok.reserved lexer

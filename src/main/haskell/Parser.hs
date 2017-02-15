@@ -140,6 +140,19 @@ letins = do
   body <- expr
   return $ foldr (uncurry Let) body defs
 
+block :: Parser Expr
+block = do
+  exprs <- braces (expr `sepEndBy` semi)
+  let letins = if null exprs
+               then Literal UnitLit
+               else do
+                 let init' = init exprs
+                 let last' = last exprs
+                 let namedExprs = zip ['a'..] init'
+                 let letin = foldr (\(name, e) acc -> (Let (show name) e acc)) last' namedExprs
+                 letin
+  return letins
+
 factor :: Parser Expr
 factor = try floating
       <|> try boolLit
@@ -149,6 +162,7 @@ factor = try floating
       <|> try call
       <|> try variable
       <|> ifthen
+      <|> block
       <|> (parens expr)
 
 defn :: Parser Expr

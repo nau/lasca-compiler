@@ -16,8 +16,9 @@ def depth(x) = if x < 10 then 1 else 1 + depth(x / 10)
 
 def print(x) = printrec(x, depth(x))
 
-def main() =
-	let a = println("Hello World!"),
-	    b = println("Factorial of 8 is:"),
-	    c = print(fact(10))
-	in println("")
+def main() = {
+  println("Hello World!");
+  println("Factorial of 8 is:");
+  print(fact(10));
+  println("");
+}

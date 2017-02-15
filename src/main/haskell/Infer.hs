@@ -158,7 +158,6 @@ lookupEnv (TypeEnv env) x =
 
 infer :: TypeEnv -> Expr -> Infer (Subst, Type)
 infer env ex = case ex of
-
   Var x -> lookupEnv env x
 
   Apply e1 [arg] -> do
@@ -208,18 +207,6 @@ infer env ex = case ex of
       (s1, t1) <- infer env' e
       return (s1, apply s1 tv `TArr` t1)
 
-{-  Function name _ [] e -> do
-    tv <- fresh
-    (s1, t1) <- infer env e
-    return (s1, t1)
-
-  Function name _ [arg] e -> do
-    tv <- fresh
-    let (Arg name _) = arg
-    let env' = env `extend` (name, Forall [] tv)
-    (s1, t1) <- infer env' e
-    return (s1, apply s1 tv `TArr` t1)-}
-
   Function name t (args) e -> do
     let largs = map (\(Arg a _) -> a) args
     let curried = Fix (foldr (\arg expr -> Lam arg expr) e (name:largs))
@@ -228,6 +215,7 @@ infer env ex = case ex of
   Literal (IntLit _)  -> return (nullSubst, typeInt)
   Literal (BoolLit _) -> return (nullSubst, typeBool)
   Literal (StringLit _) -> return (nullSubst, typeString)
+  Literal (UnitLit) -> return (nullSubst, typeUnit)
 
 inferPrim :: TypeEnv -> [Expr] -> Type -> Infer (Subst, Type)
 inferPrim env l t = do

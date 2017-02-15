@@ -27,6 +27,7 @@ data Expr
 data Lit = IntLit Int
   | FloatLit Double
   | BoolLit Bool
+  | UnitLit
   | StringLit String
   deriving (Eq, Ord, Show)
 
