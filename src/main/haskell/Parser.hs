@@ -153,6 +153,13 @@ block = do
                  letin
   return letins
 
+dataDef :: Parser Expr
+dataDef = do
+  reserved "data"
+  name <- identifier
+  args <- parens (arg `sepEndBy` comma)
+  return (Data name args)
+
 factor :: Parser Expr
 factor = try floating
       <|> try boolLit
@@ -168,6 +175,7 @@ factor = try floating
 defn :: Parser Expr
 defn = try extern
     <|> try function
+    <|> try dataDef
     <|> expr
 
 contents :: Parser a -> Parser a

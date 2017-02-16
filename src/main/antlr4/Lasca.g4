@@ -128,8 +128,10 @@ blockStat
 type: TypeId
    ;
 
+dataDef: DATA TypeId '(' params ')';
+
 compilationUnit
-   : (externDef | defDef | valDef)*
+   : (externDef | defDef | valDef | dataDef)*
    ;
 
 // Lexer
@@ -141,6 +143,7 @@ InlineComment : MINUS_MINUS .*? '\n' -> channel(HIDDEN)
    ;
 
 
+DATA : 'data' ;
 LET : 'let' ;
 IN : 'in' ;
 MINUS_MINUS: '--';

@@ -1,0 +1,10 @@
+-- Records
+-- Dynamic mode
+data Point (x: Int, y: Int)
+
+data Point2(a)
+
+def main() = {
+  println("Test Data");
+}
+

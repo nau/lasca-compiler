@@ -107,6 +107,8 @@ defineStringConstants (S.Let _ e body) = do
 defineStringConstants _ = return ()
 
 -- codegenTop :: S.Expr -> LLVM ()
+codegenTop ctx (S.Data name args) = return ()
+
 codegenTop ctx (S.Function name tpe args body) = do
   defineStringConstants body
   define retType name largs bls

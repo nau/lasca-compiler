@@ -90,7 +90,7 @@ genModule opts modo source = case parseToplevel source of
         then case typeCheck ex of
           Right env -> do
             putStrLn "typechecked OK"
---             putStrLn $ show env
+            putStrLn $ show env
             return (Just (codegenModule modo ex))
           Left e -> do
             putStrLn $ show e
@@ -160,7 +160,7 @@ main = execParser opts >>= greet
 
 
 typeCheck :: [Expr] -> Either TypeError TypeEnv
-typeCheck exprs = inferTop emptyTyenv ({-Debug.trace (show a)-} a)
+typeCheck exprs = inferTop emptyTyenv (Debug.trace (show a) a)
   where
         a = map f exprs
         f e@(Fix (Function name _ _ _)) = (name, e)

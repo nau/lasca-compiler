@@ -39,6 +39,7 @@ float      = Tok.float lexer
 parens     = Tok.parens lexer
 braces     = Tok.braces lexer
 commaSep   = Tok.commaSep lexer
+comma      = Tok.comma lexer
 semiSep    = Tok.semiSep lexer
 semi       = Tok.semi lexer
 identifier = Tok.identifier lexer
