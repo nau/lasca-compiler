@@ -90,6 +90,40 @@ defineStringLit s = do  addDefn $ AST.GlobalDefinition $ AST.globalVariableDefau
     bytes = map constByte (ByteString.unpack bytestring)
     len = ByteString.length bytestring
 
+
+uncurryLambda expr = go expr ([], expr) where
+  go (S.Lam name e) result = let (args, body) = go e result in (name : args, body)
+  go e (args, _) = (args, e)
+
+defineClosures :: Ctx -> S.Name -> S.Expr -> LLVM ()
+defineClosures ctx funcName (S.Lam name expr) = do
+  Debug.traceM ("Generated AAA " ++ name)
+  let func = (S.Function (funcName ++ "_lambda") typeAny [(S.Arg name typeAny)] expr)
+  Debug.traceM ("Generated lambda " ++ show func)
+  codegenTop ctx func
+defineClosures ctx funcName (S.If cond true false) = do
+  defineClosures ctx funcName cond
+  defineClosures ctx funcName true
+  defineClosures ctx funcName false
+  return ()
+defineClosures ctx funcName (S.Apply _ exprs) = do
+  mapM (defineClosures ctx funcName) exprs
+  return ()
+defineClosures ctx funcName (S.Let _ e body) = do
+  defineClosures ctx funcName e
+  defineClosures ctx funcName body
+  return ()
+defineClosures ctx funcName _ = return ()
+
+{-transform :: (S.Expr -> [S.Expr]) -> [S.Expr] -> [S.Expr]
+transform transformer exprs = exprs >>= transformer
+
+transformExpr :: (S.Expr -> [S.Expr]) -> S.Expr -> [S.Expr]
+transformExpr transformer (S.If cond true false) = do
+
+transformExpr transformer expr = transformer expr-}
+
+
 defineStringConstants :: S.Expr -> LLVM ()
 defineStringConstants (S.Literal (S.StringLit s)) = defineStringLit s
 defineStringConstants (S.If cond true false) = do
@@ -110,7 +144,11 @@ defineStringConstants _ = return ()
 codegenTop ctx (S.Data name args) = return ()
 
 codegenTop ctx (S.Function name tpe args body) = do
-  defineStringConstants body
+  Debug.traceM ("Generating function " ++ name)
+  r1 <- defineStringConstants body
+  Debug.traceM ("Generating function1 " ++ name ++ (show r1))
+  defineClosures ctx name body
+  Debug.traceM ("Generating function2 " ++ name ++ (show r1))
   define retType name largs bls
   where
     largs = toSig args
@@ -197,17 +235,24 @@ cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
 cgen ctx (S.Apply (S.Var fn) args) = do
   largs <- mapM (cgen ctx) args
   syms <- gets symtab
-  case lookup fn syms of
-    Just x  -> do
+  let func = lookup fn syms
+  Debug.traceM ("Found11 " ++ (show func))
+  Debug.traceM ("symtab " ++ (show syms))
+  case func of
+    Just x -> do
       let arglist = map (\x -> ptrType) args
-      op <- bitcast (AST.LocalReference ptrType (AST.Name fn)) (T.ptr (funcType ptrType arglist))
-      call (op) largs
+      x1 <- load x
+      call (global runtimeApplyFuncType (AST.Name "runtimeApply")) (x1 : largs)
     Nothing -> call (global ptrType (AST.Name fn)) largs
+cgen ctx (S.Apply expr args) = do
+  e <- cgen ctx expr
+  largs <- mapM (cgen ctx) args
+  call e largs
+cgen ctx (S.Lam name expr) = boxFunc "main_lambda"
 cgen ctx (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
   ifexit <- addBlock "if.exit"
-
   -- %entry
   ------------------
   cond <- cgen ctx cond
@@ -237,6 +282,8 @@ cgen ctx (S.If cond tr fl) = do
   setBlock ifexit
   phi ptrType [(trval, ifthen), (flval, ifelse)]
 
+cgen ctx e = error ("cgen shit " ++ show e)
+
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------
@@ -246,7 +293,7 @@ initLascaRuntimeFuncType = funcType T.void []
 mainFuncType = funcType ptrType []
 boxFuncType = funcType ptrType [T.i32]
 runtimeBinOpFuncType = funcType ptrType [T.i32, ptrType, ptrType]
-runtimeApplyFuncType = funcType ptrType [ptrType]
+runtimeApplyFuncType = funcType ptrType [ptrType, ptrType]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
 
 box :: S.Lit -> Codegen AST.Operand
@@ -259,6 +306,10 @@ box (S.StringLit s) = do
   ref' <- bitcast ref ptrType
   call (global boxFuncType (AST.Name "box")) [constInt 3, ref']
 
+boxFunc name = do
+  let ptr = global ptrType (AST.Name name)
+  cast <- bitcast (ptr) ptrType
+  call (global (funcType ptrType [ptrType]) (AST.Name "boxFunc")) [cast]
 
 boolToInt True = 1
 boolToInt False = 0

@@ -69,7 +69,7 @@ binops = [
 operatorTable = binops ++ [[unop], [binop]]
 
 expr :: Parser Expr
-expr =  Ex.buildExpressionParser operatorTable factor
+expr =  Ex.buildExpressionParser operatorTable apply
 
 variable :: Parser Expr
 variable = Var <$> identifier
@@ -112,11 +112,20 @@ arg = do
   tpe <- option typeAny typeAscription
   return (Arg name tpe)
 
+apply :: Parser Expr
+apply = try methodCall <|> try call <|> factor
+
+methodCall = do
+  arg <- factor
+  string "."
+  func <- identifier
+  return (Apply (Var func) [arg])
+
 call :: Parser Expr
 call = do
-  name <- identifier
+  name <- factor
   args <- parens $ commaSep expr
-  return (Apply (Var name) args)
+  return (Apply name args)
 
 ifthen :: Parser Expr
 ifthen = do
@@ -140,9 +149,18 @@ letins = do
   body <- expr
   return $ foldr (uncurry Let) body defs
 
-block :: Parser Expr
-block = do
-  exprs <- braces (expr `sepEndBy` semi)
+closure = do
+  c <- braces cls
+  return c
+    where cls = do
+            args <- commaSep arg
+            reservedOp "->"
+            letins <- blockStmts
+            let lambdas = foldr (\(Arg a _) expr -> Lam a expr) letins args
+            return lambdas
+
+blockStmts = do
+  exprs <- expr `sepEndBy` semi
   let letins = if null exprs
                then Literal UnitLit
                else do
@@ -153,12 +171,22 @@ block = do
                  letin
   return letins
 
+
+block :: Parser Expr
+block = braces blockStmts
+
 dataDef :: Parser Expr
 dataDef = do
   reserved "data"
+  typeName <- identifier
+  reservedOp "="
+  constructors <- dataConstructor `sepBy` reservedOp "|"
+  return (Data typeName constructors)
+
+dataConstructor = do
   name <- identifier
   args <- parens (arg `sepEndBy` comma)
-  return (Data name args)
+  return (DataConst name args)
 
 factor :: Parser Expr
 factor = try floating
@@ -166,8 +194,9 @@ factor = try floating
       <|> try letins
       <|> try stringLit
       <|> try integerLit
-      <|> try call
+--       <|> try apply
       <|> try variable
+      <|> try closure
       <|> ifthen
       <|> block
       <|> (parens expr)

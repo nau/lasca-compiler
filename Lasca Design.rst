@@ -760,6 +760,20 @@ See:
 * https://dave.cheney.net/2012/01/18/why-go-gets-exceptions-right
 * http://stackoverflow.com/questions/3413389/panic-recover-in-go-v-s-try-catch-in-other-languages
 
+Thoughts About OOP
+==================
+Pros:
+
+OOP gives subtyping, inheritance, and dynamic dispatch.
+
+Cons:
+
+Subtyping implies all sorts of problems: least upper bound search for type inference,
+variance complexities (variance annotations, covariant/contravariant positions),
+conforming to Liskov Substitutions Principle.
+
+I suggest getting benefits and avoiding problems by allowing subtyping only for operations, in form of Type Classes.
+No data subtyping/inheritance. Consider Go-like embedding.
 
 .. include:: LangsOverview.rst
 

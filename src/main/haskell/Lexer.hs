@@ -13,25 +13,27 @@ module Lexer where
 
 import Text.Parsec.String (Parser)
 import Text.Parsec.Language (emptyDef)
-import Text.Parsec.Prim (many)
+import Text.Parsec.Prim
 
 import qualified Text.Parsec.Token as Tok
 
-lexer :: Tok.TokenParser ()
-lexer = Tok.makeTokenParser style
-  where
-    ops = ["+","*","-","/",";", "==", "=",",","<",">","|",":"]
-    names = ["data", "def", "extern", "if", "then", "else", "end", "in",
+ops = ["+","*","-","/",";", "==", "=",",","<",">","|",":"]
+keywords = ["data", "def", "extern", "if", "then", "else", "end", "in",
             "binary", "unary", "let", "true", "false"
             ]
-    style = emptyDef {
+
+lascaLangDef = emptyDef {
                Tok.commentStart   = "{-"
              , Tok.commentEnd     = "-}"
              , Tok.commentLine = "--"
              , Tok.nestedComments = True
              , Tok.reservedOpNames = ops
-             , Tok.reservedNames = names
+             , Tok.reservedNames = keywords
              }
+
+lexer :: Tok.TokenParser ()
+lexer = Tok.makeTokenParser lascaLangDef
+
 
 integer    = Tok.integer lexer
 stringLiteral     = Tok.stringLiteral lexer

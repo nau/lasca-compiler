@@ -156,7 +156,7 @@ main = execParser opts >>= greet
     opts = info (helper <*> lascaOpts)
       ( fullDesc
      <> progDesc "Print a greeting for TARGET"
-     <> header "hello - a test for optparse-applicative" )
+     <> header "Lasca compiler" )
 
 
 typeCheck :: [Expr] -> Either TypeError TypeEnv
@@ -166,3 +166,5 @@ typeCheck exprs = inferTop emptyTyenv (Debug.trace (show a) a)
         f e@(Fix (Function name _ _ _)) = (name, e)
         f e@(Function name _ _ _) = (name, e)
         f e@(Extern name _ _) = (name, e)
+        f e@(Data name _) = (name, e)
+        f e = error ("What the fuck " ++ show e)

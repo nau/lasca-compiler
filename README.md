@@ -6,6 +6,7 @@ Lasca is Scala shifted towards Haskell.
 Inspired by:
 - Scala
 - Haskell, LiquidHaskell
+- Sage
 - Closure (persisted data structures)
 - Idris/Agda (dependent types?)
 - Go (simplicity, Any interface?, all-in-one compiler)
@@ -18,6 +19,8 @@ Inspired by:
 - Julia (docs, comparison promotions?, macros, concurrency?)
 - Unison
 - Cloud Haskell 
+
+Check out http://whiley.org/about/overview/
 
 Motivation
 ---

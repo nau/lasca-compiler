@@ -113,6 +113,17 @@ struct type_info* runtimeBinOp(int code, struct type_info* lhs, struct type_info
   return result;
 }
 
+struct type_info* runtimeApply(struct type_info* func, struct type_info* arg) {
+  if (func->type != 4) {
+    printf("AAAA!!! Type mismatch! expected function but called on %d", func->type);
+    exit(1);
+  }
+//  printf("APPLY!!!");
+  void* (*funcptr)(struct type_info*) = (void* (*)(struct type_info*)) func->value;
+  return funcptr(arg);
+//  return NULL;
+}
+
 double putchard(double X) {
   putchar((char)X);
   fflush(stdout);

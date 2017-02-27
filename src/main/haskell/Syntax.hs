@@ -16,14 +16,16 @@ data Expr
   = Literal Lit
   | Var String
   | Apply Expr [Expr]
-  | Lam String Expr -- typechecker only
+  | Lam String Expr
   | Fix Expr        -- typechecker only
   | Function Name Type [Arg] Expr
   | Extern Name Type [Arg]
   | If Expr Expr Expr
   | Let Name Expr Expr
-  | Data Name [Arg]
+  | Data Name [DataConst]
   deriving (Eq, Ord, Show)
+
+data DataConst = DataConst Name [Arg] deriving (Eq, Ord, Show)
 
 data Lit = IntLit Int
   | FloatLit Double

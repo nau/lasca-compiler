@@ -1,4 +1,6 @@
 
+data Test = Test(x, y)
+
 def id(x) = x
 
 -- f :: (a -> b -> c) -> a -> b -> c
@@ -6,7 +8,7 @@ def apply(f, a) = f(a)
 
 def foo(x: Bool): Int = 48 + x
 
-def test(f) = f(foo(1))
+def test(f) = f(1.foo)
 
 def test1(a) = test(id)
 

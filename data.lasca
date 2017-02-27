@@ -1,10 +1,11 @@
 -- Records
 -- Dynamic mode
-data Point (x: Int, y: Int)
+data Point = Point(x: Int, y: Int)
 
-data Point2(a)
+data Point2 = Point2(a)
 
 def main() = {
-  println("Test Data");
+  let print = { s -> println(s) }
+  in print("Hello lambda!")
 }
 

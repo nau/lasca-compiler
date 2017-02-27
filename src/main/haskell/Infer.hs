@@ -212,6 +212,9 @@ infer env ex = case ex of
     let curried = Fix (foldr (\arg expr -> Lam arg expr) e (name:largs))
     infer env ({-Debug.trace ("Func " ++ show curried)-} curried)
 
+  Data name constructors -> do
+    return (nullSubst, typeUnit)
+
   Literal (IntLit _)  -> return (nullSubst, typeInt)
   Literal (BoolLit _) -> return (nullSubst, typeBool)
   Literal (StringLit _) -> return (nullSubst, typeString)
