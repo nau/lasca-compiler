@@ -11,6 +11,7 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Codegen where
 
@@ -26,6 +27,7 @@ import qualified Data.ByteString.Char8 as Char8
 
 import Control.Monad.State
 import Control.Applicative
+import Control.Lens
 
 import LLVM.General.AST
 import LLVM.General.AST.Global
@@ -43,23 +45,33 @@ import qualified LLVM.General.AST.FloatingPointPredicate as FP
 -- Module Level
 -------------------------------------------------------------------------------
 
-newtype LLVM a = LLVM { unLLVM :: State AST.Module a }
-  deriving (Functor, Applicative, Monad, MonadState AST.Module )
+newtype LLVM a = LLVM { unLLVM :: State ModuleState a }
+  deriving (Functor, Applicative, Monad, MonadState ModuleState )
 
+data ModuleState = ModuleState {
+  _llvmModule :: AST.Module,
+  _modNames :: Names
+}
 
+-- makeLenses ''ModuleState
 
 runLLVM :: AST.Module -> LLVM a -> AST.Module
-runLLVM = flip (execState . unLLVM)
+runLLVM modl s = result where
+  state = execState (unLLVM s) (initModuleState modl)
+  result = _llvmModule state
+
+initModuleState modl = ModuleState modl Map.empty
 
 emptyModule :: String -> AST.Module
 emptyModule label = defaultModule { moduleName = label }
 
 addDefn :: Definition -> LLVM ()
 addDefn d = do
-  defs <- gets moduleDefinitions
+  modl <- gets _llvmModule
+  let defs = moduleDefinitions modl
   if d `elem` defs
   then modify id
-  else modify $ \s -> s { moduleDefinitions = defs ++ [d] }
+  else modify $ \s -> s { _llvmModule = (_llvmModule s) { moduleDefinitions = defs ++ [d] } }
 
 define ::  Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
 define retty label argtys body = addDefn $

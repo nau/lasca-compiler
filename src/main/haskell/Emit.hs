@@ -324,9 +324,12 @@ codegenModule :: AST.Module -> [S.Expr] -> AST.Module
 codegenModule modo fns = ast2
     where
         ctx = createGlobalContext fns
+--         rewrite ctx fns
         modn = mapM (codegenTop ctx) fns
         ast = runLLVM modo modn
         ast2 = runLLVM ast codegenInit
+
+-- rewrite :: Ctx -> [S.Expr] -> LLVM (Ctx, [S.Expr])
 
 createGlobalContext :: [S.Expr] -> Set.Set String
 createGlobalContext exprs = context

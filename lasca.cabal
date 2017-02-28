@@ -27,6 +27,7 @@ executable lasca
                         murmur-hash,
                         hashable,
                         unordered-containers,
+                        lens,
                         mtl
   Extra-libraries:      lascart
   default-language:    Haskell2010
