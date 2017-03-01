@@ -10,6 +10,7 @@
 --------------------------------------------------------------------
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Emit where
 
@@ -39,6 +40,7 @@ import qualified Data.ByteString
 import qualified Data.Text.Encoding
 import Data.Digest.Murmur32
 import Data.Maybe
+import qualified Data.List as List
 import Data.Word
 import Data.Int
 import Control.Monad.State
@@ -95,33 +97,36 @@ uncurryLambda expr = go expr ([], expr) where
   go (S.Lam name e) result = let (args, body) = go e result in (name : args, body)
   go e (args, _) = (args, e)
 
-defineClosures :: Ctx -> S.Name -> S.Expr -> LLVM ()
-defineClosures ctx funcName (S.Lam name expr) = do
-  Debug.traceM ("Generated AAA " ++ name)
-  let func = (S.Function (funcName ++ "_lambda") typeAny [(S.Arg name typeAny)] expr)
-  Debug.traceM ("Generated lambda " ++ show func)
-  codegenTop ctx func
-defineClosures ctx funcName (S.If cond true false) = do
-  defineClosures ctx funcName cond
-  defineClosures ctx funcName true
-  defineClosures ctx funcName false
-  return ()
-defineClosures ctx funcName (S.Apply _ exprs) = do
-  mapM (defineClosures ctx funcName) exprs
-  return ()
-defineClosures ctx funcName (S.Let _ e body) = do
-  defineClosures ctx funcName e
-  defineClosures ctx funcName body
-  return ()
-defineClosures ctx funcName _ = return ()
 
-{-transform :: (S.Expr -> [S.Expr]) -> [S.Expr] -> [S.Expr]
-transform transformer exprs = exprs >>= transformer
 
-transformExpr :: (S.Expr -> [S.Expr]) -> S.Expr -> [S.Expr]
-transformExpr transformer (S.If cond true false) = do
+transform :: (S.Expr -> LLVM S.Expr) -> [S.Expr] -> LLVM [S.Expr]
+transform transformer exprs = sequence [transformExpr transformer expr | expr <- exprs]
 
-transformExpr transformer expr = transformer expr-}
+transformExpr :: (S.Expr -> LLVM S.Expr) -> S.Expr -> LLVM S.Expr
+transformExpr transformer expr = case expr of
+  (S.If cond true false) -> do
+    cond' <- go cond
+    true' <- go true
+    false' <- go false
+    transformer (S.If cond' true' false')
+  (S.Let n e body) -> do
+    e' <- go e
+    body' <- go body
+    transformer (S.Let n e' body')
+  (S.Lam n e) -> do
+      e' <- go e
+      transformer (S.Lam n e')
+  (S.Apply e args) -> do
+    e' <- go e
+    args' <- sequence [go arg | arg <- args]
+    transformer (S.Apply e' args')
+  (S.Function name tpe arg e1) -> do
+      e' <- go e1
+      transformer (S.Function name tpe arg e')
+  e -> do
+    transformer e
+  where go e = transformExpr transformer e
+
 
 
 defineStringConstants :: S.Expr -> LLVM ()
@@ -146,14 +151,15 @@ codegenTop ctx (S.Data name args) = return ()
 codegenTop ctx (S.Function name tpe args body) = do
   Debug.traceM ("Generating function " ++ name)
   r1 <- defineStringConstants body
-  Debug.traceM ("Generating function1 " ++ name ++ (show r1))
-  defineClosures ctx name body
-  Debug.traceM ("Generating function2 " ++ name ++ (show r1))
-  define retType name largs bls
+--   Debug.traceM ("Generating function1 " ++ name ++ (show r1))
+--   defineClosures ctx name body
+--   Debug.traceM ("Generating function2 " ++ name ++ (show r1))
+  modState <- get
+  define retType name largs (bls modState)
   where
     largs = toSig args
     retType = ptrType -- typeMapping tpe
-    bls = createBlocks $ execCodegen [] $ do
+    bls modState = createBlocks $ execCodegen [] modState $ do
       entry <- addBlock entryBlockName
       setBlock entry
       forM args $ \(S.Arg n t) -> do
@@ -170,17 +176,19 @@ codegenTop _ (S.Extern name tpe args) = do
     fnargs = externArgsToSig args
 
 codegenTop ctx exp = do
-  define double "main" [] bls
+  modState <- get
+  define double "main" [] (bls modState)
   where
-    bls = createBlocks $ execCodegen [] $ do
+    bls modState = createBlocks $ execCodegen [] modState $ do
       entry <- addBlock entryBlockName
       setBlock entry
       cgen ctx exp >>= ret
 
-codegenInit = do
-  define T.void "start" [] bls
+codegenStartFunc = do
+  modState <- get
+  define T.void "start" [] (bls modState)
   where
-    bls = createBlocks $ execCodegen [] $ do
+    bls modState = createBlocks $ execCodegen [] modState $ do
         entry <- addBlock entryBlockName
         setBlock entry
         call (global initLascaRuntimeFuncType (AST.Name "initLascaRuntime")) []
@@ -208,6 +216,9 @@ binops :: Map.Map String Integer
 binops = Map.fromList [("+", 10), ("-", 11), ("*", 12), ("/", 13),
   ("==", 42), ("!=", 43), ("<", 44), ("<=", 45), (">=", 46), (">", 47)]
 
+
+
+
 cgen :: Ctx -> S.Expr -> Codegen AST.Operand
 cgen ctx (S.Let a b c) = do
   i <- alloca (T.ptr T.i8)
@@ -219,11 +230,20 @@ cgen ctx (S.Var x) = do
   syms <- gets symtab
   case lookup x syms of
     Just x -> Debug.trace ("Found " ++ show x) (load x)
-    Nothing | x `Set.member` ctx -> do
-                                      let tpe = funcType ptrType [ptrType]
-                                      let a = Debug.trace ("Global ident " ++ x) x
-                                      bitcast (global tpe (AST.Name x)) ptrType
-            | otherwise -> error $ "Ooops, can't find symbol " ++ x
+    Nothing {-| x `Set.member` ctx-} -> do
+      state <- get
+      let tpe = funcType ptrType [ptrType]
+      let a = Debug.trace ("Global ident " ++ x) x
+      let defs = AST.moduleDefinitions (_llvmModule (moduleState state))
+      Debug.traceM (show defs)
+      let predicate = \def -> case def of
+                                AST.GlobalDefinition (AST.Function{name = AST.Name x}) -> True
+                                d -> False
+
+      case List.find predicate defs of
+        Just _ -> bitcast (global tpe (AST.Name x)) ptrType
+        Nothing -> error $ "Ooops, can't find symbol " ++ x
+            -- | otherwise ->
 cgen ctx (S.Literal l) = box l
 cgen ctx (S.Apply (S.Var "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True)) rhs)
 cgen ctx (S.Apply (S.Var "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False)))
@@ -232,7 +252,7 @@ cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
   lrhs <- cgen ctx rhs
   let code = constInt (binops Map.! fn)
   call (global runtimeBinOpFuncType (AST.Name "runtimeBinOp")) [code, llhs, lrhs]
-cgen ctx (S.Apply (S.Var fn) args) = do
+{-cgen ctx (S.Apply (S.Var fn) args) = do
   largs <- mapM (cgen ctx) args
   syms <- gets symtab
   let func = lookup fn syms
@@ -243,12 +263,12 @@ cgen ctx (S.Apply (S.Var fn) args) = do
       let arglist = map (\x -> ptrType) args
       x1 <- load x
       call (global runtimeApplyFuncType (AST.Name "runtimeApply")) (x1 : largs)
-    Nothing -> call (global ptrType (AST.Name fn)) largs
+    Nothing -> call (global ptrType (AST.Name fn)) largs-}
 cgen ctx (S.Apply expr args) = do
   e <- cgen ctx expr
   largs <- mapM (cgen ctx) args
   call e largs
-cgen ctx (S.Lam name expr) = boxFunc "main_lambda"
+-- cgen ctx (S.Lam name expr) = boxFunc "main_lambda"
 cgen ctx (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
@@ -321,15 +341,29 @@ codegen opts modo fns = do
   return ast
 
 codegenModule :: AST.Module -> [S.Expr] -> AST.Module
-codegenModule modo fns = ast2
+codegenModule modo fns = modul
     where
         ctx = createGlobalContext fns
---         rewrite ctx fns
-        modn = mapM (codegenTop ctx) fns
-        ast = runLLVM modo modn
-        ast2 = runLLVM ast codegenInit
+        modul = runLLVM modo genModule
+        genModule = do
+          fns' <- rewrite ctx fns
+          Debug.traceM ("Rewritten exprs: " ++ show fns')
+          mapM (codegenTop ctx) fns'
+          codegenStartFunc
 
--- rewrite :: Ctx -> [S.Expr] -> LLVM (Ctx, [S.Expr])
+rewrite ctx fns = transform extractLambda fns where
+  extractLambda (S.Lam name expr) = do
+    nms <- gets _modNames
+    let (funcName, nms') = uniqueName "lambda" nms
+    modify (\s -> s { _modNames = nms' })
+    let func = (S.Function (funcName) typeAny [(S.Arg name typeAny)] expr)
+    Debug.traceM ("Generated lambda " ++ show func)
+    codegenTop ctx func
+    return (S.Apply (S.Var funcName)
+  extractLambda expr = do
+    return expr
+
+
 
 createGlobalContext :: [S.Expr] -> Set.Set String
 createGlobalContext exprs = context

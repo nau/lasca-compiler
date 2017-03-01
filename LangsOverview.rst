@@ -395,6 +395,9 @@ Cons
 Any dynamic language
 --------------------
 
+{temperature : 383}
+<temperature>393</temperature>
+
 Writing code is the easiest part of software development. The most
 interesting part comes after the code is written. Its maintenance,
 changing, and refactoring – that is complex, and must be addressed.

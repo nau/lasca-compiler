@@ -51,7 +51,7 @@ newtype LLVM a = LLVM { unLLVM :: State ModuleState a }
 data ModuleState = ModuleState {
   _llvmModule :: AST.Module,
   _modNames :: Names
-}
+} deriving (Show)
 
 -- makeLenses ''ModuleState
 
@@ -136,6 +136,7 @@ data CodegenState
   , blockCount   :: Int                      -- Count of basic blocks
   , count        :: Word                     -- Count of unnamed instructions
   , names        :: Names                    -- Name Supply
+  , moduleState  :: ModuleState
   } deriving Show
 
 data BlockState
@@ -170,11 +171,19 @@ entryBlockName = "entry"
 emptyBlock :: Int -> BlockState
 emptyBlock i = BlockState i [] Nothing
 
-emptyCodegen :: CodegenState
-emptyCodegen = CodegenState (Name entryBlockName) Map.empty [] 1 0 Map.empty
+emptyCodegen :: ModuleState -> CodegenState
+emptyCodegen = \ms -> CodegenState {
+  currentBlock = (Name entryBlockName),
+  blocks = Map.empty,
+  symtab = [],
+  blockCount = 1,
+  count = 0,
+  names = Map.empty,
+  moduleState = ms
+}
 
-execCodegen :: [(String, Operand)] -> Codegen a -> CodegenState
-execCodegen vars m = execState (runCodegen m) emptyCodegen { symtab = vars }
+execCodegen :: [(String, Operand)] -> ModuleState -> Codegen a -> CodegenState
+execCodegen vars modState m = execState (runCodegen m) (emptyCodegen modState) { symtab = vars }
 
 fresh :: Codegen Word
 fresh = do
