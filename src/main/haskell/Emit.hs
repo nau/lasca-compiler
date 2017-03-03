@@ -149,7 +149,6 @@ defineStringConstants _ = return ()
 codegenTop ctx (S.Data name args) = return ()
 
 codegenTop ctx (S.Function name tpe args body) = do
-  Debug.traceM ("Generating function " ++ name)
   r1 <- defineStringConstants body
 --   Debug.traceM ("Generating function1 " ++ name ++ (show r1))
 --   defineClosures ctx name body
@@ -162,6 +161,7 @@ codegenTop ctx (S.Function name tpe args body) = do
     bls modState = createBlocks $ execCodegen [] modState $ do
       entry <- addBlock entryBlockName
       setBlock entry
+      Debug.traceM ("Generating function2 " ++ name)
       forM args $ \(S.Arg n t) -> do
 --         var <- alloca (typeMapping t)   -- FIXME: this shouldn't be necessary
         var <- alloca ptrType
@@ -170,8 +170,12 @@ codegenTop ctx (S.Function name tpe args body) = do
       cgen ctx body >>= ret
 
 codegenTop _ (S.Extern name tpe args) = do
+--   s <- gets _llvmModule
+  Debug.traceM("External function " ++ name)
+--   Debug.traceM ("External function " ++ show s)
   external llvmType name fnargs
   where
+    h s = show s
     llvmType = typeMapping tpe
     fnargs = externArgsToSig args
 
@@ -226,24 +230,13 @@ cgen ctx (S.Let a b c) = do
   store i val
   assign a i
   cgen ctx c
-cgen ctx (S.Var x) = do
+cgen ctx (S.Var name) = do
   syms <- gets symtab
-  case lookup x syms of
-    Just x -> Debug.trace ("Found " ++ show x) (load x)
+  case lookup name syms of
+    Just x -> Debug.trace ("Local " ++ show name) (load x)
     Nothing {-| x `Set.member` ctx-} -> do
-      state <- get
-      let tpe = funcType ptrType [ptrType]
-      let a = Debug.trace ("Global ident " ++ x) x
-      let defs = AST.moduleDefinitions (_llvmModule (moduleState state))
-      Debug.traceM (show defs)
-      let predicate = \def -> case def of
-                                AST.GlobalDefinition (AST.Function{name = AST.Name x}) -> True
-                                d -> False
-
-      case List.find predicate defs of
-        Just _ -> bitcast (global tpe (AST.Name x)) ptrType
-        Nothing -> error $ "Ooops, can't find symbol " ++ x
-            -- | otherwise ->
+      Debug.traceM ("Global " ++ show name)
+      boxFunc name
 cgen ctx (S.Literal l) = box l
 cgen ctx (S.Apply (S.Var "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True)) rhs)
 cgen ctx (S.Apply (S.Var "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False)))
@@ -267,8 +260,10 @@ cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
 cgen ctx (S.Apply expr args) = do
   e <- cgen ctx expr
   largs <- mapM (cgen ctx) args
-  call e largs
+  call (global runtimeApplyFuncType (AST.Name "runtimeApply")) (e : largs)
+--   call e largs
 -- cgen ctx (S.Lam name expr) = boxFunc "main_lambda"
+cgen ctx (S.BoxFunc funcName) = boxFunc funcName
 cgen ctx (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
@@ -346,20 +341,29 @@ codegenModule modo fns = modul
         ctx = createGlobalContext fns
         modul = runLLVM modo genModule
         genModule = do
+          st <- gets _llvmModule
           fns' <- rewrite ctx fns
-          Debug.traceM ("Rewritten exprs: " ++ show fns')
-          mapM (codegenTop ctx) fns'
+          syn <- gets _syntacticAst
+          let fns'' = fns' ++ syn
+          st' <- gets _llvmModule
+          Debug.traceM ("Rewritten exprs: " ++ show fns'')
+--           Debug.traceM ("Rewritten exprs: " ++ show st')
+--           Debug.traceM ("Rewritten exprs: " ++ show st')
+          mapM (codegenTop ctx) fns''
           codegenStartFunc
 
 rewrite ctx fns = transform extractLambda fns where
+
+  extractLambda :: S.Expr -> LLVM S.Expr
   extractLambda (S.Lam name expr) = do
-    nms <- gets _modNames
+    state <- get
+    let nms = _modNames state
+    let syntactic = _syntacticAst state
     let (funcName, nms') = uniqueName "lambda" nms
-    modify (\s -> s { _modNames = nms' })
     let func = (S.Function (funcName) typeAny [(S.Arg name typeAny)] expr)
+    modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
     Debug.traceM ("Generated lambda " ++ show func)
-    codegenTop ctx func
-    return (S.Apply (S.Var funcName)
+    return (S.BoxFunc funcName)
   extractLambda expr = do
     return expr
 

@@ -39,6 +39,9 @@ import qualified LLVM.General.AST.Attribute as A
 import qualified LLVM.General.AST.CallingConvention as CC
 import qualified LLVM.General.AST.FloatingPointPredicate as FP
 
+import qualified Debug.Trace as Debug
+
+import qualified Syntax as S
 
 
 -------------------------------------------------------------------------------
@@ -50,6 +53,7 @@ newtype LLVM a = LLVM { unLLVM :: State ModuleState a }
 
 data ModuleState = ModuleState {
   _llvmModule :: AST.Module,
+  _syntacticAst :: [S.Expr],
   _modNames :: Names
 } deriving (Show)
 
@@ -60,7 +64,7 @@ runLLVM modl s = result where
   state = execState (unLLVM s) (initModuleState modl)
   result = _llvmModule state
 
-initModuleState modl = ModuleState modl Map.empty
+initModuleState modl = ModuleState modl [] Map.empty
 
 emptyModule :: String -> AST.Module
 emptyModule label = defaultModule { moduleName = label }

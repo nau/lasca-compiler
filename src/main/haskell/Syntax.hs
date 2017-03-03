@@ -18,6 +18,7 @@ data Expr
   | Apply Expr [Expr]
   | Lam String Expr
   | Fix Expr        -- typechecker only
+  | BoxFunc Name    -- LLVM codegen only
   | Function Name Type [Arg] Expr
   | Extern Name Type [Arg]
   | If Expr Expr Expr
