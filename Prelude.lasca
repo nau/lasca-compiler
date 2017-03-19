@@ -4,7 +4,7 @@ extern def boxInt(d: Int): Any
 extern def boxBool(d: Int): Any
 extern def boxFunc(d: Int): Any
 extern def runtimeBinOp(code: Int, lhs: Any, rhs: Any): Any
-extern def runtimeApply(funcs: Any, size: Int, func: Any, args: Any, argc: Int): Any
+extern def runtimeApply(funcs: Any, func: Any, args: Any, argc: Int): Any
 extern def initLascaRuntime(): Unit
 extern def unbox(ptr: Any, d: Int): Any
 extern def println(s: Any): Any

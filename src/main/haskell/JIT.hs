@@ -44,17 +44,17 @@ jit c = EE.withMCJIT c optlevel model ptrelim fastins
     ptrelim  = Nothing -- frame pointer elimination
     fastins  = Nothing -- fast instruction selection
 
-passes :: PassSetSpec
-passes = defaultCuratedPassSetSpec { optLevel = Just 2 }
+passes :: Int -> PassSetSpec
+passes level = defaultCuratedPassSetSpec { optLevel = Just (fromIntegral level) }
 
 runJIT :: LascaOpts -> AST.Module -> IO (Either String AST.Module)
 runJIT opts mod = do
   withContext $ \context ->
     jit context $ \executionEngine ->
       runExceptT $ withModuleFromAST context mod $ \m ->
-        withPassManager passes $ \pm -> do
+        withPassManager (passes (optimization opts)) $ \pm -> do
           -- Optimization Pass
---           runPassManager pm m
+          runPassManager pm m
           optmod <- moduleAST m
           s <- moduleLLVMAssembly m
 

@@ -22,11 +22,15 @@ struct closure {
   void* argv[];
 };
 
-
 struct Function {
   struct string* name;
   void * funcPtr;
   int arity;
+};
+
+struct Functions {
+  int size;
+  struct Function functions[];
 };
 
 void initLascaRuntime() {
@@ -120,17 +124,17 @@ struct type_info* runtimeBinOp(int code, struct type_info* lhs, struct type_info
   return result;
 }
 
-struct type_info* runtimeApply(struct Function fs[], int size, struct type_info* func, struct type_info* args[], int argc) {
+struct type_info* runtimeApply(struct Functions* fs, struct type_info* func, struct type_info* args[], int argc) {
   if (func->type != 4) {
     printf("AAAA!!! Type mismatch! expected function but called on %d", func->type);
     exit(1);
   }
-  if ((int)func->value >= size) {
-    printf("AAAA!!! No such function with id %d", (int) func->value);
+  if ((int)func->value >= fs->size) {
+    printf("AAAA!!! No such function with id %d, max id is %d", (int) func->value, fs->size);
     exit(1);
   }
   int idx = (int)func->value;
-  struct Function f = fs[idx];
+  struct Function f = fs->functions[idx];
   switch (f.arity) {
     case 0: {
       void* (*funcptr)() = (void* (*)()) f.funcPtr;

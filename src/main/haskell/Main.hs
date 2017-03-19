@@ -42,6 +42,13 @@ instance Read LascaMode where
 -}
 
 
+optimizeOpt :: Parser Int
+optimizeOpt = option auto
+            ( long "optimization-level"
+           <> short 'g'
+           <> value 0
+           <> help "Optimization level for LLVM" )
+
 lascaOpts :: Parser LascaOpts
 lascaOpts = LascaOpts
   <$> many (argument str (metavar "FILES..."))
@@ -58,6 +65,7 @@ lascaOpts = LascaOpts
   <*> switch
       ( long "print-llvm"
       <> help "Print LLVM IR" )
+  <*> optimizeOpt
 
 greet :: LascaOpts -> IO ()
 greet opts | null (lascaFiles opts) = repl opts

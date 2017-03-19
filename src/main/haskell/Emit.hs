@@ -278,7 +278,7 @@ cgen ctx (S.Apply expr args) = do
     store p arg})
   sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
   sequence [asdf (constInt (toInteger i), a) | (i, a) <- (zip [0..len] largs)]
-  call (global runtimeApplyFuncType (AST.Name "runtimeApply")) ([funcs, funcsize, e, sargs, argc])
+  call (global runtimeApplyFuncType (AST.Name "runtimeApply")) ([funcs, e, sargs, argc])
 --   call e largs
 -- cgen ctx (S.Lam name expr) = boxFunc "main_lambda"
 cgen ctx (S.BoxFunc funcName) = do
@@ -328,7 +328,7 @@ initLascaRuntimeFuncType = funcType T.void []
 mainFuncType = funcType ptrType []
 boxFuncType = funcType ptrType [T.i32]
 runtimeBinOpFuncType = funcType ptrType [T.i32, ptrType, ptrType]
-runtimeApplyFuncType = funcType ptrType [ptrType, T.i32, ptrType, ptrType, T.i32]
+runtimeApplyFuncType = funcType ptrType [ptrType, ptrType, ptrType, T.i32]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
 
 box :: S.Lit -> Codegen AST.Operand
@@ -388,15 +388,14 @@ rewrite ctx fns = transform extractLambda fns where
     return expr
 
 functionStructType = T.StructureType False [ptrType, ptrType, T.i32]
-
+functionsStructType len = T.StructureType False [T.i32, arrayTpe len]
 
 arrayTpe len = T.ArrayType len functionStructType
 
 genFunctionMap :: [S.Expr] -> LLVM ()
 genFunctionMap fns = do
   defineNames
-  defineConst (AST.Name "Functions") (arrayTpe len) (Just array)
-  defineConst (AST.Name "FunctionsSize") T.i32 (Just ( C.Int 32 (toInteger len)))
+  defineConst (AST.Name "Functions") (functionsStructType len) (Just struct1)
   Debug.traceM (show mapping)
   Debug.traceM (show array)
   modify (\s -> s { functions = mapping })
@@ -419,6 +418,8 @@ genFunctionMap fns = do
 
 
     entries = fmap (\(name, arity) -> (name, struct name arity)) funcsWithArities
+
+    struct1 = C.Struct (Nothing) False [C.Int 32 (toInteger len), array]
 
     struct name arity = C.Struct (Nothing) False
                             [C.BitCast (ref name) ptrType, constRef name, C.Int 32 (toInteger arity)]
