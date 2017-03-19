@@ -132,11 +132,33 @@ struct type_info* runtimeApply(struct Function fs[], int size, struct type_info*
   int idx = (int)func->value;
   struct Function f = fs[idx];
   switch (f.arity) {
+    case 0: {
+      void* (*funcptr)() = (void* (*)()) f.funcPtr;
+      return funcptr();
+    }
   	case 1: {
-  	    void* (*funcptr)(struct type_info*) = (void* (*)(struct type_info*)) f.funcPtr;
-        return funcptr(args[0]);
-  	    break;
-  	  }
+  	  void* (*funcptr)(struct type_info*) = (void* (*)(struct type_info*)) f.funcPtr;
+      return funcptr(args[0]);
+  	}
+    case 2: {
+	  void* (*funcptr)(struct type_info*, struct type_info*) = (void* (*)(struct type_info*, struct type_info*)) f.funcPtr;
+	  return funcptr(args[0], args[1]);
+    }
+    case 3: {
+	  void* (*funcptr)(struct type_info*, struct type_info*, struct type_info*) =
+	    (void* (*)(struct type_info*, struct type_info*, struct type_info*)) f.funcPtr;
+	  return funcptr(args[0], args[1], args[2]);
+	}
+	case 4: {
+	  void* (*funcptr)(struct type_info*, struct type_info*, struct type_info*, struct type_info*) =
+		(void* (*)(struct type_info*, struct type_info*, struct type_info*, struct type_info*)) f.funcPtr;
+	  return funcptr(args[0], args[1], args[2], args[3]);
+	}
+	case 5: {
+	  void* (*funcptr)(struct type_info*, struct type_info*, struct type_info*, struct type_info*, struct type_info*) =
+		(void* (*)(struct type_info*, struct type_info*, struct type_info*, struct type_info*, struct type_info*)) f.funcPtr;
+	  return funcptr(args[0], args[1], args[2], args[3], args[4]);
+	}
   	default:
   	  printf("AAAA! Unsupported arity %d", f.arity);
   	  exit(1);

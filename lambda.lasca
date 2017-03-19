@@ -1,5 +1,6 @@
 
 def main() = {
  let a = { s -> println(s) } in a("Hello Lambda!");
+ let a = 1 in a("Runtime Error!");
 }
 
