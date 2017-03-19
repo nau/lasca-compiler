@@ -54,7 +54,8 @@ newtype LLVM a = LLVM { unLLVM :: State ModuleState a }
 data ModuleState = ModuleState {
   _llvmModule :: AST.Module,
   _syntacticAst :: [S.Expr],
-  _modNames :: Names
+  _modNames :: Names,
+  functions :: Map.Map String Int
 } deriving (Show)
 
 -- makeLenses ''ModuleState
@@ -64,7 +65,7 @@ runLLVM modl s = result where
   state = execState (unLLVM s) (initModuleState modl)
   result = _llvmModule state
 
-initModuleState modl = ModuleState modl [] Map.empty
+initModuleState modl = ModuleState modl [] Map.empty Map.empty
 
 emptyModule :: String -> AST.Module
 emptyModule label = defaultModule { moduleName = label }
@@ -76,6 +77,14 @@ addDefn d = do
   if d `elem` defs
   then modify id
   else modify $ \s -> s { _llvmModule = (_llvmModule s) { moduleDefinitions = defs ++ [d] } }
+
+defineConst name tpe body = addDefn $
+  AST.GlobalDefinition $ AST.globalVariableDefaults {
+    LLVM.General.AST.Global.name        = name
+  , LLVM.General.AST.Global.isConstant  = True
+  , LLVM.General.AST.Global.type' = tpe
+  , LLVM.General.AST.Global.initializer = body
+  }
 
 define ::  Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
 define retty label argtys body = addDefn $
@@ -296,6 +305,8 @@ local = LocalReference ptrType
 global :: Type -> Name -> Operand
 global tpe name = constant (C.GlobalReference tpe name)
 
+
+
 constant :: C.Constant -> Operand
 constant = ConstantOperand
 
@@ -303,6 +314,8 @@ constInt i = constant (C.Int 32 i)
 constByte b = constant (C.Int 8 b)
 constTrue = constant (C.Int 1 1)
 constFalse = constant (C.Int 1 0)
+constRef name = let ptr = C.GlobalReference ptrType (AST.Name name) in C.BitCast ptr ptrType
+constRefOperand name = constant (constRef name)
 
 uitofp :: Type -> Operand -> Codegen Operand
 uitofp ty a = instr $ UIToFP a ty []
@@ -322,6 +335,8 @@ call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 alloca :: Type -> Codegen Operand
 alloca ty = instr $ Alloca ty Nothing 0 []
 
+allocaSize ty size = instr $ Alloca ty (Just size) 0 []
+
 store :: Operand -> Operand -> Codegen Operand
 store ptr val = instr $ Store False ptr val Nothing 0 []
 
@@ -340,3 +355,5 @@ phi ty incoming = instr $ Phi ty incoming []
 
 ret :: Operand -> Codegen (Named Terminator)
 ret val = terminator $ Do $ Ret (Just val) []
+
+getelementptr addr indices = instr $ GetElementPtr False addr indices []

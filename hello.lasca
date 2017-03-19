@@ -1,7 +1,6 @@
-extern def sleep(s: Int): Int
 extern def putchar(c: Int): Int
 
-def lascamain = print (fact 8)
+def main() = print (fact 8)
 
 {- Documentation
 -}

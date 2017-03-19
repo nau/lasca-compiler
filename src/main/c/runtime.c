@@ -5,6 +5,7 @@
 #include <string.h>
 #include <gc.h>
 
+
 struct type_info {
   int type;
   void* value;
@@ -22,10 +23,15 @@ struct closure {
 };
 
 
-void initLascaRuntime(/*void* (*main)()*/) {
+struct Function {
+  struct string* name;
+  void * funcPtr;
+  int arity;
+};
+
+void initLascaRuntime() {
     GC_init();
-    puts("Init Lasca 0.0.0.1 runtime. Enjoy :)\n");
-//    main();
+    printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n");
 }
 
 void *gcMalloc(size_t s) {
@@ -53,8 +59,8 @@ struct type_info * boxFloat64(double i) {
   return box(2, (void *) (long) i);
 }
 
-struct type_info * boxFunc(void* funcPtr) {
-  return box(4, funcPtr);
+struct type_info * boxFunc(int idx) {
+  return box(4, (void *) (long) idx);
 }
 
 void *unbox(struct type_info* ti, int expected) {
@@ -66,6 +72,7 @@ void *unbox(struct type_info* ti, int expected) {
     exit(1);
   }
 }
+
 
 const int ADD = 10;
 const int SUB = 11;                           // x - y
@@ -113,14 +120,28 @@ struct type_info* runtimeBinOp(int code, struct type_info* lhs, struct type_info
   return result;
 }
 
-struct type_info* runtimeApply(struct type_info* func, struct type_info* arg) {
+struct type_info* runtimeApply(struct Function fs[], int size, struct type_info* func, struct type_info* args[], int argc) {
   if (func->type != 4) {
     printf("AAAA!!! Type mismatch! expected function but called on %d", func->type);
     exit(1);
   }
-//  printf("APPLY!!!");
-  void* (*funcptr)(struct type_info*) = (void* (*)(struct type_info*)) func->value;
-  return funcptr(arg);
+  if ((int)func->value >= size) {
+    printf("AAAA!!! No such function with id %d", (int) func->value);
+    exit(1);
+  }
+  int idx = (int)func->value;
+  struct Function f = fs[idx];
+  switch (f.arity) {
+  	case 1: {
+  	    void* (*funcptr)(struct type_info*) = (void* (*)(struct type_info*)) f.funcPtr;
+        return funcptr(args[0]);
+  	    break;
+  	  }
+  	default:
+  	  printf("AAAA! Unsupported arity %d", f.arity);
+  	  exit(1);
+  	  break;
+  };
 //  return NULL;
 }
 

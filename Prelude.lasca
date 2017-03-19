@@ -2,9 +2,9 @@ extern def runtimePutchar(d: Any): Any
 extern def box(t: Int, ptr: Any): Any
 extern def boxInt(d: Int): Any
 extern def boxBool(d: Int): Any
-extern def boxFunc(d: Any): Any
+extern def boxFunc(d: Int): Any
 extern def runtimeBinOp(code: Int, lhs: Any, rhs: Any): Any
-extern def runtimeApply(rhs: Any, arg: Any): Any
+extern def runtimeApply(funcs: Any, size: Int, func: Any, args: Any, argc: Int): Any
 extern def initLascaRuntime(): Unit
 extern def unbox(ptr: Any, d: Int): Any
 extern def println(s: Any): Any

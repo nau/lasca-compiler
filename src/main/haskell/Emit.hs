@@ -74,14 +74,16 @@ stringStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral l
 applyStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
 
 
-getStringLitName s = AST.Name name
+getStringLitASTName s = AST.Name (getStringLitName s)
+
+getStringLitName s = name
   where
     name = (take 15 s) ++ "." ++ (show hash)
     hash = hash32 s
 
 defineStringLit :: String -> LLVM ()
 defineStringLit s = do  addDefn $ AST.GlobalDefinition $ AST.globalVariableDefaults {
-                          LLVM.General.AST.Global.name        = getStringLitName s
+                          LLVM.General.AST.Global.name        = getStringLitASTName s
                         , LLVM.General.AST.Global.isConstant  = True
                         , LLVM.General.AST.Global.type' = stringStructType len
                         , LLVM.General.AST.Global.initializer = Just (C.Struct (Nothing) False [C.Int 32 (toInteger len), C.Array T.i8 bytes])
@@ -232,11 +234,13 @@ cgen ctx (S.Let a b c) = do
   cgen ctx c
 cgen ctx (S.Var name) = do
   syms <- gets symtab
+  modState <- gets moduleState
+  let mapping = functions modState
   case lookup name syms of
     Just x -> Debug.trace ("Local " ++ show name) (load x)
     Nothing {-| x `Set.member` ctx-} -> do
       Debug.traceM ("Global " ++ show name)
-      boxFunc name
+      boxFunc name mapping
 cgen ctx (S.Literal l) = box l
 cgen ctx (S.Apply (S.Var "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True)) rhs)
 cgen ctx (S.Apply (S.Var "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False)))
@@ -258,12 +262,28 @@ cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
       call (global runtimeApplyFuncType (AST.Name "runtimeApply")) (x1 : largs)
     Nothing -> call (global ptrType (AST.Name fn)) largs-}
 cgen ctx (S.Apply expr args) = do
+  modState <- gets moduleState
   e <- cgen ctx expr
   largs <- mapM (cgen ctx) args
-  call (global runtimeApplyFuncType (AST.Name "runtimeApply")) (e : largs)
+  let funcs = functions modState
+  let argc = constInt (toInteger (length largs))
+  let len = Map.size funcs
+  let funcs = constRefOperand "Functions"
+--   let argArray = C.Array (T.ArrayType (fromIntegral len) ptrType) largs
+--   let funcsize = global T.i32 "FunctionsSize"
+  let funcsize = constInt (toInteger len)
+  sargsPtr <- allocaSize (ptrType) argc
+  let asdf = (\(idx, arg) -> do {
+    p <- getelementptr sargsPtr [idx];
+    store p arg})
+  sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
+  sequence [asdf (constInt (toInteger i), a) | (i, a) <- (zip [0..len] largs)]
+  call (global runtimeApplyFuncType (AST.Name "runtimeApply")) ([funcs, funcsize, e, sargs, argc])
 --   call e largs
 -- cgen ctx (S.Lam name expr) = boxFunc "main_lambda"
-cgen ctx (S.BoxFunc funcName) = boxFunc funcName
+cgen ctx (S.BoxFunc funcName) = do
+  modState <- gets moduleState
+  boxFunc funcName (functions modState)
 cgen ctx (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
@@ -308,23 +328,22 @@ initLascaRuntimeFuncType = funcType T.void []
 mainFuncType = funcType ptrType []
 boxFuncType = funcType ptrType [T.i32]
 runtimeBinOpFuncType = funcType ptrType [T.i32, ptrType, ptrType]
-runtimeApplyFuncType = funcType ptrType [ptrType, ptrType]
+runtimeApplyFuncType = funcType ptrType [ptrType, T.i32, ptrType, ptrType, T.i32]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
 
 box :: S.Lit -> Codegen AST.Operand
 box (S.BoolLit b) = call (global boxFuncType (AST.Name "boxBool")) [constInt (boolToInt b)]
 box (S.IntLit  n) = call (global boxFuncType (AST.Name "boxInt")) [constInt (toInteger n)]
 box (S.StringLit s) = do
-  let name = getStringLitName s
+  let name = getStringLitASTName s
   let len = ByteString.length . UTF8.fromString $ s
   let ref = global (stringStructType len) name
   ref' <- bitcast ref ptrType
   call (global boxFuncType (AST.Name "box")) [constInt 3, ref']
 
-boxFunc name = do
-  let ptr = global ptrType (AST.Name name)
-  cast <- bitcast (ptr) ptrType
-  call (global (funcType ptrType [ptrType]) (AST.Name "boxFunc")) [cast]
+boxFunc name mapping = do
+  let idx = mapping Map.! name
+  call (global (funcType ptrType [ptrType]) (AST.Name "boxFunc")) [constInt (toInteger idx)]
 
 boolToInt True = 1
 boolToInt False = 0
@@ -349,6 +368,7 @@ codegenModule modo fns = modul
           Debug.traceM ("Rewritten exprs: " ++ show fns'')
 --           Debug.traceM ("Rewritten exprs: " ++ show st')
 --           Debug.traceM ("Rewritten exprs: " ++ show st')
+          genFunctionMap fns''
           mapM (codegenTop ctx) fns''
           codegenStartFunc
 
@@ -367,7 +387,48 @@ rewrite ctx fns = transform extractLambda fns where
   extractLambda expr = do
     return expr
 
+functionStructType = T.StructureType False [ptrType, ptrType, T.i32]
 
+
+arrayTpe len = T.ArrayType len functionStructType
+
+genFunctionMap :: [S.Expr] -> LLVM ()
+genFunctionMap fns = do
+  defineNames
+  defineConst (AST.Name "Functions") (arrayTpe len) (Just array)
+  defineConst (AST.Name "FunctionsSize") T.i32 (Just ( C.Int 32 (toInteger len)))
+  Debug.traceM (show mapping)
+  Debug.traceM (show array)
+  modify (\s -> s { functions = mapping })
+  where
+
+    defineNames = mapM (\(name, _) -> defineStringLit name) funcsWithArities
+
+    len = fromIntegral (length funcsWithArities)
+
+
+--     structType = T.StructureType False [stringStructType, T.i32]
+
+    array = C.Array functionStructType (fmap (\(_, s) -> s) entries)
+
+    mapping :: Map.Map String Int
+    mapping = go 0 Map.empty entries where
+      go i m ((name, _) : es) = go (i + 1) (Map.insert name i m) es
+      go i m [] = m
+
+
+
+    entries = fmap (\(name, arity) -> (name, struct name arity)) funcsWithArities
+
+    struct name arity = C.Struct (Nothing) False
+                            [C.BitCast (ref name) ptrType, constRef name, C.Int 32 (toInteger arity)]
+
+    ref name = C.GlobalReference (stringStructType (length name)) (getStringLitASTName name)
+
+    funcsWithArities = (foldl go [] fns) where
+      go s (S.Function name tpe args body) = (name, length args) : s
+      go s (S.Extern name tpe args) = (name, length args) : s
+      go s _ = s
 
 createGlobalContext :: [S.Expr] -> Set.Set String
 createGlobalContext exprs = context
