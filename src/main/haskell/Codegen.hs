@@ -19,6 +19,7 @@ import Data.Word
 import Data.String
 import Data.List
 import Data.Function
+import qualified Data.Set as Set
 import qualified Data.Map.Strict as Map
 -- import qualified Data.Text as Text
 import qualified Data.ByteString as ByteString
@@ -53,6 +54,9 @@ newtype LLVM a = LLVM { unLLVM :: State ModuleState a }
 
 data ModuleState = ModuleState {
   _llvmModule :: AST.Module,
+  _locals :: Set.Set String,
+  _outers :: Set.Set String,
+  _usedVars :: Set.Set String,
   _syntacticAst :: [S.Expr],
   _modNames :: Names,
   functions :: Map.Map String Int
@@ -65,7 +69,15 @@ runLLVM modl s = result where
   state = execState (unLLVM s) (initModuleState modl)
   result = _llvmModule state
 
-initModuleState modl = ModuleState modl [] Map.empty Map.empty
+initModuleState modl = ModuleState {
+  _llvmModule = modl,
+  _locals = Set.empty,
+  _outers = Set.empty,
+  _usedVars = Set.empty,
+  _syntacticAst = [],
+  _modNames = Map.empty,
+  functions = Map.empty
+}
 
 emptyModule :: String -> AST.Module
 emptyModule label = defaultModule { moduleName = label }
@@ -120,6 +132,10 @@ boolType = IntegerType 1
 
 typeInfoStructType = T.StructureType False [T.i32, ptrType]
 ptrType = T.ptr T.i8
+
+ptrSize :: Int
+ptrSize = 8
+
 -------------------------------------------------------------------------------
 -- Names
 -------------------------------------------------------------------------------
@@ -310,7 +326,9 @@ global tpe name = constant (C.GlobalReference tpe name)
 constant :: C.Constant -> Operand
 constant = ConstantOperand
 
-constInt i = constant (C.Int 32 i)
+constInt :: Int -> Operand
+constInt i = constant (C.Int 32 (toInteger i))
+
 constByte b = constant (C.Int 8 b)
 constTrue = constant (C.Int 1 1)
 constFalse = constant (C.Int 1 0)

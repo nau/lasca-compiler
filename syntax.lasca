@@ -24,10 +24,10 @@ trait Functor(F) {
 instance Functor(List) {
     -- pure, O(c.size), total
     def map(c, f) = {
-      (Nil, f) => Nil
-      (x::xs, f) => Cons(f(x), xs.map(f))
-      (x::xs, f) => Cons(f x, xs.map f)
-      (x::xs, f) => Cons (f x) (xs.map f)
+      | (Nil, f) => Nil
+      | (x::xs, f) => Cons(f(x), xs.map(f))
+      | (x::xs, f) => Cons(f x, xs.map f)
+      | (x::xs, f) => Cons (f x) (xs.map f)
     }
 }
 
@@ -100,14 +100,14 @@ def main = {
 
 -- Everything is {}
 -- Lambda
-   val lam = { x => x + 1 }
-   val patLambda = { (Context x _) value => value + x }
-   val patMat = {
-   	 (Context x None)   value          => value + x
-   	 (Context _ Some(y) value if y > 0 => value + y
-   	 (Context _ Some(y) value          => value + y + 1
+   lam = { x => x + 1 }
+   patLambda = { (Context x _) value => value + x }
+   patMat = match {
+   	 | (Context x None)   value          => value + x
+   	 | (Context _ Some(y) value if y > 0 => value + y
+   	 | (Context _ Some(y) value          => value + y + 1
    }
 -- do block
-  val list = [1 .. 3]
-	  val doubled = do { i <- list; pure (i * i) } -- [1, 4, 9]
+  list = [1 .. 3]
+	doubled = do { i <- list; pure(i * i) } -- [1, 4, 9]
 }

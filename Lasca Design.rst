@@ -5,6 +5,8 @@ Lasca Programming Language
 
 Lasca Programming Language Design Draft v0.0.1
 
+Simple yet powerful modern functional programming language.
+
 
 .. contents::
 
@@ -15,11 +17,14 @@ Overview
 - functional
 - expression based
 - pattern matching
-- strongly statically typed with type inference, gradual typing, and dynamic modes
+- no null
+- strongly statically typed with type inference, and dynamic modes
 - System F with liquid types (`Liquid Haskell`_)
 - type inference (Hindley-Milner alike)
-- type classes (Haskell), or implicit instances (Idris)
-- several optional type checking passes (types, big O checks, side-effects/purity checks, totality checks)
+- type o (Haskell), or implicit instances (Idris)
+- syntactic sugar for function application (named arguments, defaults, method calls), lenses, records, indexed access,
+  applicatives and monads (do-notation).
+- multiple type checking passes (types, side-effects/purity checks, totality checks, big O checks?)
 - immutable data by default
 - persisted data structures (see [1]_, [2]_)
 - message passing concurrency (see Erlang_ actors, Akka_) (or CPS like in Go?)
@@ -29,8 +34,7 @@ Overview
 - REPL
 
 
-Inspired by: Scala, Haskell, Idris, Clojure, Erlang, Julia, Ruby, Python, Haxe, Go, Rust, D, Pony_
-
+Inspired by: Scala, Haskell, Idris, OCaml/SML, Clojure, Erlang, Julia, Ruby, Python, Haxe, Go, Rust, D, Pony_
 
 Domain
 ======

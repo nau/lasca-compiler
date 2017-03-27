@@ -107,6 +107,7 @@ Great language. But it has 25 years of legacy none could improve.
 
 SML/Ocaml
 ---------
+Lots of weird syntactic decisions, like #~ prefixes for field access/named arguments.
 
 Module system is weird. I'd consider type classes instead. Also, there
 is a paper "ML Modules and Haskell Type Classes: A Constructive

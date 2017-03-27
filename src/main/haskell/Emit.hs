@@ -112,19 +112,24 @@ transformExpr transformer expr = case expr of
     false' <- go false
     transformer (S.If cond' true' false')
   (S.Let n e body) -> do
+    modify (\s -> s { _locals = (Set.insert n (_locals s)) } )
     e' <- go e
     body' <- go body
     transformer (S.Let n e' body')
   (S.Lam n e) -> do
-      e' <- go e
-      transformer (S.Lam n e')
+    modify (\s -> s { _outers = _locals s } )
+    modify (\s -> s { _locals = Set.singleton n } )
+    e' <- go e
+    transformer (S.Lam n e')
   (S.Apply e args) -> do
     e' <- go e
     args' <- sequence [go arg | arg <- args]
     transformer (S.Apply e' args')
-  (S.Function name tpe arg e1) -> do
-      e' <- go e1
-      transformer (S.Function name tpe arg e')
+  (S.Function name tpe args e1) -> do
+    let argNames = Set.fromList (map (\(S.Arg n _) -> n) args)
+    modify (\s -> s { _locals = argNames, _outers = Set.empty, _usedVars = Set.empty } )
+    e' <- go e1
+    transformer (S.Function name tpe args e')
   e -> do
     transformer e
   where go e = transformExpr transformer e
@@ -218,11 +223,9 @@ typeMapping (TCon "String") = ptrType
 -- Operations
 -------------------------------------------------------------------------------
 
-binops :: Map.Map String Integer
+binops :: Map.Map String Int
 binops = Map.fromList [("+", 10), ("-", 11), ("*", 12), ("/", 13),
   ("==", 42), ("!=", 43), ("<", 44), ("<=", 45), (">=", 46), (">", 47)]
-
-
 
 
 cgen :: Ctx -> S.Expr -> Codegen AST.Operand
@@ -266,24 +269,26 @@ cgen ctx (S.Apply expr args) = do
   e <- cgen ctx expr
   largs <- mapM (cgen ctx) args
   let funcs = functions modState
-  let argc = constInt (toInteger (length largs))
+  let argc = constInt (length largs)
   let len = Map.size funcs
   let funcs = constRefOperand "Functions"
 --   let argArray = C.Array (T.ArrayType (fromIntegral len) ptrType) largs
 --   let funcsize = global T.i32 "FunctionsSize"
-  let funcsize = constInt (toInteger len)
+  let funcsize = constInt len
   sargsPtr <- allocaSize (ptrType) argc
   let asdf = (\(idx, arg) -> do {
     p <- getelementptr sargsPtr [idx];
     store p arg})
   sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
-  sequence [asdf (constInt (toInteger i), a) | (i, a) <- (zip [0..len] largs)]
-  call (global runtimeApplyFuncType (AST.Name "runtimeApply")) ([funcs, e, sargs, argc])
+  -- cdecl calling convension, arguments passed right to left
+  sequence [asdf (constInt i, a) | (i, a) <- (zip [0..len] (largs))]
+  call (global runtimeApplyFuncType (AST.Name "runtimeApply")) ([funcs, e, argc, sargs])
 --   call e largs
--- cgen ctx (S.Lam name expr) = boxFunc "main_lambda"
-cgen ctx (S.BoxFunc funcName) = do
+cgen ctx (S.BoxFunc funcName enclosedVars) = do
   modState <- gets moduleState
-  boxFunc funcName (functions modState)
+  let mapping = functions modState
+  if null enclosedVars then boxFunc funcName mapping
+  else boxClosure funcName mapping enclosedVars
 cgen ctx (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
@@ -328,12 +333,15 @@ initLascaRuntimeFuncType = funcType T.void []
 mainFuncType = funcType ptrType []
 boxFuncType = funcType ptrType [T.i32]
 runtimeBinOpFuncType = funcType ptrType [T.i32, ptrType, ptrType]
-runtimeApplyFuncType = funcType ptrType [ptrType, ptrType, ptrType, T.i32]
+runtimeApplyFuncType = funcType ptrType [ptrType, ptrType, T.i32, ptrType]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
+
+gcMalloc size = call (global (funcType ptrType [T.i32]) (AST.Name "gcMalloc")) [constInt size]
 
 box :: S.Lit -> Codegen AST.Operand
 box (S.BoolLit b) = call (global boxFuncType (AST.Name "boxBool")) [constInt (boolToInt b)]
-box (S.IntLit  n) = call (global boxFuncType (AST.Name "boxInt")) [constInt (toInteger n)]
+box (S.IntLit  n) = call (global boxFuncType (AST.Name "boxInt")) [constInt n]
+`-- box (S.UnitLit) = call (global boxFuncType (AST.Name "box")) [constInt 5, ]
 box (S.StringLit s) = do
   let name = getStringLitASTName s
   let len = ByteString.length . UTF8.fromString $ s
@@ -343,7 +351,27 @@ box (S.StringLit s) = do
 
 boxFunc name mapping = do
   let idx = mapping Map.! name
-  call (global (funcType ptrType [ptrType]) (AST.Name "boxFunc")) [constInt (toInteger idx)]
+  call (global (funcType ptrType [T.i32]) (AST.Name "boxFunc")) [constInt idx]
+
+boxClosure :: String -> Map.Map String Int -> [S.Arg] -> Codegen AST.Operand
+boxClosure name mapping enclosedVars = do
+  syms <- gets symtab
+  let symMap = Map.fromList syms
+  let idx = mapping Map.! name
+  let argc = length enclosedVars
+  let args = map (\(S.Arg n _) -> symMap Map.! n) enclosedVars
+  sargsPtr <- gcMalloc (ptrSize * argc)
+  sargsPtr1 <- bitcast sargsPtr (T.ptr ptrType)
+  let asdf = (\(idx, arg) -> do {
+    p <- getelementptr sargsPtr1 [idx];
+    bc1 <- bitcast p (T.ptr ptrType);
+    bc <- load arg;
+    store bc1 bc
+  })
+  let sargs = sargsPtr
+  sequence [asdf (constInt i, a) | (i, a) <- zip [0..argc] args]
+  call (global (funcType ptrType [T.i32, T.i32, ptrType]) (AST.Name "boxClosure"))
+    [constInt idx, constInt argc, sargsPtr]
 
 boolToInt True = 1
 boolToInt False = 0
@@ -372,20 +400,26 @@ codegenModule modo fns = modul
           mapM (codegenTop ctx) fns''
           codegenStartFunc
 
-rewrite ctx fns = transform extractLambda fns where
+rewrite ctx fns = transform extractLambda fns
 
-  extractLambda :: S.Expr -> LLVM S.Expr
-  extractLambda (S.Lam name expr) = do
-    state <- get
-    let nms = _modNames state
-    let syntactic = _syntacticAst state
-    let (funcName, nms') = uniqueName "lambda" nms
-    let func = (S.Function (funcName) typeAny [(S.Arg name typeAny)] expr)
-    modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
-    Debug.traceM ("Generated lambda " ++ show func)
-    return (S.BoxFunc funcName)
-  extractLambda expr = do
-    return expr
+extractLambda :: S.Expr -> LLVM S.Expr
+extractLambda (S.Lam name expr) = do
+  state <- get
+  let nms = _modNames state
+  let syntactic = _syntacticAst state
+  let outerVars = _outers state
+  let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
+  let enclosedArgs = map (\n -> S.Arg n typeAny) usedOuterVars
+  let (funcName, nms') = uniqueName "lambda" nms
+  let func = (S.Function (funcName) typeAny (enclosedArgs ++ [(S.Arg name typeAny)]) expr)
+  modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
+  Debug.traceM ("Generated lambda " ++ show func ++ ", outerVars = " ++ show outerVars ++ ", usedOuterVars" ++ show usedOuterVars)
+  return (S.BoxFunc funcName enclosedArgs)
+extractLambda expr@(S.Var n) = do
+  modify (\s -> s { _usedVars = Set.insert n (_usedVars s)})
+  return expr
+extractLambda expr = do
+  return expr
 
 functionStructType = T.StructureType False [ptrType, ptrType, T.i32]
 functionsStructType len = T.StructureType False [T.i32, arrayTpe len]
@@ -396,8 +430,8 @@ genFunctionMap :: [S.Expr] -> LLVM ()
 genFunctionMap fns = do
   defineNames
   defineConst (AST.Name "Functions") (functionsStructType len) (Just struct1)
-  Debug.traceM (show mapping)
-  Debug.traceM (show array)
+--   Debug.traceM (show mapping)
+--   Debug.traceM (show array)
   modify (\s -> s { functions = mapping })
   where
 

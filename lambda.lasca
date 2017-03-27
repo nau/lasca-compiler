@@ -1,6 +1,3 @@
 
-def main() = {
- let a = { s -> println(s) } in a("Hello Lambda!");
- let a = 1 in a("Runtime Error!");
-}
+def main() = let b = println in let c = "HEllo" in let a = {s -> b(c) } in a("world")
 
