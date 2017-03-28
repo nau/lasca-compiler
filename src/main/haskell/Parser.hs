@@ -155,21 +155,38 @@ closure = do
     where cls = do
             args <- commaSep arg
             reservedOp "->"
-            letins <- blockStmts
-            let lambdas = foldr (\(Arg a _) expr -> Lam a expr) letins args
+            letin <- blockStmts
+            let lambdas = foldr (\(Arg a _) expr -> Lam a expr) letin args
             return lambdas
 
+data LetVal = Named Name Expr | Stmt Expr
+
+valdef = do
+  id <- identifier
+  reservedOp "="
+  e <- expr
+  return (Named id e)
+
+unnamedStmt = do
+  e <- expr
+  return (Stmt e)
+
 blockStmts = do
-  exprs <- expr `sepEndBy` semi
-  let letins = if null exprs
-               then Literal UnitLit
-               else do
-                 let init' = init exprs
-                 let last' = last exprs
-                 let namedExprs = zip ['a'..] init'
-                 let letin = foldr (\(name, e) acc -> (Let (show name) e acc)) last' namedExprs
-                 letin
-  return letins
+  exprs <- (try valdef <|> unnamedStmt) `sepEndBy` semi
+  let letin = foldStmtsIntoOneLetExpr (reverse exprs)
+  return letin
+  where
+        foldStmtsIntoOneLetExpr [] = Literal UnitLit
+        foldStmtsIntoOneLetExpr exprs@(lst : init) = do
+          let (init', last') = case lst of
+                                (Stmt e) -> (init, e)
+                                (Named _ _) -> (exprs, Literal UnitLit)
+          let namedExprs = go init' 1
+          foldl (\acc (name, e) -> Let name e acc) last' namedExprs
+
+        go ((Stmt e) : exprs) idx = ('_' : show idx, e) : go exprs (idx + 1)
+        go ((Named id e) : exprs) idx = (id, e) : go exprs idx
+        go [] _ = []
 
 
 block :: Parser Expr

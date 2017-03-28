@@ -1,3 +1,8 @@
 
-def main() = let b = println in let c = "HEllo" in let a = {s -> b(c) } in a("world")
+def main() = {
+  b = println;
+  c = "HEllo";
+  a = {s -> b(c) };
+  a("world")
+}
 

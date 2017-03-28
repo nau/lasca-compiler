@@ -24,6 +24,7 @@ data Expr
   | Extern Name Type [Arg]
   | If Expr Expr Expr
   | Let Name Expr Expr
+  | Array [Expr]
   | Data Name [DataConst]
   deriving (Eq, Ord, Show)
 

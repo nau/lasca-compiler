@@ -341,7 +341,7 @@ gcMalloc size = call (global (funcType ptrType [T.i32]) (AST.Name "gcMalloc")) [
 box :: S.Lit -> Codegen AST.Operand
 box (S.BoolLit b) = call (global boxFuncType (AST.Name "boxBool")) [constInt (boolToInt b)]
 box (S.IntLit  n) = call (global boxFuncType (AST.Name "boxInt")) [constInt n]
-`-- box (S.UnitLit) = call (global boxFuncType (AST.Name "box")) [constInt 5, ]
+-- box (S.UnitLit) = call (global boxFuncType (AST.Name "box")) [constInt 5, ]
 box (S.StringLit s) = do
   let name = getStringLitASTName s
   let len = ByteString.length . UTF8.fromString $ s

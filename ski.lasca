@@ -1,7 +1,7 @@
 
 def i(x) = x
 def k(x, y) = x
-def s(x, y, z) = let a = x(z) in let b = y(z) in a(b)
+def s(x, y, z) = let a = x(z), b = y(z) in a(b)
 
 def main() = (k(println, 1))(i("Hello"))
 
