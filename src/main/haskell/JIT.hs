@@ -54,11 +54,13 @@ runJIT opts mod = do
       runExceptT $ withModuleFromAST context mod $ \m ->
         withPassManager (passes (optimization opts)) $ \pm -> do
           -- Optimization Pass
-          runPassManager pm m
+--           runPassManager pm m
           optmod <- moduleAST m
-          s <- moduleLLVMAssembly m
 
-          if (printLLVMAsm opts) then putStrLn s else return ()
+          if (printLLVMAsm opts) then do
+            s <- moduleLLVMAssembly m
+            putStrLn s
+          else return ()
 
           EE.withModuleInEngine executionEngine m $ \ee -> do
             initLascaRuntime <- EE.getFunction ee (AST.Name "start")

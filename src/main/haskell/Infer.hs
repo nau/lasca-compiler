@@ -35,6 +35,7 @@ data TypeError
   = UnificationFail Type Type
   | InfiniteType TVar Type
   | UnboundVariable String
+  | UnificationMismatch [Type] [Type]
   deriving Show
 
 runInfer :: Infer (Subst, Type) -> Either TypeError Scheme
@@ -67,10 +68,12 @@ instance Substitutable Type where
   apply _ (TypeIdent a)       = TypeIdent a
   apply s t@(TVar a)     = Map.findWithDefault t a s
   apply s (t1 `TypeFunc` t2) = apply s t1 `TypeFunc` apply s t2
+  apply s (TypeApply t [args]) = TypeApply (apply s t) [args] -- TODO do proper substitution
 
   ftv TypeIdent{}         = Set.empty
   ftv (TVar a)       = Set.singleton a
   ftv (t1 `TypeFunc` t2) = ftv t1 `Set.union` ftv t2
+  ftv (TypeApply t [args])       = ftv t  -- TODO do proper substitution
 
 instance Substitutable Scheme where
   {-# INLINE apply #-}
@@ -104,7 +107,18 @@ unify (l `TypeFunc` r) (l' `TypeFunc` r')  = do
 unify (TVar a) t = bind a t
 unify t (TVar a) = bind a t
 unify (TypeIdent a) (TypeIdent b) | a == b || a == "Any" || b == "Any" = return nullSubst
+unify (TypeApply (TypeIdent lhs) largs) (TypeApply (TypeIdent rhs) rargs) | lhs == rhs = (unifyList largs rargs)
 unify t1 t2 = throwError $ UnificationFail t1 t2
+
+unifyList :: [Type] -> [Type] -> Infer Subst
+-- unifyList x y | traceArgs ["unifyList", show x, show y] = undefined
+unifyList [TVar _] [] = return nullSubst
+unifyList [] [] = return nullSubst
+unifyList (t1 : ts1) (t2 : ts2) =
+  do su1 <- unify t1 t2
+     su2 <- unifyList (apply su1 ts1) (apply su1 ts2)
+     return (su2 `compose` su1)
+unifyList t1 t2 = throwError $ UnificationMismatch t1 t2
 
 bind ::  TVar -> Type -> Infer Subst
 bind a t
@@ -251,10 +265,12 @@ normalize (Forall ts body) = Forall (fmap snd ord) (normtype body)
     fv (TVar a)   = [a]
     fv (TypeFunc a b) = fv a ++ fv b
     fv (TypeIdent _)   = []
+    fv (TypeApply t [args])   = fv t
 
-    normtype (TypeFunc a b) = TypeFunc (normtype a) (normtype b)
+    normtype (TypeFunc a b)  = TypeFunc  (normtype a) (normtype b)
+    normtype (TypeApply a b) = TypeApply (normtype a) b
     normtype (TypeIdent a)   = TypeIdent a
-    normtype (TVar a)   =
+    normtype (TVar a)        =
       case lookup a ord of
         Just x -> TVar x
         Nothing -> error "type variable not in signature"

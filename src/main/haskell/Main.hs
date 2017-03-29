@@ -168,7 +168,7 @@ main = execParser opts >>= greet
 
 
 typeCheck :: [Expr] -> Either TypeError TypeEnv
-typeCheck exprs = inferTop emptyTyenv (Debug.trace (show a) a)
+typeCheck exprs = inferTop emptyTyenv ({-Debug.trace (show a)-} a)
   where
         a = map f exprs
         f e@(Fix (Function name _ _ _)) = (name, e)

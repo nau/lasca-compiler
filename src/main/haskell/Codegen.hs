@@ -28,7 +28,7 @@ import qualified Data.ByteString.Char8 as Char8
 
 import Control.Monad.State
 import Control.Applicative
-import Control.Lens
+-- import Control.Lens
 
 import LLVM.General.AST
 import LLVM.General.AST.Global
@@ -229,6 +229,7 @@ current = do
     Nothing -> error $ "No such block: " ++ show c
 
 instr :: Instruction -> Codegen (Operand)
+{-# INLINE instr #-}
 instr ins = do
   n <- fresh
   let ref = (UnName n)

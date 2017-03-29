@@ -168,7 +168,7 @@ codegenTop ctx (S.Function name tpe args body) = do
     bls modState = createBlocks $ execCodegen [] modState $ do
       entry <- addBlock entryBlockName
       setBlock entry
-      Debug.traceM ("Generating function2 " ++ name)
+--       Debug.traceM ("Generating function2 " ++ name)
       forM args $ \(S.Arg n t) -> do
 --         var <- alloca (typeMapping t)   -- FIXME: this shouldn't be necessary
         var <- alloca ptrType
@@ -178,7 +178,7 @@ codegenTop ctx (S.Function name tpe args body) = do
 
 codegenTop _ (S.Extern name tpe args) = do
 --   s <- gets _llvmModule
-  Debug.traceM("External function " ++ name)
+--   Debug.traceM("External function " ++ name)
 --   Debug.traceM ("External function " ++ show s)
   external llvmType name fnargs
   where
@@ -240,9 +240,11 @@ cgen ctx (S.Var name) = do
   modState <- gets moduleState
   let mapping = functions modState
   case lookup name syms of
-    Just x -> Debug.trace ("Local " ++ show name) (load x)
+    Just x ->
+--       Debug.trace ("Local " ++ show name)
+      load x
     Nothing {-| x `Set.member` ctx-} -> do
-      Debug.traceM ("Global " ++ show name)
+--       Debug.traceM ("Global " ++ show name)
       boxFunc name mapping
 cgen ctx (S.Literal l) = box l
 cgen ctx (S.Apply (S.Var "newArray") [elm]) = cgen ctx elm
@@ -394,7 +396,7 @@ codegenModule modo fns = modul
           syn <- gets _syntacticAst
           let fns'' = fns' ++ syn
           st' <- gets _llvmModule
-          Debug.traceM ("Rewritten exprs: " ++ show fns'')
+--           Debug.traceM ("Rewritten exprs: " ++ show fns'')
 --           Debug.traceM ("Rewritten exprs: " ++ show st')
 --           Debug.traceM ("Rewritten exprs: " ++ show st')
           genFunctionMap fns''
@@ -414,7 +416,7 @@ extractLambda (S.Lam name expr) = do
   let (funcName, nms') = uniqueName "lambda" nms
   let func = (S.Function (funcName) typeAny (enclosedArgs ++ [(S.Arg name typeAny)]) expr)
   modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
-  Debug.traceM ("Generated lambda " ++ show func ++ ", outerVars = " ++ show outerVars ++ ", usedOuterVars" ++ show usedOuterVars)
+--   Debug.traceM ("Generated lambda " ++ show func ++ ", outerVars = " ++ show outerVars ++ ", usedOuterVars" ++ show usedOuterVars)
   return (S.BoxFunc funcName enclosedArgs)
 extractLambda expr@(S.Var n) = do
   modify (\s -> s { _usedVars = Set.insert n (_usedVars s)})

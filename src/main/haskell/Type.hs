@@ -12,12 +12,14 @@ data Type
   = TVar !TVar
   | TypeIdent !String
   | TypeFunc Type Type
+  | TypeApply Type [Type]
   deriving (Eq, Ord)
 
 instance Show Type where
   show (TVar (TV n)) = n
   show (TypeIdent s) = s
   show (TypeFunc l r) = "(" ++ show l ++ " -> " ++ show r ++ ")"
+  show (TypeApply t args) = "(" ++ show t ++ foldl (\acc a -> " " ++ acc ++ show a) "" args ++ ")"
 
 
 infixr `TypeFunc`
@@ -41,7 +43,7 @@ typeBool = TypeIdent "Bool"
 typeAny = TypeIdent "Any"
 typeString = TypeIdent "String"
 typeUnit = TypeIdent "Unit"
-typeArrayInt = TypeFunc (TypeIdent "Array") typeInt
+typeArrayInt = TypeApply (TypeIdent "Array") [typeInt]
 
 isAny (TypeIdent "Any") = True
 isAny _ = False

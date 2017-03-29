@@ -5,9 +5,11 @@ flags:
   llvm-general:
     shared-llvm: true
 
-#ghc-options:
-#  lasca:
+ghc-options:
+  lasca:
+    -O2
 #    -rtsopts
+#    -prof
 #    -fprof-auto
 #    -auto-all
 #    -caf-all
