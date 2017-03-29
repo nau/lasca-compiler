@@ -34,67 +34,67 @@ const int STRING   = 4;
 const int CLOSURE  = 5;
 const int ARRAY    = 6;
 
-struct type_info {
+typedef struct {
   int type;
   void* value;
-};
+} Box;
 
-struct type_info * UNIT_SINGLETON;
-
-struct string {
-  int length;
-  char bytes[];
-};
-
-struct closure {
-  int funcIdx;
-  int argc;
-  struct type_info** argv;
-};
+Box * UNIT_SINGLETON;
 
 typedef struct {
   int length;
-  struct type_info** data;
+  char bytes[];
+} String;
+
+typedef struct {
+  int funcIdx;
+  int argc;
+  Box** argv;
+} Closure;
+
+typedef struct {
+  int length;
+  Box** data;
 } Array;
 
-struct Function {
-  struct string* name;
+typedef struct {
+  String* name;
   void * funcPtr;
   int arity;
-};
+} Function;
 
-struct Functions {
+typedef struct {
   int size;
-  struct Function functions[];
-};
+  Function functions[];
+} Functions;
 
 void *gcMalloc(size_t s) {
     return GC_malloc(s);
 }
 
-struct type_info *box(int type_id, void *value) {
-  struct type_info* ti = gcMalloc(sizeof(struct type_info));
+Box *box(int type_id, void *value) {
+  Box* ti = gcMalloc(sizeof(Box));
   ti->type = type_id;
   ti->value = value;
   return ti;
 }
 
-struct type_info * boxBool(int i) {
+Box * boxBool(int i) {
 //  printf("boxBool(%d) ", i);
   return box(BOOL, (void *) (long) i);
 }
 
-struct type_info * boxInt(int i) {
+Box * boxInt(int i) {
 //  printf("boxInt(%d) ", i);
   return box(INT, (void *) (long) i);
 }
 
-struct type_info * boxFloat64(double i) {
+Box * boxFloat64(double i) {
   return box(DOUBLE, (void *) (long) i);
 }
 
-struct type_info * boxClosure(int idx, int argc, struct type_info** args) {
-  struct closure* cl = gcMalloc(sizeof(struct closure));
+Box * boxClosure(int idx, int argc, Box** args) {
+  Closure* cl = gcMalloc(sizeof(Closure));
 //  printf("boxClosure(%d, %d, %p)\n", idx, argc, args);
 //  fflush(stdout);
   cl->funcIdx = idx;
@@ -105,13 +105,13 @@ struct type_info * boxClosure(int idx, int argc, struct type_info** args) {
   return box(CLOSURE, cl);
 }
 
-struct type_info * boxFunc(int idx) {
+Box * boxFunc(int idx) {
 //  printf("boxFunc(%d)\n", idx);
 //  fflush(stdout);
   return boxClosure(idx, 0, NULL);
 }
 
-void *unbox(struct type_info* ti, int expected) {
+void *unbox(Box* ti, int expected) {
 //  printf("unbox(%d, %d) ", ti->type, (int) ti->value);
   if (ti->type == expected) {
   	return ti->value;
@@ -121,14 +121,14 @@ void *unbox(struct type_info* ti, int expected) {
   }
 }
 
-struct type_info* runtimeBinOp(int code, struct type_info* lhs, struct type_info* rhs) {
+Box* runtimeBinOp(int code, Box* lhs, Box* rhs) {
   if (lhs->type != rhs->type) {
   	printf("AAAA!!! Type mismatch! lhs = %i, rhs = %i\n", lhs->type, rhs->type);
   	exit(1);
   }
   int left = (int) lhs->value;
   int right = (int) rhs->value;
-  struct type_info* result = NULL;
+  Box* result = NULL;
 
   switch (code) {
   case ADD: result = boxInt(left + right); break;
@@ -148,16 +148,16 @@ struct type_info* runtimeBinOp(int code, struct type_info* lhs, struct type_info
   return result;
 }
 
-struct type_info* __cdecl runtimeApply(struct Functions* fs, struct type_info* val, int argc, struct type_info* argv[]) {
+Box* __cdecl runtimeApply(Functions* fs, Box* val, int argc, Box* argv[]) {
   if (val->type != CLOSURE) {
     exit(1);
   }
-  struct closure *closure = val->value;
+  Closure *closure = val->value;
   if (closure->funcIdx >= fs->size) {
     printf("AAAA!!! No such function with id %d, max id is %d", (int) closure->funcIdx, fs->size);
     exit(1);
   }
-  struct Function f = fs->functions[closure->funcIdx];
+  Function f = fs->functions[closure->funcIdx];
   if (f.arity != argc + closure->argc) {
     printf("AAAA!!! Function %.*s takes %d params, but passed %d enclosed params and %d params instead",
       f.name->length, f.name->bytes, closure->argc, argc);
@@ -171,11 +171,11 @@ struct type_info* __cdecl runtimeApply(struct Functions* fs, struct type_info* v
       return funcptr();
     }
     case 1: {
-      void* (*funcptr)(struct type_info*) = f.funcPtr;
+      void* (*funcptr)(Box*) = f.funcPtr;
       return (argc == 1) ? funcptr(argv[0]) : funcptr(closure->argv[0]);
     }
     case 2: {
-      void* (*funcptr)(struct type_info*, struct type_info*) = f.funcPtr;
+      void* (*funcptr)(Box*, Box*) = f.funcPtr;
       switch (argc) {
         case 0: return funcptr(closure->argv[0], closure->argv[1]);
         case 1: return funcptr(closure->argv[0], argv[0]);
@@ -183,7 +183,7 @@ struct type_info* __cdecl runtimeApply(struct Functions* fs, struct type_info* v
       }
     }
     case 3: {
-      void* (*funcptr)(struct type_info*, struct type_info*, struct type_info*) = f.funcPtr;
+      void* (*funcptr)(Box*, Box*, Box*) = f.funcPtr;
         switch (argc) {
           case 0: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2]);
           case 1: return funcptr(closure->argv[0], closure->argv[1], argv[0]);
@@ -192,7 +192,7 @@ struct type_info* __cdecl runtimeApply(struct Functions* fs, struct type_info* v
         }
     }
     case 4: {
-      void* (*funcptr)(struct type_info*, struct type_info*, struct type_info*, struct type_info*) = f.funcPtr;
+      void* (*funcptr)(Box*, Box*, Box*, Box*) = f.funcPtr;
       switch (argc) {
         case 0: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], closure->argv[3]);
         case 1: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], argv[0]);
@@ -202,7 +202,7 @@ struct type_info* __cdecl runtimeApply(struct Functions* fs, struct type_info* v
       }
     }
     case 5: {
-      void* (*funcptr)(struct type_info*, struct type_info*, struct type_info*, struct type_info*, struct type_info*) = f.funcPtr;
+      void* (*funcptr)(Box*, Box*, Box*, Box*, Box*) = f.funcPtr;
       switch (argc) {
         case 0: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], closure->argv[3], closure->argv[4]);
         case 1: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], closure->argv[3], argv[0]);
@@ -213,7 +213,7 @@ struct type_info* __cdecl runtimeApply(struct Functions* fs, struct type_info* v
       }
     }
     case 6: {
-      void* (*funcptr)(struct type_info*, struct type_info*, struct type_info*, struct type_info*, struct type_info*, struct type_info*) = f.funcPtr;
+      void* (*funcptr)(Box*, Box*, Box*, Box*, Box*, Box*) = f.funcPtr;
       switch (argc) {
         case 0: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], closure->argv[3], closure->argv[4], closure->argv[5]);
         case 1: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], closure->argv[3], closure->argv[4], argv[0]);
@@ -240,15 +240,15 @@ double putchard(double X) {
   return 0;
 }
 
-void * runtimePutchar(struct type_info* ch) {
+void * runtimePutchar(Box* ch) {
   char c = (char) unbox(ch, INT);
   putchar(c);
   fflush(stdout);
   return 0;
 }
 
-void * __cdecl println(struct type_info* val) {
-  struct string * str = unbox(val, STRING);
+void * __cdecl println(Box* val) {
+  String * str = unbox(val, STRING);
   printf("%.*s\n", str->length, str->bytes);
   return NULL;
 }
@@ -260,32 +260,32 @@ void * __cdecl println(struct type_info* val) {
 Array* createArray(size_t size) {
   Array * array = gcMalloc(sizeof(Array));
   array->length = size;
-  array->data = (size > 0 ) ? gcMalloc(sizeof(struct type_info*) * size) : NULL;
+  array->data = (size > 0 ) ? gcMalloc(sizeof(Box*) * size) : NULL;
   return array;
 }
 
-struct type_info* newArray() {
+Box* newArray() {
   return box(ARRAY, createArray(0));
 }
 
-struct type_info* append(struct type_info* arrayValue, struct type_info* value) {
+Box* append(Box* arrayValue, Box* value) {
   Array* array = unbox(arrayValue, ARRAY);
   Array * newArray = createArray(array->length + 1);
-  memcpy(newArray->data, array->data, sizeof(struct type_info*) * array->length);
+  memcpy(newArray->data, array->data, sizeof(Box*) * array->length);
   newArray->data[array->length] = value;
   return box(ARRAY, newArray);
 }
 
-struct type_info* prepend(struct type_info* arrayValue, struct type_info* value) {
+Box* prepend(Box* arrayValue, Box* value) {
   Array* array = unbox(arrayValue, ARRAY);
   Array * newArray = createArray(array->length + 1);
-  memcpy(newArray->data + 1, array->data, sizeof(struct type_info*) * array->length);
+  memcpy(newArray->data + 1, array->data, sizeof(Box*) * array->length);
   newArray->data[0] = value;
   return box(ARRAY, newArray);
 }
 
-struct type_info* makeString(char * str) {
-  struct string* val = gcMalloc(sizeof(struct string));
+Box* makeString(char * str) {
+  String* val = gcMalloc(sizeof(String));
   val->length = strlen(str);
   strncpy(val->bytes, str, val->length);
   return box(STRING, val);
@@ -317,7 +317,7 @@ void itoa(int n, char s[]) {
   reverse(s);
 }
 
-struct type_info* arrayToString(struct type_info* arrayValue) {
+Box* arrayToString(Box* arrayValue) {
   Array* array = unbox(arrayValue, ARRAY);
   if (array->length == 0) {
     return makeString("[]");
@@ -327,7 +327,7 @@ struct type_info* arrayToString(struct type_info* arrayValue) {
     char * result = gcMalloc(array->length * 12 + seps + 1);
     strcat(result, "[");
     for (int i = 0; i < array->length; i++) {
-      struct type_info* elem = array->data[i];
+      Box* elem = array->data[i];
       int value = (int) unbox(elem, INT);
       itoa(value, buf);
       strcat(result, buf);
@@ -339,7 +339,7 @@ struct type_info* arrayToString(struct type_info* arrayValue) {
   }
 }
 
-struct type_info* arrayApply(struct type_info* arrayValue, struct type_info* idx) {
+Box* arrayApply(Box* arrayValue, Box* idx) {
   Array* array = unbox(arrayValue, ARRAY);
   int index = (int) unbox(idx, INT);
   assert(array->length > index);
