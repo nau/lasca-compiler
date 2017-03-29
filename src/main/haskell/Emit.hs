@@ -300,7 +300,7 @@ cgen ctx (S.If cond tr fl) = do
   ------------------
   cond <- cgen ctx cond
   -- unbox Bool
-  voidPtrCond <- call (global unboxFuncType (AST.Name "unbox")) [cond, constInt 0]
+  voidPtrCond <- call (global unboxFuncType (AST.Name "unbox")) [cond, constInt 1]
   bool <- ptrtoint voidPtrCond T.i1
 
   test <- instr2 T.i1 (I.ICmp IP.EQ bool constTrue [])
@@ -344,13 +344,13 @@ gcMalloc size = call (global (funcType ptrType [T.i32]) (AST.Name "gcMalloc")) [
 box :: S.Lit -> Codegen AST.Operand
 box (S.BoolLit b) = call (global boxFuncType (AST.Name "boxBool")) [constInt (boolToInt b)]
 box (S.IntLit  n) = call (global boxFuncType (AST.Name "boxInt")) [constInt n]
--- box (S.UnitLit) = call (global boxFuncType (AST.Name "box")) [constInt 5, ]
+box (S.UnitLit) = call (global boxFuncType (AST.Name "box")) [constInt 0, constInt 0]
 box (S.StringLit s) = do
   let name = getStringLitASTName s
   let len = ByteString.length . UTF8.fromString $ s
   let ref = global (stringStructType len) name
   ref' <- bitcast ref ptrType
-  call (global boxFuncType (AST.Name "box")) [constInt 3, ref']
+  call (global boxFuncType (AST.Name "box")) [constInt 4, ref']
 
 boxFunc name mapping = do
   let idx = mapping Map.! name

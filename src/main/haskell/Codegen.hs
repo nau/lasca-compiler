@@ -327,6 +327,8 @@ global tpe name = constant (C.GlobalReference tpe name)
 constant :: C.Constant -> Operand
 constant = ConstantOperand
 
+constNull = IntToPtr (constInt 0) ptrType []
+
 constInt :: Int -> Operand
 constInt i = constant (C.Int 32 (toInteger i))
 
