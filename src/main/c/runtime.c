@@ -40,6 +40,7 @@ typedef struct {
 } Box;
 
 Box * UNIT_SINGLETON;
+Box * UNIT_STRING;
 
 typedef struct {
   int length;
@@ -70,6 +71,10 @@ typedef struct {
 
 void *gcMalloc(size_t s) {
     return GC_malloc(s);
+}
+
+void *gcRealloc(void* old, size_t s) {
+    return GC_realloc(old, s);
 }
 
 Box *box(int type_id, void *value) {
@@ -264,7 +269,7 @@ Array* createArray(size_t size) {
   return array;
 }
 
-Box* newArray() {
+Box* seq() {
   return box(ARRAY, createArray(0));
 }
 
@@ -317,25 +322,56 @@ void itoa(int n, char s[]) {
   reverse(s);
 }
 
+Box* toString(Box* value);
+
 Box* arrayToString(Box* arrayValue) {
   Array* array = unbox(arrayValue, ARRAY);
   if (array->length == 0) {
     return makeString("[]");
   } else {
     int seps = array->length * 2;
-    char buf[12]; // longest number is −2147483648, it's 11 bytes + 0 termination byte;
-    char * result = gcMalloc(array->length * 12 + seps + 1);
+    size_t resultSize = array->length * 32; // assume 32 bytes per array element. No reason, just guess
+    char * result = gcMalloc(resultSize);
     strcat(result, "[");
+    size_t curSize = 1;
     for (int i = 0; i < array->length; i++) {
       Box* elem = array->data[i];
-      int value = (int) unbox(elem, INT);
-      itoa(value, buf);
-      strcat(result, buf);
-      if (i + 1 < array->length)
+      String* value = unbox(toString(elem), STRING);
+      if (curSize + value->length >= resultSize + 10) { // reserve 10 bytes for trailing ']' etc
+        size_t newSize = resultSize * 1.5;
+        result = gcRealloc(result, newSize);
+        resultSize = newSize;
+      }
+      strncat(result, value->bytes, value->length);
+      curSize += value->length;
+      if (i + 1 < array->length) {
         strcat(result, ", ");
+        curSize += 2;
+      }
     }
     strcat(result, "]");
     return makeString(result);
+  }
+}
+
+Box* toString(Box* value) {
+  char buf[12];
+
+  switch (value->type) {
+    case UNIT: return UNIT_STRING;
+    case BOOL: return makeString(value->value == 0 ? "false" : "true");
+    case INT:
+      itoa((long) value->value, buf);
+      return makeString(buf);
+    case DOUBLE:
+      itoa((long) value->value, buf);
+      return makeString(buf);
+    case STRING:  return value;
+    case CLOSURE: return makeString("<func>");
+    case ARRAY:   return arrayToString(value);
+    default:
+      printf("Unsupported type %d", value->type);
+      exit(1);
   }
 }
 
@@ -349,5 +385,6 @@ Box* arrayApply(Box* arrayValue, Box* idx) {
 void initLascaRuntime() {
     GC_init();
     UNIT_SINGLETON = box(UNIT, 0);
+    UNIT_STRING = makeString("()");
     printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n");
 }

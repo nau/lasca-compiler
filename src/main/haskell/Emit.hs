@@ -247,7 +247,7 @@ cgen ctx (S.Var name) = do
 --       Debug.traceM ("Global " ++ show name)
       boxFunc name mapping
 cgen ctx (S.Literal l) = box l
-cgen ctx (S.Apply (S.Var "newArray") [elm]) = cgen ctx elm
+cgen ctx (S.Apply (S.Var "seq") [elm]) = cgen ctx elm
 cgen ctx (S.Apply (S.Var "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True)) rhs)
 cgen ctx (S.Apply (S.Var "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False)))
 cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do

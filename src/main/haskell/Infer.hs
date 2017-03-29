@@ -174,7 +174,7 @@ infer :: TypeEnv -> Expr -> Infer (Subst, Type)
 infer env ex = case ex of
   Var x -> lookupEnv env x
 
-  Apply (Var "newArray") [elm] -> do
+  Apply (Var "seq") [elm] -> do
       return (nullSubst, typeArrayInt)
 
   Apply (Var op) [e1, e2] | op `Map.member` ops -> do

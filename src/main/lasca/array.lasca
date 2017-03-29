@@ -1,10 +1,10 @@
 def returnArray() = {
-  array = newArray();
-  array1 = append(array, 2);
+  array = seq();
+  array1 = append(array, "Hello");
   array2 = append(array1, 3);
   array3 = prepend(array2, 1);
-  runtimePutchar(48 + arrayApply(array3, 2));
-  println(arrayToString(array3));
+  println(toString(arrayApply(array3, 2)));
+  println(toString(array3));
 }
 
 def main() = {
