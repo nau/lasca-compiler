@@ -10,4 +10,8 @@ extern def runtimeApply(funcs: Any, func: Any, argc: Int, args: Any): Any
 extern def initLascaRuntime(): Unit
 extern def unbox(ptr: Any, d: Int): Any
 extern def println(s: Any): Any
---extern def newArray(i: Int): Any
+extern def newArray(): Any
+extern def append(array: Any, v: Any): Any
+extern def prepend(array: Any, v: Any): Any
+extern def arrayToString(array: Any): Any
+extern def arrayApply(array: Any, i: Any): Any

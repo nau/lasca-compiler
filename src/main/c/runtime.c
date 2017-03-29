@@ -43,6 +43,11 @@ struct closure {
   struct type_info** argv;
 };
 
+typedef struct {
+  int length;
+  struct type_info** data;
+} Array;
+
 struct Function {
   struct string* name;
   void * funcPtr;
@@ -247,4 +252,103 @@ void * __cdecl println(struct type_info* val) {
   struct string * str = (struct string *) val->value;
   printf("%.*s\n", str->length, str->bytes);
   return NULL;
+}
+
+
+//=================== Arrays =================
+
+
+Array* createArray(size_t size) {
+  Array * array = gcMalloc(sizeof(Array));
+  array->length = size;
+  array->data = (size > 0 ) ? (struct type_info**) gcMalloc(sizeof(struct type_info*) * size) : NULL;
+  return array;
+}
+
+struct type_info* newArray() {
+  return box(5, createArray(0));
+}
+
+struct type_info* append(struct type_info* arrayValue, struct type_info* value) {
+  assert(arrayValue->type == 5); // it's an array
+  Array* array = (Array *) arrayValue->value;
+  Array * newArray = createArray(array->length + 1);
+  memcpy(newArray->data, array->data, sizeof(struct type_info*) * array->length);
+  newArray->data[array->length] = value;
+  return box(5, newArray);
+}
+
+struct type_info* prepend(struct type_info* arrayValue, struct type_info* value) {
+  assert(arrayValue->type == 5); // it's an array
+  Array* array = (Array *) arrayValue->value;
+  Array * newArray = createArray(array->length + 1);
+  memcpy(newArray->data + 1, array->data, sizeof(struct type_info*) * array->length);
+  newArray->data[0] = value;
+  return box(5, newArray);
+}
+
+struct type_info* makeString(char * str) {
+  struct string* val = gcMalloc(sizeof(struct string));
+  val->length = strlen(str);
+  strncpy(val->bytes, str, val->length);
+  return box(3, val);
+}
+
+void reverse(char s[]) {
+     int i, j;
+     char c;
+
+     for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
+         c = s[i];
+         s[i] = s[j];
+         s[j] = c;
+     }
+}
+
+void itoa(int n, char s[]) {
+  int i, sign;
+
+  if ((sign = n) < 0)  /* record sign */
+     n = -n;          /* make n positive */
+  i = 0;
+  do {       /* generate digits in reverse order */
+     s[i++] = n % 10 + '0';   /* get next digit */
+  } while ((n /= 10) > 0);     /* delete it */
+  if (sign < 0)
+     s[i++] = '-';
+  s[i] = '\0';
+  reverse(s);
+}
+
+struct type_info* arrayToString(struct type_info* arrayValue) {
+  assert(arrayValue->type == 5); // it's an array
+  Array* array = (Array *) arrayValue->value;
+  if (array->length == 0) {
+    return makeString("[]");
+  } else {
+    int seps = array->length * 2;
+    char buf[12]; // longest number is −2147483648, it's 11 bytes + 0 termination byte;
+    char * result = (char *) gcMalloc(array->length * 12 + seps + 1);
+    strcat(result, "[");
+    for (int i = 0; i < array->length; i++) {
+      struct type_info*elem = (struct type_info*) array->data[i];
+      assert(elem->type == 1); // only Int for now
+      int value = (int) elem->value;
+      itoa(value, buf);
+      strcat(result, buf);
+      if (i + 1 < array->length)
+        strcat(result, ", ");
+    }
+    strcat(result, "]");
+    return makeString(result);
+  }
+}
+
+struct type_info* arrayApply(struct type_info* arrayValue, struct type_info* idx) {
+  assert(arrayValue->type == 5); // it's an array
+  assert(idx->type == 1);
+  Array* array = (Array *) arrayValue->value;
+  int index = (int) idx->value;
+  assert(array->length > index);
+  return array->data[index];
 }
