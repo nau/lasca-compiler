@@ -106,7 +106,7 @@ genModule opts modo source = case parseToplevel source of
         else return (Just (codegenModule modo ex))
 
 
-prelude = readFile "Prelude.lasca"
+prelude = readFile "src/main/lasca/Prelude.lasca"
 -- prelude = return ""
 
 readMod :: LascaOpts -> String -> IO (Maybe AST.Module)
