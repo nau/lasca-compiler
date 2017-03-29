@@ -64,13 +64,13 @@ class Substitutable a where
 
 instance Substitutable Type where
   {-# INLINE apply #-}
-  apply _ (TCon a)       = TCon a
+  apply _ (TypeIdent a)       = TypeIdent a
   apply s t@(TVar a)     = Map.findWithDefault t a s
-  apply s (t1 `TArr` t2) = apply s t1 `TArr` apply s t2
+  apply s (t1 `TypeFunc` t2) = apply s t1 `TypeFunc` apply s t2
 
-  ftv TCon{}         = Set.empty
+  ftv TypeIdent{}         = Set.empty
   ftv (TVar a)       = Set.singleton a
-  ftv (t1 `TArr` t2) = ftv t1 `Set.union` ftv t2
+  ftv (t1 `TypeFunc` t2) = ftv t1 `Set.union` ftv t2
 
 instance Substitutable Scheme where
   {-# INLINE apply #-}
@@ -96,14 +96,14 @@ compose :: Subst -> Subst -> Subst
 s1 `compose` s2 = Map.map (apply s1) s2 `Map.union` s1
 
 unify ::  Type -> Type -> Infer Subst
-unify (l `TArr` r) (l' `TArr` r')  = do
+unify (l `TypeFunc` r) (l' `TypeFunc` r')  = do
   s1 <- unify l l'
   s2 <- unify (apply s1 r) (apply s1 r')
   return (s2 `compose` s1)
 
 unify (TVar a) t = bind a t
 unify t (TVar a) = bind a t
-unify (TCon a) (TCon b) | a == b || a == "Any" || b == "Any" = return nullSubst
+unify (TypeIdent a) (TypeIdent b) | a == b || a == "Any" || b == "Any" = return nullSubst
 unify t1 t2 = throwError $ UnificationFail t1 t2
 
 bind ::  TVar -> Type -> Infer Subst
@@ -135,18 +135,18 @@ generalize env t  = Forall as t
   where as = Set.toList $ ftv t `Set.difference` ftv env
 
 ops = Map.fromList [
-  ("+", typeInt `TArr` typeInt `TArr` typeInt),
-  ("-", typeInt `TArr` typeInt `TArr` typeInt),
-  ("*", typeInt `TArr` typeInt `TArr` typeInt),
-  ("/", typeInt `TArr` typeInt `TArr` typeInt),
-  ("==", typeInt `TArr` typeInt `TArr` typeBool),
-  ("!=", typeInt `TArr` typeInt `TArr` typeBool),
-  ("<", typeInt `TArr` typeInt `TArr` typeBool),
-  ("<=", typeInt `TArr` typeInt `TArr` typeBool),
-  (">", typeInt `TArr` typeInt `TArr` typeBool),
-  (">=", typeInt `TArr` typeInt `TArr` typeBool),
-  ("and", typeBool `TArr` typeBool `TArr` typeBool),
-  ("or", typeBool `TArr` typeBool `TArr` typeBool)
+  ("+", typeInt `TypeFunc` typeInt `TypeFunc` typeInt),
+  ("-", typeInt `TypeFunc` typeInt `TypeFunc` typeInt),
+  ("*", typeInt `TypeFunc` typeInt `TypeFunc` typeInt),
+  ("/", typeInt `TypeFunc` typeInt `TypeFunc` typeInt),
+  ("==", typeInt `TypeFunc` typeInt `TypeFunc` typeBool),
+  ("!=", typeInt `TypeFunc` typeInt `TypeFunc` typeBool),
+  ("<", typeInt `TypeFunc` typeInt `TypeFunc` typeBool),
+  ("<=", typeInt `TypeFunc` typeInt `TypeFunc` typeBool),
+  (">", typeInt `TypeFunc` typeInt `TypeFunc` typeBool),
+  (">=", typeInt `TypeFunc` typeInt `TypeFunc` typeBool),
+  ("and", typeBool `TypeFunc` typeBool `TypeFunc` typeBool),
+  ("or", typeBool `TypeFunc` typeBool `TypeFunc` typeBool)
   ]
 
 lookupEnv :: TypeEnv -> String -> Infer (Subst, Type)
@@ -160,19 +160,22 @@ infer :: TypeEnv -> Expr -> Infer (Subst, Type)
 infer env ex = case ex of
   Var x -> lookupEnv env x
 
-  Apply e1 [arg] -> do
-    tv <- fresh
-    (s1, t1) <- infer env e1
-    (s2, t2) <- infer (apply s1 env) arg
-    s3       <- unify (apply s2 t1) (TArr t2 tv)
-    return (s3 `compose` s2 `compose` s1, apply s3 tv)
+  Apply (Var "newArray") [elm] -> do
+      return (nullSubst, typeArrayInt)
 
   Apply (Var op) [e1, e2] | op `Map.member` ops -> do
     (s1, t1) <- infer env e1
     (s2, t2) <- infer env e2
     tv <- fresh
-    s3 <- unify (TArr t1 (TArr t2 tv)) (ops Map.! op)
+    s3 <- unify (TypeFunc t1 (TypeFunc t2 tv)) (ops Map.! op)
     return (s1 `compose` s2 `compose` s3, apply s3 tv)
+
+  Apply e1 [arg] -> do
+    tv <- fresh
+    (s1, t1) <- infer env e1
+    (s2, t2) <- infer (apply s1 env) arg
+    s3       <- unify (apply s2 t1) (TypeFunc t2 tv)
+    return (s3 `compose` s2 `compose` s1, apply s3 tv)
 
   Apply e1 (args) -> do
      let curried = foldl (\expr arg -> Apply expr [arg]) e1 args
@@ -187,11 +190,11 @@ infer env ex = case ex of
 
   If cond tr fl -> do
     tv <- fresh
-    inferPrim env [cond, tr, fl] (typeBool `TArr` tv `TArr` tv `TArr` tv)
+    inferPrim env [cond, tr, fl] (typeBool `TypeFunc` tv `TypeFunc` tv `TypeFunc` tv)
 
   Fix e1 -> do
       tv <- fresh
-      inferPrim env [e1] ((tv `TArr` tv) `TArr` tv)
+      inferPrim env [e1] ((tv `TypeFunc` tv) `TypeFunc` tv)
 
   Extern name tpe args -> do
     let ts = map argToType args
@@ -199,13 +202,13 @@ infer env ex = case ex of
     return (nullSubst, t)
     where
           argToType (Arg _ t) = t
-          f z t = z `TArr` t
+          f z t = z `TypeFunc` t
 
   Lam x e -> do
       tv <- fresh
       let env' = env `extend` (x, Forall [] tv)
       (s1, t1) <- infer env' e
-      return (s1, apply s1 tv `TArr` t1)
+      return (s1, apply s1 tv `TypeFunc` t1)
 
   Function name t (args) e -> do
     let largs = map (\(Arg a _) -> a) args
@@ -229,7 +232,7 @@ inferPrim env l t = do
   where
   inferStep (s, tf) exp = do
     (s', t) <- infer (apply s env) exp
-    return (s' `compose` s, tf . (TArr t))
+    return (s' `compose` s, tf . (TypeFunc t))
 
 inferExpr :: TypeEnv -> Expr -> Either TypeError Scheme
 inferExpr env = runInfer . infer env
@@ -246,11 +249,11 @@ normalize (Forall ts body) = Forall (fmap snd ord) (normtype body)
     ord = zip (List.nub $ fv body) (fmap TV letters)
 
     fv (TVar a)   = [a]
-    fv (TArr a b) = fv a ++ fv b
-    fv (TCon _)   = []
+    fv (TypeFunc a b) = fv a ++ fv b
+    fv (TypeIdent _)   = []
 
-    normtype (TArr a b) = TArr (normtype a) (normtype b)
-    normtype (TCon a)   = TCon a
+    normtype (TypeFunc a b) = TypeFunc (normtype a) (normtype b)
+    normtype (TypeIdent a)   = TypeIdent a
     normtype (TVar a)   =
       case lookup a ord of
         Just x -> TVar x

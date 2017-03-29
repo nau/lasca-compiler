@@ -78,7 +78,7 @@ typeAscription :: Parser Type
 typeAscription = do
   reservedOp ":"
   name <- identifier
-  return $ TCon name
+  return $ TypeIdent name
 
 funcArgument :: Parser Name
 funcArgument = do
@@ -104,7 +104,7 @@ extern = do
   args <- parens $ commaSep arg
   reservedOp ":"
   tpe <- identifier
-  return (Extern name (TCon tpe) args)
+  return (Extern name (TypeIdent tpe) args)
 
 arg :: Parser Arg
 arg = do

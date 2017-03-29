@@ -1,0 +1,6 @@
+def returnArray() = newArray(1)
+
+def main() = {
+  println("Hello lambda!");
+}
+

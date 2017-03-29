@@ -9,18 +9,18 @@ instance Show TVar where
   show (TV s) = s
 
 data Type
-  = TVar {-# UNPACK #-} !TVar
-  | TCon {-# UNPACK #-} !String
-  | TArr Type Type
+  = TVar !TVar
+  | TypeIdent !String
+  | TypeFunc Type Type
   deriving (Eq, Ord)
 
 instance Show Type where
   show (TVar (TV n)) = n
-  show (TCon s) = s
-  show (TArr l r) = "(" ++ show l ++ " -> " ++ show r ++ ")"
+  show (TypeIdent s) = s
+  show (TypeFunc l r) = "(" ++ show l ++ " -> " ++ show r ++ ")"
 
 
-infixr `TArr`
+infixr `TypeFunc`
 
 data Scheme = Forall [TVar] Type
   deriving (Eq, Ord)
@@ -33,14 +33,15 @@ instance Show Scheme where
       typeVarNames = (map show vars)
 
 typeInt :: Type
-typeInt  = TCon "Int"
+typeInt  = TypeIdent "Int"
 
 typeBool :: Type
-typeBool = TCon "Bool"
+typeBool = TypeIdent "Bool"
 
-typeAny = TCon "Any"
-typeString = TCon "String"
-typeUnit = TCon "Unit"
+typeAny = TypeIdent "Any"
+typeString = TypeIdent "String"
+typeUnit = TypeIdent "Unit"
+typeArrayInt = TypeFunc (TypeIdent "Array") typeInt
 
-isAny (TCon "Any") = True
+isAny (TypeIdent "Any") = True
 isAny _ = False

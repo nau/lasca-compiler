@@ -210,12 +210,12 @@ codegenStartFunc = do
 
 -- Static mode
 typeMapping :: Type -> AST.Type
-typeMapping (TCon "Any") = ptrType
-typeMapping (TCon "Unit") = T.void
-typeMapping (TCon "Bool") = T.i1
-typeMapping (TCon "Int") = T.i32
-typeMapping (TCon "Float64") = T.double
-typeMapping (TCon "String") = ptrType
+typeMapping (TypeIdent "Any") = ptrType
+typeMapping (TypeIdent "Unit") = T.void
+typeMapping (TypeIdent "Bool") = T.i1
+typeMapping (TypeIdent "Int") = T.i32
+typeMapping (TypeIdent "Float64") = T.double
+typeMapping (TypeIdent "String") = ptrType
 
 -- Dynamic mode
 -- typeMapping _ = typeInfoType
@@ -245,6 +245,7 @@ cgen ctx (S.Var name) = do
       Debug.traceM ("Global " ++ show name)
       boxFunc name mapping
 cgen ctx (S.Literal l) = box l
+cgen ctx (S.Apply (S.Var "newArray") [elm]) = cgen ctx elm
 cgen ctx (S.Apply (S.Var "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True)) rhs)
 cgen ctx (S.Apply (S.Var "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False)))
 cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
