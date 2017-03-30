@@ -180,7 +180,7 @@ codegenTop _ (S.Extern name tpe args) = do
 --   s <- gets _llvmModule
 --   Debug.traceM("External function " ++ name)
 --   Debug.traceM ("External function " ++ show s)
-  external llvmType name fnargs
+  external llvmType name fnargs False
   where
     h s = show s
     llvmType = typeMapping tpe
@@ -247,6 +247,10 @@ cgen ctx (S.Var name) = do
 --       Debug.traceM ("Global " ++ show name)
       boxFunc name mapping
 cgen ctx (S.Literal l) = box l
+cgen ctx (S.Array exprs) = do
+  vs <- values
+  boxArray vs
+  where values = sequence [cgen ctx e | e <- exprs]
 cgen ctx (S.Apply (S.Var "seq") [elm]) = cgen ctx elm
 cgen ctx (S.Apply (S.Var "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True)) rhs)
 cgen ctx (S.Apply (S.Var "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False)))
@@ -335,6 +339,7 @@ funcType retTy args = T.FunctionType retTy args False
 initLascaRuntimeFuncType = funcType T.void []
 mainFuncType = funcType ptrType []
 boxFuncType = funcType ptrType [T.i32]
+boxArrayFuncType = T.FunctionType ptrType [T.i32] True
 runtimeBinOpFuncType = funcType ptrType [T.i32, ptrType, ptrType]
 runtimeApplyFuncType = funcType ptrType [ptrType, ptrType, T.i32, ptrType]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
@@ -352,6 +357,8 @@ box (S.StringLit s) = do
   let ref = global (stringStructType len) name
   ref' <- bitcast ref ptrType
   call (global boxFuncType (AST.Name "box")) [constInt 4, ref']
+
+boxArray values = call (global boxFuncType (AST.Name "boxArray")) (constInt (length values) : values)
 
 boxFunc name mapping = do
   let idx = mapping Map.! name
@@ -401,8 +408,12 @@ codegenModule modo fns = modul
 --           Debug.traceM ("Rewritten exprs: " ++ show st')
 --           Debug.traceM ("Rewritten exprs: " ++ show st')
           genFunctionMap fns''
+          declareStdFuncs
           mapM (codegenTop ctx) fns''
           codegenStartFunc
+
+declareStdFuncs = do
+  external ptrType "boxArray" [(intType, AST.Name "size")] True
 
 rewrite ctx fns = transform extractLambda fns
 

@@ -40,6 +40,7 @@ stringLiteral     = Tok.stringLiteral lexer
 float      = Tok.float lexer
 parens     = Tok.parens lexer
 braces     = Tok.braces lexer
+brackets     = Tok.brackets lexer
 commaSep   = Tok.commaSep lexer
 comma      = Tok.comma lexer
 semiSep    = Tok.semiSep lexer

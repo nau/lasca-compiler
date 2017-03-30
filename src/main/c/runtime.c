@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <string.h>
 #include <gc.h>
@@ -307,6 +308,17 @@ Array* createArray(size_t size) {
   array->length = size;
   array->data = (size > 0 ) ? gcMalloc(sizeof(Box*) * size) : NULL;
   return array;
+}
+
+Box* boxArray(size_t size, ...) {
+  va_list argp;
+  Array * array = createArray(size);
+  va_start (argp, size);
+  for (int i = 0; i < size; i++) {
+    array->data[i] = va_arg(argp, Box*);
+  }
+  va_end (argp);                  /* Clean up. */
+  return box(ARRAY, array);
 }
 
 Box* seq() {

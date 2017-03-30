@@ -59,11 +59,11 @@ emptyTyenv = TypeEnv (Map.fromList [
     ("-",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
     ("*",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
     ("/",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
-    ("==", (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
-    ("!=", (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
-    ("<",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
-    ("<=", (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
-    (">",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)))
+    ("==", (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))),
+    ("!=", (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))),
+    ("<",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))),
+    ("<=", (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))),
+    (">",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)))
   ])
   where a = TV "a"
         ta = TVar a
@@ -116,9 +116,11 @@ unify (l `TypeFunc` r) (l' `TypeFunc` r')  = do
   s2 <- unify (apply s1 r) (apply s1 r')
   return (s2 `compose` s1)
 
-unify (TVar a) t = bind a t
+unify (TypeIdent "Any") t = return nullSubst
+unify t (TypeIdent "Any") = return nullSubst
 unify t (TVar a) = bind a t
-unify (TypeIdent a) (TypeIdent b) | a == b || a == "Any" || b == "Any" = return nullSubst
+unify (TVar a) t = bind a t
+unify (TypeIdent a) (TypeIdent b) | a == b = return nullSubst
 unify (TypeApply (TypeIdent lhs) largs) (TypeApply (TypeIdent rhs) rargs) | lhs == rhs = (unifyList largs rargs)
 unify t1 t2 = throwError $ UnificationFail t1 t2
 
@@ -233,6 +235,11 @@ infer env ex = case ex of
 
   Data name constructors -> do
     return (nullSubst, typeUnit)
+
+  Array exprs -> do
+    tv <- fresh
+    let tpe = foldr (\_ t -> tv `TypeFunc` t) (typeArray tv) exprs
+    inferPrim env exprs tpe
 
   Literal (IntLit _)  -> return (nullSubst, typeInt)
   Literal (FloatLit _)  -> return (nullSubst, typeFloat)

@@ -43,7 +43,8 @@ typeBool = TypeIdent "Bool"
 typeAny = TypeIdent "Any"
 typeString = TypeIdent "String"
 typeUnit = TypeIdent "Unit"
-typeArrayInt = TypeApply (TypeIdent "Array") [typeInt]
+typeArray t = TypeApply (TypeIdent "Array") [t]
+typeArrayInt = typeArray typeInt
 
 isAny (TypeIdent "Any") = True
 isAny _ = False

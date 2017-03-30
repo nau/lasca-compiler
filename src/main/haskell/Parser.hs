@@ -40,6 +40,8 @@ boolLit = Literal . BoolLit . strToBool <$> (true <|> false)
     true = reserved "true" >> return "true"
     false = reserved "false" >> return "false"
 
+arrayLit = Array <$> (brackets (commaSep expr))
+
 stringLit :: Parser Expr
 stringLit = Literal . StringLit <$> stringLiteral
 
@@ -209,6 +211,7 @@ factor :: Parser Expr
 factor = try floating
       <|> try boolLit
       <|> try letins
+      <|> try arrayLit
       <|> try stringLit
       <|> try integerLit
 --       <|> try apply
