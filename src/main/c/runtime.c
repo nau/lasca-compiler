@@ -36,7 +36,11 @@ const int ARRAY    = 6;
 
 typedef struct {
   int type;
-  void* value;
+  union Value {
+    long num;
+    double dbl;
+    void* ptr;
+  } value;
 } Box;
 
 Box * UNIT_SINGLETON;
@@ -80,22 +84,29 @@ void *gcRealloc(void* old, size_t s) {
 Box *box(int type_id, void *value) {
   Box* ti = gcMalloc(sizeof(Box));
   ti->type = type_id;
-  ti->value = value;
+  ti->value.ptr = value;
   return ti;
 }
 
 Box * boxBool(int i) {
-//  printf("boxBool(%d) ", i);
-  return box(BOOL, (void *) (long) i);
+  Box* ti = gcMalloc(sizeof(Box));
+  ti->type = BOOL;
+  ti->value.num = i;
+  return ti;
 }
 
-Box * boxInt(int i) {
-//  printf("boxInt(%d) ", i);
-  return box(INT, (void *) (long) i);
+Box * boxInt(long i) {
+  Box* ti = gcMalloc(sizeof(Box));
+  ti->type = INT;
+  ti->value.num = i;
+  return ti;
 }
 
 Box * boxFloat64(double i) {
-  return box(DOUBLE, (void *) (long) i);
+  Box* ti = gcMalloc(sizeof(Box));
+  ti->type = DOUBLE;
+  ti->value.dbl = i;
+  return ti;
 }
 
 Box * boxClosure(int idx, int argc, Box** args) {
@@ -119,33 +130,65 @@ Box * boxFunc(int idx) {
 void *unbox(Box* ti, int expected) {
 //  printf("unbox(%d, %d) ", ti->type, (int) ti->value);
   if (ti->type == expected) {
-  	return ti->value;
+  	return ti->value.ptr;
   } else {
     printf("AAAA!!! Expected %i but got %i\n", expected, ti->type);
     exit(1);
   }
 }
 
+long unboxInt(Box* ti) {
+//  printf("unbox(%d, %d) ", ti->type, (int) ti->value);
+  if (ti->type == INT) {
+  	return ti->value.num;
+  } else {
+    printf("AAAA!!! Expected %i but got %i\n", INT, ti->type);
+    exit(1);
+  }
+}
+
+#define DO_OP(op) if (lhs->type == INT) { result = boxInt(left op right); } else if (lhs->type == DOUBLE) { result = boxFloat64(lhs->value.dbl op rhs->value.dbl); } else { \
+                        printf("AAAA!!! Type mismatch! Expected Int or Double for op but got %i\n", lhs->type); exit(1); }
+
+#define DO_CMP(op) switch (lhs->type){ \
+                   case BOOL:    { result = boxBool (left op right); break; } \
+                   case INT:     { result = boxBool (left op right); break; } \
+                   case DOUBLE:  { result = boxBool (left op right); break; } \
+                   default: {printf("AAAA!!! Type mismatch! Expected Bool, Int or Double but got %i\n", lhs->type); exit(1); }\
+                   }
 Box* runtimeBinOp(int code, Box* lhs, Box* rhs) {
   if (lhs->type != rhs->type) {
   	printf("AAAA!!! Type mismatch! lhs = %i, rhs = %i\n", lhs->type, rhs->type);
   	exit(1);
   }
-  int left = (int) lhs->value;
-  int right = (int) rhs->value;
+
+  long left = lhs->value.num;
+  long right = rhs->value.num;
   Box* result = NULL;
 
   switch (code) {
-  case ADD: result = boxInt(left + right); break;
-  case SUB: result = boxInt(left - right); break;
-  case MUL: result = boxInt(left * right); break;
-  case DIV: result = boxInt(left / right); break;
-  case EQ:  result = boxBool(left == right); break;
-  case NE:  result = boxBool(left != right); break;
-  case LT:  result = boxBool(left < right); break;
-  case LE:  result = boxBool(left <= right); break;
-  case GE:  result = boxBool(left >= right); break;
-  case GT:  result = boxBool(left > right); break;
+  case ADD: DO_OP(+); break;
+  case SUB: DO_OP(-); break;
+  case MUL: DO_OP(*); break;
+  case DIV: DO_OP(/); break;
+  case EQ:
+    DO_CMP(==);
+    break;
+  case NE:
+    DO_CMP(!=);
+    break;
+  case LT:
+    DO_CMP(<);
+    break;
+  case LE:
+    DO_CMP(<=);
+    break;
+  case GE:
+      DO_CMP(>=);
+      break;
+  case GT:
+    DO_CMP(>);
+    break;
   default:
   	printf("AAAA!!! Unsupported binary operation %i", code);
     exit(1);
@@ -154,10 +197,7 @@ Box* runtimeBinOp(int code, Box* lhs, Box* rhs) {
 }
 
 Box* __cdecl runtimeApply(Functions* fs, Box* val, int argc, Box* argv[]) {
-  if (val->type != CLOSURE) {
-    exit(1);
-  }
-  Closure *closure = val->value;
+  Closure *closure = unbox(val, CLOSURE);
   if (closure->funcIdx >= fs->size) {
     printf("AAAA!!! No such function with id %d, max id is %d", (int) closure->funcIdx, fs->size);
     exit(1);
@@ -246,7 +286,7 @@ double putchard(double X) {
 }
 
 void * runtimePutchar(Box* ch) {
-  char c = (char) unbox(ch, INT);
+  char c = (char) unboxInt(ch);
   putchar(c);
   fflush(stdout);
   return 0;
@@ -355,16 +395,16 @@ Box* arrayToString(Box* arrayValue) {
 }
 
 Box* toString(Box* value) {
-  char buf[12];
+  char buf[100];
 
   switch (value->type) {
     case UNIT: return UNIT_STRING;
-    case BOOL: return makeString(value->value == 0 ? "false" : "true");
+    case BOOL: return makeString(value->value.num == 0 ? "false" : "true");
     case INT:
-      itoa((long) value->value, buf);
+      snprintf(buf, 100, "%ld", value->value.num);
       return makeString(buf);
     case DOUBLE:
-      itoa((long) value->value, buf);
+      snprintf(buf, 100, "%12.9lf", value->value.dbl);
       return makeString(buf);
     case STRING:  return value;
     case CLOSURE: return makeString("<func>");
@@ -377,7 +417,7 @@ Box* toString(Box* value) {
 
 Box* arrayApply(Box* arrayValue, Box* idx) {
   Array* array = unbox(arrayValue, ARRAY);
-  int index = (int) unbox(idx, INT);
+  long index = unboxInt(idx);
   assert(array->length > index);
   return array->data[index];
 }

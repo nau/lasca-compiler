@@ -36,7 +36,7 @@ instance Show Scheme where
 
 typeInt :: Type
 typeInt  = TypeIdent "Int"
-
+typeFloat = TypeIdent "Float"
 typeBool :: Type
 typeBool = TypeIdent "Bool"
 

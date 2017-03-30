@@ -39,6 +39,7 @@ import qualified LLVM.General.AST.Constant as C
 import qualified LLVM.General.AST.Attribute as A
 import qualified LLVM.General.AST.CallingConvention as CC
 import qualified LLVM.General.AST.FloatingPointPredicate as FP
+import qualified LLVM.General.AST.Float as F
 
 import qualified Debug.Trace as Debug
 
@@ -331,6 +332,8 @@ constNull = IntToPtr (constInt 0) ptrType []
 
 constInt :: Int -> Operand
 constInt i = constant (C.Int 32 (toInteger i))
+
+constFloat i = constant (C.Float (F.Double i))
 
 constByte b = constant (C.Int 8 b)
 constTrue = constant (C.Int 1 1)

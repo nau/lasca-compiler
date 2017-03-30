@@ -54,7 +54,19 @@ extend :: TypeEnv -> (String, Scheme) -> TypeEnv
 extend (TypeEnv env) (x, s) = TypeEnv $ Map.insert x s env
 
 emptyTyenv :: TypeEnv
-emptyTyenv = TypeEnv Map.empty
+emptyTyenv = TypeEnv (Map.fromList [
+    ("+",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
+    ("-",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
+    ("*",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
+    ("/",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
+    ("==", (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
+    ("!=", (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
+    ("<",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
+    ("<=", (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
+    (">",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)))
+  ])
+  where a = TV "a"
+        ta = TVar a
 
 typeof :: TypeEnv -> String -> Maybe Type.Scheme
 typeof (TypeEnv env) name = Map.lookup name env
@@ -149,16 +161,6 @@ generalize env t  = Forall as t
   where as = Set.toList $ ftv t `Set.difference` ftv env
 
 ops = Map.fromList [
-  ("+", typeInt `TypeFunc` typeInt `TypeFunc` typeInt),
-  ("-", typeInt `TypeFunc` typeInt `TypeFunc` typeInt),
-  ("*", typeInt `TypeFunc` typeInt `TypeFunc` typeInt),
-  ("/", typeInt `TypeFunc` typeInt `TypeFunc` typeInt),
-  ("==", typeInt `TypeFunc` typeInt `TypeFunc` typeBool),
-  ("!=", typeInt `TypeFunc` typeInt `TypeFunc` typeBool),
-  ("<", typeInt `TypeFunc` typeInt `TypeFunc` typeBool),
-  ("<=", typeInt `TypeFunc` typeInt `TypeFunc` typeBool),
-  (">", typeInt `TypeFunc` typeInt `TypeFunc` typeBool),
-  (">=", typeInt `TypeFunc` typeInt `TypeFunc` typeBool),
   ("and", typeBool `TypeFunc` typeBool `TypeFunc` typeBool),
   ("or", typeBool `TypeFunc` typeBool `TypeFunc` typeBool)
   ]
@@ -233,6 +235,7 @@ infer env ex = case ex of
     return (nullSubst, typeUnit)
 
   Literal (IntLit _)  -> return (nullSubst, typeInt)
+  Literal (FloatLit _)  -> return (nullSubst, typeFloat)
   Literal (BoolLit _) -> return (nullSubst, typeBool)
   Literal (StringLit _) -> return (nullSubst, typeString)
   Literal (UnitLit) -> return (nullSubst, typeUnit)

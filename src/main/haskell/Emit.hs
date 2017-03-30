@@ -214,7 +214,7 @@ typeMapping (TypeIdent "Any") = ptrType
 typeMapping (TypeIdent "Unit") = T.void
 typeMapping (TypeIdent "Bool") = T.i1
 typeMapping (TypeIdent "Int") = T.i32
-typeMapping (TypeIdent "Float64") = T.double
+typeMapping (TypeIdent "Float") = T.double
 typeMapping (TypeIdent "String") = ptrType
 
 -- Dynamic mode
@@ -344,6 +344,7 @@ gcMalloc size = call (global (funcType ptrType [T.i32]) (AST.Name "gcMalloc")) [
 box :: S.Lit -> Codegen AST.Operand
 box (S.BoolLit b) = call (global boxFuncType (AST.Name "boxBool")) [constInt (boolToInt b)]
 box (S.IntLit  n) = call (global boxFuncType (AST.Name "boxInt")) [constInt n]
+box (S.FloatLit  n) = call (global boxFuncType (AST.Name "boxFloat64")) [constFloat n]
 box (S.UnitLit) = call (global boxFuncType (AST.Name "box")) [constInt 0, constInt 0]
 box (S.StringLit s) = do
   let name = getStringLitASTName s

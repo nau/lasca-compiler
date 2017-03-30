@@ -1,0 +1,9 @@
+def returnArray() = {
+  sun = (1.23 * 2.0 - 0.46) / 4.0 + 5.0;
+  println(toString(sun))
+}
+
+def main() = {
+  returnArray()
+}
+
