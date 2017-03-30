@@ -4,6 +4,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <string.h>
+#include <math.h>
 #include <gc.h>
 
 // Operators
@@ -321,10 +322,6 @@ Box* boxArray(size_t size, ...) {
   return box(ARRAY, array);
 }
 
-Box* seq() {
-  return box(ARRAY, createArray(0));
-}
-
 Box* append(Box* arrayValue, Box* value) {
   Array* array = unbox(arrayValue, ARRAY);
   Array * newArray = createArray(array->length + 1);
@@ -346,32 +343,6 @@ Box* makeString(char * str) {
   val->length = strlen(str);
   strncpy(val->bytes, str, val->length);
   return box(STRING, val);
-}
-
-void reverse(char s[]) {
-     int i, j;
-     char c;
-
-     for (i = 0, j = strlen(s)-1; i<j; i++, j--) {
-         c = s[i];
-         s[i] = s[j];
-         s[j] = c;
-     }
-}
-
-void itoa(int n, char s[]) {
-  int i, sign;
-
-  if ((sign = n) < 0)  /* record sign */
-     n = -n;          /* make n positive */
-  i = 0;
-  do {       /* generate digits in reverse order */
-     s[i++] = n % 10 + '0';   /* get next digit */
-  } while ((n /= 10) > 0);     /* delete it */
-  if (sign < 0)
-     s[i++] = '-';
-  s[i] = '\0';
-  reverse(s);
 }
 
 Box* toString(Box* value);
@@ -432,6 +403,19 @@ Box* arrayApply(Box* arrayValue, Box* idx) {
   long index = unboxInt(idx);
   assert(array->length > index);
   return array->data[index];
+}
+
+Box* arrayLength(Box* arrayValue) {
+  Array* array = unbox(arrayValue, ARRAY);
+  return boxInt(array->length);
+}
+
+Box* lasqrt(Box * dbl) {
+  switch (dbl->type) {
+    case INT: return boxInt((long) sqrt(dbl->value.num)); break;
+    case DOUBLE: return boxFloat64(sqrt(dbl->value.dbl)); break;
+    default: printf("AAAA!!! Type mismatch! Expected Int or Double for lasqrt but got %i\n", dbl->type); exit(1);
+  }
 }
 
 void initLascaRuntime() {
