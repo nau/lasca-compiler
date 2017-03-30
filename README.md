@@ -695,3 +695,22 @@ cabal install llvm-general -fshared-llvm
 Resources
 ====
 https://www.youtube.com/watch?v=U_LNo_cSc70 Github, statistics, languages
+
+First time n-body run:
+
+nau-macpro:lasca-compiler nau$ time lasca --mode static src/main/lasca/nbody.lasca --exec --print-llvm -g 2
+
+Parsed OK
+Compiler mode is static
+typechecked OK
+Read module OK
+Running JIT
+; ModuleID = 'src/main/lasca/nbody.lasca'
+
+Init Lasca 0.0.0.1 runtime. Enjoy :)
+-0.169075164
+-0.169059907
+
+real	26m3.883s
+user	28m14.192s
+sys	8m36.289s

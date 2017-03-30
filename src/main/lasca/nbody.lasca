@@ -213,7 +213,7 @@ def returnArray() = {
   bodies = [sun(), jupiter(), saturn(), uranus(), neptune()];
   initedBodies = init(bodies);
   println(toString(energy(initedBodies)));
-  advanced = calculate(1000, initedBodies);
+  advanced = calculate(50000000, initedBodies);
   println(toString(energy(advanced)));
 }
 

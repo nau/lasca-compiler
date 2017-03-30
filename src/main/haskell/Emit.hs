@@ -251,7 +251,6 @@ cgen ctx (S.Array exprs) = do
   vs <- values
   boxArray vs
   where values = sequence [cgen ctx e | e <- exprs]
-cgen ctx (S.Apply (S.Var "seq") [elm]) = cgen ctx elm
 cgen ctx (S.Apply (S.Var "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True)) rhs)
 cgen ctx (S.Apply (S.Var "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False)))
 cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
@@ -259,18 +258,9 @@ cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
   lrhs <- cgen ctx rhs
   let code = constInt (binops Map.! fn)
   call (global runtimeBinOpFuncType (AST.Name "runtimeBinOp")) [code, llhs, lrhs]
-{-cgen ctx (S.Apply (S.Var fn) args) = do
+cgen ctx (S.Apply (S.Var fn) args) | fn `Set.member` ctx = do -- TODO Here are BUGZZZZ!!!! :)
   largs <- mapM (cgen ctx) args
-  syms <- gets symtab
-  let func = lookup fn syms
-  Debug.traceM ("Found11 " ++ (show func))
-  Debug.traceM ("symtab " ++ (show syms))
-  case func of
-    Just x -> do
-      let arglist = map (\x -> ptrType) args
-      x1 <- load x
-      call (global runtimeApplyFuncType (AST.Name "runtimeApply")) (x1 : largs)
-    Nothing -> call (global ptrType (AST.Name fn)) largs-}
+  call (global ptrType (AST.Name fn)) largs
 cgen ctx (S.Apply expr args) = do
   modState <- gets moduleState
   e <- cgen ctx expr
