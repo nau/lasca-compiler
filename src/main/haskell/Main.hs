@@ -65,6 +65,9 @@ lascaOpts = LascaOpts
   <*> switch
       ( long "print-llvm"
       <> help "Print LLVM IR" )
+  <*> switch
+        ( long "print-types"
+        <> help "Print infered types" )
   <*> optimizeOpt
 
 greet :: LascaOpts -> IO ()
@@ -98,7 +101,7 @@ genModule opts modo source = case parseToplevel source of
         then case typeCheck ex of
           Right env -> do
             putStrLn "typechecked OK"
-            putStrLn $ show env
+            if printTypes opts then putStrLn $ show env else return ()
             return (Just (codegenModule modo ex))
           Left e -> do
             putStrLn $ show e

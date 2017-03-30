@@ -10,6 +10,7 @@ data LascaOpts = LascaOpts
   , mode :: String
   , exec :: Bool
   , printLLVMAsm :: Bool
+  , printTypes :: Bool
   , optimization :: Int
   }
 
