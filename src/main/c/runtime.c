@@ -198,7 +198,23 @@ Box* runtimeBinOp(int code, Box* lhs, Box* rhs) {
   return result;
 }
 
-Box* __cdecl runtimeApply(Functions* fs, Box* val, int argc, Box* argv[]) {
+Box* arrayApply(Box* arrayValue, Box* idx) {
+  Array* array = unbox(arrayValue, ARRAY);
+  long index = unboxInt(idx);
+  assert(array->length > index);
+  return array->data[index];
+}
+
+Box* arrayLength(Box* arrayValue) {
+  Array* array = unbox(arrayValue, ARRAY);
+  return boxInt(array->length);
+}
+
+Box* runtimeApply(Functions* fs, Box* val, int argc, Box* argv[]) {
+  // Handle array(idx) call
+  if (val->type == ARRAY && argc == 1 && argv[0]->type == INT) {
+    return arrayApply(val, argv[0]);
+  }
   Closure *closure = unbox(val, CLOSURE);
   if (closure->funcIdx >= fs->size) {
     printf("AAAA!!! No such function with id %d, max id is %d", (int) closure->funcIdx, fs->size);
@@ -396,18 +412,6 @@ Box* toString(Box* value) {
       printf("Unsupported type %d", value->type);
       exit(1);
   }
-}
-
-Box* arrayApply(Box* arrayValue, Box* idx) {
-  Array* array = unbox(arrayValue, ARRAY);
-  long index = unboxInt(idx);
-  assert(array->length > index);
-  return array->data[index];
-}
-
-Box* arrayLength(Box* arrayValue) {
-  Array* array = unbox(arrayValue, ARRAY);
-  return boxInt(array->length);
 }
 
 Box* lasqrt(Box * dbl) {

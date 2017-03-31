@@ -697,8 +697,9 @@ Resources
 https://www.youtube.com/watch?v=U_LNo_cSc70 Github, statistics, languages
 
 First time n-body run:
+----------------------
 
-nau-macpro:lasca-compiler nau$ time lasca --mode static src/main/lasca/nbody.lasca --exec --print-llvm -g 2
+$ time lasca --mode static src/main/lasca/nbody.lasca --exec --print-llvm -g 2
 
 Parsed OK
 Compiler mode is static
@@ -714,3 +715,8 @@ Init Lasca 0.0.0.1 runtime. Enjoy :)
 real	26m3.883s
 user	28m14.192s
 sys	8m36.289s
+
+$ find src/main/haskell -name *.hs  | xargs cat | wc -l
+    1850
+    
+    

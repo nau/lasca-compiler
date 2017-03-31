@@ -47,9 +47,9 @@ def sun() = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, solarMass()]
 def go(bodies, i, pxyz) = {
   body = arrayApply(bodies, i);
   updatedPs = [
-    arrayApply(pxyz, 0) + arrayApply(body, 3) * arrayApply(body, 6),
-    arrayApply(pxyz, 1) + arrayApply(body, 4) * arrayApply(body, 6),
-    arrayApply(pxyz, 2) + arrayApply(body, 5) * arrayApply(body, 6)
+    pxyz(0) + body(3) * body(6),
+    pxyz(1) + body(4) * body(6),
+    pxyz(2) + body(5) * body(6)
   ];
   if i == 0 then updatedPs else go(bodies, i - 1, updatedPs)
 }
@@ -58,9 +58,9 @@ def offsetMomentum(object, px, py, pz) = {
   vx = (0.0 - px) / solarMass();
   vy = (0.0 - py) / solarMass();
   vz = (0.0 - pz) / solarMass();
-  [ arrayApply(object, 0), arrayApply(object, 1), arrayApply(object, 2),
+  [ object(0), object(1), object(2),
     vx, vy, vz,
-    arrayApply(object, 6)
+    object(6)
   ]
 }
 
@@ -68,77 +68,77 @@ def init(bodies) = {
   len = arrayLength(bodies);
   pxyzInit = [0.0, 0.0, 0.0];
   offsets = go(bodies, len - 1, pxyzInit);
-  sun = offsetMomentum(arrayApply(bodies, 0), arrayApply(offsets, 0), arrayApply(offsets, 1), arrayApply(offsets, 2));
-  [sun, arrayApply(bodies, 1), arrayApply(bodies, 2), arrayApply(bodies, 3), arrayApply(bodies, 4)]
+  sun = offsetMomentum(bodies(0), offsets(0), offsets(1), offsets(2));
+  [sun, bodies(1), bodies(2), bodies(3), bodies(4)]
 }
 
 def advanceInner(from, to, dt) = {
-  dx = arrayApply(from, 0) - arrayApply(to, 0);
-  dy = arrayApply(from, 1) - arrayApply(to, 1);
-  dz = arrayApply(from, 2) - arrayApply(to, 2);
+  dx = from(0) - to(0);
+  dy = from(1) - to(1);
+  dz = from(2) - to(2);
   dSquared = dx * dx + dy * dy + dz * dz;
   distance = lasqrt(dSquared);
   mag = dt / (dSquared * distance);
-  toMass = arrayApply(to, 6);
-  fromMass = arrayApply(from, 6);
-  fromVx = arrayApply(from, 3) - dx * toMass * mag;
-  fromVy = arrayApply(from, 4) - dy * toMass * mag;
-  fromVz = arrayApply(from, 5) - dz * toMass * mag;
-  toVx   = arrayApply(to, 3)   + dx * fromMass * mag;
-  toVy   = arrayApply(to, 4)   + dy * fromMass * mag;
-  toVz   = arrayApply(to, 5)   + dz * fromMass * mag;
+  toMass = to(6);
+  fromMass = from(6);
+  fromVx = from(3) - dx * toMass * mag;
+  fromVy = from(4) - dy * toMass * mag;
+  fromVz = from(5) - dz * toMass * mag;
+  toVx   = to(3)   + dx * fromMass * mag;
+  toVy   = to(4)   + dy * fromMass * mag;
+  toVz   = to(5)   + dz * fromMass * mag;
   [
-    [arrayApply(from, 0), arrayApply(from, 1), arrayApply(from, 2), fromVx, fromVy, fromVz, fromMass],
-    [arrayApply(to, 0), arrayApply(to, 1), arrayApply(to, 2), toVx, toVy, toVz, toMass]
+    [from(0), from(1), from(2), fromVx, fromVy, fromVz, fromMass],
+    [to(0), to(1), to(2), toVx, toVy, toVz, toMass]
   ]
 }
 
 def advance(bodies, dt) = {
-  r01 = advanceInner(arrayApply(bodies, 0), arrayApply(bodies, 1), dt);
-  r02 = advanceInner(arrayApply(r01, 0),    arrayApply(bodies, 2), dt);
-  r03 = advanceInner(arrayApply(r02, 0),    arrayApply(bodies, 3), dt);
-  r04 = advanceInner(arrayApply(r03, 0),    arrayApply(bodies, 4), dt);
+  r01 = advanceInner(bodies(0), bodies(1), dt);
+  r02 = advanceInner(r01(0),    bodies(2), dt);
+  r03 = advanceInner(r02(0),    bodies(3), dt);
+  r04 = advanceInner(r03(0),    bodies(4), dt);
 
-  r12 = advanceInner(arrayApply(r01, 1),    arrayApply(r02, 1), dt);
-  r13 = advanceInner(arrayApply(r12, 0),    arrayApply(r03, 1), dt);
-  r14 = advanceInner(arrayApply(r13, 0),    arrayApply(r04, 1), dt);
+  r12 = advanceInner(r01(1),    r02(1), dt);
+  r13 = advanceInner(r12(0),    r03(1), dt);
+  r14 = advanceInner(r13(0),    r04(1), dt);
 
-  r23 = advanceInner(arrayApply(r12, 1),    arrayApply(r13, 1), dt);
-  r24 = advanceInner(arrayApply(r23, 0),    arrayApply(r14, 1), dt);
+  r23 = advanceInner(r12(1),    r13(1), dt);
+  r24 = advanceInner(r23(0),    r14(1), dt);
 
-  r34 = advanceInner(arrayApply(r23, 1),    arrayApply(r24, 1), dt);
+  r34 = advanceInner(r23(1),    r24(1), dt);
 
-  sun = arrayApply(bodies, 0);
-  sunVx = arrayApply(arrayApply(r04, 0), 3);
-  sunVy = arrayApply(arrayApply(r04, 0), 4);
-  sunVz = arrayApply(arrayApply(r04, 0), 5);
+  sun = bodies(0);
+  sunVx = arrayApply(r04(0), 3);
+  sunVy = arrayApply(r04(0), 4);
+  sunVz = arrayApply(r04(0), 5);
 
-  jupiter = arrayApply(bodies, 1);
-  jupiterVx = arrayApply(arrayApply(r14, 0), 3);
-  jupiterVy = arrayApply(arrayApply(r14, 0), 4);
-  jupiterVz = arrayApply(arrayApply(r14, 0), 5);
+  jupiter = bodies(1);
+  jupiterVx = arrayApply(r14(0), 3);
+  jupiterVy = arrayApply(r14(0), 4);
+  jupiterVz = arrayApply(r14(0), 5);
 
-  saturn = arrayApply(bodies, 2);
-  saturnVx = arrayApply(arrayApply(r24, 0), 3);
-  saturnVy = arrayApply(arrayApply(r24, 0), 4);
-  saturnVz = arrayApply(arrayApply(r24, 0), 5);
+  saturn = bodies(2);
+  saturnVx = arrayApply(r24(0), 3);
+  saturnVy = arrayApply(r24(0), 4);
+  saturnVz = arrayApply(r24(0), 5);
 
-  uranus = arrayApply(bodies, 3);
-  uranusVx = arrayApply(arrayApply(r34, 0), 3);
-  uranusVy = arrayApply(arrayApply(r34, 0), 4);
-  uranusVz = arrayApply(arrayApply(r34, 0), 5);
+  uranus = bodies(3);
+  uranusVx = arrayApply(r34(0), 3);
+  uranusVy = arrayApply(r34(0), 4);
+  uranusVz = arrayApply(r34(0), 5);
 
-  neptune = arrayApply(bodies, 4);
-  neptuneVx = arrayApply(arrayApply(r34, 1), 3);
-  neptuneVy = arrayApply(arrayApply(r34, 1), 4);
-  neptuneVz = arrayApply(arrayApply(r34, 1), 5);
+  neptune = bodies(4);
+  neptuneVx = arrayApply(r34(1), 3);
+  neptuneVy = arrayApply(r34(1), 4);
+  neptuneVz = arrayApply(r34(1), 5);
 
   [
-    [arrayApply(sun,     0) + dt * sunVx,     arrayApply(sun,     1) + dt * sunVy,     arrayApply(sun,     2) + dt * sunVz,     sunVx, sunVy, sunVz, arrayApply(sun, 6)],
-    [arrayApply(jupiter, 0) + dt * jupiterVx, arrayApply(jupiter, 1) + dt * jupiterVy, arrayApply(jupiter, 2) + dt * jupiterVz, jupiterVx, jupiterVy, jupiterVz, arrayApply(jupiter, 6)],
-    [arrayApply(saturn,  0) + dt * saturnVx,  arrayApply(saturn,  1) + dt * saturnVy,  arrayApply(saturn,  2) + dt * saturnVz,  saturnVx,  saturnVy,  saturnVz, arrayApply(saturn, 6)],
-    [arrayApply(uranus,  0) + dt * uranusVx,  arrayApply(uranus,  1) + dt * uranusVy,  arrayApply(uranus,  2) + dt * uranusVz,  uranusVx,  uranusVy,  uranusVz, arrayApply(uranus, 6)],
-    [arrayApply(neptune, 0) + dt * neptuneVx, arrayApply(neptune, 1) + dt * neptuneVy, arrayApply(neptune, 2) + dt * neptuneVz,  neptuneVx,  neptuneVy,  neptuneVz, arrayApply(neptune, 6)]
+    [sun(0) + dt * sunVx,     sun(1) + dt * sunVy,     sun(2) + dt * sunVz,     sunVx, sunVy, sunVz, sun(6)],
+    [jupiter(0) + dt * jupiterVx, jupiter(1) + dt * jupiterVy, jupiter(2) + dt * jupiterVz, jupiterVx, jupiterVy, jupiterVz, jupiter(6)],
+    [saturn(0) + dt * saturnVx,  saturn(1) + dt * saturnVy,  saturn(2) + dt * saturnVz,  saturnVx,  saturnVy,  saturnVz, saturn(6)],
+    [uranus(0) + dt * uranusVx,  uranus(1) + dt * uranusVy,  uranus(2) + dt * uranusVz,  uranusVx,  uranusVy,  uranusVz, uranus(6)],
+    [neptune(0) + dt * neptuneVx, neptune(1) + dt * neptuneVy, neptune(2) + dt * neptuneVz,  neptuneVx,  neptuneVy,  neptuneVz, neptune(6)]
   ]
 
 }
@@ -146,43 +146,43 @@ def advance(bodies, dt) = {
 def squared(x, y, z) = x * x + y * y + z * z
 
 def energyInner(bodies, from, to) = {
-  dx = arrayApply(from, 0) - arrayApply(to, 0);
-  dy = arrayApply(from, 1) - arrayApply(to, 1);
-  dz = arrayApply(from, 2) - arrayApply(to, 2);
+  dx = from(0) - to(0);
+  dy = from(1) - to(1);
+  dz = from(2) - to(2);
   distance = lasqrt(squared(dx, dy, dz));
-  arrayApply(from, 6) * arrayApply(to, 6) / distance;
+  from(6) * to(6) / distance;
 }
 
 def energy(bodies) = {
-  sun = arrayApply(bodies, 0);
-  sunVx = arrayApply(sun, 3);
-  sunVy = arrayApply(sun, 4);
-  sunVz = arrayApply(sun, 5);
-  sunMass = arrayApply(sun, 6);
+  sun = bodies(0);
+  sunVx = sun(3);
+  sunVy = sun(4);
+  sunVz = sun(5);
+  sunMass = sun(6);
 
-  jupiter = arrayApply(bodies, 1);
-  jupiterVx = arrayApply(jupiter, 3);
-  jupiterVy = arrayApply(jupiter, 4);
-  jupiterVz = arrayApply(jupiter, 5);
-  jupiterMass = arrayApply(jupiter, 6);
+  jupiter = bodies(1);
+  jupiterVx = jupiter(3);
+  jupiterVy = jupiter(4);
+  jupiterVz = jupiter(5);
+  jupiterMass = jupiter(6);
 
-  saturn = arrayApply(bodies, 2);
-  saturnVx = arrayApply(saturn, 3);
-  saturnVy = arrayApply(saturn, 4);
-  saturnVz = arrayApply(saturn, 5);
-  saturnMass = arrayApply(saturn, 6);
+  saturn = bodies(2);
+  saturnVx = saturn(3);
+  saturnVy = saturn(4);
+  saturnVz = saturn(5);
+  saturnMass = saturn(6);
 
-  uranus = arrayApply(bodies, 3);
-  uranusVx = arrayApply(uranus, 3);
-  uranusVy = arrayApply(uranus, 4);
-  uranusVz = arrayApply(uranus, 5);
-  uranusMass = arrayApply(uranus, 6);
+  uranus = bodies(3);
+  uranusVx = uranus(3);
+  uranusVy = uranus(4);
+  uranusVz = uranus(5);
+  uranusMass = uranus(6);
 
-  neptune = arrayApply(bodies, 4);
-  neptuneVx = arrayApply(neptune, 3);
-  neptuneVy = arrayApply(neptune, 4);
-  neptuneVz = arrayApply(neptune, 5);
-  neptuneMass = arrayApply(neptune, 6);
+  neptune = bodies(4);
+  neptuneVx = neptune(3);
+  neptuneVy = neptune(4);
+  neptuneVz = neptune(5);
+  neptuneMass = neptune(6);
 
   e0 =      0.5 * sunMass * squared(sunVx, sunVy, sunVz);
   e1 = e0 + 0.5 * jupiterMass * squared(jupiterVx, jupiterVy, jupiterVz);
@@ -190,34 +190,29 @@ def energy(bodies) = {
   e3 = e2 + 0.5 * uranusMass * squared(uranusVx, uranusVy, uranusVz);
   e  = e3 + 0.5 * neptuneMass * squared(neptuneVx, neptuneVy, neptuneVz);
 
-  e01 = energyInner(bodies, arrayApply(bodies, 0), arrayApply(bodies, 1));
-  e02 = energyInner(bodies, arrayApply(bodies, 0), arrayApply(bodies, 2));
-  e03 = energyInner(bodies, arrayApply(bodies, 0), arrayApply(bodies, 3));
-  e04 = energyInner(bodies, arrayApply(bodies, 0), arrayApply(bodies, 4));
+  e01 = energyInner(bodies, bodies(0), bodies(1));
+  e02 = energyInner(bodies, bodies(0), bodies(2));
+  e03 = energyInner(bodies, bodies(0), bodies(3));
+  e04 = energyInner(bodies, bodies(0), bodies(4));
 
-  e12 = energyInner(bodies, arrayApply(bodies, 1), arrayApply(bodies, 2));
-  e13 = energyInner(bodies, arrayApply(bodies, 1), arrayApply(bodies, 3));
-  e14 = energyInner(bodies, arrayApply(bodies, 1), arrayApply(bodies, 4));
+  e12 = energyInner(bodies, bodies(1), bodies(2));
+  e13 = energyInner(bodies, bodies(1), bodies(3));
+  e14 = energyInner(bodies, bodies(1), bodies(4));
 
-  e23 = energyInner(bodies, arrayApply(bodies, 2), arrayApply(bodies, 3));
-  e24 = energyInner(bodies, arrayApply(bodies, 2), arrayApply(bodies, 4));
+  e23 = energyInner(bodies, bodies(2), bodies(3));
+  e24 = energyInner(bodies, bodies(2), bodies(4));
 
-  e34 = energyInner(bodies, arrayApply(bodies, 3), arrayApply(bodies, 4));
+  e34 = energyInner(bodies, bodies(3), bodies(4));
 
   e - e01 - e02 - e03 - e04 - e12 - e13 - e14 - e23 - e24 - e34
 }
 
 def calculate(i, bodies) = if i > 0 then calculate(i - 1, advance(bodies, 0.01)) else bodies
 
-def returnArray() = {
+def main() = {
   bodies = [sun(), jupiter(), saturn(), uranus(), neptune()];
   initedBodies = init(bodies);
   println(toString(energy(initedBodies)));
   advanced = calculate(50000000, initedBodies);
   println(toString(energy(advanced)));
 }
-
-def main() = {
-  returnArray()
-}
-

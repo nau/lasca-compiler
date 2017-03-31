@@ -258,28 +258,33 @@ cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
   lrhs <- cgen ctx rhs
   let code = constInt (binops Map.! fn)
   call (global runtimeBinOpFuncType (AST.Name "runtimeBinOp")) [code, llhs, lrhs]
-cgen ctx (S.Apply (S.Var fn) args) | fn `Set.member` ctx = do -- TODO Here are BUGZZZZ!!!! :)
-  largs <- mapM (cgen ctx) args
-  call (global ptrType (AST.Name fn)) largs
 cgen ctx (S.Apply expr args) = do
-  modState <- gets moduleState
-  e <- cgen ctx expr
+  syms <- gets symtab
   largs <- mapM (cgen ctx) args
-  let funcs = functions modState
-  let argc = constInt (length largs)
-  let len = Map.size funcs
-  let funcs = constRefOperand "Functions"
---   let argArray = C.Array (T.ArrayType (fromIntegral len) ptrType) largs
---   let funcsize = global T.i32 "FunctionsSize"
-  let funcsize = constInt len
-  sargsPtr <- allocaSize (ptrType) argc
-  let asdf = (\(idx, arg) -> do {
-    p <- getelementptr sargsPtr [idx];
-    store p arg})
-  sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
-  -- cdecl calling convension, arguments passed right to left
-  sequence [asdf (constInt i, a) | (i, a) <- (zip [0..len] (largs))]
-  call (global runtimeApplyFuncType (AST.Name "runtimeApply")) ([funcs, e, argc, sargs])
+  let symMap = Map.fromList syms
+  case expr of
+     -- TODO Here are BUGZZZZ!!!! :)
+     -- TODO check arguments!
+     -- this is done to speed-up calls if you call a global function
+    S.Var fn | (fn `Set.member` ctx) && not (fn `Map.member` symMap) -> call (global ptrType (AST.Name fn)) largs
+    expr -> do
+      modState <- gets moduleState
+      e <- cgen ctx expr
+      let funcs = functions modState
+      let argc = constInt (length largs)
+      let len = Map.size funcs
+      let funcs = constRefOperand "Functions"
+    --   let argArray = C.Array (T.ArrayType (fromIntegral len) ptrType) largs
+    --   let funcsize = global T.i32 "FunctionsSize"
+      let funcsize = constInt len
+      sargsPtr <- allocaSize (ptrType) argc
+      let asdf = (\(idx, arg) -> do {
+        p <- getelementptr sargsPtr [idx];
+        store p arg})
+      sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
+      -- cdecl calling convension, arguments passed right to left
+      sequence [asdf (constInt i, a) | (i, a) <- (zip [0..len] (largs))]
+      call (global runtimeApplyFuncType (AST.Name "runtimeApply")) ([funcs, e, argc, sargs])
 --   call e largs
 cgen ctx (S.BoxFunc funcName enclosedVars) = do
   modState <- gets moduleState

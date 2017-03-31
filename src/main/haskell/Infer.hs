@@ -121,6 +121,8 @@ unify t (TypeIdent "Any") = return nullSubst
 unify t (TVar a) = bind a t
 unify (TVar a) t = bind a t
 unify (TypeIdent a) (TypeIdent b) | a == b = return nullSubst
+unify (TypeApply (TypeIdent "Array") [t]) (TypeFunc typeInt r) = unify t r -- special case of array(idx) syntax. Hack.
+unify (TypeFunc typeInt t) (TypeApply (TypeIdent "Array") [r]) = unify r t -- special case of array(idx) syntax. Hack.
 unify (TypeApply (TypeIdent lhs) largs) (TypeApply (TypeIdent rhs) rargs) | lhs == rhs = (unifyList largs rargs)
 unify t1 t2 = throwError $ UnificationFail t1 t2
 
