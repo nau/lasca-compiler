@@ -31,7 +31,7 @@
 
 grammar Lasca;
 
-valDef: VAL Id (':' type)? '=' expr;
+valDef: VAL? Id (':' type)? '=' expr;
 
 literal:
       IntegerLiteral # integer
@@ -68,8 +68,11 @@ letbind: ident '=' expr ;
 letins:
    'let' letbind (',' letbind)* 'in' expr;
 
+arrayLiteral : LBRACKET exprs? RBRACKET ;
+
 expr:
-     ifExpr
+     arrayLiteral
+   | ifExpr
    | letins
    | infixExpr
    ;
@@ -87,7 +90,7 @@ infixExpr
    ;
 
 prefixExpr
-   : UnaryOp? (blockExpr | simpleExpr1)
+   : UnaryOp? (closureExpr | blockExpr | simpleExpr1)
    ;
 
 simpleExpr1:
@@ -110,6 +113,10 @@ exprs
    : expr (',' expr)*
    ;
 
+closureExpr:
+   '{' params ARROW block '}'
+   ;
+
 blockExpr:
 	'{' block '}'
    ;
@@ -120,7 +127,6 @@ block
 
 blockStat
    : valDef
-   | defDef
    | expr
    |
    ;
@@ -178,6 +184,9 @@ AND : 'and' ;
 OR : 'or' ;
 LBRACE : '{' ;
 RBRACE : '}' ;
+LBRACKET : '[';
+RBRACKET : ']';
+ARROW: '->' ;
 
 BooleanLiteral
    : 'true' | 'false'
@@ -216,15 +225,6 @@ Semi
    : ';'
    ;
 
-
-Paren
-   : '(' | ')' | '[' | ']' | '{' | '}'
-   ;
-
-
-Delim
-   : '`' | '\'' | '"' | '.' | ';' | ','
-   ;
 
 // fragments
 
