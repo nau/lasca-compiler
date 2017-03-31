@@ -144,7 +144,9 @@ processModule opts mod fname = do
     writeFile (fname ++ ".ll") asm
     let name = takeWhile (/= '.') fname
     -- Dynamic linking
-    callProcess "clang-3.5" ["-e", "_start", "-g", "-o", name, "-L.", "-llascart", fname ++ ".ll"]
+    let optLevel = optimization opts
+    let optimizationOpts = if optLevel > 0 then ["-O" ++ show optLevel] else []
+    callProcess "clang-3.5" (optimizationOpts ++ ["-e", "_start", "-g", "-o", name, "-L.", "-llascart", fname ++ ".ll"])
     -- Static linking
   --         callProcess "clang-3.5" ["-e", "_start", "-g", "-o", name, "-L.", {-"-llascart",-} fname ++ ".ll", "/usr/local/lib/libgc.a","liblascart.a"]
     return ()
