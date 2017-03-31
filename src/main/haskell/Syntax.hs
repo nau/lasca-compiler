@@ -10,13 +10,15 @@ data LascaOpts = LascaOpts
   , mode :: String
   , exec :: Bool
   , printLLVMAsm :: Bool
+  , printAst :: Bool
   , printTypes :: Bool
   , optimization :: Int
   }
 
 data Expr
   = Literal Lit
-  | Var String
+  | Var Name
+  | Val Name Expr
   | Apply Expr [Expr]
   | Lam String Expr
   | Fix Expr        -- typechecker only

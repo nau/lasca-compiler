@@ -59,6 +59,7 @@ data ModuleState = ModuleState {
   _outers :: Set.Set String,
   _usedVars :: Set.Set String,
   _syntacticAst :: [S.Expr],
+  _globalValsInit :: [(S.Name, S.Expr)],
   _modNames :: Names,
   functions :: Map.Map String Int
 } deriving (Show)
@@ -76,6 +77,7 @@ initModuleState modl = ModuleState {
   _outers = Set.empty,
   _usedVars = Set.empty,
   _syntacticAst = [],
+  _globalValsInit = [],
   _modNames = Map.empty,
   functions = Map.empty
 }
@@ -90,6 +92,14 @@ addDefn d = do
   if d `elem` defs
   then modify id
   else modify $ \s -> s { _llvmModule = (_llvmModule s) { moduleDefinitions = defs ++ [d] } }
+
+defineGlobal name tpe body = addDefn $
+  AST.GlobalDefinition $ AST.globalVariableDefaults {
+    LLVM.General.AST.Global.name        = name
+  , LLVM.General.AST.Global.isConstant  = False
+  , LLVM.General.AST.Global.type' = tpe
+  , LLVM.General.AST.Global.initializer = body
+  }
 
 defineConst name tpe body = addDefn $
   AST.GlobalDefinition $ AST.globalVariableDefaults {

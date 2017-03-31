@@ -155,6 +155,10 @@ defineStringConstants _ = return ()
 -- codegenTop :: S.Expr -> LLVM ()
 codegenTop ctx (S.Data name args) = return ()
 
+codegenTop ctx (S.Val name expr) = do
+  modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
+  defineGlobal (AST.Name name) ptrType (Just (C.Null ptrType))
+
 codegenTop ctx (S.Function name tpe args body) = do
   r1 <- defineStringConstants body
 --   Debug.traceM ("Generating function1 " ++ name ++ (show r1))
@@ -195,7 +199,7 @@ codegenTop ctx exp = do
       setBlock entry
       cgen ctx exp >>= ret
 
-codegenStartFunc = do
+codegenStartFunc ctx = do
   modState <- get
   define T.void "start" [] (bls modState)
   where
@@ -203,9 +207,20 @@ codegenStartFunc = do
         entry <- addBlock entryBlockName
         setBlock entry
         call (global initLascaRuntimeFuncType (AST.Name "initLascaRuntime")) []
+        initGlobals
         call (global mainFuncType (AST.Name "main")) []
         terminator $ I.Do $ I.Ret (Nothing) []
         return ()
+
+    initGlobals = do
+      modState <- gets moduleState
+      let globalValsInit = _globalValsInit modState
+      mapM gen globalValsInit
+
+    gen (name, expr) = do
+      v <- cgen ctx expr
+      store (global ptrType (AST.Name name)) v
+      return v
 
 
 -- Static mode
@@ -243,9 +258,10 @@ cgen ctx (S.Var name) = do
     Just x ->
 --       Debug.trace ("Local " ++ show name)
       load x
-    Nothing {-| x `Set.member` ctx-} -> do
---       Debug.traceM ("Global " ++ show name)
-      boxFunc name mapping
+    Nothing | name `Set.member` ctx -> do
+--       Debug.traceM ("Use global " ++ show name)
+      load (global ptrType (AST.Name name))
+    Nothing | otherwise  -> boxFunc name mapping
 cgen ctx (S.Literal l) = box l
 cgen ctx (S.Array exprs) = do
   vs <- values
@@ -405,7 +421,7 @@ codegenModule modo fns = modul
           genFunctionMap fns''
           declareStdFuncs
           mapM (codegenTop ctx) fns''
-          codegenStartFunc
+          codegenStartFunc ctx
 
 declareStdFuncs = do
   external ptrType "boxArray" [(intType, AST.Name "size")] True
@@ -481,5 +497,6 @@ createGlobalContext exprs = context
       context = loop exprs Set.empty
       loop [] m = m
       loop (e:exprs) m = names e m `Set.union` loop exprs m
+      names (S.Val name _) m = Set.insert name m
       names (S.Function name _ _ _) m = Set.insert name m
       names (S.Extern name _ _) m = Set.insert name m

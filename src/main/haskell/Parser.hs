@@ -169,6 +169,12 @@ valdef = do
   e <- expr
   return (Named id e)
 
+valdef1 = do
+  id <- identifier
+  reservedOp "="
+  e <- expr
+  return (Val id e)
+
 unnamedStmt = do
   e <- expr
   return (Stmt e)
@@ -225,6 +231,7 @@ defn :: Parser Expr
 defn = try extern
     <|> try function
     <|> try dataDef
+    <|> try valdef1
     <|> expr
 
 contents :: Parser a -> Parser a

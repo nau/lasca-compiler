@@ -66,6 +66,9 @@ lascaOpts = LascaOpts
       ( long "print-llvm"
       <> help "Print LLVM IR" )
   <*> switch
+        ( long "print-ast"
+        <> help "Print AST" )
+  <*> switch
         ( long "print-types"
         <> help "Print infered types" )
   <*> optimizeOpt
@@ -95,7 +98,7 @@ genModule opts modo source = case parseToplevel source of
         return Nothing
     Right ex -> do
         putStrLn "Parsed OK"
---         putStrLn (show ex)
+        if printAst opts then putStrLn (show ex) else return ()
         putStrLn("Compiler mode is " ++ (mode opts))
         if ((mode opts) == "static")
         then case typeCheck ex of
@@ -175,6 +178,7 @@ typeCheck exprs = inferTop emptyTyenv ({-Debug.trace (show a)-} a)
   where
         a = map f exprs
         f e@(Fix (Function name _ _ _)) = (name, e)
+        f e@(Val name _) = (name, e)
         f e@(Function name _ _ _) = (name, e)
         f e@(Extern name _ _) = (name, e)
         f e@(Data name _) = (name, e)
