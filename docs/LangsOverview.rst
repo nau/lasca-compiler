@@ -81,7 +81,7 @@ Great language. But it has 25 years of legacy none could improve.
 - Laziness may cause performance uncertainties.
 - There are 5 types for strings: String, Text, Text.Lazy, ByteString, ByteString.Lazy. And
   String is the worst one, and is not recommended to use in a real
-  program. And it's a default String. It's in Prelude. You can't do a shit
+  program. And it's a default String. It's in Prelude. You can't do a thing
   without enabling at least 5 language extensions. And you have to know
   about them. And there are about 70 of those.
 
@@ -101,9 +101,21 @@ Great language. But it has 25 years of legacy none could improve.
 	{-# LANGUAGE ViewPatterns #-}
 	...
 
-- And there is ``$`` operator. I guess people use it because it's hard to
-  introduce another name in you perfect 120 character long one-liner. And
-  people hate parens.
+- Records are pain.
+- Don't have named arguments, nor default arguments.
+- And there is ``$`` operator, which only make things worth.
+
+http://www.haskellforall.com/2015/09/how-to-make-your-haskell-code-more.html
+
+Basically, Gabriel summarize it to several rules:
+
+1. Don't use ($) and other weird and commonly unfamiliar operators.
+2. Don't use lenses for the same reason.
+3. Don't use point-free style.
+4. Use do notation generously
+  Meaning, write your code imperatively, don't do huge one-liners
+
+Can't agree more.
 
 SML/Ocaml
 ---------
@@ -132,10 +144,10 @@ type inference Dependent types
 Cons
 ~~~~
 
-Quite hard to grok for an average programmer Complicated (compared to
-"usual" imperative lang) effect system with monads/do notations Data
-immutability implies complications for an average programmer Unusual
-syntax
+Quite hard to grok for an average programmer
+Complicated (compared to "usual" imperative lang) effect system with monads/do notations
+Data immutability implies complications for an average programmer
+Unusual syntax
 
 Syntax I Consider Hard to Interpret
 -----------------------------------
@@ -402,7 +414,9 @@ Any dynamic language
 Writing code is the easiest part of software development. The most
 interesting part comes after the code is written. Its maintenance,
 changing, and refactoring – that is complex, and must be addressed.
-Dynamic languages complicate productive IDE support.
+
+Any sufficiently complicated program written in a dynamic language contains an ad hoc,
+informally-specified, bug-ridden, unsound, and slow implementation of half of System F.
 
 Any Java
 --------
@@ -413,6 +427,5 @@ late.
 Any .NET
 --------
 
-I don't care about any language/platform bound to a single OS. And Mono
+Don't care about any language/platform bound to a single OS. And Mono
 doesn't count. And it's too late, Microsoft, to make it cross-platform.
-Fuck you. F# is ok, though. C# is legit too.
