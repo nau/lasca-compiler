@@ -45,7 +45,7 @@ neptune = [
 sun = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, solarMass]
 
 def go(bodies, i, pxyz) = {
-  body = arrayApply(bodies, i);
+  body = bodies(i);
   updatedPs = [
     pxyz(0) + body(3) * body(6),
     pxyz(1) + body(4) * body(6),
@@ -81,12 +81,14 @@ def advanceInner(from, to, dt) = {
   mag = dt / (dSquared * distance);
   toMass = to(6);
   fromMass = from(6);
-  fromVx = from(3) - dx * toMass * mag;
-  fromVy = from(4) - dy * toMass * mag;
-  fromVz = from(5) - dz * toMass * mag;
-  toVx   = to(3)   + dx * fromMass * mag;
-  toVy   = to(4)   + dy * fromMass * mag;
-  toVz   = to(5)   + dz * fromMass * mag;
+  toMassMag = toMass * mag;
+  fromMassMag = fromMass * mag;
+  fromVx = from(3) - dx * toMassMag;
+  fromVy = from(4) - dy * toMassMag;
+  fromVz = from(5) - dz * toMassMag;
+  toVx   = to(3)   + dx * fromMassMag;
+  toVy   = to(4)   + dy * fromMassMag;
+  toVz   = to(5)   + dz * fromMassMag;
   [
     [from(0), from(1), from(2), fromVx, fromVy, fromVz, fromMass],
     [to(0), to(1), to(2), toVx, toVy, toVz, toMass]
@@ -213,6 +215,6 @@ def main() = {
   bodies = [sun, jupiter, saturn, uranus, neptune];
   initedBodies = init(bodies);
   println(toString(energy(initedBodies)));
-  advanced = calculate(5000, initedBodies); -- set to 50000000 for real benchmark
+  advanced = calculate(50000000, initedBodies); -- set to 50000000 for real benchmark
   println(toString(energy(advanced)));
 }

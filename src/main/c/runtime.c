@@ -45,8 +45,23 @@ typedef struct {
   } value;
 } Box;
 
-Box * UNIT_SINGLETON;
+Box TRUE_SINGLETON = {
+  .type = BOOL,
+  .value.num = 1
+};
+Box FALSE_SINGLETON = {
+  .type = BOOL,
+  .value.num = 0
+};
+Box UNIT_SINGLETON = {
+  .type = UNIT
+};
 Box * UNIT_STRING;
+Box  INT_ARRAY[100];
+Box  DOUBLE_ZERO = {
+  .type = DOUBLE,
+  .value.dbl = 0.0
+};
 
 typedef struct {
   int length;
@@ -91,20 +106,24 @@ Box *box(int type_id, void *value) {
 }
 
 Box * boxBool(int i) {
-  Box* ti = gcMalloc(sizeof(Box));
-  ti->type = BOOL;
-  ti->value.num = i;
-  return ti;
+  switch (i) {
+    case 0: return &FALSE_SINGLETON; break;
+    default: return &TRUE_SINGLETON; break;
+  }
 }
 
 Box * boxInt(long i) {
-  Box* ti = gcMalloc(sizeof(Box));
-  ti->type = INT;
-  ti->value.num = i;
-  return ti;
+  if (i >= 0 && i < 100) return &INT_ARRAY[i];
+  else {
+    Box* ti = gcMalloc(sizeof(Box));
+    ti->type = INT;
+    ti->value.num = i;
+    return ti;
+  }
 }
 
 Box * boxFloat64(double i) {
+  if (i == 0.0) return &DOUBLE_ZERO;
   Box* ti = gcMalloc(sizeof(Box));
   ti->type = DOUBLE;
   ti->value.dbl = i;
@@ -424,7 +443,10 @@ Box* lasqrt(Box * dbl) {
 
 void initLascaRuntime() {
     GC_init();
-    UNIT_SINGLETON = box(UNIT, 0);
     UNIT_STRING = makeString("()");
+    for (int i = 0; i < 100; i++) {
+      INT_ARRAY[i].type = INT;
+      INT_ARRAY[i].value.num = i;
+    }
     printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n");
 }
