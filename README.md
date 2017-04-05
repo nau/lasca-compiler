@@ -292,25 +292,43 @@ Another for, say, O-complexity tracking.
 	def println(s: String): Unit
 ``` 
 
-Build
-===
-You need LLVM 3.5.2 installed, and Haskell Stack.
+Build on Mac OS
+===============
+You need LLVM 4.0 installed, and latest Haskell Stack.
+
+    brew install llvm-hs/homebrew-llvm/llvm-4.0
+    
+    brew install boehmgc
 
     brew install haskell-stack
+    
+Update extra-lib-dirs in stack.yaml, add absolute path to a lasca-compiler directory. 
+ghc will search there for liblascart.so
+    
+You need to build Lasca Runtime System library liblascart.so
+
+    make rts
+    
+Setup stack, build and install lasca compiler    
     
     stack setup
     
     stack install
 
-    brew install homebrew/versions/llvm35
+Add your `~/.local/bin` directory to your `$PATH`
 
-    cabal install llvm-general -fshared-llvm
+Add bash completion config for lasca compiler options:
 
-    stack install
+    lasca --bash-completion-script lasca > $(brew --prefix)/etc/bash_completion.d/lasca
     
-You need to build Lasca Runtime System library liblascart.so
-
-    make rts
+Run hello.lasca
+     
+    lasca --exec src/main/lasca/hello.lasca
+    
+If you want to build everything with profiling support
+uncomment -rtsopts, -prof, -fprof-auto ghc options in stack.yaml, and run
+    
+    stack build --executable-profiling --library-profiling
     
 First time n-body run:
 ----------------------
