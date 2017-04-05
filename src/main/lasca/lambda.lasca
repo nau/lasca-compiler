@@ -1,8 +1,7 @@
 
 def main() = {
-  b = println;
   c = "HEllo";
-  a = {s -> b(c) };
+  a = { s -> println(c) };
   a("world")
 }
 

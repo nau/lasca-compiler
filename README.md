@@ -7,16 +7,19 @@ It has a 'dynamic' compilation mode, meaning instant code generation without com
 allowing instant compilation/execution cycle, like dynamic languages give. 
  
 Imagine
-- Scala with type classes, fast compilation/startup time, without OOP, inheritance, variance, and other complexities
-- Go with global type inference and parametric polymorphism
-- Haskell that is strict and has more 'traditional' syntax and semantics
+- Scala with type classes, fast compilation/startup time, without OOP, inheritance, variance, implicits, and other complexities
+- Go with ADTs, global type inference and parametric polymorphism 
+- Haskell that is strict and has more 'traditional' syntax and semantics, normal String, and string interpolation
+- OCaml with overloaded +-*/ for ints and floats, type classes 
 - Rust with garbage collector and without all those scopes and <>::!?
-- Erlang with type inference and fast execution
+- Erlang with types and fast execution
+- Python with multiline lambdas
 - IntelliJ Idea support :)
 
 Inspired by:
 - Scala
 - Haskell, Liquid Haskell
+- OCaml/SML
 - Closure (persisted data structures)
 - Idris/Agda (dependent types?)
 - Go (simplicity, speed, Any interface?, all-in-one compiler)
@@ -292,6 +295,12 @@ Another for, say, O-complexity tracking.
 Build
 ===
 You need LLVM 3.5.2 installed, and Haskell Stack.
+
+    brew install haskell-stack
+    
+    stack setup
+    
+    stack install
 
     brew install homebrew/versions/llvm35
 

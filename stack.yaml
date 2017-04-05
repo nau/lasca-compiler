@@ -1,9 +1,9 @@
-resolver: lts-6.9
+resolver:  nightly-2017-04-05 #lts-6.9
 packages:
 - '.'
 flags:
-  llvm-general:
-    shared-llvm: true
+#  llvm-general:
+#    shared-llvm: true
 
 ghc-options:
   lasca:
@@ -16,14 +16,14 @@ ghc-options:
 #    -fforce-recomp
 #    -fdefer-type-errors
 extra-deps:
-- llvm-general-3.5.1.2
-- llvm-general-pure-3.5.1.0
-- daemons-0.2.1
-- liquid-fixpoint-0.5.0.1
-- located-base-0.1.1.0
-- dotgen-0.4.2
-- fgl-visualize-0.1.0.1
-- intern-0.9.1.4
+#- llvm-general-3.5.1.2
+#- llvm-general-pure-3.5.1.0
+#- daemons-0.2.1
+#- liquid-fixpoint-0.5.0.1
+#- located-base-0.1.1.0
+#- dotgen-0.4.2
+#- fgl-visualize-0.1.0.1
+#- intern-0.9.1.4
 extra-lib-dirs:
  - /usr/local/Cellar/libffi/3.0.13/lib
  - /Users/nau/projects/lasca/lasca-compiler

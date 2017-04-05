@@ -1,9 +1,9 @@
 def returnArray() = {
-  array = seq();
+  array = [];
   array1 = append(array, "Hello");
   array2 = append(array1, 10.5 * 1.0);
   array3 = prepend(array2, 1);
-  println(toString(arrayApply(array3, 2)));
+  println(toString(array3(2)));
   println(toString(array3));
 }
 

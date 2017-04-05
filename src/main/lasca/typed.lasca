@@ -1,6 +1,4 @@
 
-data Test = Test(x, y)
-
 def id(x) = x
 
 -- f :: (a -> b -> c) -> a -> b -> c

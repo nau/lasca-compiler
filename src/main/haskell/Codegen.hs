@@ -30,16 +30,16 @@ import Control.Monad.State
 import Control.Applicative
 -- import Control.Lens
 
-import LLVM.General.AST
-import LLVM.General.AST.Global
-import qualified LLVM.General.AST as AST
-import qualified LLVM.General.AST.Type as T
+import LLVM.AST
+import LLVM.AST.Global
+import qualified LLVM.AST as AST
+import qualified LLVM.AST.Type as T
 
-import qualified LLVM.General.AST.Constant as C
-import qualified LLVM.General.AST.Attribute as A
-import qualified LLVM.General.AST.CallingConvention as CC
-import qualified LLVM.General.AST.FloatingPointPredicate as FP
-import qualified LLVM.General.AST.Float as F
+import qualified LLVM.AST.Constant as C
+import qualified LLVM.AST.Attribute as A
+import qualified LLVM.AST.CallingConvention as CC
+import qualified LLVM.AST.FloatingPointPredicate as FP
+import qualified LLVM.AST.Float as F
 
 import qualified Debug.Trace as Debug
 
@@ -95,18 +95,18 @@ addDefn d = do
 
 defineGlobal name tpe body = addDefn $
   AST.GlobalDefinition $ AST.globalVariableDefaults {
-    LLVM.General.AST.Global.name        = name
-  , LLVM.General.AST.Global.isConstant  = False
-  , LLVM.General.AST.Global.type' = tpe
-  , LLVM.General.AST.Global.initializer = body
+    LLVM.AST.Global.name        = name
+  , LLVM.AST.Global.isConstant  = False
+  , LLVM.AST.Global.type' = tpe
+  , LLVM.AST.Global.initializer = body
   }
 
 defineConst name tpe body = addDefn $
   AST.GlobalDefinition $ AST.globalVariableDefaults {
-    LLVM.General.AST.Global.name        = name
-  , LLVM.General.AST.Global.isConstant  = True
-  , LLVM.General.AST.Global.type' = tpe
-  , LLVM.General.AST.Global.initializer = body
+    LLVM.AST.Global.name        = name
+  , LLVM.AST.Global.isConstant  = True
+  , LLVM.AST.Global.type' = tpe
+  , LLVM.AST.Global.initializer = body
   }
 
 define ::  Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
@@ -158,9 +158,6 @@ uniqueName nm ns =
   case Map.lookup nm ns of
     Nothing -> (nm,  Map.insert nm 1 ns)
     Just ix -> (nm ++ show ix, Map.insert nm (ix+1) ns)
-
-instance IsString Name where
-  fromString = Name . fromString
 
 -------------------------------------------------------------------------------
 -- Codegen State

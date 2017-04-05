@@ -14,26 +14,26 @@
 
 module Emit where
 
-import LLVM.General.Module
-import LLVM.General.Context
-import LLVM.General.Analysis
-import LLVM.General.PassManager
+import LLVM.Module
+import LLVM.Context
+import LLVM.Analysis
+import LLVM.PassManager
 
-import qualified LLVM.General.AST as AST
-import qualified LLVM.General.AST.Global
-import qualified LLVM.General.AST.Type as T
-import qualified LLVM.General.AST.Instruction as I
-import qualified LLVM.General.AST.Constant as C
-import qualified LLVM.General.AST.Float as F
-import qualified LLVM.General.AST.IntegerPredicate as IP
-import qualified LLVM.General.AST.FloatingPointPredicate as FP
+import qualified LLVM.AST as AST
+import qualified LLVM.AST.Global
+import qualified LLVM.AST.Type as T
+import qualified LLVM.AST.Instruction as I
+import qualified LLVM.AST.Constant as C
+import qualified LLVM.AST.Float as F
+import qualified LLVM.AST.IntegerPredicate as IP
+import qualified LLVM.AST.FloatingPointPredicate as FP
 
 -- import qualified Data.Text as Text
 import qualified Data.ByteString as ByteString
 import qualified Data.Text.Encoding as Encoding
 import qualified Data.ByteString.UTF8 as UTF8
 
-import LLVM.General.ExecutionEngine ( withMCJIT, withModuleInEngine, getFunction )
+import LLVM.ExecutionEngine ( withMCJIT, withModuleInEngine, getFunction )
 
 import qualified Data.Text
 import qualified Data.ByteString
@@ -83,10 +83,10 @@ getStringLitName s = name
 
 defineStringLit :: String -> LLVM ()
 defineStringLit s = do  addDefn $ AST.GlobalDefinition $ AST.globalVariableDefaults {
-                          LLVM.General.AST.Global.name        = getStringLitASTName s
-                        , LLVM.General.AST.Global.isConstant  = True
-                        , LLVM.General.AST.Global.type' = stringStructType len
-                        , LLVM.General.AST.Global.initializer = Just (C.Struct (Nothing) False [C.Int 32 (toInteger len), C.Array T.i8 bytes])
+                          LLVM.AST.Global.name        = getStringLitASTName s
+                        , LLVM.AST.Global.isConstant  = True
+                        , LLVM.AST.Global.type' = stringStructType len
+                        , LLVM.AST.Global.initializer = Just (C.Struct (Nothing) False [C.Int 32 (toInteger len), C.Array T.i8 bytes])
                         }
   where
     bytestring = UTF8.fromString s

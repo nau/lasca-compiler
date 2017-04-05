@@ -28,9 +28,10 @@ import System.Environment
 import System.Process
 import System.Console.Haskeline
 import Options.Applicative
+import Data.Semigroup ((<>))
 import qualified Debug.Trace as Debug
 
-import qualified LLVM.General.AST as AST
+import qualified LLVM.AST as AST
 
 data LascaMode = Dynamic | Static deriving (Show, Eq)
 
