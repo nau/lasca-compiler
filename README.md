@@ -326,4 +326,12 @@ First time n-body run:
     $ find src/main/haskell -name *.hs  | xargs cat | wc -l
         1850
     
+Current time n-body run:
+--------------------
+    Init Lasca 0.0.0.1 runtime. Enjoy :)
+    -0.169075164
+    -0.169059907
     
+    real	13m33.031s
+    user	14m26.219s
+    sys	3m48.577s

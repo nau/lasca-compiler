@@ -22,7 +22,7 @@ medium: medium.s
 	time $(CC) -fPIC medium.s -o medium
 
 rts:
-	$(CC) -shared -fPIC -g -I/usr/local/include -L/usr/local/lib -lgc -lstdc++ src/main/c/*.c* -o liblascart.so
+	$(CC) -shared -fPIC -g -O2 -I/usr/local/include -L/usr/local/lib -lgc -lstdc++ src/main/c/*.c* -o liblascart.so
 
 lasca:
 	stack build

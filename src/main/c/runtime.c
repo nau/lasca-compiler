@@ -94,6 +94,10 @@ void *gcMalloc(size_t s) {
     return GC_malloc(s);
 }
 
+void *gcMallocAtomic(size_t s) {
+    return GC_malloc_atomic(s);
+}
+
 void *gcRealloc(void* old, size_t s) {
     return GC_realloc(old, s);
 }
@@ -115,7 +119,7 @@ Box * boxBool(int i) {
 Box * boxInt(long i) {
   if (i >= 0 && i < 100) return &INT_ARRAY[i];
   else {
-    Box* ti = gcMalloc(sizeof(Box));
+    Box* ti = gcMallocAtomic(sizeof(Box));
     ti->type = INT;
     ti->value.num = i;
     return ti;
@@ -124,7 +128,7 @@ Box * boxInt(long i) {
 
 Box * boxFloat64(double i) {
   if (i == 0.0) return &DOUBLE_ZERO;
-  Box* ti = gcMalloc(sizeof(Box));
+  Box* ti = gcMallocAtomic(sizeof(Box));
   ti->type = DOUBLE;
   ti->value.dbl = i;
   return ti;
