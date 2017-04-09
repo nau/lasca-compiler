@@ -20,7 +20,7 @@ Inspired by:
 - Scala
 - Haskell, Liquid Haskell
 - OCaml/SML
-- Closure (persisted data structures)
+- Clojure (persisted data structures)
 - Idris/Agda (dependent types?)
 - Go (simplicity, speed, Any interface?, all-in-one compiler)
 - Rust (borrowing?, method syntax)
