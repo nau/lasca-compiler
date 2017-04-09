@@ -4,7 +4,8 @@ Lasca Language
 Lasca is Scala shifted towards Haskell. 
 Lasca is a LLVM-based statically typed general purpose programming language.
 It has a 'dynamic' compilation mode, meaning instant code generation without compile time type checking/inference, 
-allowing instant compilation/execution cycle, like dynamic languages give. 
+allowing instant compilation/execution cycle, like dynamic languages give.
+It's planned to have a full type inference, parametric polymorphism, and sort of type classes (a-la Idris or Rust, allowing multiple instances for an interface, unlike Haskell).
  
 Imagine
 - Scala with type classes, fast compilation/startup time, without OOP, inheritance, variance, implicits, and other complexities
@@ -23,11 +24,11 @@ Inspired by:
 - Clojure (persisted data structures)
 - Idris/Agda (dependent types?)
 - Go (simplicity, speed, Any interface?, all-in-one compiler)
-- Rust (borrowing?, method syntax)
+- Rust (linear types, borrowing, method syntax)
 - Erlang (actors, immutability, simplicity, distributed)
 - Python (docstrings, doctests)
-- Swift (???)
-- D (unified method syntax, macros?) 
+- Swift
+- D (unified method syntax, macros) 
 - Pony (ref caps, behaviours)
 - Julia
 - Whiley (http://whiley.org/about/overview/)
@@ -68,12 +69,12 @@ Ideas
 - Linear types (Rust)?
 - Liquid Type system (refinement types) + Dependent Type system? 
   https://github.com/pleiad/Refinements
-  
-  Consider optional refinement typing. Z3 (commercial license?), CVC4
-  
+  http://leon.epfl.ch
+  https://github.com/ucsd-progsys/liquidhaskell
+  Z3 (commercial license?), CVC4 as proof assistant.  
 - light, non-symbol-polluted syntax
 - Uniqueness type (inplace write, no gc)
-  See Pony, Idris Unique type
+  See Rust, Pony, Idris Unique type
   http://lampwww.epfl.ch/~phaller/doc/capabilities-uniqueness2.pdf  
 - indentation-based? 
 	no, curly braces: merge conflicts!, reformat, easier to copy-paste from SO 
@@ -99,15 +100,14 @@ Ideas
 - annotation-based extensions, like visibility (@private, public by default)
 	- nope
     - Consider private by default, bc adding public function to a package may require full source recompilation. If it is.
+- macros based metaprogramming (Scala Meta, Template Haskell)    
 - macro-based extensions?
 - implicits? (Scala/Haskell/Idris)
 - implicit macro? (Scala). No, if possible.  
 - import features (Scala-like)
 - compile-time and runtime reflection
-- theorem prover? (Idris)
-- dependent types? (Idris)
 - totality? (Idris)
-- mixfix syntax? (Agda)
+- mixfix syntax? (Agda). No.
 - save/distribute AST (Scala TASTY). Full program optimization/reflection
 - ABI?
 - important things must be greppable and googlable, call it searchability :)
@@ -135,6 +135,8 @@ Practical things that matter
 - immutability as concurrently shared data
 - https://www.infoq.com/presentations/Value-Identity-State-Rich-Hickey
 - Persisted Data Structures!
+- performance! (mutable non-shared state?, mutable collections)
+- consider language support for StateT monad.
 - sized collections in some cases
 - pure functions for concurrency and caching
 - readability
@@ -145,10 +147,12 @@ Practical things that matter
 
 Performance (need research)
 ---
+- mutable non-shared state
+- mutable collections + convertions to immutable
 - specialization
 - inlining
 - escape analysis?
-- tail-call optimization? (LLVM?)
+- tail-call optimization (LLVM)
 - stack allocation
 - typesafe move semantics? borrowing etc? (Rust)
 - typesafe array bounds check (runtime checks elimination)
@@ -207,19 +211,17 @@ for now, use Boehm conservative GC
 Evaluation
 ---
 Strict, applicative order of evaluation, 
-@lazy annotation/keyword or (Lazy expr) type for normal order
+lazy keyword for normal order
 
-@lazy val a = readDb()
+lazy val a = readDb()
 
-val a = Lazy readDb()
+def Or(lhs: Expr, lazy rhs: Expr)
             
 Immutability
 ---
 A value is immutable by default
 
 Mutable things must require more things to do than immutable for people to prefer immutable.
-
-Mutable value can be seen as immutable snapshot (CoW?)
 
 Below are raw ideas. Could be bullshit.
 
@@ -240,7 +242,7 @@ Syntax
 - pattern-matching
 - no OOP
 - ADT, traits, type classes
-- easy C interop
+- easy C interop (
 - no exceptions?
 - sane syntax 
   avoid garbage-symbols pollution, 
@@ -248,7 +250,7 @@ Syntax
   no braces, 
   no <>, 
   less (), 
-  less ','
+  less [],:`'~!@#$%^&*
   no _ in ident names
 - strict formatting rules
 - fast compilation
@@ -256,16 +258,19 @@ Syntax
 - string interpolation: "$ident = ${expression}"
 - multiline strings
 - IDE-friendly!
-- Uniform Function Call Syntax (Rust, D)
-- uniform select principle. Use (.) for func calls, package name resolution etc
+- Uniform Function Call Syntax (Rust, D).
+  For example, any function can be a method for its first arguement:
+    def toString(s: String)
+    "Hello".toString
+    def plus(l: Num, r: Num)
+    1.plus(2)
+    Benefits: 'traditional' syntax, dot-completion, more 'flat', less LISP
+- uniform select principle. Use (.) for record field selection, func calls, package name resolution etc
 - A&B, A|B types?
 - no overloading/overriding
 - UTF-8 strings
-- Option TypeName as TypeName? sugar
-- slices are stupid bullshit. 
-    Just fucking use normal take/head/init/last/slice methods. 
-    There is zero point to make this a language feature.
-- no language-embedded data structures    
+- Haskell-like application for type functions: Option Int, Either Int String, etc
+- Option TypeName as TypeName? sugar   
    
 
 Orthogonal type systems
@@ -280,7 +285,7 @@ Another for, say, O-complexity tracking.
  
 ```scala
 	--@ O(1), pure, total 
-	def toString(a): String =
+	def toString(a): String = "a"
 	--@ O(1), pure
 	def head(l: List a): a = {
 	  require(l.size > 0) -- compile time proof
