@@ -12,13 +12,11 @@
 {-# LANGUAGE Strict #-}
 module Parser where
 
-import Text.Parsec
-import Text.Parsec.String (Parser)
-import qualified Data.Text as T
 import Control.Applicative ((<$>))
-
-import qualified Text.Parsec.Expr as Ex
-import qualified Text.Parsec.Token as Tok
+import Data.Foldable
+import Text.Megaparsec
+import Text.Megaparsec.String
+import qualified Text.Megaparsec.Expr as Ex
 
 import Lexer
 import Syntax
@@ -45,33 +43,32 @@ arrayLit = Array <$> (brackets (commaSep expr))
 stringLit :: Parser Expr
 stringLit = Literal . StringLit <$> stringLiteral
 
-binop = Ex.Infix parser Ex.AssocLeft
-  where parser = (\op lhs rhs -> Apply (Var op) [lhs, rhs]) <$> op
-unop = Ex.Prefix parser
-  where parser = (\op expr -> Apply (Var ("unary" ++ op)) [expr]) <$> op
+binop = Ex.InfixL parser
+  where parser = (\op lhs rhs -> Apply (Var op) [lhs, rhs]) <$> anyOperatorParser
 
-binary s assoc = Ex.Infix parser assoc
+unop = Ex.Prefix parser
+  where parser = (\op expr -> Apply (Var ("unary" ++ op)) [expr]) <$> anyOperatorParser
+
+binary s = Ex.InfixL parser
   where parser = reservedOp s >> return (\lhs rhs -> Apply (Var s) [lhs, rhs])
 
-op :: Parser String
-op = do
-  whitespace
-  o <- operator
-  whitespace
-  return o
+anyOperatorParser = do
+  traverse_ (notFollowedBy . reservedOp) ops
+  x <- identOp
+  fail $ "operator (" ++ x ++ ") is not defined"
 
 binops = [
-          [binary "*" Ex.AssocLeft, binary "/" Ex.AssocLeft],
-          [binary "+" Ex.AssocLeft, binary "-" Ex.AssocLeft],
-          [binary "<" Ex.AssocLeft, binary "==" Ex.AssocLeft, binary "!=" Ex.AssocLeft],
-          [binary "and" Ex.AssocLeft],
-          [binary "or" Ex.AssocLeft]
-          ]
+          [binary "*", binary "/" ],
+          [binary "+", binary "-" ],
+          [binary "<=", binary ">=", binary "<", binary ">", binary "==" , binary "!="],
+          [binary "and"],
+          [binary "or"]
+         ]
 
 operatorTable = binops ++ [[unop], [binop]]
 
 expr :: Parser Expr
-expr =  Ex.buildExpressionParser operatorTable apply
+expr =  Ex.makeExprParser apply operatorTable
 
 variable :: Parser Expr
 variable = Var <$> identifier
@@ -234,20 +231,13 @@ defn = try extern
     <|> try valdef1
     <|> expr
 
-contents :: Parser a -> Parser a
-contents p = do
-  Tok.whiteSpace lexer
-  r <- p
-  eof
-  return r
+contents p = between sc eof p
 
 toplevel :: Parser [Expr]
 toplevel = many $ do
     def <- defn
     return def
 
-parseExpr :: String -> Either ParseError Expr
 parseExpr s = parse (contents expr) "<stdin>" s
 
-parseToplevel :: String -> Either ParseError [Expr]
 parseToplevel s = parse (contents toplevel) "<stdin>" s
