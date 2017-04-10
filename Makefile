@@ -3,7 +3,7 @@ IFORMAT = markdown
 FLAGS = --standalone --toc --highlight-style pygments
 
 CC = gcc
-LLC = llc-3.5
+LLC = llc-4.0
 
 OPTS = -no-user-package-db -package-db .cabal-sandbox/*-packages.conf.d
 

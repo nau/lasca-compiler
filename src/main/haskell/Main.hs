@@ -33,16 +33,6 @@ import qualified Debug.Trace as Debug
 
 import qualified LLVM.AST as AST
 
-data LascaMode = Dynamic | Static deriving (Show, Eq)
-
-{-
-instance Read LascaMode where
-  read "dynamic" = Dynamic
-  read "static" = Static
-
--}
-
-
 optimizeOpt :: Parser Int
 optimizeOpt = option auto
             ( long "optimization-level"
@@ -147,7 +137,7 @@ processModule opts mod fname = do
     -- Dynamic linking
     let optLevel = optimization opts
     let optimizationOpts = if optLevel > 0 then ["-O" ++ show optLevel] else []
-    callProcess "clang-3.5" (optimizationOpts ++ ["-e", "_start", "-g", "-o", name, "-L.", "-llascart", fname ++ ".ll"])
+    callProcess "clang-4.0" (optimizationOpts ++ ["-e", "_start", "-g", "-o", name, "-L.", "-llascart", fname ++ ".ll"])
     -- Static linking
   --         callProcess "clang-3.5" ["-e", "_start", "-g", "-o", name, "-L.", {-"-llascart",-} fname ++ ".ll", "/usr/local/lib/libgc.a","liblascart.a"]
     return ()

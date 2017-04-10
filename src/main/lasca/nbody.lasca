@@ -186,27 +186,27 @@ def energy(bodies) = {
   neptuneVz = neptune(5);
   neptuneMass = neptune(6);
 
-  e0 =      0.5 * sunMass * squared(sunVx, sunVy, sunVz);
-  e1 = e0 + 0.5 * jupiterMass * squared(jupiterVx, jupiterVy, jupiterVz);
-  e2 = e1 + 0.5 * saturnMass * squared(saturnVx, saturnVy, saturnVz);
-  e3 = e2 + 0.5 * uranusMass * squared(uranusVx, uranusVy, uranusVz);
-  e  = e3 + 0.5 * neptuneMass * squared(neptuneVx, neptuneVy, neptuneVz);
+  e =     0.5 * sunMass * squared(sunVx, sunVy, sunVz);
+  e = e + 0.5 * jupiterMass * squared(jupiterVx, jupiterVy, jupiterVz);
+  e = e + 0.5 * saturnMass * squared(saturnVx, saturnVy, saturnVz);
+  e = e + 0.5 * uranusMass * squared(uranusVx, uranusVy, uranusVz);
+  e = e + 0.5 * neptuneMass * squared(neptuneVx, neptuneVy, neptuneVz);
 
-  e01 = energyInner(bodies, bodies(0), bodies(1));
-  e02 = energyInner(bodies, bodies(0), bodies(2));
-  e03 = energyInner(bodies, bodies(0), bodies(3));
-  e04 = energyInner(bodies, bodies(0), bodies(4));
+  e = e - energyInner(bodies, bodies(0), bodies(1));
+  e = e - energyInner(bodies, bodies(0), bodies(2));
+  e = e - energyInner(bodies, bodies(0), bodies(3));
+  e = e - energyInner(bodies, bodies(0), bodies(4));
 
-  e12 = energyInner(bodies, bodies(1), bodies(2));
-  e13 = energyInner(bodies, bodies(1), bodies(3));
-  e14 = energyInner(bodies, bodies(1), bodies(4));
+  e = e - energyInner(bodies, bodies(1), bodies(2));
+  e = e - energyInner(bodies, bodies(1), bodies(3));
+  e = e - energyInner(bodies, bodies(1), bodies(4));
 
-  e23 = energyInner(bodies, bodies(2), bodies(3));
-  e24 = energyInner(bodies, bodies(2), bodies(4));
+  e = e - energyInner(bodies, bodies(2), bodies(3));
+  e = e - energyInner(bodies, bodies(2), bodies(4));
 
-  e34 = energyInner(bodies, bodies(3), bodies(4));
+  e = e - energyInner(bodies, bodies(3), bodies(4));
 
-  e - e01 - e02 - e03 - e04 - e12 - e13 - e14 - e23 - e24 - e34
+  e
 }
 
 def calculate(i, bodies) = if i > 0 then calculate(i - 1, advance(bodies, 0.01)) else bodies
@@ -215,6 +215,6 @@ def main() = {
   bodies = [sun, jupiter, saturn, uranus, neptune];
   initedBodies = init(bodies);
   println(toString(energy(initedBodies)));
-  advanced = calculate(50000000, initedBodies); -- set to 50000000 for real benchmark
+  advanced = calculate(50000, initedBodies); -- set to 50000000 for real benchmark
   println(toString(energy(advanced)));
 }

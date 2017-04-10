@@ -1,17 +1,6 @@
---------------------------------------------------------------------
--- |
--- Module    :  Emit
--- Copyright :  (c) Stephen Diehl 2013
--- License   :  MIT
--- Maintainer:  stephen.m.diehl@gmail.com
--- Stability :  experimental
--- Portability: non-portable
---
---------------------------------------------------------------------
-
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-  {-# LANGUAGE Strict #-}
+{-# LANGUAGE Strict #-}
 
 module Emit where
 
