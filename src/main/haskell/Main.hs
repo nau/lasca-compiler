@@ -8,7 +8,7 @@
 -- Portability: non-portable
 --
 --------------------------------------------------------------------
-
+{-# LANGUAGE Strict #-}
 module Main where
 
 import Parser

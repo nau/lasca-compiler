@@ -1,3 +1,4 @@
+{-# LANGUAGE Strict #-}
 module Type where
 
 import Data.List

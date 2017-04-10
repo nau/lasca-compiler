@@ -9,7 +9,7 @@
 --
 --------------------------------------------------------------------
 {-# LANGUAGE OverloadedStrings #-}
-
+{-# LANGUAGE Strict #-}
 module Parser where
 
 import Text.Parsec

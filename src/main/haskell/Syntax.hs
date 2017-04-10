@@ -1,3 +1,4 @@
+{-# LANGUAGE Strict #-}
 module Syntax where
 
 import Data.Text

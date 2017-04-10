@@ -11,6 +11,7 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+  {-# LANGUAGE Strict #-}
 
 module Emit where
 
