@@ -152,7 +152,7 @@ Box * boxFunc(int idx) {
   return boxClosure(idx, 0, NULL);
 }
 
-void *unbox(Box* ti, int expected) {
+void *unbox(int expected, Box* ti) {
 //  printf("unbox(%d, %d) ", ti->type, (int) ti->value);
   if (ti->type == expected) {
   	return ti->value.ptr;
@@ -222,14 +222,14 @@ Box* runtimeBinOp(int code, Box* lhs, Box* rhs) {
 }
 
 Box* arrayApply(Box* arrayValue, Box* idx) {
-  Array* array = unbox(arrayValue, ARRAY);
+  Array* array = unbox(ARRAY, arrayValue);
   long index = unboxInt(idx);
   assert(array->length > index);
   return array->data[index];
 }
 
 Box* arrayLength(Box* arrayValue) {
-  Array* array = unbox(arrayValue, ARRAY);
+  Array* array = unbox(ARRAY, arrayValue);
   return boxInt(array->length);
 }
 
@@ -238,7 +238,7 @@ Box* runtimeApply(Functions* fs, Box* val, int argc, Box* argv[]) {
   if (val->type == ARRAY && argc == 1 && argv[0]->type == INT) {
     return arrayApply(val, argv[0]);
   }
-  Closure *closure = unbox(val, CLOSURE);
+  Closure *closure = unbox(CLOSURE, val);
   if (closure->funcIdx >= fs->size) {
     printf("AAAA!!! No such function with id %d, max id is %d", (int) closure->funcIdx, fs->size);
     exit(1);
@@ -334,7 +334,7 @@ void * runtimePutchar(Box* ch) {
 }
 
 void * __cdecl println(Box* val) {
-  String * str = unbox(val, STRING);
+  String * str = unbox(STRING, val);
   printf("%.*s\n", str->length, str->bytes);
   return NULL;
 }
@@ -362,7 +362,7 @@ Box* boxArray(size_t size, ...) {
 }
 
 Box* append(Box* arrayValue, Box* value) {
-  Array* array = unbox(arrayValue, ARRAY);
+  Array* array = unbox(ARRAY, arrayValue);
   Array * newArray = createArray(array->length + 1);
   memcpy(newArray->data, array->data, sizeof(Box*) * array->length);
   newArray->data[array->length] = value;
@@ -370,7 +370,7 @@ Box* append(Box* arrayValue, Box* value) {
 }
 
 Box* prepend(Box* arrayValue, Box* value) {
-  Array* array = unbox(arrayValue, ARRAY);
+  Array* array = unbox(ARRAY, arrayValue);
   Array * newArray = createArray(array->length + 1);
   memcpy(newArray->data + 1, array->data, sizeof(Box*) * array->length);
   newArray->data[0] = value;
@@ -387,7 +387,7 @@ Box* makeString(char * str) {
 Box* toString(Box* value);
 
 Box* arrayToString(Box* arrayValue) {
-  Array* array = unbox(arrayValue, ARRAY);
+  Array* array = unbox(ARRAY, arrayValue);
   if (array->length == 0) {
     return makeString("[]");
   } else {
@@ -398,7 +398,7 @@ Box* arrayToString(Box* arrayValue) {
     size_t curSize = 1;
     for (int i = 0; i < array->length; i++) {
       Box* elem = array->data[i];
-      String* value = unbox(toString(elem), STRING);
+      String* value = unbox(STRING, toString(elem));
       if (curSize + value->length >= resultSize + 10) { // reserve 10 bytes for trailing ']' etc
         size_t newSize = resultSize * 1.5;
         result = gcRealloc(result, newSize);

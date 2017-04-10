@@ -64,7 +64,8 @@ emptyTyenv = TypeEnv (Map.fromList [
     ("!=", (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))),
     ("<",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))),
     ("<=", (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))),
-    (">",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)))
+    (">",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))),
+    (">=", (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)))
   ])
   where a = TV "a"
         ta = TVar a

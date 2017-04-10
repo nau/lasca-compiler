@@ -1,14 +1,3 @@
---------------------------------------------------------------------
--- |
--- Module    :  Codegen
--- Copyright :  (c) Stephen Diehl 2013
--- License   :  MIT
--- Maintainer:  stephen.m.diehl@gmail.com
--- Stability :  experimental
--- Portability: non-portable
---
---------------------------------------------------------------------
-
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -119,11 +108,11 @@ define retty label argtys body = addDefn $
   , basicBlocks = body
   }
 
-external ::  Type -> String -> [(Type, Name)] -> Bool -> LLVM ()
+external ::  Type -> String -> [(String, Type)] -> Bool -> LLVM ()
 external retty label argtys vararg = addDefn $
   GlobalDefinition $ functionDefaults {
     name        = Name label
-  , parameters  = ([Parameter ty nm [] | (ty, nm) <- argtys], vararg)
+  , parameters  = ([Parameter ty (Name nm) [] | (nm, ty) <- argtys], vararg)
   , returnType  = retty
   , basicBlocks = []
   }
@@ -131,10 +120,6 @@ external retty label argtys vararg = addDefn $
 ---------------------------------------------------------------------------------
 -- Types
 -------------------------------------------------------------------------------
-
--- IEEE 754 double
-double :: Type
-double = FloatingPointType 64 IEEE
 
 intType :: Type
 intType = IntegerType 32

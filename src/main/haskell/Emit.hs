@@ -53,8 +53,8 @@ zero = constant $ C.Float (F.Double 0.0)
 false = zero
 true = one
 
-externArgsToSig :: [S.Arg] -> [(AST.Type, AST.Name)]
-externArgsToSig = map (\(S.Arg name tpe) -> (typeMapping tpe, AST.Name name))
+externArgsToSig :: [S.Arg] -> [(S.Name, AST.Type)]
+externArgsToSig = map (\(S.Arg name tpe) -> (name, typeMapping tpe))
 
 toSig :: [S.Arg] -> [(AST.Type, AST.Name)]
 toSig = map (\(S.Arg name tpe) -> (ptrType, AST.Name name))
@@ -182,7 +182,7 @@ codegenTop _ (S.Extern name tpe args) = do
 
 codegenTop ctx exp = do
   modState <- get
-  define double "main" [] (bls modState)
+  define T.double "main" [] (bls modState)
   where
     bls modState = createBlocks $ execCodegen [] modState $ do
       entry <- addBlock entryBlockName
@@ -305,7 +305,7 @@ cgen ctx (S.If cond tr fl) = do
   ------------------
   cond <- cgen ctx cond
   -- unbox Bool
-  voidPtrCond <- call (global unboxFuncType (AST.Name "unbox")) [cond, constInt 1]
+  voidPtrCond <- call (global unboxFuncType (AST.Name "unbox")) [constInt 1, cond]
   bool <- ptrtoint voidPtrCond T.i1
 
   test <- instr2 T.i1 (I.ICmp IP.EQ bool constTrue [])
@@ -414,7 +414,18 @@ codegenModule modo fns = modul
           codegenStartFunc ctx
 
 declareStdFuncs = do
-  external ptrType "boxArray" [(intType, AST.Name "size")] True
+  external T.void "initLascaRuntime" [] False
+  external ptrType "gcMalloc" [("size", intType)] False
+  external ptrType "box" [("t", intType), ("ptr", ptrType)] False
+  external ptrType "unbox" [("t", intType), ("ptr", ptrType)] False
+  external ptrType "boxInt" [("d", intType)] False
+  external ptrType "boxBool" [("d", intType)] False
+  external ptrType "boxFunc" [("id", intType)] False
+  external ptrType "boxClosure" [("id", intType), ("argc", intType), ("argv", ptrType)] False
+  external ptrType "boxFloat64" [("d", T.double)] False
+  external ptrType "boxArray" [("size", intType)] True
+  external ptrType "runtimeBinOp" [("code", intType), ("lhs", ptrType), ("rhs", ptrType)] False
+  external ptrType "runtimeApply" [("funcs", ptrType), ("func", ptrType), ("argc", intType), ("argv", ptrType)] False
 
 rewrite ctx fns = transform extractLambda fns
 
