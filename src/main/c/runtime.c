@@ -39,7 +39,7 @@ const int ARRAY    = 6;
 typedef struct {
   int type;
   union Value {
-    long num;
+    int num;
     double dbl;
     void* ptr;
   } value;
@@ -116,7 +116,7 @@ Box * boxBool(int i) {
   }
 }
 
-Box * boxInt(long i) {
+Box * boxInt(int i) {
   if (i >= 0 && i < 100) return &INT_ARRAY[i];
   else {
     Box* ti = gcMallocAtomic(sizeof(Box));
@@ -162,7 +162,7 @@ void *unbox(int expected, Box* ti) {
   }
 }
 
-long unboxInt(Box* ti) {
+int unboxInt(Box* ti) {
 //  printf("unbox(%d, %d) ", ti->type, (int) ti->value);
   if (ti->type == INT) {
   	return ti->value.num;
@@ -187,8 +187,8 @@ Box* runtimeBinOp(int code, Box* lhs, Box* rhs) {
   	exit(1);
   }
 
-  long left = lhs->value.num;
-  long right = rhs->value.num;
+  int left = lhs->value.num;
+  int right = rhs->value.num;
   Box* result = NULL;
 
   switch (code) {
@@ -223,7 +223,7 @@ Box* runtimeBinOp(int code, Box* lhs, Box* rhs) {
 
 Box* arrayApply(Box* arrayValue, Box* idx) {
   Array* array = unbox(ARRAY, arrayValue);
-  long index = unboxInt(idx);
+  int index = unboxInt(idx);
   assert(array->length > index);
   return array->data[index];
 }
@@ -423,7 +423,7 @@ Box* toString(Box* value) {
     case UNIT: return UNIT_STRING;
     case BOOL: return makeString(value->value.num == 0 ? "false" : "true");
     case INT:
-      snprintf(buf, 100, "%ld", value->value.num);
+      snprintf(buf, 100, "%d", value->value.num);
       return makeString(buf);
     case DOUBLE:
       snprintf(buf, 100, "%12.9lf", value->value.dbl);
@@ -439,7 +439,7 @@ Box* toString(Box* value) {
 
 Box* lasqrt(Box * dbl) {
   switch (dbl->type) {
-    case INT: return boxInt((long) sqrt(dbl->value.num)); break;
+    case INT: return boxInt((int) sqrt(dbl->value.num)); break;
     case DOUBLE: return boxFloat64(sqrt(dbl->value.dbl)); break;
     default: printf("AAAA!!! Type mismatch! Expected Int or Double for lasqrt but got %i\n", dbl->type); exit(1);
   }

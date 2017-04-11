@@ -33,8 +33,10 @@ lexeme = L.lexeme sc
 symbol = L.symbol sc
 
 integer       = lexeme L.integer
+
 stringLiteral :: Parser String
 stringLiteral = char '"' >> manyTill L.charLiteral (char '"')
+
 float         = lexeme L.float
 signedInteger = L.signed sc integer
 signedFloat   = L.signed sc float

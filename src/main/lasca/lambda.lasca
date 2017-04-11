@@ -1,7 +1,6 @@
 
 def main() = {
-  c = "HEllo";
-  a = { s -> println(c) };
-  a("world")
+  a = -2;
+  println(toString(a))
 }
 

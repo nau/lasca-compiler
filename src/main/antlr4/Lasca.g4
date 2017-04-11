@@ -34,7 +34,7 @@ grammar Lasca;
 valDef: VAL? Id (':' type)? '=' expr;
 
 literal:
-      IntegerLiteral # integer
+     '-'? IntegerLiteral # integer
 	| BooleanLiteral # boolean
 	| StringLiteral  # stringLit
    ;

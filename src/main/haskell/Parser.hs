@@ -23,10 +23,10 @@ import Syntax
 import Type
 
 integerLit :: Parser Expr
-integerLit = Literal . IntLit . fromIntegral <$> integer
+integerLit = Literal . IntLit . fromIntegral <$> signedInteger
 
 floating :: Parser Expr
-floating = Literal . FloatLit <$> float
+floating = Literal . FloatLit <$> signedFloat
 
 strToBool :: String -> Bool
 strToBool "true" = True
