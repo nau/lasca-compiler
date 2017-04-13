@@ -1,7 +1,7 @@
 Lasca Language
 ==============
 
-[![Join the chat at https://gitter.im/lasca-lang/compiler](https://badges.gitter.im/lasca-lang/Lobby.svg)](https://gitter.im/lasca-lang/Lobby?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Join the chat at https://gitter.im/lasca-lang/compiler](https://badges.gitter.im/lasca-lang/Lobby.svg)](https://gitter.im/lasca-lang/compiler?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 Lasca is Scala shifted towards Haskell. 
 Lasca is a LLVM-based statically typed general purpose programming language.
