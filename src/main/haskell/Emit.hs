@@ -45,8 +45,15 @@ import Type
 import JIT (runJIT)
 import qualified Syntax as S
 
--- data Ctx = Context
-type Ctx = Set.Set String
+data Ctx = Context {
+  globalFunctions :: Set.Set String,
+  globalVals :: Set.Set String
+} deriving (Show, Eq)
+
+emptyCtx = Context {
+  globalFunctions = Set.empty,
+  globalVals = Set.empty
+}
 
 one = constant $ C.Float (F.Double 1.0)
 zero = constant $ C.Float (F.Double 0.0)
@@ -155,11 +162,16 @@ codegenTop ctx (S.Function name tpe args body) = do
 --   defineClosures ctx name body
 --   Debug.traceM ("Generating function2 " ++ name ++ (show r1))
   modState <- get
-  define retType name largs (bls modState)
+  let codeGenResult = codeGen modState
+  let blocks = createBlocks codeGenResult
+  mapM defineStringLit (generatedStrings codeGenResult)
+  define retType name largs blocks
   where
     largs = toSig args
+
     retType = ptrType -- typeMapping tpe
-    bls modState = createBlocks $ execCodegen [] modState $ do
+
+    codeGen modState = execCodegen [] modState $ do
       entry <- addBlock entryBlockName
       setBlock entry
 --       Debug.traceM ("Generating function2 " ++ name)
@@ -235,7 +247,7 @@ binops = Map.fromList [("+", 10), ("-", 11), ("*", 12), ("/", 13),
 
 cgen :: Ctx -> S.Expr -> Codegen AST.Operand
 cgen ctx (S.Let a b c) = do
-  i <- alloca (T.ptr T.i8)
+  i <- alloca ptrType
   val <- cgen ctx b
   store i val
   assign a i
@@ -248,10 +260,13 @@ cgen ctx (S.Var name) = do
     Just x ->
 --       Debug.trace ("Local " ++ show name)
       load x
-    Nothing | name `Set.member` ctx -> do
---       Debug.traceM ("Use global " ++ show name)
-      load (global ptrType (AST.Name name))
-    Nothing | otherwise  -> boxFunc name mapping
+    Nothing -> if name `Set.member` (globalFunctions ctx) then do
+                 Debug.traceM ("Use global def " ++ show name)
+                 boxFunc name mapping
+               else if name `Set.member` (globalVals ctx) then do
+                 Debug.traceM ("Use global val " ++ show name)
+                 load (global ptrType (AST.Name name))
+               else boxError name
 cgen ctx (S.Literal l) = box l
 cgen ctx (S.Array exprs) = do
   vs <- values
@@ -262,17 +277,21 @@ cgen ctx (S.Apply (S.Var "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal 
 cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
   llhs <- cgen ctx lhs
   lrhs <- cgen ctx rhs
-  let code = constInt (binops Map.! fn)
-  call (global runtimeBinOpFuncType (AST.Name "runtimeBinOp")) [code, llhs, lrhs]
+  let code = case Map.lookup fn binops of
+               Just c -> c
+               Nothing -> error ("Couldn't find binop " ++ fn)
+  let codeOp = constInt code
+  call (global runtimeBinOpFuncType (AST.Name "runtimeBinOp")) [codeOp, llhs, lrhs]
 cgen ctx (S.Apply expr args) = do
   syms <- gets symtab
   largs <- mapM (cgen ctx) args
   let symMap = Map.fromList syms
+  let isGlobal fn = (fn `Set.member` (globalFunctions ctx)) && not (fn `Map.member` symMap)
   case expr of
      -- TODO Here are BUGZZZZ!!!! :)
      -- TODO check arguments!
      -- this is done to speed-up calls if you call a global function
-    S.Var fn | (fn `Set.member` ctx) && not (fn `Map.member` symMap) -> call (global ptrType (AST.Name fn)) largs
+    S.Var fn | isGlobal fn -> call (global ptrType (AST.Name fn)) largs
     expr -> do
       modState <- gets moduleState
       e <- cgen ctx expr
@@ -362,8 +381,18 @@ box (S.StringLit s) = do
 boxArray values = call (global boxFuncType (AST.Name "boxArray")) (constInt (length values) : values)
 
 boxFunc name mapping = do
-  let idx = mapping Map.! name
+  let idx = case Map.lookup name mapping of
+              Just i -> i
+              Nothing -> error ("No such function " ++ name)
   call (global (funcType ptrType [T.i32]) (AST.Name "boxFunc")) [constInt idx]
+
+boxError name = do
+  modify (\s -> s { generatedStrings = name : (generatedStrings s) })
+  let strLitName = getStringLitASTName name
+  let len = length name
+  let ref = global (stringStructType len) strLitName
+  ref <- bitcast ref ptrType
+  call (global (funcType ptrType [T.i32]) (AST.Name "boxError")) [ref]
 
 boxClosure :: String -> Map.Map String Int -> [S.Arg] -> Codegen AST.Operand
 boxClosure name mapping enclosedVars = do
@@ -418,6 +447,7 @@ declareStdFuncs = do
   external ptrType "gcMalloc" [("size", intType)] False
   external ptrType "box" [("t", intType), ("ptr", ptrType)] False
   external ptrType "unbox" [("t", intType), ("ptr", ptrType)] False
+  external ptrType "boxError" [("n", ptrType)] False
   external ptrType "boxInt" [("d", intType)] False
   external ptrType "boxBool" [("d", intType)] False
   external ptrType "boxFunc" [("id", intType)] False
@@ -492,12 +522,23 @@ genFunctionMap fns = do
       go s (S.Extern name tpe args) = (name, length args) : s
       go s _ = s
 
-createGlobalContext :: [S.Expr] -> Set.Set String
-createGlobalContext exprs = context
+
+
+createGlobalContext :: [S.Expr] -> Ctx
+createGlobalContext exprs = execState (loop exprs) emptyCtx
   where
-      context = loop exprs Set.empty
-      loop [] m = m
-      loop (e:exprs) m = names e m `Set.union` loop exprs m
-      names (S.Val name _) m = Set.insert name m
-      names (S.Function name _ _ _) m = Set.insert name m
-      names (S.Extern name _ _) m = Set.insert name m
+      loop [] = return ()
+      loop (e:exprs) = do
+        names e
+        loop exprs
+
+      names :: S.Expr -> State Ctx ()
+      names (S.Val name _) = do
+        globVals <- gets globalVals
+        modify (\s -> s { globalVals = Set.insert name globVals } )
+      names (S.Function name _ _ _) = do
+        globFuncs <- gets globalFunctions
+        modify (\s -> s { globalFunctions = Set.insert name globFuncs } )
+      names (S.Extern name _ _) = do
+        globFuncs <- gets globalFunctions
+        modify (\s -> s { globalFunctions = Set.insert name globFuncs } )

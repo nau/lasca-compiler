@@ -102,6 +102,19 @@ void *gcRealloc(void* old, size_t s) {
     return GC_realloc(old, s);
 }
 
+const char * typeIdToName(int typeId) {
+  switch (typeId) {
+    case 0: return "Unit";
+    case 1: return "Bool";
+    case 2: return "Int";
+    case 3: return "Double";
+    case 4: return "String";
+    case 5: return "<function>";
+    case 6: return "Array";
+    default: return "Unknown";
+  }
+}
+
 Box *box(int type_id, void *value) {
   Box* ti = gcMalloc(sizeof(Box));
   ti->type = type_id;
@@ -116,7 +129,11 @@ Box * boxBool(int i) {
   }
 }
 
-Box * boxInt(int i) {
+Box * boxError(String *name) {
+  return box(-1, name);
+}
+
+Box * boxInt(int i) __attribute__ ((const)) {
   if (i >= 0 && i < 100) return &INT_ARRAY[i];
   else {
     Box* ti = gcMallocAtomic(sizeof(Box));
@@ -126,7 +143,7 @@ Box * boxInt(int i) {
   }
 }
 
-Box * boxFloat64(double i) {
+Box * boxFloat64(double i) __attribute__ ((const)) {
   if (i == 0.0) return &DOUBLE_ZERO;
   Box* ti = gcMallocAtomic(sizeof(Box));
   ti->type = DOUBLE;
@@ -156,8 +173,12 @@ void *unbox(int expected, Box* ti) {
 //  printf("unbox(%d, %d) ", ti->type, (int) ti->value);
   if (ti->type == expected) {
   	return ti->value.ptr;
+  } else if (ti->type == -1) {
+    String *name = (String *) ti->value.ptr;
+    printf("AAAA!!! Undefined identifier %.*s\n", name->length, name->bytes);
+    exit(1);
   } else {
-    printf("AAAA!!! Expected %i but got %i\n", expected, ti->type);
+    printf("AAAA!!! Expected %s but got %s\n", typeIdToName(expected), typeIdToName(ti->type));
     exit(1);
   }
 }
@@ -167,23 +188,23 @@ int unboxInt(Box* ti) {
   if (ti->type == INT) {
   	return ti->value.num;
   } else {
-    printf("AAAA!!! Expected %i but got %i\n", INT, ti->type);
+    printf("AAAA!!! Expected %s but got %s\n", typeIdToName(INT), typeIdToName(ti->type));
     exit(1);
   }
 }
 
 #define DO_OP(op) if (lhs->type == INT) { result = boxInt(left op right); } else if (lhs->type == DOUBLE) { result = boxFloat64(lhs->value.dbl op rhs->value.dbl); } else { \
-                        printf("AAAA!!! Type mismatch! Expected Int or Double for op but got %i\n", lhs->type); exit(1); }
+                        printf("AAAA!!! Type mismatch! Expected Int or Double for op but got %s\n", typeIdToName(lhs->type)); exit(1); }
 
 #define DO_CMP(op) switch (lhs->type){ \
                    case BOOL:    { result = boxBool (left op right); break; } \
                    case INT:     { result = boxBool (left op right); break; } \
                    case DOUBLE:  { result = boxBool (left op right); break; } \
-                   default: {printf("AAAA!!! Type mismatch! Expected Bool, Int or Double but got %i\n", lhs->type); exit(1); }\
+                   default: {printf("AAAA!!! Type mismatch! Expected Bool, Int or Double but got %s\n", typeIdToName(lhs->type)); exit(1); }\
                    }
 Box* runtimeBinOp(int code, Box* lhs, Box* rhs) {
   if (lhs->type != rhs->type) {
-  	printf("AAAA!!! Type mismatch! lhs = %i, rhs = %i\n", lhs->type, rhs->type);
+  	printf("AAAA!!! Type mismatch! lhs = %s, rhs = %s\n", typeIdToName(lhs->type), typeIdToName(rhs->type));
   	exit(1);
   }
 
@@ -246,7 +267,7 @@ Box* runtimeApply(Functions* fs, Box* val, int argc, Box* argv[]) {
   Function f = fs->functions[closure->funcIdx];
   if (f.arity != argc + closure->argc) {
     printf("AAAA!!! Function %.*s takes %d params, but passed %d enclosed params and %d params instead",
-      f.name->length, f.name->bytes, closure->argc, argc);
+      f.name->length, f.name->bytes, f.arity, closure->argc, argc);
     exit(1);
   }
   // TODO: use platform ABI, like it should be.
@@ -431,6 +452,11 @@ Box* toString(Box* value) {
     case STRING:  return value;
     case CLOSURE: return makeString("<func>");
     case ARRAY:   return arrayToString(value);
+    case -1: {
+      String *name = (String *) value->value.ptr;
+      printf("AAAA!!! Undefined identifier %.*s\n", name->length, name->bytes);
+      exit(1);
+    }
     default:
       printf("Unsupported type %d", value->type);
       exit(1);

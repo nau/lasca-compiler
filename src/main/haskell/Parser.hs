@@ -1,13 +1,3 @@
---------------------------------------------------------------------
--- |
--- Module    :  Parser
--- Copyright :  (c) Stephen Diehl 2013
--- License   :  MIT
--- Maintainer:  stephen.m.diehl@gmail.com
--- Stability :  experimental
--- Portability: non-portable
---
---------------------------------------------------------------------
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Strict #-}
 module Parser where
@@ -89,7 +79,7 @@ function :: Parser Expr
 function = do
   reserved "def"
   name <- identifier
-  args <- parens $ commaSep arg
+  args <- parens (commaSep arg)
   tpe <- option typeAny typeAscription
   reservedOp "="
   body <- expr
@@ -123,7 +113,7 @@ methodCall = do
 call :: Parser Expr
 call = do
   name <- factor
-  args <- parens $ commaSep expr
+  args <- parens (commaSep expr)
   return (Apply name args)
 
 ifthen :: Parser Expr

@@ -160,6 +160,7 @@ data CodegenState
   , count        :: Word                     -- Count of unnamed instructions
   , names        :: Names                    -- Name Supply
   , moduleState  :: ModuleState
+  , generatedStrings :: [String]
   } deriving Show
 
 data BlockState
@@ -202,11 +203,15 @@ emptyCodegen = \ms -> CodegenState {
   blockCount = 1,
   count = 0,
   names = Map.empty,
-  moduleState = ms
+  moduleState = ms,
+  generatedStrings = []
 }
 
 execCodegen :: [(String, Operand)] -> ModuleState -> Codegen a -> CodegenState
-execCodegen vars modState m = execState (runCodegen m) (emptyCodegen modState) { symtab = vars }
+execCodegen vars modState m = execState transformations initialState
+  where
+    transformations = (runCodegen m)
+    initialState = (emptyCodegen modState) { symtab = vars }
 
 fresh :: Codegen Word
 fresh = do

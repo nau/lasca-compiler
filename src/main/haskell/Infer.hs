@@ -174,7 +174,7 @@ ops = Map.fromList [
 lookupEnv :: TypeEnv -> String -> Infer (Subst, Type)
 lookupEnv (TypeEnv env) x =
   case Map.lookup x env of
-    Nothing -> throwError $ UnboundVariable (show x)
+    Nothing -> throwError $ UnboundVariable x
     Just s  -> do t <- instantiate s
                   return (nullSubst, t)
 
