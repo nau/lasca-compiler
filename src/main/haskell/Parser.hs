@@ -1,16 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE Strict #-}
+{-# LANGUAGE Strict            #-}
 module Parser where
 
-import Control.Applicative ((<$>))
-import Data.Foldable
-import Text.Megaparsec
-import Text.Megaparsec.String
-import qualified Text.Megaparsec.Expr as Ex
+import           Control.Applicative    ((<$>))
+import           Data.Foldable
+import           Text.Megaparsec
+import qualified Text.Megaparsec.Expr   as Ex
+import           Text.Megaparsec.String
 
-import Lexer
-import Syntax
-import Type
+import           Lexer
+import           Syntax
+import           Type
 
 integerLit :: Parser Expr
 integerLit = Literal . IntLit . fromIntegral <$> signedInteger
@@ -20,7 +20,7 @@ floating = Literal . FloatLit <$> signedFloat
 
 strToBool :: String -> Bool
 strToBool "true" = True
-strToBool _ = False
+strToBool _      = False
 
 boolLit :: Parser Expr
 boolLit = Literal . BoolLit . strToBool <$> (true <|> false)
@@ -28,7 +28,7 @@ boolLit = Literal . BoolLit . strToBool <$> (true <|> false)
     true = reserved "true" >> return "true"
     false = reserved "false" >> return "false"
 
-arrayLit = Array <$> (brackets (commaSep expr))
+arrayLit = Array <$> brackets (commaSep expr)
 
 stringLit :: Parser Expr
 stringLit = Literal . StringLit <$> stringLiteral
@@ -138,9 +138,7 @@ letins = do
   body <- expr
   return $ foldr (uncurry Let) body defs
 
-closure = do
-  c <- braces cls
-  return c
+closure = do braces cls
     where cls = do
             args <- commaSep arg
             reservedOp "->"
@@ -174,10 +172,10 @@ blockStmts = do
         foldStmtsIntoOneLetExpr [] = Literal UnitLit
         foldStmtsIntoOneLetExpr exprs@(lst : init) = do
           let (init', last') = case lst of
-                                (Stmt e) -> (init, e)
+                                (Stmt e)    -> (init, e)
                                 (Named _ _) -> (exprs, Literal UnitLit)
           let namedExprs = go init' 1
-          foldl (\acc (name, e) -> Let name e acc) last' namedExprs
+          foldl' (\acc (name, e) -> Let name e acc) last' namedExprs
 
         go ((Stmt e) : exprs) idx = ('_' : show idx, e) : go exprs (idx + 1)
         go ((Named id e) : exprs) idx = (id, e) : go exprs idx

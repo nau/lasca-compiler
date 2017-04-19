@@ -73,7 +73,7 @@ initModuleState modl = ModuleState {
 }
 
 emptyModule :: String -> AST.Module
-emptyModule label = defaultModule { moduleName = label }
+emptyModule label = defaultModule { moduleName = label, moduleSourceFileName = label }
 
 addDefn :: Definition -> LLVM ()
 addDefn d = do
@@ -379,3 +379,5 @@ ret :: Operand -> Codegen (Named Terminator)
 ret val = terminator $ Do $ Ret (Just val) []
 
 getelementptr addr indices = instr $ GetElementPtr False addr indices []
+
+insertValue ptr val indices = instr $ InsertValue ptr val indices []

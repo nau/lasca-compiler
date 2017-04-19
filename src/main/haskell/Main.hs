@@ -1,13 +1,3 @@
---------------------------------------------------------------------
--- |
--- Module    :  Main
--- Copyright :  (c) Stephen Diehl 2013
--- License   :  MIT
--- Maintainer:  stephen.m.diehl@gmail.com
--- Stability :  experimental
--- Portability: non-portable
---
---------------------------------------------------------------------
 {-# LANGUAGE Strict #-}
 module Main where
 
@@ -164,15 +154,3 @@ main = execParser opts >>= greet
       ( fullDesc
      <> progDesc "Print a greeting for TARGET"
      <> header "Lasca compiler" )
-
-
-typeCheck :: [Expr] -> Either TypeError TypeEnv
-typeCheck exprs = inferTop emptyTyenv ({-Debug.trace (show a)-} a)
-  where
-        a = map f exprs
-        f e@(Fix (Function name _ _ _)) = (name, e)
-        f e@(Val name _) = (name, e)
-        f e@(Function name _ _ _) = (name, e)
-        f e@(Extern name _ _) = (name, e)
-        f e@(Data name _) = (name, e)
-        f e = error ("What the fuck " ++ show e)

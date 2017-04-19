@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE Strict #-}
 
 module Emit where
@@ -45,14 +44,23 @@ import Type
 import JIT (runJIT)
 import qualified Syntax as S
 
+data DataDef = DataDef Int String [S.DataConst]
+  deriving (Show, Eq)
+
 data Ctx = Context {
   globalFunctions :: Set.Set String,
-  globalVals :: Set.Set String
+  globalVals :: Set.Set String,
+  dataDefs :: Map.Map String DataDef,
+  constructorToDataDef :: Map.Map String DataDef,
+  typeId :: Int
 } deriving (Show, Eq)
 
 emptyCtx = Context {
   globalFunctions = Set.empty,
-  globalVals = Set.empty
+  globalVals = Set.empty,
+  dataDefs = Map.empty,
+  constructorToDataDef = Map.empty,
+  typeId = 1000
 }
 
 one = constant $ C.Float (F.Double 1.0)
@@ -75,15 +83,15 @@ getStringLitASTName s = AST.Name (getStringLitName s)
 
 getStringLitName s = name
   where
-    name = (take 15 s) ++ "." ++ (show hash)
+    name = take 15 s ++ "." ++ (show hash)
     hash = hash32 s
 
 defineStringLit :: String -> LLVM ()
-defineStringLit s = do  addDefn $ AST.GlobalDefinition $ AST.globalVariableDefaults {
+defineStringLit s = addDefn $ AST.GlobalDefinition $ AST.globalVariableDefaults {
                           LLVM.AST.Global.name        = getStringLitASTName s
                         , LLVM.AST.Global.isConstant  = True
                         , LLVM.AST.Global.type' = stringStructType len
-                        , LLVM.AST.Global.initializer = Just (C.Struct (Nothing) False [C.Int 32 (toInteger len), C.Array T.i8 bytes])
+                        , LLVM.AST.Global.initializer = Just (C.Struct Nothing False [C.Int 32 (toInteger len), C.Array T.i8 bytes])
                         }
   where
     bytestring = UTF8.fromString s
@@ -109,7 +117,7 @@ transformExpr transformer expr = case expr of
     false' <- go false
     transformer (S.If cond' true' false')
   (S.Let n e body) -> do
-    modify (\s -> s { _locals = (Set.insert n (_locals s)) } )
+    modify (\s -> s { _locals = Set.insert n (_locals s) } )
     e' <- go e
     body' <- go body
     transformer (S.Let n e' body')
@@ -150,8 +158,6 @@ defineStringConstants (S.Let _ e body) = do
 defineStringConstants _ = return ()
 
 -- codegenTop :: S.Expr -> LLVM ()
-codegenTop ctx (S.Data name args) = return ()
-
 codegenTop ctx (S.Val name expr) = do
   modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
   defineGlobal (AST.Name name) ptrType (Just (C.Null ptrType))
@@ -176,11 +182,44 @@ codegenTop ctx (S.Function name tpe args body) = do
       setBlock entry
 --       Debug.traceM ("Generating function2 " ++ name)
       forM args $ \(S.Arg n t) -> do
---         var <- alloca (typeMapping t)   -- FIXME: this shouldn't be necessary
         var <- alloca ptrType
         store var (local (AST.Name n))
         assign n var
       cgen ctx body >>= ret
+
+codegenTop ctx (S.Data name constructors) = do
+  mapM_ (\(S.DataConst name args) -> defineConstructor name args) constructors
+  where
+    defineConstructor name args = do
+      addDefn $ AST.TypeDefinition structTypeName (Just tpe)
+      modState <- get
+      let codeGenResult = codeGen modState
+      let blocks = createBlocks codeGenResult
+      define ptrType name fargs blocks -- define constructor function
+      where
+        structTypeName = AST.Name (name ++ "Struct")
+        largs = map (\(S.Arg _ t) -> ptrType) args
+        tpe = T.StructureType False largs
+        fargs = toSig args
+
+        codeGen modState = execCodegen [] modState $ do
+          entry <- addBlock entryBlockName
+          setBlock entry
+          Debug.traceM ("Generating constructor " ++ name)
+
+          ptr <- call (global ptrType (AST.Name "gcMalloc")) [constInt 100] -- FIXME sizeof
+          let tpeRef = AST.NamedTypeReference structTypeName
+          structPtr <- bitcast ptr (T.ptr tpe)
+          let argsWithId = zip args [0..]
+          forM argsWithId $ \((S.Arg n t), i) -> do
+            p <- getelementptr structPtr [constInt 0, constInt i]
+            store p (local (AST.Name n))
+          let tid = case Map.lookup name (dataDefs ctx) of
+                         Just (DataDef id _ _) -> id
+                         Nothing -> error ("Couldn't find data type " ++ name)
+          boxed <- call (global ptrType (AST.Name "box")) [constInt tid, ptr] -- FIXME sizeof
+          ret boxed
+
 
 codegenTop _ (S.Extern name tpe args) = do
 --   s <- gets _llvmModule
@@ -302,14 +341,14 @@ cgen ctx (S.Apply expr args) = do
     --   let argArray = C.Array (T.ArrayType (fromIntegral len) ptrType) largs
     --   let funcsize = global T.i32 "FunctionsSize"
       let funcsize = constInt len
-      sargsPtr <- allocaSize (ptrType) argc
+      sargsPtr <- allocaSize ptrType argc
       let asdf = (\(idx, arg) -> do {
         p <- getelementptr sargsPtr [idx];
         store p arg})
       sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
       -- cdecl calling convension, arguments passed right to left
-      sequence [asdf (constInt i, a) | (i, a) <- (zip [0..len] (largs))]
-      call (global runtimeApplyFuncType (AST.Name "runtimeApply")) ([funcs, e, argc, sargs])
+      sequence [asdf (constInt i, a) | (i, a) <- (zip [0..len] largs)]
+      call (global runtimeApplyFuncType (AST.Name "runtimeApply")) [funcs, e, argc, sargs]
 --   call e largs
 cgen ctx (S.BoxFunc funcName enclosedVars) = do
   modState <- gets moduleState
@@ -387,7 +426,7 @@ boxFunc name mapping = do
   call (global (funcType ptrType [T.i32]) (AST.Name "boxFunc")) [constInt idx]
 
 boxError name = do
-  modify (\s -> s { generatedStrings = name : (generatedStrings s) })
+  modify (\s -> s { generatedStrings = name : generatedStrings s })
   let strLitName = getStringLitASTName name
   let len = length name
   let ref = global (stringStructType len) strLitName
@@ -518,6 +557,9 @@ genFunctionMap fns = do
     ref name = C.GlobalReference (stringStructType (length name)) (getStringLitASTName name)
 
     funcsWithArities = (foldl go [] fns) where
+      go s (S.Data name consts) =
+        let m = foldl (\acc (S.DataConst n args) -> (n, length args) : acc) [] consts
+        in m ++ s
       go s (S.Function name tpe args body) = (name, length args) : s
       go s (S.Extern name tpe args) = (name, length args) : s
       go s _ = s
@@ -539,6 +581,16 @@ createGlobalContext exprs = execState (loop exprs) emptyCtx
       names (S.Function name _ _ _) = do
         globFuncs <- gets globalFunctions
         modify (\s -> s { globalFunctions = Set.insert name globFuncs } )
+      names (S.Data name consts) = do
+        id <- gets typeId
+        globFuncs <- gets globalFunctions
+        let dataDef = DataDef id name consts
+        let m = foldl (\acc (S.DataConst n _) -> n : acc) [] consts
+        modify (\s -> s {
+          dataDefs = Map.insert name dataDef (dataDefs s),
+          globalFunctions = globFuncs `Set.union` (Set.fromList m),
+          typeId = id + 1
+          })
       names (S.Extern name _ _) = do
         globFuncs <- gets globalFunctions
         modify (\s -> s { globalFunctions = Set.insert name globFuncs } )

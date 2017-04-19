@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE Strict #-}
+-- {-# LANGUAGE Strict #-}
 
 module Infer where
 
@@ -21,7 +21,6 @@ import qualified Data.Set as Set
 import qualified Debug.Trace as Debug
 
 newtype TypeEnv = TypeEnv (Map.Map String Scheme)
-  deriving (Monoid)
 
 instance Show TypeEnv where
   show (TypeEnv subst) = "Γ = {\n" ++ elems ++ "}"
@@ -287,3 +286,16 @@ normalize (Forall ts body) = Forall (fmap snd ord) (normtype body)
       case lookup a ord of
         Just x -> TVar x
         Nothing -> error "type variable not in signature"
+
+typeCheck :: [Expr] -> Either TypeError TypeEnv
+typeCheck exprs = inferTop emptyTyenv ({-Debug.trace (show a)-} a)
+  where
+        typeEnv = emptyTyenv
+
+        a = map f exprs
+        f e@(Fix (Function name _ _ _)) = (name, e)
+        f e@(Val name _) = (name, e)
+        f e@(Function name _ _ _) = (name, e)
+        f e@(Extern name _ _) = (name, e)
+        f e@(Data name _) = (name, e)
+        f e = error ("What the fuck " ++ show e)

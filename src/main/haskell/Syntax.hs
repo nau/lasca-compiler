@@ -1,18 +1,18 @@
 {-# LANGUAGE Strict #-}
 module Syntax where
 
-import Data.Text
-import Type
+import           Data.Text
+import           Type
 
 type Name = String
 
 data LascaOpts = LascaOpts
-  { lascaFiles :: [String]
-  , mode :: String
-  , exec :: Bool
+  { lascaFiles   :: [String]
+  , mode         :: String
+  , exec         :: Bool
   , printLLVMAsm :: Bool
-  , printAst :: Bool
-  , printTypes :: Bool
+  , printAst     :: Bool
+  , printTypes   :: Bool
   , optimization :: Int
   }
 
@@ -22,6 +22,7 @@ data Expr
   | Val Name Expr
   | Apply Expr [Expr]
   | Lam String Expr
+  | Select Expr Expr
   | Fix Expr        -- typechecker only
   | BoxFunc Name [Arg]   -- LLVM codegen only
   | Function Name Type [Arg] Expr
