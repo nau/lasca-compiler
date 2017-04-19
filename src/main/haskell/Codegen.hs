@@ -184,10 +184,10 @@ createBlocks :: CodegenState -> [BasicBlock]
 createBlocks m = map makeBlock $ sortBlocks $ Map.toList (blocks m)
 
 makeBlock :: (Name, BlockState) -> BasicBlock
-makeBlock (l, (BlockState _ s t)) = BasicBlock l s (maketerm t)
+makeBlock (l, BlockState _ s t) = BasicBlock l s (maketerm t)
   where
     maketerm (Just x) = x
-    maketerm Nothing = error $ "Block has no terminator: " ++ (show l)
+    maketerm Nothing = error $ "Block has no terminator: " ++ show l
 
 entryBlockName :: String
 entryBlockName = "entry"
@@ -196,8 +196,8 @@ emptyBlock :: Int -> BlockState
 emptyBlock i = BlockState i [] Nothing
 
 emptyCodegen :: ModuleState -> CodegenState
-emptyCodegen = \ms -> CodegenState {
-  currentBlock = (Name entryBlockName),
+emptyCodegen ms = CodegenState {
+  currentBlock = Name entryBlockName,
   blocks = Map.empty,
   symtab = [],
   blockCount = 1,
@@ -210,7 +210,7 @@ emptyCodegen = \ms -> CodegenState {
 execCodegen :: [(String, Operand)] -> ModuleState -> Codegen a -> CodegenState
 execCodegen vars modState m = execState transformations initialState
   where
-    transformations = (runCodegen m)
+    transformations = runCodegen m
     initialState = (emptyCodegen modState) { symtab = vars }
 
 fresh :: Codegen Word
@@ -227,20 +227,20 @@ current = do
     Just x -> return x
     Nothing -> error $ "No such block: " ++ show c
 
-instr :: Instruction -> Codegen (Operand)
+instr :: Instruction -> Codegen Operand
 {-# INLINE instr #-}
 instr ins = do
   n <- fresh
-  let ref = (UnName n)
+  let ref = UnName n
   blk <- current
   let i = stack blk
   modifyBlock (blk { stack = i ++ [ref := ins] } )
   return $ local ref
 
-instr2 :: Type -> Instruction -> Codegen (Operand)
+instr2 :: Type -> Instruction -> Codegen Operand
 instr2 tpe ins = do
   n <- fresh
-  let ref = (UnName n)
+  let ref = UnName n
   blk <- current
   let i = stack blk
   modifyBlock (blk { stack = i ++ [ref := ins] } )
@@ -303,7 +303,7 @@ modifyBlock new = do
 assign :: String -> Operand -> Codegen ()
 assign var x = do
   lcls <- gets symtab
-  modify $ \s -> s { symtab = [(var, x)] ++ lcls }
+  modify $ \s -> s { symtab = (var, x) : lcls }
 
 getvar :: String -> Codegen Operand
 getvar var = do
@@ -326,7 +326,8 @@ global tpe name = constant (C.GlobalReference tpe name)
 constant :: C.Constant -> Operand
 constant = ConstantOperand
 
-constNull = IntToPtr (constInt 0) ptrType []
+constNull tpe = constant (C.IntToPtr (C.Int 32 0) (T.ptr tpe))
+constNullPtr = constNull T.i8
 
 constInt :: Int -> Operand
 constInt i = constant (C.Int 32 (toInteger i))

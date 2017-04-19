@@ -83,7 +83,7 @@ getStringLitASTName s = AST.Name (getStringLitName s)
 
 getStringLitName s = name
   where
-    name = take 15 s ++ "." ++ (show hash)
+    name = take 15 s ++ "." ++ show hash
     hash = hash32 s
 
 defineStringLit :: String -> LLVM ()
@@ -135,8 +135,7 @@ transformExpr transformer expr = case expr of
     modify (\s -> s { _locals = argNames, _outers = Set.empty, _usedVars = Set.empty } )
     e' <- go e1
     transformer (S.Function name tpe args e')
-  e -> do
-    transformer e
+  e -> transformer e
   where go e = transformExpr transformer e
 
 
@@ -149,7 +148,7 @@ defineStringConstants (S.If cond true false) = do
   defineStringConstants false
   return ()
 defineStringConstants (S.Apply _ exprs) = do
-  mapM defineStringConstants exprs
+  mapM_ defineStringConstants exprs
   return ()
 defineStringConstants (S.Let _ e body) = do
   defineStringConstants e
@@ -170,7 +169,7 @@ codegenTop ctx (S.Function name tpe args body) = do
   modState <- get
   let codeGenResult = codeGen modState
   let blocks = createBlocks codeGenResult
-  mapM defineStringLit (generatedStrings codeGenResult)
+  mapM_ defineStringLit (generatedStrings codeGenResult)
   define retType name largs blocks
   where
     largs = toSig args
@@ -206,8 +205,9 @@ codegenTop ctx (S.Data name constructors) = do
           entry <- addBlock entryBlockName
           setBlock entry
           Debug.traceM ("Generating constructor " ++ name)
-
-          ptr <- call (global ptrType (AST.Name "gcMalloc")) [constInt 100] -- FIXME sizeof
+          nullptr <- getelementptr (constNull tpe) [constInt 1]
+          sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
+          ptr <- call (global ptrType (AST.Name "gcMalloc")) [sizeof]
           let tpeRef = AST.NamedTypeReference structTypeName
           structPtr <- bitcast ptr (T.ptr tpe)
           let argsWithId = zip args [0..]
@@ -217,7 +217,7 @@ codegenTop ctx (S.Data name constructors) = do
           let tid = case Map.lookup name (dataDefs ctx) of
                          Just (DataDef id _ _) -> id
                          Nothing -> error ("Couldn't find data type " ++ name)
-          boxed <- call (global ptrType (AST.Name "box")) [constInt tid, ptr] -- FIXME sizeof
+          boxed <- call (global ptrType (AST.Name "box")) [constInt tid, ptr]
           ret boxed
 
 
