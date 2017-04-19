@@ -2,7 +2,7 @@
 -- Dynamic mode
 data Point = Point(x: Int, y: Int)
 
-data Point2 = Point2(a)
+data Point2 = Point2(a: Strinf)
 
 def main() = {
   p1 = Point(1, 2);

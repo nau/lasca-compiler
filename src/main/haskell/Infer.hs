@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 -- {-# LANGUAGE Strict #-}
 
 module Infer where
@@ -26,7 +25,7 @@ instance Show TypeEnv where
   show (TypeEnv subst) = "Γ = {\n" ++ elems ++ "}"
     where elems = List.foldl (\s (name, scheme) -> s ++ name ++ " : " ++ show scheme ++ "\n") "" (Map.toList subst)
 
-data Unique = Unique { count :: Int }
+newtype Unique = Unique{count :: Int}
 
 type Infer = ExceptT TypeError (State Unique)
 type Subst = Map.Map TVar Type
@@ -45,7 +44,7 @@ runInfer m = case evalState (runExceptT m) initUnique of
 
 closeOver :: (Map.Map TVar Type, Type) -> Scheme
 closeOver (sub, ty) = normalize sc
-  where sc = generalize emptyTyenv (apply sub ty)
+  where sc = generalize defaultTyenv (apply sub ty)
 
 initUnique :: Unique
 initUnique = Unique { count = 0 }
@@ -53,18 +52,18 @@ initUnique = Unique { count = 0 }
 extend :: TypeEnv -> (String, Scheme) -> TypeEnv
 extend (TypeEnv env) (x, s) = TypeEnv $ Map.insert x s env
 
-emptyTyenv :: TypeEnv
-emptyTyenv = TypeEnv (Map.fromList [
-    ("+",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
-    ("-",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
-    ("*",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
-    ("/",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` ta))),
-    ("==", (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))),
-    ("!=", (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))),
-    ("<",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))),
-    ("<=", (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))),
-    (">",  (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))),
-    (">=", (Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)))
+defaultTyenv :: TypeEnv
+defaultTyenv = TypeEnv (Map.fromList [
+    ("+",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
+    ("-",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
+    ("*",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
+    ("/",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
+    ("==", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
+    ("!=", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
+    ("<",  Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
+    ("<=", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
+    (">",  Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
+    (">=", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))
   ])
   where a = TV "a"
         ta = TVar a
@@ -124,7 +123,7 @@ unify (TVar a) t = bind a t
 unify (TypeIdent a) (TypeIdent b) | a == b = return nullSubst
 unify (TypeApply (TypeIdent "Array") [t]) (TypeFunc typeInt r) = unify t r -- special case of array(idx) syntax. Hack.
 unify (TypeFunc typeInt t) (TypeApply (TypeIdent "Array") [r]) = unify r t -- special case of array(idx) syntax. Hack.
-unify (TypeApply (TypeIdent lhs) largs) (TypeApply (TypeIdent rhs) rargs) | lhs == rhs = (unifyList largs rargs)
+unify (TypeApply (TypeIdent lhs) largs) (TypeApply (TypeIdent rhs) rargs) | lhs == rhs = unifyList largs rargs
 unify t1 t2 = throwError $ UnificationFail t1 t2
 
 unifyList :: [Type] -> [Type] -> Infer Subst
@@ -197,7 +196,7 @@ infer env ex = case ex of
     s3       <- unify (apply s2 t1) (TypeFunc t2 tv)
     return (s3 `compose` s2 `compose` s1, apply s3 tv)
 
-  Apply e1 (args) -> do
+  Apply e1 args -> do
      let curried = foldl (\expr arg -> Apply expr [arg]) e1 args
      infer env curried
 
@@ -230,13 +229,12 @@ infer env ex = case ex of
       (s1, t1) <- infer env' e
       return (s1, apply s1 tv `TypeFunc` t1)
 
-  Function name t (args) e -> do
+  Function name t args e -> do
     let largs = map (\(Arg a _) -> a) args
     let curried = Fix (foldr (\arg expr -> Lam arg expr) e (name:largs))
     infer env ({-Debug.trace ("Func " ++ show curried)-} curried)
 
-  Data name constructors -> do
-    return (nullSubst, typeUnit)
+  Data name constructors -> return (nullSubst, typeUnit)
 
   Array exprs -> do
     tv <- fresh
@@ -247,7 +245,7 @@ infer env ex = case ex of
   Literal (FloatLit _)  -> return (nullSubst, typeFloat)
   Literal (BoolLit _) -> return (nullSubst, typeBool)
   Literal (StringLit _) -> return (nullSubst, typeString)
-  Literal (UnitLit) -> return (nullSubst, typeUnit)
+  Literal UnitLit -> return (nullSubst, typeUnit)
 
 inferPrim :: TypeEnv -> [Expr] -> Type -> Infer (Subst, Type)
 inferPrim env l t = do
@@ -288,14 +286,30 @@ normalize (Forall ts body) = Forall (fmap snd ord) (normtype body)
         Nothing -> error "type variable not in signature"
 
 typeCheck :: [Expr] -> Either TypeError TypeEnv
-typeCheck exprs = inferTop emptyTyenv ({-Debug.trace (show a)-} a)
+typeCheck exprs = do
+  let (dat, other) = List.partition pred exprs
+  let bbb = dat >>= ddd
+  let a = map f other
+  let (TypeEnv te) = defaultTyenv
+  let typeEnv = TypeEnv (Map.union te (Map.fromList bbb))
+  inferTop typeEnv (Debug.trace (show typeEnv) a)
   where
-        typeEnv = emptyTyenv
+            pred Data{} = True
+            pred _      = False
 
-        a = map f exprs
-        f e@(Fix (Function name _ _ _)) = (name, e)
-        f e@(Val name _) = (name, e)
-        f e@(Function name _ _ _) = (name, e)
-        f e@(Extern name _ _) = (name, e)
-        f e@(Data name _) = (name, e)
-        f e = error ("What the fuck " ++ show e)
+            ddd :: Expr -> [(String, Scheme)]
+            ddd (Data typeName constrs) = constrs >>= genScheme
+              where
+                 genScheme :: DataConst -> [(String, Scheme)]
+                 genScheme (DataConst name args) =
+                    let tpe = foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) (TypeIdent typeName) args
+                    in [(name, Forall [] tpe)]
+
+
+
+            f e@(Fix (Function name _ _ _)) = (name, e)
+            f e@(Val name _) = (name, e)
+            f e@(Function name _ _ _) = (name, e)
+            f e@(Extern name _ _) = (name, e)
+            f e = error ("What the fuck " ++ show e)
+
