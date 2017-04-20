@@ -16,7 +16,7 @@ import Text.Megaparsec.String
 import Control.Monad (void)
 import qualified Text.Megaparsec.Lexer as L
 
-ops = ["+","*","-","/",";", "==", "=",",","<",">","|",":"]
+ops = ["+","*","-","/",";", "==", "=",",",".","<",">","|",":"]
 keywords = ["data", "def", "extern", "if", "then", "else", "end", "in",
             "binary", "unary", "let", "true", "false"
             ]

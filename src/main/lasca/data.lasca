@@ -2,11 +2,12 @@
 -- Dynamic mode
 data Point = Point(x: Int, y: Int)
 
-data Point2 = Point2(a: Strinf)
+data Point2 = Point2(a: String)
 
 def main() = {
   p1 = Point(1, 2);
---  p2 = Point2("Test")
+  l = { s -> { p -> p("Hello1") } };
+  l("Hello1")(println);
   println("Hello")
 }
 

@@ -1,6 +1,8 @@
 
 def main() = {
-  a = -2;
-  println(toString(a))
+  b = println;
+  c = "Hello";
+  a = {s -> b(c) };
+  a("test")
 }
 

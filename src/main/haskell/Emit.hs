@@ -204,7 +204,6 @@ codegenTop ctx (S.Data name constructors) = do
         codeGen modState = execCodegen [] modState $ do
           entry <- addBlock entryBlockName
           setBlock entry
-          Debug.traceM ("Generating constructor " ++ name)
           nullptr <- getelementptr (constNull tpe) [constInt 1]
           sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
           ptr <- call (global ptrType (AST.Name "gcMalloc")) [sizeof]
@@ -436,10 +435,14 @@ boxError name = do
 boxClosure :: String -> Map.Map String Int -> [S.Arg] -> Codegen AST.Operand
 boxClosure name mapping enclosedVars = do
   syms <- gets symtab
-  let symMap = Map.fromList syms
-  let idx = mapping Map.! name
+  let idx = case Map.lookup name mapping of
+              Just i -> i
+              Nothing -> error ("Couldn't find " ++ name ++ " in mapping:\n" ++ show mapping)
   let argc = length enclosedVars
-  let args = map (\(S.Arg n _) -> symMap Map.! n) enclosedVars
+  let findArg n = case lookup n syms of
+                    Just op -> op
+                    Nothing -> error ("Couldn't find " ++ n ++  " variable in symbols " ++ show syms)
+  let args = map (\(S.Arg n _) -> findArg n) enclosedVars
   sargsPtr <- gcMalloc (ptrSize * argc)
   sargsPtr1 <- bitcast sargsPtr (T.ptr ptrType)
   let asdf = (\(idx, arg) -> do {
@@ -588,7 +591,7 @@ createGlobalContext exprs = execState (loop exprs) emptyCtx
         let m = foldl (\acc (S.DataConst n _) -> n : acc) [] consts
         modify (\s -> s {
           dataDefs = Map.insert name dataDef (dataDefs s),
-          globalFunctions = globFuncs `Set.union` (Set.fromList m),
+          globalFunctions = globFuncs `Set.union` Set.fromList m,
           typeId = id + 1
           })
       names (S.Extern name _ _) = do

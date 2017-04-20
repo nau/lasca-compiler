@@ -47,7 +47,16 @@ anyOperatorParser = do
   x <- identOp
   fail $ "operator (" ++ x ++ ") is not defined"
 
+postfixApply = Ex.Postfix parser
+  where parser = do
+          argss <- many argsApply
+          let apply e = foldl (\acc args -> Apply acc args) e argss
+          return apply
+
+
 binops = [
+          [Ex.InfixL (reservedOp "." >> return Select)],
+          [postfixApply],
           [binary "*", binary "/" ],
           [binary "+", binary "-" ],
           [binary "<=", binary ">=", binary "<", binary ">", binary "==" , binary "!="],
@@ -58,7 +67,7 @@ binops = [
 operatorTable = binops ++ [[unop], [binop]]
 
 expr :: Parser Expr
-expr =  Ex.makeExprParser apply operatorTable
+expr =  Ex.makeExprParser factor operatorTable
 
 variable :: Parser Expr
 variable = Var <$> identifier
@@ -101,20 +110,7 @@ arg = do
   tpe <- option typeAny typeAscription
   return (Arg name tpe)
 
-apply :: Parser Expr
-apply = try methodCall <|> try call <|> factor
-
-methodCall = do
-  arg <- factor
-  string "."
-  func <- identifier
-  return (Apply (Var func) [arg])
-
-call :: Parser Expr
-call = do
-  name <- factor
-  args <- parens (commaSep expr)
-  return (Apply name args)
+argsApply = parens (commaSep expr)
 
 ifthen :: Parser Expr
 ifthen = do
@@ -205,7 +201,6 @@ factor = try floating
       <|> try arrayLit
       <|> try stringLit
       <|> try integerLit
---       <|> try apply
       <|> try variable
       <|> try closure
       <|> ifthen
