@@ -2,7 +2,9 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 -- {-# LANGUAGE Strict #-}
 
-module Infer where
+module Infer (
+  typeCheck
+) where
 
 import Prelude hiding (foldr)
 

@@ -1,6 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Strict            #-}
-module Parser where
+module Parser (
+  parseExpr,
+  parseToplevel
+) where
 
 import           Control.Applicative    ((<$>))
 import           Data.Foldable

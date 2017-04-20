@@ -6,8 +6,8 @@ flags:
 #    shared-llvm: true
 
 ghc-options:
-  lasca:
-    -O2
+#  lasca:
+#    -O2
 #    -rtsopts
 #    -prof
 #    -fprof-auto

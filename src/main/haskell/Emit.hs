@@ -1,7 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Strict #-}
 
-module Emit where
+module Emit (
+  codegen,
+  codegenModule
+) where
 
 import LLVM.Module
 import LLVM.Context
