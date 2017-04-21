@@ -254,6 +254,15 @@ Box* arrayLength(Box* arrayValue) {
   return boxInt(array->length);
 }
 
+String s = {
+  .length = 20,
+  .bytes = "Unimplemented select"
+};
+
+Box* runtimeSelect(Functions* fs, Box* tree, Box* ident) {
+  return boxError(&s);
+}
+
 Box* runtimeApply(Functions* fs, Box* val, int argc, Box* argv[]) {
   // Handle array(idx) call
   if (val->type == ARRAY && argc == 1 && argv[0]->type == INT) {

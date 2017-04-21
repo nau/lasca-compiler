@@ -313,6 +313,11 @@ cgen ctx (S.Array exprs) = do
   vs <- values
   boxArray vs
   where values = sequence [cgen ctx e | e <- exprs]
+cgen ctx (S.Select tree expr) = do
+  tree <- cgen ctx tree
+  e <- cgen ctx expr
+  let funcs = constRefOperand "Functions"
+  call (global runtimeSelectFuncType (AST.Name "runtimeSelect")) [funcs, tree, e]
 cgen ctx (S.Apply (S.Var "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True)) rhs)
 cgen ctx (S.Apply (S.Var "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False)))
 cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
@@ -340,9 +345,6 @@ cgen ctx (S.Apply expr args) = do
       let argc = constInt (length largs)
       let len = Map.size funcs
       let funcs = constRefOperand "Functions"
-    --   let argArray = C.Array (T.ArrayType (fromIntegral len) ptrType) largs
-    --   let funcsize = global T.i32 "FunctionsSize"
-      let funcsize = constInt len
       sargsPtr <- allocaSize ptrType argc
       let asdf = (\(idx, arg) -> do {
         p <- getelementptr sargsPtr [idx];
@@ -403,6 +405,7 @@ boxFuncType = funcType ptrType [T.i32]
 boxArrayFuncType = T.FunctionType ptrType [T.i32] True
 runtimeBinOpFuncType = funcType ptrType [T.i32, ptrType, ptrType]
 runtimeApplyFuncType = funcType ptrType [ptrType, ptrType, T.i32, ptrType]
+runtimeSelectFuncType = funcType ptrType [ptrType, ptrType, ptrType]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
 
 gcMalloc size = call (global (funcType ptrType [T.i32]) (AST.Name "gcMalloc")) [constInt size]
@@ -499,8 +502,9 @@ declareStdFuncs = do
   external ptrType "boxClosure" [("id", intType), ("argc", intType), ("argv", ptrType)] False
   external ptrType "boxFloat64" [("d", T.double)] False
   external ptrType "boxArray" [("size", intType)] True
-  external ptrType "runtimeBinOp" [("code", intType), ("lhs", ptrType), ("rhs", ptrType)] False
-  external ptrType "runtimeApply" [("funcs", ptrType), ("func", ptrType), ("argc", intType), ("argv", ptrType)] False
+  external ptrType "runtimeBinOp"  [("code",  intType), ("lhs",  ptrType), ("rhs", ptrType)] False
+  external ptrType "runtimeApply"  [("funcs", ptrType), ("func", ptrType), ("argc", intType), ("argv", ptrType)] False
+  external ptrType "runtimeSelect" [("funcs", ptrType), ("tree", ptrType), ("expr", ptrType)] False
 
 rewrite ctx fns = transform extractLambda fns
 

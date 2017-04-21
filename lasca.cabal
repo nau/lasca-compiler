@@ -9,8 +9,8 @@ extra-source-files:  README.md
 cabal-version:       >=1.10
 
 executable lasca
-  other-extensions:    GADTs
-  build-depends:       base >=4.6,
+  other-extensions:     GADTs
+  build-depends:        base >=4.6,
                         text,
                         utf8-string,
                         haskeline,
@@ -23,25 +23,23 @@ executable lasca
                         optparse-applicative,
                         bytestring,
                         murmur-hash,
-                        unordered-containers,
---                        lens,
                         mtl
   Extra-libraries:      lascart
-  default-language:    Haskell2010
-  hs-source-dirs:      src/main/haskell
-  main-is:             Main.hs
-  other-modules:       Codegen
-                       Emit
-                       Infer
-                       JIT
-                       Lexer
-                       Parser
-                       Syntax
-                       Type
+  default-language:     Haskell2010
+  hs-source-dirs:       src/main/haskell
+  main-is:              Main.hs
+  other-modules:        Codegen
+                        Emit
+                        Infer
+                        JIT
+                        Lexer
+                        Parser
+                        Syntax
+                        Type
 
-executable gencode
-  other-extensions:    GADTs
-  build-depends:       base >=4.6
-  default-language:    Haskell2010
-  hs-source-dirs:      src/main/gencode
-  main-is:             GenBench.hs
+--executable gencode
+--  other-extensions:    GADTs
+--  build-depends:       base >=4.6
+--  default-language:    Haskell2010
+--  hs-source-dirs:      src/main/gencode
+--  main-is:             GenBench.hs

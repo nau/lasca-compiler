@@ -4,10 +4,11 @@ packages:
 flags:
 #  llvm-general:
 #    shared-llvm: true
-
+apply-ghc-options: everything
 ghc-options:
+  "*": -O0
 #  lasca:
-#    -O2
+#   -O2
 #    -rtsopts
 #    -prof
 #    -fprof-auto

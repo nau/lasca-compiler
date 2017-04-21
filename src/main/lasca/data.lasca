@@ -6,8 +6,8 @@ data Point2 = Point2(a: String)
 
 def main() = {
   p1 = Point(1, 2);
-  l = { s -> { p -> p("Hello1") } };
-  l("Hello1")(println);
+  x = p1.x;
+  println(x);
   println("Hello")
 }
 
