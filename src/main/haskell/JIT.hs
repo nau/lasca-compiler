@@ -9,29 +9,33 @@
 --
 --------------------------------------------------------------------
 {-# LANGUAGE Strict #-}
-module JIT where
+module JIT (
+  jit,
+  runJIT,
+  getLLAsString
+) where
 
-import Data.Int
-import Data.Word
-import Foreign.Ptr ( FunPtr, castFunPtr )
-import Syntax
+import           Data.Int
+import           Data.Word
+import           Foreign.Ptr          (FunPtr, castFunPtr)
+import           Syntax
 
-import Control.Monad.Except
+import           Control.Monad.Except
 
-import LLVM.Target
-import LLVM.Context
-import LLVM.CodeModel
-import LLVM.Module as Mod
-import qualified LLVM.AST as AST
+import qualified LLVM.AST             as AST
+import           LLVM.CodeModel
+import           LLVM.Context
+import           LLVM.Module          as Mod
+import           LLVM.Target
 
-import LLVM.PassManager
-import LLVM.Transforms
-import LLVM.Analysis
+import           LLVM.Analysis
+import           LLVM.PassManager
+import           LLVM.Transforms
 
 import qualified LLVM.ExecutionEngine as EE
 
-foreign import ccall "dynamic" haskFun :: FunPtr (IO Double) -> (IO Double)
-foreign import ccall "dynamic" startFun :: FunPtr (IO ()) -> (IO ())
+foreign import ccall "dynamic" haskFun :: FunPtr (IO Double) -> IO Double
+foreign import ccall "dynamic" startFun :: FunPtr (IO ()) -> IO ()
 
 run :: FunPtr a -> IO Double
 run fn = haskFun (castFunPtr fn :: FunPtr (IO Double))
@@ -48,8 +52,7 @@ passes :: Int -> PassSetSpec
 passes level = defaultCuratedPassSetSpec { optLevel = Just (fromIntegral level) }
 
 runJIT :: LascaOpts -> AST.Module -> IO (Either String AST.Module)
-runJIT opts mod = do
-  withContext $ \context ->
+runJIT opts mod = withContext $ \context ->
     jit context $ \executionEngine ->
       runExceptT $ withModuleFromAST context mod $ \m ->
         withPassManager (passes (optimization opts)) $ \pm -> do
@@ -57,10 +60,9 @@ runJIT opts mod = do
           runPassManager pm m
           optmod <- moduleAST m
 
-          if (printLLVMAsm opts) then do
+          when (printLLVMAsm opts) $ do
             s <- moduleLLVMAssembly m
             putStrLn s
-          else return ()
 
           EE.withModuleInEngine executionEngine m $ \ee -> do
             initLascaRuntime <- EE.getFunction ee (AST.Name "start")
