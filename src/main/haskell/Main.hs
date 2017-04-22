@@ -72,6 +72,12 @@ process opts modo source = do
       ast <- codegen opts modo ex
       return $ Just ast
 
+codegen :: LascaOpts -> AST.Module -> [Expr] -> IO AST.Module
+codegen opts modo fns = do
+  let ast = codegenModule modo fns
+  runJIT opts ast
+  return ast
+
 genModule :: LascaOpts -> AST.Module -> String -> IO (Maybe AST.Module)
 genModule opts modo source = case parseToplevel source of
     Left err -> do

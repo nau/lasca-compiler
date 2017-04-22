@@ -57,7 +57,7 @@ runJIT opts mod = withContext $ \context ->
       runExceptT $ withModuleFromAST context mod $ \m ->
         withPassManager (passes (optimization opts)) $ \pm -> do
           -- Optimization Pass
-          runPassManager pm m
+--          runPassManager pm m
           optmod <- moduleAST m
 
           when (printLLVMAsm opts) $ do

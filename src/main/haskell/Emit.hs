@@ -2,7 +2,6 @@
 {-# LANGUAGE Strict #-}
 
 module Emit (
-  codegen,
   codegenModule
 ) where
 
@@ -40,11 +39,11 @@ import Control.Monad.Except
 import Control.Applicative
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Sequence as Seq
 import qualified Debug.Trace as Debug
 
 import Codegen
 import Type
-import JIT (runJIT)
 import qualified Syntax as S
 
 data DataDef = DataDef Int String [S.DataConst]
@@ -53,16 +52,14 @@ data DataDef = DataDef Int String [S.DataConst]
 data Ctx = Context {
   globalFunctions :: Set.Set String,
   globalVals :: Set.Set String,
-  dataDefs :: Map.Map String DataDef,
-  constructorToDataDef :: Map.Map String DataDef,
-  typeId :: Int
+  dataDefs :: [DataDef],
+  typeId :: Int -- TODO remove this. Needed for type id generation. Move to ModuleState?
 } deriving (Show, Eq)
 
 emptyCtx = Context {
   globalFunctions = Set.empty,
   globalVals = Set.empty,
-  dataDefs = Map.empty,
-  constructorToDataDef = Map.empty,
+  dataDefs = [],
   typeId = 1000
 }
 
@@ -89,19 +86,22 @@ getStringLitName s = name
     name = take 15 s ++ "." ++ show hash
     hash = hash32 s
 
-defineStringLit :: String -> LLVM ()
-defineStringLit s = addDefn $ AST.GlobalDefinition $ AST.globalVariableDefaults {
-                          LLVM.AST.Global.name        = getStringLitASTName s
-                        , LLVM.AST.Global.isConstant  = True
-                        , LLVM.AST.Global.type' = stringStructType len
-                        , LLVM.AST.Global.initializer = Just (C.Struct Nothing False [C.Int 32 (toInteger len), C.Array T.i8 bytes])
-                        }
+createString s = (C.Struct Nothing False [C.Int 32 (toInteger len), C.Array T.i8 bytes], len)
   where
     bytestring = UTF8.fromString s
     constByte b = C.Int 8 (toInteger b)
     bytes = map constByte (ByteString.unpack bytestring)
     len = ByteString.length bytestring
 
+defineStringLit :: String -> LLVM ()
+defineStringLit s = addDefn $ AST.GlobalDefinition $ AST.globalVariableDefaults {
+                          LLVM.AST.Global.name        = getStringLitASTName s
+                        , LLVM.AST.Global.isConstant  = True
+                        , LLVM.AST.Global.type' = stringStructType len
+                        , LLVM.AST.Global.initializer = Just string
+                        }
+  where
+    (string, len) = createString s
 
 uncurryLambda expr = go expr ([], expr) where
   go (S.Lam name e) result = let (args, body) = go e result in (name : args, body)
@@ -189,38 +189,7 @@ codegenTop ctx (S.Function name tpe args body) = do
         assign n var
       cgen ctx body >>= ret
 
-codegenTop ctx (S.Data name constructors) = do
-  mapM_ (\(S.DataConst name args) -> defineConstructor name args) constructors
-  where
-    defineConstructor name args = do
-      addDefn $ AST.TypeDefinition structTypeName (Just tpe)
-      modState <- get
-      let codeGenResult = codeGen modState
-      let blocks = createBlocks codeGenResult
-      define ptrType name fargs blocks -- define constructor function
-      where
-        structTypeName = AST.Name (name ++ "Struct")
-        largs = map (\(S.Arg _ t) -> ptrType) args
-        tpe = T.StructureType False largs
-        fargs = toSig args
-
-        codeGen modState = execCodegen [] modState $ do
-          entry <- addBlock entryBlockName
-          setBlock entry
-          nullptr <- getelementptr (constNull tpe) [constInt 1]
-          sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
-          ptr <- call (global ptrType (AST.Name "gcMalloc")) [sizeof]
-          let tpeRef = AST.NamedTypeReference structTypeName
-          structPtr <- bitcast ptr (T.ptr tpe)
-          let argsWithId = zip args [0..]
-          forM argsWithId $ \((S.Arg n t), i) -> do
-            p <- getelementptr structPtr [constInt 0, constInt i]
-            store p (local (AST.Name n))
-          let tid = case Map.lookup name (dataDefs ctx) of
-                         Just (DataDef id _ _) -> id
-                         Nothing -> error ("Couldn't find data type " ++ name)
-          boxed <- call (global ptrType (AST.Name "box")) [constInt tid, ptr]
-          ret boxed
+codegenTop ctx (S.Data name constructors) = return ()
 
 
 codegenTop _ (S.Extern name tpe args) = do
@@ -302,10 +271,10 @@ cgen ctx (S.Var name) = do
 --       Debug.trace ("Local " ++ show name)
       load x
     Nothing -> if name `Set.member` (globalFunctions ctx) then do
-                 Debug.traceM ("Use global def " ++ show name)
+--                 Debug.traceM ("Use global def " ++ show name)
                  boxFunc name mapping
                else if name `Set.member` (globalVals ctx) then do
-                 Debug.traceM ("Use global val " ++ show name)
+--                 Debug.traceM ("Use global val " ++ show name)
                  load (global ptrType (AST.Name name))
                else boxError name
 cgen ctx (S.Literal l) = box l
@@ -465,29 +434,25 @@ boxClosure name mapping enclosedVars = do
 boolToInt True = 1
 boolToInt False = 0
 
-codegen :: S.LascaOpts -> AST.Module -> [S.Expr] -> IO AST.Module
-codegen opts modo fns = do
-  let ast = codegenModule modo fns
-  runJIT opts ast
-  return ast
-
 codegenModule :: AST.Module -> [S.Expr] -> AST.Module
-codegenModule modo fns = modul
+codegenModule modo exprs = modul
     where
-        ctx = createGlobalContext fns
+        ctx = createGlobalContext exprs
         modul = runLLVM modo genModule
         genModule = do
           st <- gets _llvmModule
-          fns' <- rewrite ctx fns
+          fns' <- transform extractLambda exprs
           syn <- gets _syntacticAst
           let fns'' = fns' ++ syn
           st' <- gets _llvmModule
 --           Debug.traceM ("Rewritten exprs: " ++ show fns'')
 --           Debug.traceM ("Rewritten exprs: " ++ show st')
 --           Debug.traceM ("Rewritten exprs: " ++ show st')
-          genFunctionMap fns''
           declareStdFuncs
-          mapM (codegenTop ctx) fns''
+          genFunctionMap fns''
+          let structs = reverse (dataDefs ctx)
+          genStructs structs
+          mapM_ (codegenTop ctx) fns''
           codegenStartFunc ctx
 
 declareStdFuncs = do
@@ -506,8 +471,6 @@ declareStdFuncs = do
   external ptrType "runtimeApply"  [("funcs", ptrType), ("func", ptrType), ("argc", intType), ("argv", ptrType)] False
   external ptrType "runtimeSelect" [("funcs", ptrType), ("tree", ptrType), ("expr", ptrType)] False
 
-rewrite ctx fns = transform extractLambda fns
-
 extractLambda :: S.Expr -> LLVM S.Expr
 extractLambda (S.Lam name expr) = do
   state <- get
@@ -524,13 +487,79 @@ extractLambda (S.Lam name expr) = do
 extractLambda expr@(S.Var n) = do
   modify (\s -> s { _usedVars = Set.insert n (_usedVars s)})
   return expr
-extractLambda expr = do
-  return expr
+extractLambda expr = return expr
+
+createStruct (DataDef tid name [S.DataConst n args]) =
+--  C.Struct Nothing False [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, C.Int 32 (fromIntegral len)]
+  C.Struct Nothing False [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, C.Int 32 (fromIntegral len), fieldsArray]
+  where
+    len = length args
+    fieldsArray = C.Array ptrType fields
+    fields = map (\(S.Arg n _) -> globalStringRefAsPtr n) args
+
+defineStructs defs =
+  forM_ defs $ \d@(DataDef _ name constrs) -> do
+    let struct = createStruct d
+    let (S.DataConst _ args) = head constrs
+    let len = length args
+    defineConst (AST.Name ("Struct." ++ name)) (T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral len) ptrType]) (Just struct)
+
+createStructs structs = C.Struct Nothing False [C.Int 32 (toInteger len), array]
+  where
+    len = length structs
+    array = C.Array ptrType refs
+    refs = fmap (\(DataDef _ name _) -> constRef ("Struct." ++ name)) structs
 
 functionStructType = T.StructureType False [ptrType, ptrType, T.i32]
 functionsStructType len = T.StructureType False [T.i32, arrayTpe len]
 
 arrayTpe len = T.ArrayType len functionStructType
+
+globalStringRef name = C.GlobalReference (stringStructType (length name)) (getStringLitASTName name)
+globalStringRefAsPtr name = C.BitCast (globalStringRef name) ptrType
+
+genStructs defs = do
+  let structs = createStructs defs
+  let len = length defs
+  defineNames defs
+  defineStructs defs
+  let structs = createStructs defs
+  defineConst (AST.Name "Structs") (T.StructureType False [T.i32, T.ArrayType (fromIntegral len) ptrType]) (Just structs)
+  forM_ defs $ \(DataDef tid name constrs)  -> forM_ constrs $ \ (S.DataConst _ args) -> 
+    defineConstructor name tid args
+  where
+    defineNames defs =
+     forM_ defs $ \(DataDef _ name constrs) -> forM_ constrs $
+      \ (S.DataConst name args) ->
+        do defineStringLit name
+           forM_ args $ \ (S.Arg name _) -> defineStringLit name
+           
+    defineConstructor name tid args = do
+          addDefn $ AST.TypeDefinition (AST.Name "Field") Nothing
+          addDefn $ AST.TypeDefinition structTypeName (Just tpe)
+          modState <- get
+          let codeGenResult = codeGen modState
+          let blocks = createBlocks codeGenResult
+          define ptrType name fargs blocks -- define constructor function
+          where
+            structTypeName = AST.Name (name ++ "Struct")
+            largs = map (\(S.Arg _ t) -> ptrType) args
+            tpe = T.StructureType False largs
+            fargs = toSig args
+
+            codeGen modState = execCodegen [] modState $ do
+              entry <- addBlock entryBlockName
+              setBlock entry
+              nullptr <- getelementptr (constNull tpe) [constInt 1]
+              sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
+              ptr <- call (global ptrType (AST.Name "gcMalloc")) [sizeof]
+              structPtr <- bitcast ptr (T.ptr tpe)
+              let argsWithId = zip args [0..]
+              forM_ argsWithId $ \(S.Arg n t, i) -> do
+                p <- getelementptr structPtr [constInt 0, constInt i]
+                store p (local (AST.Name n))
+              boxed <- call (global ptrType (AST.Name "box")) [constInt tid, ptr]
+              ret boxed
 
 genFunctionMap :: [S.Expr] -> LLVM ()
 genFunctionMap fns = do
@@ -548,7 +577,7 @@ genFunctionMap fns = do
 
 --     structType = T.StructureType False [stringStructType, T.i32]
 
-    array = C.Array functionStructType (fmap (\(_, s) -> s) entries)
+    array = C.Array functionStructType (fmap snd entries)
 
     mapping :: Map.Map String Int
     mapping = go 0 Map.empty entries where
@@ -559,15 +588,15 @@ genFunctionMap fns = do
 
     entries = fmap (\(name, arity) -> (name, struct name arity)) funcsWithArities
 
-    struct1 = C.Struct (Nothing) False [C.Int 32 (toInteger len), array]
+    struct1 = C.Struct Nothing False [C.Int 32 (toInteger len), array]
 
-    struct name arity = C.Struct (Nothing) False
-                            [C.BitCast (ref name) ptrType, constRef name, C.Int 32 (toInteger arity)]
+    struct name arity = C.Struct Nothing False
+                            [globalStringRefAsPtr name, constRef name, C.Int 32 (toInteger arity)]
 
-    ref name = C.GlobalReference (stringStructType (length name)) (getStringLitASTName name)
 
-    funcsWithArities = (foldl go [] fns) where
+    funcsWithArities = foldl go [] fns where
       go s (S.Data name consts) =
+        -- Add data constructors as global functions
         let m = foldl (\acc (S.DataConst n args) -> (n, length args) : acc) [] consts
         in m ++ s
       go s (S.Function name tpe args body) = (name, length args) : s
@@ -597,7 +626,7 @@ createGlobalContext exprs = execState (loop exprs) emptyCtx
         let dataDef = DataDef id name consts
         let m = foldl (\acc (S.DataConst n _) -> n : acc) [] consts
         modify (\s -> s {
-          dataDefs = Map.insert name dataDef (dataDefs s),
+          dataDefs =  dataDef : dataDefs s,
           globalFunctions = globFuncs `Set.union` Set.fromList m,
           typeId = id + 1
           })

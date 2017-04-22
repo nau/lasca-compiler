@@ -50,7 +50,8 @@ data ModuleState = ModuleState {
   _syntacticAst :: [S.Expr],
   _globalValsInit :: [(S.Name, S.Expr)],
   _modNames :: Names,
-  functions :: Map.Map String Int
+  functions :: Map.Map String Int,
+  structs :: Map.Map Int Int
 } deriving (Show)
 
 -- makeLenses ''ModuleState
@@ -68,7 +69,8 @@ initModuleState modl = ModuleState {
   _syntacticAst = [],
   _globalValsInit = [],
   _modNames = Map.empty,
-  functions = Map.empty
+  functions = Map.empty,
+  structs = Map.empty
 }
 
 emptyModule :: String -> AST.Module

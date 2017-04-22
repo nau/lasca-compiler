@@ -90,6 +90,18 @@ typedef struct {
   Function functions[];
 } Functions;
 
+typedef struct {
+  String name;
+  Box* value;
+} Field;
+
+typedef struct {
+  int typeId;
+  String* name;
+  int numFields;
+  String fields[];
+} Data;
+
 void *gcMalloc(size_t s) {
     return GC_malloc(s);
 }
@@ -114,6 +126,8 @@ const char * typeIdToName(int typeId) {
     default: return "Unknown";
   }
 }
+
+/* =============== Boxing ================== */
 
 Box *box(int type_id, void *value) {
   Box* ti = gcMalloc(sizeof(Box));
@@ -192,6 +206,9 @@ int unboxInt(Box* ti) {
     exit(1);
   }
 }
+
+/* ==================== Runtime Ops ============== */
+
 
 #define DO_OP(op) if (lhs->type == INT) { result = boxInt(left op right); } else if (lhs->type == DOUBLE) { result = boxFloat64(lhs->value.dbl op rhs->value.dbl); } else { \
                         printf("AAAA!!! Type mismatch! Expected Int or Double for op but got %s\n", typeIdToName(lhs->type)); exit(1); }
@@ -349,6 +366,7 @@ Box* runtimeApply(Functions* fs, Box* val, int argc, Box* argv[]) {
 
 }
 
+/* ================== IO ================== */
 
 double putchard(double X) {
   putchar((char)X);
@@ -370,7 +388,7 @@ void * __cdecl println(Box* val) {
 }
 
 
-//=================== Arrays =================
+/* =================== Arrays ================= */
 
 
 Array* createArray(size_t size) {
@@ -446,6 +464,8 @@ Box* arrayToString(Box* arrayValue) {
   }
 }
 
+/* =============== Strings ============= */
+
 Box* toString(Box* value) {
   char buf[100];
 
@@ -471,6 +491,8 @@ Box* toString(Box* value) {
       exit(1);
   }
 }
+
+/* =========== Math ================== */
 
 Box* lasqrt(Box * dbl) {
   switch (dbl->type) {
