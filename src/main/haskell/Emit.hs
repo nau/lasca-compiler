@@ -277,7 +277,8 @@ cgen ctx (S.Select tree expr) = do
   tree <- cgen ctx tree
   e <- cgen ctx expr
   let funcs = constRefOperand "Functions"
-  call (global runtimeSelectFuncType (AST.Name "runtimeSelect")) [funcs, tree, e]
+  let structs = constRefOperand "Structs"
+  call (global runtimeSelectFuncType (AST.Name "runtimeSelect")) [funcs, structs, tree, e]
 cgen ctx (S.Apply (S.Var "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True)) rhs)
 cgen ctx (S.Apply (S.Var "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False)))
 cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
@@ -363,7 +364,7 @@ boxFuncType = funcType ptrType [T.i32]
 boxArrayFuncType = T.FunctionType ptrType [T.i32] True
 runtimeBinOpFuncType = funcType ptrType [T.i32, ptrType, ptrType]
 runtimeApplyFuncType = funcType ptrType [ptrType, ptrType, T.i32, ptrType]
-runtimeSelectFuncType = funcType ptrType [ptrType, ptrType, ptrType]
+runtimeSelectFuncType = funcType ptrType [ptrType, ptrType, ptrType, ptrType]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
 
 gcMalloc size = call (global (funcType ptrType [T.i32]) (AST.Name "gcMalloc")) [constInt size]
@@ -452,7 +453,7 @@ declareStdFuncs = do
   external ptrType "boxArray" [("size", intType)] True
   external ptrType "runtimeBinOp"  [("code",  intType), ("lhs",  ptrType), ("rhs", ptrType)] False
   external ptrType "runtimeApply"  [("funcs", ptrType), ("func", ptrType), ("argc", intType), ("argv", ptrType)] False
-  external ptrType "runtimeSelect" [("funcs", ptrType), ("tree", ptrType), ("expr", ptrType)] False
+  external ptrType "runtimeSelect" [("funcs", ptrType), ("structs", ptrType), ("tree", ptrType), ("expr", ptrType)] False
 
 extractLambda :: S.Expr -> LLVM S.Expr
 extractLambda (S.Lam name expr) = do
@@ -533,13 +534,16 @@ genStructs defs = do
             codeGen modState = execCodegen [] modState $ do
               entry <- addBlock entryBlockName
               setBlock entry
+              let (S.Arg first _) = head args
+--              p <- call (global ptrType (AST.Name "toString")) [local (AST.Name first)]
+--              call (global ptrType (AST.Name "println")) [p]
               nullptr <- getelementptr (constNull tpe) [constInt 1]
               sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
-              ptr <- call (global ptrType (AST.Name "gcMalloc")) [sizeof]
-              structPtr <- bitcast ptr (T.ptr tpe)
+              ptr <- call (global ptrType (AST.Name "gcMalloc")) [constInt 16] -- FIXME Hack
+              arrayPtr <- bitcast ptr (T.ptr (T.ArrayType 2 ptrType))
               let argsWithId = zip args [0..]
               forM_ argsWithId $ \(S.Arg n t, i) -> do
-                p <- getelementptr structPtr [constInt 0, constInt i]
+                p <- getelementptr arrayPtr [constInt 0, constInt i]
                 store p (local (AST.Name n))
               boxed <- call (global ptrType (AST.Name "box")) [constInt tid, ptr]
               ret boxed

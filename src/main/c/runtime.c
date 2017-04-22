@@ -91,16 +91,17 @@ typedef struct {
 } Functions;
 
 typedef struct {
-  String name;
-  Box* value;
-} Field;
-
-typedef struct {
   int typeId;
   String* name;
   int numFields;
-  String fields[];
-} Data;
+  String* fields[];
+} Struct;
+
+typedef struct {
+  int size;
+  Struct* structs[];
+} Structs;
+
 
 void *gcMalloc(size_t s) {
     return GC_malloc(s);
@@ -113,6 +114,9 @@ void *gcMallocAtomic(size_t s) {
 void *gcRealloc(void* old, size_t s) {
     return GC_realloc(old, s);
 }
+
+Box* toString(Box* value);
+void * println(Box* val);
 
 const char * typeIdToName(int typeId) {
   switch (typeId) {
@@ -276,7 +280,29 @@ String s = {
   .bytes = "Unimplemented select"
 };
 
-Box* runtimeSelect(Functions* fs, Box* tree, Box* ident) {
+Box* runtimeSelect(Functions* fs, Structs* structs, Box* tree, Box* ident) {
+  if (tree->type >= 1000) {
+//    printf("Found struct %d\n", tree->type);
+//    printf("Found structs %d\n", structs->size);
+    if (ident->type == -1) {
+      String* name = ident->value.ptr; // should be identifier name
+//      printf("Ident name %.*s\n", name->length, name->bytes);
+      Struct* strct = structs->structs[tree->type - 1000]; // find struct in global array of structs
+      int numFields = strct->numFields;
+      for (int i = 0; i < numFields; i++) {
+        String* field = strct->fields[i];
+//        printf("Check field %d %.*s\n", field->length, field->length, field->bytes);
+        if (field->length == name->length && strncmp(field->bytes, name->bytes, name->length) == 0) {
+          Box** values = tree->value.ptr;
+          Box* value = values[i];
+//          printf("Found value %d at index %d\n", value->type, i);
+//          println(toString(value));
+          return value;
+        }
+      }
+      printf("Couldn't find field %.*s\n", name->length, name->bytes);
+    }
+  }
   return boxError(&s);
 }
 
@@ -381,7 +407,7 @@ void * runtimePutchar(Box* ch) {
   return 0;
 }
 
-void * __cdecl println(Box* val) {
+void * println(Box* val) {
   String * str = unbox(STRING, val);
   printf("%.*s\n", str->length, str->bytes);
   return NULL;
@@ -431,8 +457,6 @@ Box* makeString(char * str) {
   strncpy(val->bytes, str, val->length);
   return box(STRING, val);
 }
-
-Box* toString(Box* value);
 
 Box* arrayToString(Box* arrayValue) {
   Array* array = unbox(ARRAY, arrayValue);
