@@ -183,7 +183,7 @@ codegenTop ctx (S.Function name tpe args body) = do
       entry <- addBlock entryBlockName
       setBlock entry
 --       Debug.traceM ("Generating function2 " ++ name)
-      forM args $ \(S.Arg n t) -> do
+      forM_ args $ \(S.Arg n t) -> do
         var <- alloca ptrType
         store var (local (AST.Name n))
         assign n var
@@ -192,13 +192,8 @@ codegenTop ctx (S.Function name tpe args body) = do
 codegenTop ctx (S.Data name constructors) = return ()
 
 
-codegenTop _ (S.Extern name tpe args) = do
---   s <- gets _llvmModule
---   Debug.traceM("External function " ++ name)
---   Debug.traceM ("External function " ++ show s)
-  external llvmType name fnargs False
+codegenTop _ (S.Extern name tpe args) = external llvmType name fnargs False
   where
-    h s = show s
     llvmType = typeMapping tpe
     fnargs = externArgsToSig args
 
@@ -221,7 +216,7 @@ codegenStartFunc ctx = do
         call (global initLascaRuntimeFuncType (AST.Name "initLascaRuntime")) []
         initGlobals
         call (global mainFuncType (AST.Name "main")) []
-        terminator $ I.Do $ I.Ret (Nothing) []
+        terminator $ I.Do $ I.Ret Nothing []
         return ()
 
     initGlobals = do
@@ -270,13 +265,9 @@ cgen ctx (S.Var name) = do
     Just x ->
 --       Debug.trace ("Local " ++ show name)
       load x
-    Nothing -> if name `Set.member` (globalFunctions ctx) then do
---                 Debug.traceM ("Use global def " ++ show name)
-                 boxFunc name mapping
-               else if name `Set.member` (globalVals ctx) then do
---                 Debug.traceM ("Use global val " ++ show name)
-                 load (global ptrType (AST.Name name))
-               else boxError name
+    Nothing | name `Set.member` globalFunctions ctx -> boxFunc name mapping
+            | name `Set.member` globalVals ctx -> load (global ptrType (AST.Name name))
+            | otherwise -> boxError name
 cgen ctx (S.Literal l) = box l
 cgen ctx (S.Array exprs) = do
   vs <- values
@@ -292,16 +283,14 @@ cgen ctx (S.Apply (S.Var "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal 
 cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
   llhs <- cgen ctx lhs
   lrhs <- cgen ctx rhs
-  let code = case Map.lookup fn binops of
-               Just c -> c
-               Nothing -> error ("Couldn't find binop " ++ fn)
+  let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
   let codeOp = constInt code
   call (global runtimeBinOpFuncType (AST.Name "runtimeBinOp")) [codeOp, llhs, lrhs]
 cgen ctx (S.Apply expr args) = do
   syms <- gets symtab
   largs <- mapM (cgen ctx) args
   let symMap = Map.fromList syms
-  let isGlobal fn = (fn `Set.member` (globalFunctions ctx)) && not (fn `Map.member` symMap)
+  let isGlobal fn = (fn `Set.member` globalFunctions ctx) && not (fn `Map.member` symMap)
   case expr of
      -- TODO Here are BUGZZZZ!!!! :)
      -- TODO check arguments!
@@ -315,12 +304,12 @@ cgen ctx (S.Apply expr args) = do
       let len = Map.size funcs
       let funcs = constRefOperand "Functions"
       sargsPtr <- allocaSize ptrType argc
-      let asdf = (\(idx, arg) -> do {
-        p <- getelementptr sargsPtr [idx];
-        store p arg})
+      let asdf (idx, arg) = do
+            p <- getelementptr sargsPtr [idx]
+            store p arg
       sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
       -- cdecl calling convension, arguments passed right to left
-      sequence [asdf (constInt i, a) | (i, a) <- (zip [0..len] largs)]
+      sequence_ [asdf (constInt i, a) | (i, a) <- zip [0 .. len] largs]
       call (global runtimeApplyFuncType (AST.Name "runtimeApply")) [funcs, e, argc, sargs]
 --   call e largs
 cgen ctx (S.BoxFunc funcName enclosedVars) = do
@@ -383,7 +372,7 @@ box :: S.Lit -> Codegen AST.Operand
 box (S.BoolLit b) = call (global boxFuncType (AST.Name "boxBool")) [constInt (boolToInt b)]
 box (S.IntLit  n) = call (global boxFuncType (AST.Name "boxInt")) [constInt n]
 box (S.FloatLit  n) = call (global boxFuncType (AST.Name "boxFloat64")) [constFloat n]
-box (S.UnitLit) = call (global boxFuncType (AST.Name "box")) [constInt 0, constInt 0]
+box S.UnitLit = call (global boxFuncType (AST.Name "box")) [constInt 0, constInt 0]
 box (S.StringLit s) = do
   let name = getStringLitASTName s
   let len = ByteString.length . UTF8.fromString $ s
@@ -394,9 +383,7 @@ box (S.StringLit s) = do
 boxArray values = call (global boxFuncType (AST.Name "boxArray")) (constInt (length values) : values)
 
 boxFunc name mapping = do
-  let idx = case Map.lookup name mapping of
-              Just i -> i
-              Nothing -> error ("No such function " ++ name)
+  let idx = fromMaybe (error ("No such function " ++ name)) (Map.lookup name mapping)
   call (global (funcType ptrType [T.i32]) (AST.Name "boxFunc")) [constInt idx]
 
 boxError name = do
@@ -410,24 +397,20 @@ boxError name = do
 boxClosure :: String -> Map.Map String Int -> [S.Arg] -> Codegen AST.Operand
 boxClosure name mapping enclosedVars = do
   syms <- gets symtab
-  let idx = case Map.lookup name mapping of
-              Just i -> i
-              Nothing -> error ("Couldn't find " ++ name ++ " in mapping:\n" ++ show mapping)
+  let idx = fromMaybe (error ("Couldn't find " ++ name ++ " in mapping:\n" ++ show mapping)) (Map.lookup name mapping)
   let argc = length enclosedVars
-  let findArg n = case lookup n syms of
-                    Just op -> op
-                    Nothing -> error ("Couldn't find " ++ n ++  " variable in symbols " ++ show syms)
+  let findArg n = fromMaybe (error ("Couldn't find " ++ n ++ " variable in symbols " ++ show syms)) (lookup n syms)
   let args = map (\(S.Arg n _) -> findArg n) enclosedVars
   sargsPtr <- gcMalloc (ptrSize * argc)
   sargsPtr1 <- bitcast sargsPtr (T.ptr ptrType)
-  let asdf = (\(idx, arg) -> do {
-    p <- getelementptr sargsPtr1 [idx];
-    bc1 <- bitcast p (T.ptr ptrType);
-    bc <- load arg;
-    store bc1 bc
-  })
+  let asdf (idx, arg) = do
+       p <- getelementptr sargsPtr1 [idx]
+       bc1 <- bitcast p (T.ptr ptrType)
+       bc <- load arg
+       store bc1 bc
+              
   let sargs = sargsPtr
-  sequence [asdf (constInt i, a) | (i, a) <- zip [0..argc] args]
+  sequence_ [asdf (constInt i, a) | (i, a) <- zip [0 .. argc] args]
   call (global (funcType ptrType [T.i32, T.i32, ptrType]) (AST.Name "boxClosure"))
     [constInt idx, constInt argc, sargsPtr]
 
@@ -480,7 +463,7 @@ extractLambda (S.Lam name expr) = do
   let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
   let enclosedArgs = map (\n -> S.Arg n typeAny) usedOuterVars
   let (funcName, nms') = uniqueName "lambda" nms
-  let func = (S.Function (funcName) typeAny (enclosedArgs ++ [(S.Arg name typeAny)]) expr)
+  let func = S.Function funcName typeAny (enclosedArgs ++ [S.Arg name typeAny]) expr
   modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
 --   Debug.traceM ("Generated lambda " ++ show func ++ ", outerVars = " ++ show outerVars ++ ", usedOuterVars" ++ show usedOuterVars)
   return (S.BoxFunc funcName enclosedArgs)
