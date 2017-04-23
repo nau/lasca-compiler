@@ -58,8 +58,7 @@ postfixApply = Ex.Postfix parser
 
 
 binops = [
-          [Ex.InfixL (reservedOp "." >> return Select)],
-          [postfixApply],
+          [Ex.InfixL (reservedOp "." >> return Select), postfixApply],
           [binary "*", binary "/" ],
           [binary "+", binary "-" ],
           [binary "<=", binary ">=", binary "<", binary ">", binary "==" , binary "!="],

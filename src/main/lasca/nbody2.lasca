@@ -109,36 +109,30 @@ def advance(bodies, dt) = {
 
   r34 = advanceInner(r23(1),    r24(1), dt);
 
-  r040 = r04(0);
-  r140 = r14(0);
-  r240 = r24(0);
-  r340 = r34(0);
-  r341 = r34(1);
-
   sun = bodies(0);
-  sunVx = r040.vx;
-  sunVy = r040.vy;
-  sunVz = r040.vz;
+  sunVx = r04(0).vx;
+  sunVy = r04(0).vy;
+  sunVz = r04(0).vz;
 
   jupiter = bodies(1);
-  jupiterVx = r140.vx;
-  jupiterVy = r140.vy;
-  jupiterVz = r140.vz;
+  jupiterVx = r14(0).vx;
+  jupiterVy = r14(0).vy;
+  jupiterVz = r14(0).vz;
 
   saturn = bodies(2);
-  saturnVx = r240.vx;
-  saturnVy = r240.vy;
-  saturnVz = r240.vz;
+  saturnVx = r24(0).vx;
+  saturnVy = r24(0).vy;
+  saturnVz = r24(0).vz;
 
   uranus = bodies(3);
-  uranusVx = r340.vx;
-  uranusVy = r340.vy;
-  uranusVz = r340.vz;
+  uranusVx = r34(0).vx;
+  uranusVy = r34(0).vy;
+  uranusVz = r34(0).vz;
 
   neptune = bodies(4);
-  neptuneVx = r341.vx;
-  neptuneVy = r341.vy;
-  neptuneVz = r341.vz;
+  neptuneVx = r34(1).vx;
+  neptuneVy = r34(1).vy;
+  neptuneVz = r34(1).vz;
 
   [
     Body(sun.x + dt * sunVx,     sun.y + dt * sunVy,     sun.z + dt * sunVz,     sunVx, sunVy, sunVz, sun.mass),
@@ -197,7 +191,7 @@ def main() = {
   initedBodies = init(bodies);
   println(toString(energy(initedBodies)));
   advance(initedBodies, 0.01);
-  advanced = calculate(50000, initedBodies); -- set to 50000000 for real benchmark
+  advanced = calculate(500000, initedBodies); -- set to 50000000 for real benchmark
   println(toString(energy(advanced)));
   println("Done")
 }

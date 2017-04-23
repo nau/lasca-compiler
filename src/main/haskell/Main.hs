@@ -20,6 +20,7 @@ import System.Console.Haskeline
 import Options.Applicative
 import Data.Semigroup ((<>))
 import qualified Debug.Trace as Debug
+import qualified Text.Megaparsec as Megaparsec
 
 import qualified LLVM.AST as AST
 
@@ -81,7 +82,7 @@ codegen opts modo fns = do
 genModule :: LascaOpts -> AST.Module -> String -> IO (Maybe AST.Module)
 genModule opts modo source = case parseToplevel source of
     Left err -> do
-        putStrLn $ show err
+        putStrLn $ Megaparsec.parseErrorPretty err
         return Nothing
     Right ex -> do
         putStrLn "Parsed OK"
