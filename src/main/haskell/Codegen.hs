@@ -29,6 +29,7 @@ import qualified LLVM.AST.Attribute as A
 import qualified LLVM.AST.CallingConvention as CC
 import qualified LLVM.AST.FloatingPointPredicate as FP
 import qualified LLVM.AST.Float as F
+import qualified LLVM.AST.FunctionAttribute as FA
 
 import qualified Debug.Trace as Debug
 
@@ -109,10 +110,11 @@ define retty label argtys body = addDefn $
   , basicBlocks = body
   }
 
-external ::  Type -> String -> [(String, Type)] -> Bool -> LLVM ()
-external retty label argtys vararg = addDefn $
+external ::  Type -> String -> [(String, Type)] -> Bool -> [A.GroupID] -> LLVM ()
+external retty label argtys vararg funcAttrs = addDefn $
   GlobalDefinition $ functionDefaults {
     name        = Name label
+  , LLVM.AST.Global.functionAttributes = map Left funcAttrs
   , parameters  = ([Parameter ty (Name nm) [] | (nm, ty) <- argtys], vararg)
   , returnType  = retty
   , basicBlocks = []
@@ -132,7 +134,7 @@ typeInfoStructType = T.StructureType False [T.i32, ptrType]
 ptrType = T.ptr T.i8
 
 ptrSize :: Int
-ptrSize = 8
+ptrSize = 8 -- 64 bit architecture, TODO this is hardcode
 
 -------------------------------------------------------------------------------
 -- Names

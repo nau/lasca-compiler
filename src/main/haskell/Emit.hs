@@ -18,6 +18,7 @@ import qualified LLVM.AST.Constant as C
 import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.IntegerPredicate as IP
 import qualified LLVM.AST.FloatingPointPredicate as FP
+import qualified LLVM.AST.FunctionAttribute as FA
 
 -- import qualified Data.Text as Text
 import qualified Data.ByteString as ByteString
@@ -192,7 +193,7 @@ codegenTop ctx (S.Function name tpe args body) = do
 codegenTop ctx (S.Data name constructors) = return ()
 
 
-codegenTop _ (S.Extern name tpe args) = external llvmType name fnargs False
+codegenTop _ (S.Extern name tpe args) = external llvmType name fnargs False []
   where
     llvmType = typeMapping tpe
     fnargs = externArgsToSig args
@@ -440,20 +441,21 @@ codegenModule modo exprs = modul
           codegenStartFunc ctx
 
 declareStdFuncs = do
-  external T.void "initLascaRuntime" [] False
-  external ptrType "gcMalloc" [("size", intType)] False
-  external ptrType "box" [("t", intType), ("ptr", ptrType)] False
-  external ptrType "unbox" [("t", intType), ("ptr", ptrType)] False
-  external ptrType "boxError" [("n", ptrType)] False
-  external ptrType "boxInt" [("d", intType)] False
-  external ptrType "boxBool" [("d", intType)] False
-  external ptrType "boxFunc" [("id", intType)] False
-  external ptrType "boxClosure" [("id", intType), ("argc", intType), ("argv", ptrType)] False
-  external ptrType "boxFloat64" [("d", T.double)] False
-  external ptrType "boxArray" [("size", intType)] True
-  external ptrType "runtimeBinOp"  [("code",  intType), ("lhs",  ptrType), ("rhs", ptrType)] False
-  external ptrType "runtimeApply"  [("funcs", ptrType), ("func", ptrType), ("argc", intType), ("argv", ptrType)] False
-  external ptrType "runtimeSelect" [("funcs", ptrType), ("structs", ptrType), ("tree", ptrType), ("expr", ptrType)] False
+  external T.void "initLascaRuntime" [] False []
+  external ptrType "gcMalloc" [("size", intType)] False []
+  external ptrType "box" [("t", intType), ("ptr", ptrType)] False [FA.GroupID 0]
+  external ptrType "unbox" [("t", intType), ("ptr", ptrType)] False [FA.GroupID 0]
+  external ptrType "boxError" [("n", ptrType)] False [FA.GroupID 0]
+  external ptrType "boxInt" [("d", intType)] False [FA.GroupID 0]
+  external ptrType "boxBool" [("d", intType)] False [FA.GroupID 0]
+  external ptrType "boxFunc" [("id", intType)] False [FA.GroupID 0]
+  external ptrType "boxClosure" [("id", intType), ("argc", intType), ("argv", ptrType)] False []
+  external ptrType "boxFloat64" [("d", T.double)] False [FA.GroupID 0]
+  external ptrType "boxArray" [("size", intType)] True [FA.GroupID 0]
+  external ptrType "runtimeBinOp"  [("code",  intType), ("lhs",  ptrType), ("rhs", ptrType)] False [FA.GroupID 0]
+  external ptrType "runtimeApply"  [("funcs", ptrType), ("func", ptrType), ("argc", intType), ("argv", ptrType)] False []
+  external ptrType "runtimeSelect" [("funcs", ptrType), ("structs", ptrType), ("tree", ptrType), ("expr", ptrType)] False [FA.GroupID 0]
+  addDefn $ AST.FunctionAttributes (FA.GroupID 0) [FA.ReadOnly]
 
 extractLambda :: S.Expr -> LLVM S.Expr
 extractLambda (S.Lam name expr) = do
@@ -534,13 +536,11 @@ genStructs defs = do
             codeGen modState = execCodegen [] modState $ do
               entry <- addBlock entryBlockName
               setBlock entry
-              let (S.Arg first _) = head args
---              p <- call (global ptrType (AST.Name "toString")) [local (AST.Name first)]
---              call (global ptrType (AST.Name "println")) [p]
-              nullptr <- getelementptr (constNull tpe) [constInt 1]
-              sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
-              ptr <- call (global ptrType (AST.Name "gcMalloc")) [constInt 16] -- FIXME Hack
-              arrayPtr <- bitcast ptr (T.ptr (T.ArrayType 2 ptrType))
+--              nullptr <- getelementptr (constNull tpe) [constInt 1]
+--              sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
+              let len = length args
+              ptr <- call (global ptrType (AST.Name "gcMalloc")) [constInt (ptrSize * len)]
+              arrayPtr <- bitcast ptr (T.ptr (T.ArrayType (fromIntegral len) ptrType))
               let argsWithId = zip args [0..]
               forM_ argsWithId $ \(S.Arg n t, i) -> do
                 p <- getelementptr arrayPtr [constInt 0, constInt i]

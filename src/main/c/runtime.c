@@ -118,7 +118,7 @@ void *gcRealloc(void* old, size_t s) {
 Box* toString(Box* value);
 void * println(Box* val);
 
-const char * typeIdToName(int typeId) {
+const char * __attribute__ ((const)) typeIdToName(int typeId) {
   switch (typeId) {
     case 0: return "Unit";
     case 1: return "Bool";
@@ -140,18 +140,18 @@ Box *box(int type_id, void *value) {
   return ti;
 }
 
-Box * boxBool(int i) {
+Box * __attribute__ ((pure)) boxBool(int i) {
   switch (i) {
     case 0: return &FALSE_SINGLETON; break;
     default: return &TRUE_SINGLETON; break;
   }
 }
 
-Box * boxError(String *name) {
+Box * __attribute__ ((pure)) boxError(String *name) {
   return box(-1, name);
 }
 
-Box * boxInt(int i) __attribute__ ((const)) {
+Box * __attribute__ ((pure)) boxInt(int i) {
   if (i >= 0 && i < 100) return &INT_ARRAY[i];
   else {
     Box* ti = gcMallocAtomic(sizeof(Box));
@@ -161,7 +161,7 @@ Box * boxInt(int i) __attribute__ ((const)) {
   }
 }
 
-Box * boxFloat64(double i) __attribute__ ((const)) {
+Box * __attribute__ ((pure)) boxFloat64(double i) {
   if (i == 0.0) return &DOUBLE_ZERO;
   Box* ti = gcMallocAtomic(sizeof(Box));
   ti->type = DOUBLE;
@@ -181,13 +181,13 @@ Box * boxClosure(int idx, int argc, Box** args) {
   return box(CLOSURE, cl);
 }
 
-Box * boxFunc(int idx) {
+Box * __attribute__ ((pure)) boxFunc(int idx) {
 //  printf("boxFunc(%d)\n", idx);
 //  fflush(stdout);
   return boxClosure(idx, 0, NULL);
 }
 
-void *unbox(int expected, Box* ti) {
+void * __attribute__ ((pure)) unbox(int expected, Box* ti) {
 //  printf("unbox(%d, %d) ", ti->type, (int) ti->value);
   if (ti->type == expected) {
   	return ti->value.ptr;
@@ -201,7 +201,7 @@ void *unbox(int expected, Box* ti) {
   }
 }
 
-int unboxInt(Box* ti) {
+int __attribute__ ((pure)) unboxInt(Box* ti) {
 //  printf("unbox(%d, %d) ", ti->type, (int) ti->value);
   if (ti->type == INT) {
   	return ti->value.num;
@@ -223,7 +223,7 @@ int unboxInt(Box* ti) {
                    case DOUBLE:  { result = boxBool (left op right); break; } \
                    default: {printf("AAAA!!! Type mismatch! Expected Bool, Int or Double but got %s\n", typeIdToName(lhs->type)); exit(1); }\
                    }
-Box* runtimeBinOp(int code, Box* lhs, Box* rhs) {
+Box* __attribute__ ((pure)) runtimeBinOp(int code, Box* lhs, Box* rhs) {
   if (lhs->type != rhs->type) {
   	printf("AAAA!!! Type mismatch! lhs = %s, rhs = %s\n", typeIdToName(lhs->type), typeIdToName(rhs->type));
   	exit(1);
@@ -263,14 +263,14 @@ Box* runtimeBinOp(int code, Box* lhs, Box* rhs) {
   return result;
 }
 
-Box* arrayApply(Box* arrayValue, Box* idx) {
+Box* arrayApply(Box* arrayValue, Box* idx) __attribute__ ((const)) {
   Array* array = unbox(ARRAY, arrayValue);
   int index = unboxInt(idx);
   assert(array->length > index);
   return array->data[index];
 }
 
-Box* arrayLength(Box* arrayValue) {
+Box* arrayLength(Box* arrayValue) __attribute__ ((const)) {
   Array* array = unbox(ARRAY, arrayValue);
   return boxInt(array->length);
 }
@@ -280,7 +280,7 @@ String s = {
   .bytes = "Unimplemented select"
 };
 
-Box* runtimeSelect(Functions* fs, Structs* structs, Box* tree, Box* ident) {
+Box* __attribute__ ((pure)) runtimeSelect(Functions* fs, Structs* structs, Box* tree, Box* ident) {
   if (tree->type >= 1000) {
 //    printf("Found struct %d\n", tree->type);
 //    printf("Found structs %d\n", structs->size);
@@ -429,7 +429,8 @@ Box* boxArray(size_t size, ...) {
   Array * array = createArray(size);
   va_start (argp, size);
   for (int i = 0; i < size; i++) {
-    array->data[i] = va_arg(argp, Box*);
+    Box* arg = va_arg(argp, Box*);
+    array->data[i] = arg;
   }
   va_end (argp);                  /* Clean up. */
   return box(ARRAY, array);
@@ -451,14 +452,14 @@ Box* prepend(Box* arrayValue, Box* value) {
   return box(ARRAY, newArray);
 }
 
-Box* makeString(char * str) {
+Box* __attribute__ ((pure)) makeString(char * str) {
   String* val = gcMalloc(sizeof(String));
   val->length = strlen(str);
   strncpy(val->bytes, str, val->length);
   return box(STRING, val);
 }
 
-Box* arrayToString(Box* arrayValue) {
+Box* __attribute__ ((pure)) arrayToString(Box* arrayValue)  {
   Array* array = unbox(ARRAY, arrayValue);
   if (array->length == 0) {
     return makeString("[]");
@@ -490,7 +491,7 @@ Box* arrayToString(Box* arrayValue) {
 
 /* =============== Strings ============= */
 
-Box* toString(Box* value) {
+Box* __attribute__ ((pure)) toString(Box* value) {
   char buf[100];
 
   switch (value->type) {
@@ -518,7 +519,7 @@ Box* toString(Box* value) {
 
 /* =========== Math ================== */
 
-Box* lasqrt(Box * dbl) {
+Box* __attribute__ ((pure)) lasqrt(Box * dbl) {
   switch (dbl->type) {
     case INT: return boxInt((int) sqrt(dbl->value.num)); break;
     case DOUBLE: return boxFloat64(sqrt(dbl->value.dbl)); break;
