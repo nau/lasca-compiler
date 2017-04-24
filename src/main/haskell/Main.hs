@@ -58,7 +58,8 @@ lascaOpts = LascaOpts
 greet :: LascaOpts -> IO ()
 greet opts | null (lascaFiles opts) = repl opts
            | otherwise = do
-   mapM_ (processFile opts) (lascaFiles opts)
+   let file = head (lascaFiles opts)
+   processFile opts file
    return ()
 
 initModule :: String -> AST.Module

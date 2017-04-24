@@ -548,7 +548,7 @@ void initEnvironment(int argc, char* argv[]) {
 //    strcat(buf, argv[i]);
 //    strcat(buf, " ");
 //  }
-//  printf("Called with %d args: %s\n", argc, buf);
+//  printf("Called with %d \n", argc);
   ENV.argc = argc;
   Array* array = createArray(argc);
   for (int i = 0; i < argc; i++) {

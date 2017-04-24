@@ -17,7 +17,11 @@ module JIT (
 
 import           Data.Int
 import           Data.Word
-import           Foreign.Ptr          (FunPtr, castFunPtr)
+import System.Environment (getArgs)
+import           Foreign.Ptr          (FunPtr, Ptr, castFunPtr)
+import           Foreign.C.String
+import           Foreign.C.Types
+import Foreign.Marshal.Array
 import           Syntax
 
 import           Control.Monad.Except
@@ -34,11 +38,7 @@ import           LLVM.Transforms
 
 import qualified LLVM.ExecutionEngine as EE
 
-foreign import ccall "dynamic" haskFun :: FunPtr (IO Double) -> IO Double
-foreign import ccall "dynamic" startFun :: FunPtr (IO ()) -> IO ()
-
-run :: FunPtr a -> IO Double
-run fn = haskFun (castFunPtr fn :: FunPtr (IO Double))
+foreign import ccall "dynamic" startFun :: FunPtr (Int -> Ptr CString -> IO ()) -> Int -> Ptr CString -> IO ()
 
 jit :: Context -> (EE.MCJIT -> IO a) -> IO a
 jit c = EE.withMCJIT c optlevel model ptrelim fastins
@@ -63,12 +63,17 @@ runJIT opts mod = withContext $ \context ->
           when (printLLVMAsm opts) $ do
             s <- moduleLLVMAssembly m
             putStrLn s
-
+          let args = lascaFiles opts
+          let len = length args
           EE.withModuleInEngine executionEngine m $ \ee -> do
             initLascaRuntime <- EE.getFunction ee (AST.Name "start")
 --             mainfn <- EE.getFunction ee (AST.Name "main")
             case initLascaRuntime of
-              Just fn -> startFun (castFunPtr fn :: FunPtr (IO ()))
+              Just fn -> do
+                cargs <- mapM newCString args
+                array <- mallocArray len
+                pokeArray array cargs
+                startFun (castFunPtr fn :: FunPtr (Int -> Ptr CString -> IO ())) len array
               Nothing -> putStrLn "Couldn't find initLascaRuntime!"
 
           -- Return the optimized module
