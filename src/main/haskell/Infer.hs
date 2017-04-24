@@ -236,7 +236,8 @@ infer env ex = case ex of
     let curried = Fix (foldr (\arg expr -> Lam arg expr) e (name:largs))
     infer env ({-Debug.trace ("Func " ++ show curried)-} curried)
 
-  Data name constructors -> return (nullSubst, typeUnit)
+  Data name constructors -> error "Shouldn't happen!"
+  Select tree expr -> infer env (Apply expr [tree])
 
   Array exprs -> do
     tv <- fresh
@@ -248,6 +249,7 @@ infer env ex = case ex of
   Literal (BoolLit _) -> return (nullSubst, typeBool)
   Literal (StringLit _) -> return (nullSubst, typeString)
   Literal UnitLit -> return (nullSubst, typeUnit)
+  e -> error ("Wat? " ++ show e)
 
 inferPrim :: TypeEnv -> [Expr] -> Type -> Infer (Subst, Type)
 inferPrim env l t = do
@@ -304,8 +306,10 @@ typeCheck exprs = do
               where
                  genScheme :: DataConst -> [(String, Scheme)]
                  genScheme (DataConst name args) =
-                    let tpe = foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) (TypeIdent typeName) args
-                    in [(name, Forall [] tpe)]
+                    let dataTypeIdent = TypeIdent typeName
+                        tpe = foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args
+                        accessors = map (\(Arg n tpe) -> (n, Forall [] (TypeFunc dataTypeIdent tpe))) args
+                    in (name, Forall [] tpe) : accessors
 
 
 
