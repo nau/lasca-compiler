@@ -27,7 +27,7 @@ import qualified LLVM.AST as AST
 optimizeOpt :: Parser Int
 optimizeOpt = option auto
             ( long "optimization-level"
-           <> short 'g'
+           <> short 'O'
            <> value 0
            <> help "Optimization level for LLVM" )
 
