@@ -209,12 +209,13 @@ codegenTop ctx exp = do
 
 codegenStartFunc ctx = do
   modState <- get
-  define T.void "start" [] (bls modState)
+  define T.void "start" [(intType, AST.Name "argc"), (ptrType, AST.Name "argv")] (bls modState)
   where
     bls modState = createBlocks $ execCodegen [] modState $ do
         entry <- addBlock entryBlockName
         setBlock entry
         call (global initLascaRuntimeFuncType (AST.Name "initLascaRuntime")) []
+        call (global (funcType T.void [intType, ptrType]) (AST.Name "initEnvironment")) [local (AST.Name "argc"), local (AST.Name "argv")]
         initGlobals
         call (global mainFuncType (AST.Name "main")) []
         terminator $ I.Do $ I.Ret Nothing []
@@ -455,6 +456,7 @@ declareStdFuncs = do
   external ptrType "runtimeBinOp"  [("code",  intType), ("lhs",  ptrType), ("rhs", ptrType)] False [FA.GroupID 0]
   external ptrType "runtimeApply"  [("funcs", ptrType), ("func", ptrType), ("argc", intType), ("argv", ptrType)] False []
   external ptrType "runtimeSelect" [("funcs", ptrType), ("structs", ptrType), ("tree", ptrType), ("expr", ptrType)] False [FA.GroupID 0]
+  external T.void  "initEnvironment" [("argc", intType), ("argv", ptrType)] False []
   addDefn $ AST.FunctionAttributes (FA.GroupID 0) [FA.ReadOnly]
 
 extractLambda :: S.Expr -> LLVM S.Expr

@@ -187,11 +187,12 @@ def energy(bodies) = {
 def calculate(i, bodies) = if i > 0 then calculate(i - 1, advance(bodies, 0.01)) else bodies
 
 def main() = {
+  numIterations = toInt(getArgs()(1));
   bodies = [Sun, Jupiter, Saturn, Uranus, Neptune];
   initedBodies = init(bodies);
   println(toString(energy(initedBodies)));
   advance(initedBodies, 0.01);
-  advanced = calculate(50000, initedBodies); -- set to 50000000 for real benchmark
+  advanced = calculate(numIterations, initedBodies); -- set to 50000000 for real benchmark
   println(toString(energy(advanced)));
   println("Done")
 }

@@ -58,7 +58,7 @@ lascaOpts = LascaOpts
 greet :: LascaOpts -> IO ()
 greet opts | null (lascaFiles opts) = repl opts
            | otherwise = do
-   mapM (processFile opts) (lascaFiles opts)
+   mapM_ (processFile opts) (lascaFiles opts)
    return ()
 
 initModule :: String -> AST.Module
@@ -86,16 +86,16 @@ genModule opts modo source = case parseToplevel source of
         return Nothing
     Right ex -> do
         putStrLn "Parsed OK"
-        if printAst opts then putStrLn (show ex) else return ()
-        putStrLn("Compiler mode is " ++ (mode opts))
-        if ((mode opts) == "static")
+        when (printAst opts) $ print ex
+        putStrLn("Compiler mode is " ++ mode opts)
+        if mode opts == "static"
         then case typeCheck ex of
           Right env -> do
             putStrLn "typechecked OK"
-            if printTypes opts then putStrLn $ show env else return ()
+            when (printTypes opts) $ print env
             return (Just (codegenModule modo ex))
           Left e -> do
-            putStrLn $ show e
+            print e
             return Nothing
         else return (Just (codegenModule modo ex))
 
@@ -115,29 +115,27 @@ processFile opts fname = do
   putStrLn "Read module OK"
   case mod of
     Just mod -> processModule opts mod fname
-    Nothing -> do putStrLn "Couldn't compile a module"
+    Nothing -> putStrLn "Couldn't compile a module"
 
 processModule :: LascaOpts -> AST.Module -> String -> IO ()
-processModule opts mod fname = do
-  if (exec opts)
-  then do
-    putStrLn "Running JIT"
-    res <- runJIT opts mod
-    case res of
-        Left err -> putStrLn err
-        Right m -> return ()
-    return ()
-  else do
-    Just(asm) <- getLLAsString mod
-    writeFile (fname ++ ".ll") asm
-    let name = takeWhile (/= '.') fname
-    -- Dynamic linking
-    let optLevel = optimization opts
-    let optimizationOpts = if optLevel > 0 then ["-O" ++ show optLevel] else []
-    callProcess "clang-4.0" (optimizationOpts ++ ["-e", "_start", "-g", "-o", name, "-L.", "-llascart", fname ++ ".ll"])
-    -- Static linking
-  --         callProcess "clang-3.5" ["-e", "_start", "-g", "-o", name, "-L.", {-"-llascart",-} fname ++ ".ll", "/usr/local/lib/libgc.a","liblascart.a"]
-    return ()
+processModule opts mod fname = if exec opts then
+  do putStrLn "Running JIT"
+     res <- runJIT opts mod
+     case res of
+         Left err -> putStrLn err
+         Right m -> return ()
+     return ()
+  else
+  do Just asm <- getLLAsString mod
+     writeFile (fname ++ ".ll") asm
+     let name = takeWhile (/= '.') fname
+     let optLevel = optimization opts
+     let optimizationOpts = ["-O" ++ show optLevel | optLevel > 0]
+     callProcess "clang-4.0"
+       (optimizationOpts ++
+          ["-e", "_start", "-g", "-o", name, "-L.", "-llascart",
+           fname ++ ".ll"])
+     return ()
 
 
 repl :: LascaOpts -> IO ()

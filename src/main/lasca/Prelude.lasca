@@ -6,3 +6,5 @@ extern def arrayApply(array: Any, i: Any): Any
 extern def arrayLength(array: Any): Any
 extern def toString(a: Any): String
 extern def lasqrt(a: Any): Any
+extern def getArgs(): Any
+extern def toInt(s: Any): Any

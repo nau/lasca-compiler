@@ -102,6 +102,13 @@ typedef struct {
   Struct* structs[];
 } Structs;
 
+typedef struct {
+  int argc;
+  Box* argv;
+} Env;
+
+Env ENV;
+
 
 void *gcMalloc(size_t s) {
     return GC_malloc(s);
@@ -263,14 +270,14 @@ Box* __attribute__ ((pure)) runtimeBinOp(int code, Box* lhs, Box* rhs) {
   return result;
 }
 
-Box* arrayApply(Box* arrayValue, Box* idx) __attribute__ ((const)) {
+Box* arrayApply(Box* arrayValue, Box* idx) {
   Array* array = unbox(ARRAY, arrayValue);
   int index = unboxInt(idx);
   assert(array->length > index);
   return array->data[index];
 }
 
-Box* arrayLength(Box* arrayValue) __attribute__ ((const)) {
+Box* arrayLength(Box* arrayValue) {
   Array* array = unbox(ARRAY, arrayValue);
   return boxInt(array->length);
 }
@@ -393,6 +400,10 @@ Box* runtimeApply(Functions* fs, Box* val, int argc, Box* argv[]) {
 }
 
 /* ================== IO ================== */
+
+void putInt(int c) {
+  putchar(c + 48);
+}
 
 double putchard(double X) {
   putchar((char)X);
@@ -525,6 +536,47 @@ Box* __attribute__ ((pure)) lasqrt(Box * dbl) {
     case DOUBLE: return boxFloat64(sqrt(dbl->value.dbl)); break;
     default: printf("AAAA!!! Type mismatch! Expected Int or Double for lasqrt but got %i\n", dbl->type); exit(1);
   }
+}
+
+/* ============ System ================ */
+
+void initEnvironment(int argc, char* argv[]) {
+//  int len = 0;
+//  for (int i = 0; i< argc; i++) len += strlen(argv[i]);
+//  char buf[len + argc*2 + 10];
+//  for (int i = 0; i < argc; i++) {
+//    strcat(buf, argv[i]);
+//    strcat(buf, " ");
+//  }
+//  printf("Called with %d args: %s\n", argc, buf);
+  ENV.argc = argc;
+  Array* array = createArray(argc);
+  for (int i = 0; i < argc; i++) {
+    Box* s = makeString(argv[i]);
+    array->data[i] = s;
+  }
+  ENV.argv = box(ARRAY, array);
+}
+
+Box* getArgs() {
+  return ENV.argv;
+}
+
+Box* toInt(Box* s) {
+  String* str = unbox(STRING, s);
+//  println(s);
+  char* cstr = malloc(str->length + 1);
+  memcpy(cstr, str->bytes, str->length);
+  cstr[str->length] = 0;
+//  printf("cstr = %s\n", cstr);
+  char *ep;
+  long i = strtol(cstr, &ep, 10);
+  if (cstr == ep) {
+    printf("Couldn't convert %s to int", cstr);
+    exit( EXIT_FAILURE );
+  }
+  free(cstr);
+  return boxInt(i);
 }
 
 void initLascaRuntime() {
