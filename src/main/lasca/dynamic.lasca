@@ -3,6 +3,6 @@ def id(x) = x
 def main() = {
   a = b; -- this should be an error at static mode, and work fine in dynamic mode
   c = 1;
-  println(toString(c))
+  println(c.toString)
 }
 

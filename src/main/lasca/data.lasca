@@ -4,13 +4,11 @@ data Test = Test(a: Int)
 
 data Point = Point(x: Int, y: Int, z: Test)
 
-data Point2 = Point2(a: String)
-
 def main() = {
-  t = Test(3.0);
-  p1 = Point(12.0, 2.0, t);
+  t = Test(3);
+  p1 = Point(12, 2, t);
   x = p1.x + p1.y - p1.z.a;
-  println(toString(x));
+  println(x.toString);
   println("Hello")
 }
 
