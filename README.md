@@ -337,6 +337,20 @@ uncomment -rtsopts, -prof, -fprof-auto ghc options in stack.yaml, and run
     
     stack build --executable-profiling --library-profiling
     
+IntelliJ IDEA Plugin
+====================
+lasca-intellij-plugin.zip in the project root folder is actually a IntelliJ Plugin for Lasca. 
+
+It supports
+- sysntax highlighting
+- Go to definition
+- Find Usages for global functions
+- Rename refactoring for global functions
+
+To install the plugin:
+
+    Preferences -> Plugins -> Install Plugin From Disk -> lasca-intellij-plugin.zip
+    
 First time n-body run:
 ----------------------
 
