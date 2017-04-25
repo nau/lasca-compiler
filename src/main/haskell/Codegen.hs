@@ -329,7 +329,7 @@ global tpe name = constant (C.GlobalReference tpe name)
 constant :: C.Constant -> Operand
 constant = ConstantOperand
 
-constNull tpe = constant (C.IntToPtr (C.Int 32 0) (T.ptr tpe))
+constNull tpe = (C.IntToPtr (C.Int 32 0) (T.ptr tpe))
 constNullPtr = constNull T.i8
 
 constInt :: Int -> Operand

@@ -105,9 +105,16 @@ typedef struct {
 typedef struct {
   int argc;
   Box* argv;
-} Env;
+} Environment;
 
-Env ENV;
+typedef struct {
+  Functions* functions;
+  Structs* structs;
+  Environment* environment;
+} Runtime;
+
+Environment ENV;
+Runtime* RUNTIME;
 
 
 void *gcMalloc(size_t s) {
@@ -287,7 +294,8 @@ String s = {
   .bytes = "Unimplemented select"
 };
 
-Box* runtimeApply(Functions* fs, Box* val, int argc, Box* argv[]) {
+Box* runtimeApply(Box* val, int argc, Box* argv[]) {
+  Functions* fs = RUNTIME->functions;
   // Handle array(idx) call
   if (val->type == ARRAY && argc == 1 && argv[0]->type == INT) {
     return arrayApply(val, argv[0]);
@@ -373,7 +381,9 @@ Box* runtimeApply(Functions* fs, Box* val, int argc, Box* argv[]) {
 
 }
 
-Box* __attribute__ ((pure)) runtimeSelect(Functions* fs, Structs* structs, Box* tree, Box* ident) {
+Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident) {
+  Functions* fs = RUNTIME->functions;
+  Structs* structs = RUNTIME->structs;
   if (tree->type >= 1000) {
 //    printf("Found struct %d\n", tree->type);
 //    printf("Found structs %d\n", structs->size);
@@ -400,13 +410,13 @@ Box* __attribute__ ((pure)) runtimeSelect(Functions* fs, Structs* structs, Box* 
       // FIXME fix for closure?  check arity?
       Closure* f = unbox(CLOSURE, ident);
       assert(fs->functions[f->funcIdx].arity == 1);
-      return runtimeApply(fs, ident, 1, &tree);
+      return runtimeApply(ident, 1, &tree);
     }
   } else if (ident->type == CLOSURE) {
     // FIXME fix for closure?  check arity?
     Closure* f = unbox(CLOSURE, ident);
     assert(fs->functions[f->funcIdx].arity == 1);
-    return runtimeApply(fs, ident, 1, &tree);
+    return runtimeApply(ident, 1, &tree);
   }
   return boxError(&s);
 }
@@ -592,12 +602,13 @@ Box* toInt(Box* s) {
   return boxInt(i);
 }
 
-void initLascaRuntime() {
+void initLascaRuntime(Runtime* runtime) {
     GC_init();
+    RUNTIME = runtime;
     UNIT_STRING = makeString("()");
     for (int i = 0; i < 100; i++) {
       INT_ARRAY[i].type = INT;
       INT_ARRAY[i].value.num = i;
     }
-    printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n");
+    printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %d, # structs = %d\n", RUNTIME->functions->size, RUNTIME->structs->size);
 }

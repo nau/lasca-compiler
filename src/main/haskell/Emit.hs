@@ -214,7 +214,7 @@ codegenStartFunc ctx = do
     bls modState = createBlocks $ execCodegen [] modState $ do
         entry <- addBlock entryBlockName
         setBlock entry
-        call (global initLascaRuntimeFuncType (AST.Name "initLascaRuntime")) []
+        call (global initLascaRuntimeFuncType (AST.Name "initLascaRuntime")) [constRefOperand "Runtime"]
         call (global (funcType T.void [intType, ptrType]) (AST.Name "initEnvironment")) [local (AST.Name "argc"), local (AST.Name "argv")]
         initGlobals
         call (global mainFuncType (AST.Name "main")) []
@@ -278,9 +278,7 @@ cgen ctx (S.Array exprs) = do
 cgen ctx (S.Select tree expr) = do
   tree <- cgen ctx tree
   e <- cgen ctx expr
-  let funcs = constRefOperand "Functions"
-  let structs = constRefOperand "Structs"
-  call (global runtimeSelectFuncType (AST.Name "runtimeSelect")) [funcs, structs, tree, e]
+  call (global runtimeSelectFuncType (AST.Name "runtimeSelect")) [tree, e]
 cgen ctx (S.Apply (S.Var "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True)) rhs)
 cgen ctx (S.Apply (S.Var "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False)))
 cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
@@ -305,7 +303,6 @@ cgen ctx (S.Apply expr args) = do
       let funcs = functions modState
       let argc = constInt (length largs)
       let len = Map.size funcs
-      let funcs = constRefOperand "Functions"
       sargsPtr <- allocaSize ptrType argc
       let asdf (idx, arg) = do
             p <- getelementptr sargsPtr [idx]
@@ -313,8 +310,7 @@ cgen ctx (S.Apply expr args) = do
       sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
       -- cdecl calling convension, arguments passed right to left
       sequence_ [asdf (constInt i, a) | (i, a) <- zip [0 .. len] largs]
-      call (global runtimeApplyFuncType (AST.Name "runtimeApply")) [funcs, e, argc, sargs]
---   call e largs
+      call (global runtimeApplyFuncType (AST.Name "runtimeApply")) [e, argc, sargs]
 cgen ctx (S.BoxFunc funcName enclosedVars) = do
   modState <- gets moduleState
   let mapping = functions modState
@@ -360,13 +356,13 @@ cgen ctx e = error ("cgen shit " ++ show e)
 -------------------------------------------------------------------------------
 funcType retTy args = T.FunctionType retTy args False
 
-initLascaRuntimeFuncType = funcType T.void []
+initLascaRuntimeFuncType = funcType T.void [ptrType]
 mainFuncType = funcType ptrType []
 boxFuncType = funcType ptrType [T.i32]
 boxArrayFuncType = T.FunctionType ptrType [T.i32] True
 runtimeBinOpFuncType = funcType ptrType [T.i32, ptrType, ptrType]
-runtimeApplyFuncType = funcType ptrType [ptrType, ptrType, T.i32, ptrType]
-runtimeSelectFuncType = funcType ptrType [ptrType, ptrType, ptrType, ptrType]
+runtimeApplyFuncType = funcType ptrType [ptrType, T.i32, ptrType]
+runtimeSelectFuncType = funcType ptrType [ptrType, ptrType]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
 
 gcMalloc size = call (global (funcType ptrType [T.i32]) (AST.Name "gcMalloc")) [constInt size]
@@ -375,7 +371,7 @@ box :: S.Lit -> Codegen AST.Operand
 box (S.BoolLit b) = call (global boxFuncType (AST.Name "boxBool")) [constInt (boolToInt b)]
 box (S.IntLit  n) = call (global boxFuncType (AST.Name "boxInt")) [constInt n]
 box (S.FloatLit  n) = call (global boxFuncType (AST.Name "boxFloat64")) [constFloat n]
-box S.UnitLit = call (global boxFuncType (AST.Name "box")) [constInt 0, constInt 0]
+box S.UnitLit = call (global boxFuncType (AST.Name "box")) [constInt 0,  constant constNullPtr]
 box (S.StringLit s) = do
   let name = getStringLitASTName s
   let len = ByteString.length . UTF8.fromString $ s
@@ -438,11 +434,12 @@ codegenModule modo exprs = modul
           genFunctionMap fns''
           let structs = reverse (dataDefs ctx)
           genStructs structs
+          genRuntime
           mapM_ (codegenTop ctx) fns''
           codegenStartFunc ctx
 
 declareStdFuncs = do
-  external T.void "initLascaRuntime" [] False []
+  external T.void "initLascaRuntime" [("runtime", ptrType)] False []
   external ptrType "gcMalloc" [("size", intType)] False []
   external ptrType "box" [("t", intType), ("ptr", ptrType)] False [FA.GroupID 0]
   external ptrType "unbox" [("t", intType), ("ptr", ptrType)] False [FA.GroupID 0]
@@ -454,8 +451,8 @@ declareStdFuncs = do
   external ptrType "boxFloat64" [("d", T.double)] False [FA.GroupID 0]
   external ptrType "boxArray" [("size", intType)] True [FA.GroupID 0]
   external ptrType "runtimeBinOp"  [("code",  intType), ("lhs",  ptrType), ("rhs", ptrType)] False [FA.GroupID 0]
-  external ptrType "runtimeApply"  [("funcs", ptrType), ("func", ptrType), ("argc", intType), ("argv", ptrType)] False []
-  external ptrType "runtimeSelect" [("funcs", ptrType), ("structs", ptrType), ("tree", ptrType), ("expr", ptrType)] False [FA.GroupID 0]
+  external ptrType "runtimeApply"  [("func", ptrType), ("argc", intType), ("argv", ptrType)] False []
+  external ptrType "runtimeSelect" [("tree", ptrType), ("expr", ptrType)] False [FA.GroupID 0]
   external T.void  "initEnvironment" [("argc", intType), ("argv", ptrType)] False []
   addDefn $ AST.FunctionAttributes (FA.GroupID 0) [FA.ReadOnly]
 
@@ -593,6 +590,11 @@ genFunctionMap fns = do
       go s _ = s
 
 
+runtimeStructType = T.StructureType False [ptrType, ptrType, ptrType]
+
+genRuntime = defineConst (AST.Name "Runtime") runtimeStructType (Just runtime)
+  where
+      runtime = C.Struct Nothing False [constRef "Functions", constRef "Structs", constNullPtr]
 
 createGlobalContext :: [S.Expr] -> Ctx
 createGlobalContext exprs = execState (loop exprs) emptyCtx
