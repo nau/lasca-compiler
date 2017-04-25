@@ -79,9 +79,6 @@ toSig = map (\(S.Arg name tpe) -> (ptrType, AST.Name name))
 stringStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
 applyStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
 
-
-getStringLitASTName s = AST.Name (getStringLitName s)
-
 getStringLitName s = name
   where
     name = take 15 s ++ "." ++ show hash
@@ -96,7 +93,7 @@ createString s = (C.Struct Nothing False [C.Int 32 (toInteger len), C.Array T.i8
 
 defineStringLit :: String -> LLVM ()
 defineStringLit s = addDefn $ AST.GlobalDefinition $ AST.globalVariableDefaults {
-                          LLVM.AST.Global.name        = getStringLitASTName s
+                          LLVM.AST.Global.name        = AST.Name (getStringLitName s)
                         , LLVM.AST.Global.isConstant  = True
                         , LLVM.AST.Global.type' = stringStructType len
                         , LLVM.AST.Global.initializer = Just string
@@ -228,7 +225,7 @@ codegenStartFunc ctx = do
 
     gen (name, expr) = do
       v <- cgen ctx expr
-      store (global ptrType (AST.Name name)) v
+      store (global ptrType name) v
       return v
 
 
@@ -268,7 +265,7 @@ cgen ctx (S.Var name) = do
 --       Debug.trace ("Local " ++ show name)
       load x
     Nothing | name `Set.member` globalFunctions ctx -> boxFunc name mapping
-            | name `Set.member` globalVals ctx -> load (global ptrType (AST.Name name))
+            | name `Set.member` globalVals ctx -> load (global ptrType name)
             | otherwise -> boxError name
 cgen ctx (S.Literal l) = box l
 cgen ctx (S.Array exprs) = do
@@ -373,7 +370,7 @@ box (S.IntLit  n) = callFn boxFuncType "boxInt" [constInt n]
 box (S.FloatLit  n) = callFn boxFuncType "boxFloat64" [constFloat n]
 box S.UnitLit = callFn boxFuncType "box" [constInt 0,  constOp constNullPtr]
 box (S.StringLit s) = do
-  let name = getStringLitASTName s
+  let name = getStringLitName s
   let len = ByteString.length . UTF8.fromString $ s
   let ref = global (stringStructType len) name
   ref' <- bitcast ref ptrType
@@ -387,7 +384,7 @@ boxFunc name mapping = do
 
 boxError name = do
   modify (\s -> s { generatedStrings = name : generatedStrings s })
-  let strLitName = getStringLitASTName name
+  let strLitName = getStringLitName name
   let len = length name
   let ref = global (stringStructType len) strLitName
   ref <- bitcast ref ptrType
@@ -499,7 +496,7 @@ functionsStructType len = T.StructureType False [T.i32, arrayTpe len]
 
 arrayTpe len = T.ArrayType len functionStructType
 
-globalStringRef name = C.GlobalReference (stringStructType (length name)) (getStringLitASTName name)
+globalStringRef name = C.GlobalReference (stringStructType (length name)) (AST.Name (getStringLitName name))
 globalStringRefAsPtr name = C.BitCast (globalStringRef name) ptrType
 
 genStructs defs = do

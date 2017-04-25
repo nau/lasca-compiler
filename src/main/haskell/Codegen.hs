@@ -130,7 +130,6 @@ intType = IntegerType 32
 boolType :: Type
 boolType = IntegerType 1
 
-typeInfoStructType = T.StructureType False [T.i32, ptrType]
 ptrType = T.ptr T.i8
 
 ptrSize :: Int
@@ -323,8 +322,8 @@ localName = LocalReference ptrType
 
 local name = localName (AST.Name name)
 
-global :: Type -> Name -> Operand
-global tpe name = constOp (C.GlobalReference tpe name)
+global :: Type -> String -> Operand
+global tpe name = constOp (C.GlobalReference tpe (AST.Name name))
 
 constOp :: C.Constant -> Operand
 constOp = ConstantOperand
@@ -358,7 +357,7 @@ inttoptr op toTpe= instr2 toTpe (IntToPtr op toTpe [])
 call :: Operand -> [Operand] -> Codegen Operand
 call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 
-callFn tpe name args = call (global tpe (AST.Name name)) args
+callFn tpe name args = call (global tpe name) args
 
 alloca :: Type -> Codegen Operand
 alloca ty = instr $ Alloca ty Nothing 0 []
