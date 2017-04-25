@@ -10,6 +10,7 @@ data LascaOpts = LascaOpts
   { lascaFiles   :: [String]
   , mode         :: String
   , exec         :: Bool
+  , verboseMode  :: Bool
   , printLLVMAsm :: Bool
   , printAst     :: Bool
   , printTypes   :: Bool

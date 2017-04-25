@@ -46,6 +46,9 @@ lascaOpts = LascaOpts
      <> short 'e'
      <> help "Execute immediately" )
   <*> switch
+      ( long "verbose"
+      <> help "Verbose mode" )
+  <*> switch
       ( long "print-llvm"
       <> help "Print LLVM IR" )
   <*> switch
@@ -85,14 +88,14 @@ genModule :: LascaOpts -> AST.Module -> String -> IO (Maybe AST.Module)
 genModule opts modo source = case parseToplevel source of
     Left err -> die e where e = Megaparsec.parseErrorPretty err
     Right ex -> do
-        putStrLn "Parsed OK"
+        when (verboseMode opts) $ putStrLn "Parsed OK"
         when (printAst opts) $ print ex
-        putStrLn("Compiler mode is " ++ mode opts)
+        when (verboseMode opts) $ putStrLn("Compiler mode is " ++ mode opts)
         if mode opts == "static"
         then case typeCheck ex of
           Right env -> do
-            putStrLn "typechecked OK"
-            when (printTypes opts) $ print env
+            when (verboseMode opts) $ putStrLn "typechecked OK"
+--            when (printTypes opts) $ print env
             return (Just (codegenModule modo ex))
           Left e -> die $ show e
         else return (Just (codegenModule modo ex))
@@ -116,7 +119,7 @@ processFile opts fname = do
 
 processModule :: LascaOpts -> AST.Module -> String -> IO ()
 processModule opts mod fname = if exec opts then
-  do putStrLn "Running JIT"
+  do when (verboseMode opts) $ putStrLn "Running JIT"
      res <- runJIT opts mod
      case res of
          Left err -> die $ show err

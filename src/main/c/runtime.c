@@ -610,5 +610,5 @@ void initLascaRuntime(Runtime* runtime) {
       INT_ARRAY[i].type = INT;
       INT_ARRAY[i].value.num = i;
     }
-    printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %d, # structs = %d\n", RUNTIME->functions->size, RUNTIME->structs->size);
+//    printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %d, # structs = %d\n", RUNTIME->functions->size, RUNTIME->structs->size);
 }

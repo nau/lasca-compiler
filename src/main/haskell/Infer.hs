@@ -296,7 +296,7 @@ typeCheck exprs = do
   let a = map f other
   let (TypeEnv te) = defaultTyenv
   let typeEnv = TypeEnv (Map.union te (Map.fromList bbb))
-  inferTop typeEnv (Debug.trace (show typeEnv) a)
+  inferTop typeEnv a
   where
             pred Data{} = True
             pred _      = False
