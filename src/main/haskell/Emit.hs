@@ -64,42 +64,8 @@ emptyCtx = Context {
   typeId = 1000
 }
 
-one = constOp $ C.Float (F.Double 1.0)
-zero = constOp $ C.Float (F.Double 0.0)
-false = zero
-true = one
-
 externArgsToSig :: [S.Arg] -> [(S.Name, AST.Type)]
 externArgsToSig = map (\(S.Arg name tpe) -> (name, typeMapping tpe))
-
-toSig :: [S.Arg] -> [(AST.Type, AST.Name)]
-toSig = map (\(S.Arg name tpe) -> (ptrType, AST.Name name))
-
-
-stringStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
-applyStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
-
-getStringLitName s = name
-  where
-    name = take 15 s ++ "." ++ show hash
-    hash = hash32 s
-
-createString s = (C.Struct Nothing False [constInt len, C.Array T.i8 bytes], len)
-  where
-    bytestring = UTF8.fromString s
-    constByte b = C.Int 8 (toInteger b)
-    bytes = map constByte (ByteString.unpack bytestring)
-    len = ByteString.length bytestring
-
-defineStringLit :: String -> LLVM ()
-defineStringLit s = addDefn $ AST.GlobalDefinition $ AST.globalVariableDefaults {
-                          LLVM.AST.Global.name        = AST.Name (getStringLitName s)
-                        , LLVM.AST.Global.isConstant  = True
-                        , LLVM.AST.Global.type' = stringStructType len
-                        , LLVM.AST.Global.initializer = Just string
-                        }
-  where
-    (string, len) = createString s
 
 uncurryLambda expr = go expr ([], expr) where
   go (S.Lam name e) result = let (args, body) = go e result in (name : args, body)
@@ -472,7 +438,7 @@ extractLambda expr = return expr
 
 createStruct (DataDef tid name [S.DataConst n args]) =
 --  C.Struct Nothing False [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, C.Int 32 (fromIntegral len)]
-  C.Struct Nothing False [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, C.Int 32 (fromIntegral len), fieldsArray]
+  C.Struct Nothing False [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, constInt len, fieldsArray]
   where
     len = length args
     fieldsArray = C.Array ptrType fields
@@ -495,9 +461,6 @@ functionStructType = T.StructureType False [ptrType, ptrType, T.i32]
 functionsStructType len = T.StructureType False [T.i32, arrayTpe len]
 
 arrayTpe len = T.ArrayType len functionStructType
-
-globalStringRef name = C.GlobalReference (stringStructType (length name)) (AST.Name (getStringLitName name))
-globalStringRefAsPtr name = C.BitCast (globalStringRef name) ptrType
 
 genStructs defs = do
   let structs = createStructs defs

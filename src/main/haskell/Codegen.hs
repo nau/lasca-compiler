@@ -14,6 +14,8 @@ import qualified Data.Map.Strict as Map
 import qualified Data.ByteString as ByteString
 -- import qualified Data.Text.Encoding as Encoding
 import qualified Data.ByteString.Char8 as Char8
+import qualified Data.Text.Encoding as Encoding
+import qualified Data.ByteString.UTF8 as UTF8
 
 import Control.Monad.State
 import Control.Applicative
@@ -30,6 +32,8 @@ import qualified LLVM.AST.CallingConvention as CC
 import qualified LLVM.AST.FloatingPointPredicate as FP
 import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.FunctionAttribute as FA
+
+import Data.Digest.Murmur32
 
 import qualified Debug.Trace as Debug
 
@@ -389,3 +393,41 @@ ret val = terminator $ Do $ Ret (Just val) []
 getelementptr addr indices = instr $ GetElementPtr False addr indices []
 
 insertValue ptr val indices = instr $ InsertValue ptr val indices []
+
+globalStringRef name = C.GlobalReference (stringStructType (length name)) (AST.Name (getStringLitName name))
+
+globalStringRefAsPtr name = C.BitCast (globalStringRef name) ptrType
+
+one = constOp $ C.Float (F.Double 1.0)
+zero = constOp $ C.Float (F.Double 0.0)
+false = zero
+true = one
+
+toSig :: [S.Arg] -> [(AST.Type, AST.Name)]
+toSig = map (\(S.Arg name tpe) -> (ptrType, AST.Name name))
+
+
+stringStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
+applyStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
+
+getStringLitName s = name
+  where
+    name = take 15 s ++ "." ++ show hash
+    hash = hash32 s
+
+createString s = (C.Struct Nothing False [constInt len, C.Array T.i8 bytes], len)
+  where
+    bytestring = UTF8.fromString s
+    constByte b = C.Int 8 (toInteger b)
+    bytes = map constByte (ByteString.unpack bytestring)
+    len = ByteString.length bytestring
+
+defineStringLit :: String -> LLVM ()
+defineStringLit s = addDefn $ AST.GlobalDefinition $ AST.globalVariableDefaults {
+                          LLVM.AST.Global.name        = AST.Name (getStringLitName s)
+                        , LLVM.AST.Global.isConstant  = True
+                        , LLVM.AST.Global.type' = stringStructType len
+                        , LLVM.AST.Global.initializer = Just string
+                        }
+  where
+    (string, len) = createString s
