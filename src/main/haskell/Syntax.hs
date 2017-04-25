@@ -19,7 +19,7 @@ data LascaOpts = LascaOpts
 
 data Expr
   = Literal Lit
-  | Var Name
+  | Ident Name
   | Val Name Expr
   | Apply Expr [Expr]
   | Lam String Expr

@@ -37,13 +37,13 @@ stringLit :: Parser Expr
 stringLit = Literal . StringLit <$> stringLiteral
 
 binop = Ex.InfixL parser
-  where parser = (\op lhs rhs -> Apply (Var op) [lhs, rhs]) <$> anyOperatorParser
+  where parser = (\op lhs rhs -> Apply (Ident op) [lhs, rhs]) <$> anyOperatorParser
 
 unop = Ex.Prefix parser
-  where parser = (\op expr -> Apply (Var ("unary" ++ op)) [expr]) <$> anyOperatorParser
+  where parser = (\op expr -> Apply (Ident ("unary" ++ op)) [expr]) <$> anyOperatorParser
 
 binary s = Ex.InfixL parser
-  where parser = reservedOp s >> return (\lhs rhs -> Apply (Var s) [lhs, rhs])
+  where parser = reservedOp s >> return (\lhs rhs -> Apply (Ident s) [lhs, rhs])
 
 anyOperatorParser = do
   traverse_ (notFollowedBy . reservedOp) ops
@@ -72,7 +72,7 @@ expr :: Parser Expr
 expr =  Ex.makeExprParser factor operatorTable
 
 variable :: Parser Expr
-variable = Var <$> identifier
+variable = Ident <$> identifier
 
 typeAscription :: Parser Type
 typeAscription = do

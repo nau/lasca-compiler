@@ -182,9 +182,9 @@ infer :: TypeEnv -> Expr -> Infer (Subst, Type)
 infer env ex = case ex of
   Val n e -> infer env e
 
-  Var x -> lookupEnv env x
+  Ident x -> lookupEnv env x
 
-  Apply (Var op) [e1, e2] | op `Map.member` ops -> do
+  Apply (Ident op) [e1, e2] | op `Map.member` ops -> do
     (s1, t1) <- infer env e1
     (s2, t2) <- infer env e2
     tv <- fresh

@@ -222,7 +222,7 @@ cgen ctx (S.Let a b c) = do
   store i val
   assign a i
   cgen ctx c
-cgen ctx (S.Var name) = do
+cgen ctx (S.Ident name) = do
   syms <- gets symtab
   modState <- gets moduleState
   let mapping = functions modState
@@ -242,9 +242,9 @@ cgen ctx (S.Select tree expr) = do
   tree <- cgen ctx tree
   e <- cgen ctx expr
   callFn runtimeSelectFuncType "runtimeSelect" [tree, e]
-cgen ctx (S.Apply (S.Var "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True)) rhs)
-cgen ctx (S.Apply (S.Var "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False)))
-cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
+cgen ctx (S.Apply (S.Ident "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True)) rhs)
+cgen ctx (S.Apply (S.Ident "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False)))
+cgen ctx (S.Apply (S.Ident fn) [lhs, rhs]) | fn `Map.member` binops = do
   llhs <- cgen ctx lhs
   lrhs <- cgen ctx rhs
   let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
@@ -259,7 +259,7 @@ cgen ctx (S.Apply expr args) = do
      -- TODO Here are BUGZZZZ!!!! :)
      -- TODO check arguments!
      -- this is done to speed-up calls if you `a global function
-    S.Var fn | isGlobal fn -> callFn ptrType fn largs
+    S.Ident fn | isGlobal fn -> callFn ptrType fn largs
     expr -> do
       modState <- gets moduleState
       e <- cgen ctx expr
@@ -431,7 +431,7 @@ extractLambda (S.Lam name expr) = do
   modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
 --   Debug.traceM ("Generated lambda " ++ show func ++ ", outerVars = " ++ show outerVars ++ ", usedOuterVars" ++ show usedOuterVars)
   return (S.BoxFunc funcName enclosedArgs)
-extractLambda expr@(S.Var n) = do
+extractLambda expr@(S.Ident n) = do
   modify (\s -> s { _usedVars = Set.insert n (_usedVars s)})
   return expr
 extractLambda expr = return expr
