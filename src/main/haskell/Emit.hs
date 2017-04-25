@@ -214,10 +214,10 @@ codegenStartFunc ctx = do
     bls modState = createBlocks $ execCodegen [] modState $ do
         entry <- addBlock entryBlockName
         setBlock entry
-        call (global initLascaRuntimeFuncType (AST.Name "initLascaRuntime")) [constRefOperand "Runtime"]
-        call (global (funcType T.void [intType, ptrType]) (AST.Name "initEnvironment")) [local "argc", local "argv"]
+        callFn initLascaRuntimeFuncType "initLascaRuntime" [constRefOperand "Runtime"]
+        callFn (funcType T.void [intType, ptrType]) "initEnvironment" [local "argc", local "argv"]
         initGlobals
-        call (global mainFuncType (AST.Name "main")) []
+        callFn mainFuncType "main" []
         terminator $ I.Do $ I.Ret Nothing []
         return ()
 
@@ -278,7 +278,7 @@ cgen ctx (S.Array exprs) = do
 cgen ctx (S.Select tree expr) = do
   tree <- cgen ctx tree
   e <- cgen ctx expr
-  call (global runtimeSelectFuncType (AST.Name "runtimeSelect")) [tree, e]
+  callFn runtimeSelectFuncType "runtimeSelect" [tree, e]
 cgen ctx (S.Apply (S.Var "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True)) rhs)
 cgen ctx (S.Apply (S.Var "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False)))
 cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
@@ -286,7 +286,7 @@ cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
   lrhs <- cgen ctx rhs
   let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
   let codeOp = constInt code
-  call (global runtimeBinOpFuncType (AST.Name "runtimeBinOp")) [codeOp, llhs, lrhs]
+  callFn runtimeBinOpFuncType "runtimeBinOp" [codeOp, llhs, lrhs]
 cgen ctx (S.Apply expr args) = do
   syms <- gets symtab
   largs <- mapM (cgen ctx) args
@@ -295,8 +295,8 @@ cgen ctx (S.Apply expr args) = do
   case expr of
      -- TODO Here are BUGZZZZ!!!! :)
      -- TODO check arguments!
-     -- this is done to speed-up calls if you call a global function
-    S.Var fn | isGlobal fn -> call (global ptrType (AST.Name fn)) largs
+     -- this is done to speed-up calls if you `a global function
+    S.Var fn | isGlobal fn -> callFn ptrType fn largs
     expr -> do
       modState <- gets moduleState
       e <- cgen ctx expr
@@ -310,7 +310,7 @@ cgen ctx (S.Apply expr args) = do
       sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
       -- cdecl calling convension, arguments passed right to left
       sequence_ [asdf (constInt i, a) | (i, a) <- zip [0 .. len] largs]
-      call (global runtimeApplyFuncType (AST.Name "runtimeApply")) [e, argc, sargs]
+      callFn runtimeApplyFuncType "runtimeApply" [e, argc, sargs]
 cgen ctx (S.BoxFunc funcName enclosedVars) = do
   modState <- gets moduleState
   let mapping = functions modState
@@ -324,7 +324,7 @@ cgen ctx (S.If cond tr fl) = do
   ------------------
   cond <- cgen ctx cond
   -- unbox Bool
-  voidPtrCond <- call (global unboxFuncType (AST.Name "unbox")) [constInt 1, cond]
+  voidPtrCond <- callFn unboxFuncType "unbox" [constInt 1, cond]
   bool <- ptrtoint voidPtrCond T.i1
 
   test <- instr2 T.i1 (I.ICmp IP.EQ bool constTrue [])
@@ -365,25 +365,25 @@ runtimeApplyFuncType = funcType ptrType [ptrType, T.i32, ptrType]
 runtimeSelectFuncType = funcType ptrType [ptrType, ptrType]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
 
-gcMalloc size = call (global (funcType ptrType [T.i32]) (AST.Name "gcMalloc")) [constInt size]
+gcMalloc size = callFn (funcType ptrType [T.i32]) "gcMalloc" [constInt size]
 
 box :: S.Lit -> Codegen AST.Operand
-box (S.BoolLit b) = call (global boxFuncType (AST.Name "boxBool")) [constInt (boolToInt b)]
-box (S.IntLit  n) = call (global boxFuncType (AST.Name "boxInt")) [constInt n]
-box (S.FloatLit  n) = call (global boxFuncType (AST.Name "boxFloat64")) [constFloat n]
-box S.UnitLit = call (global boxFuncType (AST.Name "box")) [constInt 0,  constOp constNullPtr]
+box (S.BoolLit b) = callFn boxFuncType "boxBool" [constInt (boolToInt b)]
+box (S.IntLit  n) = callFn boxFuncType "boxInt" [constInt n]
+box (S.FloatLit  n) = callFn boxFuncType "boxFloat64" [constFloat n]
+box S.UnitLit = callFn boxFuncType "box" [constInt 0,  constOp constNullPtr]
 box (S.StringLit s) = do
   let name = getStringLitASTName s
   let len = ByteString.length . UTF8.fromString $ s
   let ref = global (stringStructType len) name
   ref' <- bitcast ref ptrType
-  call (global boxFuncType (AST.Name "box")) [constInt 4, ref']
+  callFn boxFuncType "box" [constInt 4, ref']
 
-boxArray values = call (global boxFuncType (AST.Name "boxArray")) (constInt (length values) : values)
+boxArray values = callFn boxFuncType "boxArray" (constInt (length values) : values)
 
 boxFunc name mapping = do
   let idx = fromMaybe (error ("No such function " ++ name)) (Map.lookup name mapping)
-  call (global (funcType ptrType [T.i32]) (AST.Name "boxFunc")) [constInt idx]
+  callFn (funcType ptrType [T.i32]) "boxFunc" [constInt idx]
 
 boxError name = do
   modify (\s -> s { generatedStrings = name : generatedStrings s })
@@ -391,7 +391,7 @@ boxError name = do
   let len = length name
   let ref = global (stringStructType len) strLitName
   ref <- bitcast ref ptrType
-  call (global (funcType ptrType [T.i32]) (AST.Name "boxError")) [ref]
+  callFn (funcType ptrType [T.i32]) "boxError" [ref]
 
 boxClosure :: String -> Map.Map String Int -> [S.Arg] -> Codegen AST.Operand
 boxClosure name mapping enclosedVars = do
@@ -410,8 +410,7 @@ boxClosure name mapping enclosedVars = do
               
   let sargs = sargsPtr
   sequence_ [asdf (constInt i, a) | (i, a) <- zip [0 .. argc] args]
-  call (global (funcType ptrType [T.i32, T.i32, ptrType]) (AST.Name "boxClosure"))
-    [constInt idx, constInt argc, sargsPtr]
+  callFn (funcType ptrType [T.i32, T.i32, ptrType]) "boxClosure" [constInt idx, constInt argc, sargsPtr]
 
 boolToInt True = 1
 boolToInt False = 0
@@ -538,13 +537,13 @@ genStructs defs = do
 --              nullptr <- getelementptr (constNull tpe) [constInt 1]
 --              sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
               let len = length args
-              ptr <- call (global ptrType (AST.Name "gcMalloc")) [constInt (ptrSize * len)]
+              ptr <- callFn ptrType "gcMalloc" [constInt (ptrSize * len)]
               arrayPtr <- bitcast ptr (T.ptr (T.ArrayType (fromIntegral len) ptrType))
               let argsWithId = zip args [0..]
               forM_ argsWithId $ \(S.Arg n t, i) -> do
                 p <- getelementptr arrayPtr [constInt 0, constInt i]
                 store p (local n)
-              boxed <- call (global ptrType (AST.Name "box")) [constInt tid, ptr]
+              boxed <- callFn ptrType "box" [constInt tid, ptr]
               ret boxed
 
 genFunctionMap :: [S.Expr] -> LLVM ()

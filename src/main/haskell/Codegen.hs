@@ -358,6 +358,8 @@ inttoptr op toTpe= instr2 toTpe (IntToPtr op toTpe [])
 call :: Operand -> [Operand] -> Codegen Operand
 call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 
+callFn tpe name args = call (global tpe (AST.Name name)) args
+
 alloca :: Type -> Codegen Operand
 alloca ty = instr $ Alloca ty Nothing 0 []
 
