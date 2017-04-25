@@ -15,6 +15,7 @@ import Control.Monad.Trans
 
 import System.IO
 import System.Environment
+import System.Exit
 import System.Process
 import System.Console.Haskeline
 import Options.Applicative
@@ -69,7 +70,7 @@ process :: LascaOpts -> AST.Module -> String -> IO (Maybe AST.Module)
 process opts modo source = do
   let res = parseToplevel source
   case res of
-    Left err -> print err >> return Nothing
+    Left err -> die (show err)
     Right ex -> do
       ast <- codegen opts modo ex
       return $ Just ast
@@ -82,9 +83,7 @@ codegen opts modo fns = do
 
 genModule :: LascaOpts -> AST.Module -> String -> IO (Maybe AST.Module)
 genModule opts modo source = case parseToplevel source of
-    Left err -> do
-        putStrLn $ Megaparsec.parseErrorPretty err
-        return Nothing
+    Left err -> die e where e = Megaparsec.parseErrorPretty err
     Right ex -> do
         putStrLn "Parsed OK"
         when (printAst opts) $ print ex
@@ -95,9 +94,7 @@ genModule opts modo source = case parseToplevel source of
             putStrLn "typechecked OK"
             when (printTypes opts) $ print env
             return (Just (codegenModule modo ex))
-          Left e -> do
-            print e
-            return Nothing
+          Left e -> die $ show e
         else return (Just (codegenModule modo ex))
 
 
@@ -113,17 +110,16 @@ readMod opts fname = do
 processFile :: LascaOpts -> String -> IO ()
 processFile opts fname = do
   mod <- readMod opts fname
-  putStrLn "Read module OK"
   case mod of
     Just mod -> processModule opts mod fname
-    Nothing -> putStrLn "Couldn't compile a module"
+    Nothing -> die "Couldn't compile a module"
 
 processModule :: LascaOpts -> AST.Module -> String -> IO ()
 processModule opts mod fname = if exec opts then
   do putStrLn "Running JIT"
      res <- runJIT opts mod
      case res of
-         Left err -> putStrLn err
+         Left err -> die $ show err
          Right m -> return ()
      return ()
   else
