@@ -331,8 +331,11 @@ constOp = ConstantOperand
 constNull tpe = C.IntToPtr (C.Int 32 0) (T.ptr tpe)
 constNullPtr = constNull T.i8
 
-constInt :: Int -> Operand
-constInt i = constOp (C.Int 32 (toInteger i))
+constInt :: Int -> C.Constant
+constInt i = C.Int 32 (toInteger i)
+
+constIntOp :: Int -> Operand
+constIntOp i = constOp (C.Int 32 (toInteger i))
 
 constFloat i = constOp (C.Float (F.Double i))
 

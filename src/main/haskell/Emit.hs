@@ -84,7 +84,7 @@ getStringLitName s = name
     name = take 15 s ++ "." ++ show hash
     hash = hash32 s
 
-createString s = (C.Struct Nothing False [C.Int 32 (toInteger len), C.Array T.i8 bytes], len)
+createString s = (C.Struct Nothing False [constInt len, C.Array T.i8 bytes], len)
   where
     bytestring = UTF8.fromString s
     constByte b = C.Int 8 (toInteger b)
@@ -282,7 +282,7 @@ cgen ctx (S.Apply (S.Var fn) [lhs, rhs]) | fn `Map.member` binops = do
   llhs <- cgen ctx lhs
   lrhs <- cgen ctx rhs
   let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
-  let codeOp = constInt code
+  let codeOp = constIntOp code
   callFn runtimeBinOpFuncType "runtimeBinOp" [codeOp, llhs, lrhs]
 cgen ctx (S.Apply expr args) = do
   syms <- gets symtab
@@ -298,7 +298,7 @@ cgen ctx (S.Apply expr args) = do
       modState <- gets moduleState
       e <- cgen ctx expr
       let funcs = functions modState
-      let argc = constInt (length largs)
+      let argc = constIntOp (length largs)
       let len = Map.size funcs
       sargsPtr <- allocaSize ptrType argc
       let asdf (idx, arg) = do
@@ -306,7 +306,7 @@ cgen ctx (S.Apply expr args) = do
             store p arg
       sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
       -- cdecl calling convension, arguments passed right to left
-      sequence_ [asdf (constInt i, a) | (i, a) <- zip [0 .. len] largs]
+      sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0 .. len] largs]
       callFn runtimeApplyFuncType "runtimeApply" [e, argc, sargs]
 cgen ctx (S.BoxFunc funcName enclosedVars) = do
   modState <- gets moduleState
@@ -321,7 +321,7 @@ cgen ctx (S.If cond tr fl) = do
   ------------------
   cond <- cgen ctx cond
   -- unbox Bool
-  voidPtrCond <- callFn unboxFuncType "unbox" [constInt 1, cond]
+  voidPtrCond <- callFn unboxFuncType "unbox" [constIntOp 1, cond]
   bool <- ptrtoint voidPtrCond T.i1
 
   test <- instr2 T.i1 (I.ICmp IP.EQ bool constTrue [])
@@ -362,25 +362,25 @@ runtimeApplyFuncType = funcType ptrType [ptrType, T.i32, ptrType]
 runtimeSelectFuncType = funcType ptrType [ptrType, ptrType]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
 
-gcMalloc size = callFn (funcType ptrType [T.i32]) "gcMalloc" [constInt size]
+gcMalloc size = callFn (funcType ptrType [T.i32]) "gcMalloc" [constIntOp size]
 
 box :: S.Lit -> Codegen AST.Operand
-box (S.BoolLit b) = callFn boxFuncType "boxBool" [constInt (boolToInt b)]
-box (S.IntLit  n) = callFn boxFuncType "boxInt" [constInt n]
+box (S.BoolLit b) = callFn boxFuncType "boxBool" [constIntOp (boolToInt b)]
+box (S.IntLit  n) = callFn boxFuncType "boxInt" [constIntOp n]
 box (S.FloatLit  n) = callFn boxFuncType "boxFloat64" [constFloat n]
-box S.UnitLit = callFn boxFuncType "box" [constInt 0,  constOp constNullPtr]
+box S.UnitLit = callFn boxFuncType "box" [constIntOp 0,  constOp constNullPtr]
 box (S.StringLit s) = do
   let name = getStringLitName s
   let len = ByteString.length . UTF8.fromString $ s
   let ref = global (stringStructType len) name
   ref' <- bitcast ref ptrType
-  callFn boxFuncType "box" [constInt 4, ref']
+  callFn boxFuncType "box" [constIntOp 4, ref']
 
-boxArray values = callFn boxFuncType "boxArray" (constInt (length values) : values)
+boxArray values = callFn boxFuncType "boxArray" (constIntOp (length values) : values)
 
 boxFunc name mapping = do
   let idx = fromMaybe (error ("No such function " ++ name)) (Map.lookup name mapping)
-  callFn (funcType ptrType [T.i32]) "boxFunc" [constInt idx]
+  callFn (funcType ptrType [T.i32]) "boxFunc" [constIntOp idx]
 
 boxError name = do
   modify (\s -> s { generatedStrings = name : generatedStrings s })
@@ -404,10 +404,10 @@ boxClosure name mapping enclosedVars = do
        bc1 <- bitcast p (T.ptr ptrType)
        bc <- load arg
        store bc1 bc
-              
+
   let sargs = sargsPtr
-  sequence_ [asdf (constInt i, a) | (i, a) <- zip [0 .. argc] args]
-  callFn (funcType ptrType [T.i32, T.i32, ptrType]) "boxClosure" [constInt idx, constInt argc, sargsPtr]
+  sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0 .. argc] args]
+  callFn (funcType ptrType [T.i32, T.i32, ptrType]) "boxClosure" [constIntOp idx, constIntOp argc, sargsPtr]
 
 boolToInt True = 1
 boolToInt False = 0
@@ -485,7 +485,7 @@ defineStructs defs =
     let len = length args
     defineConst ("Struct." ++ name) (T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral len) ptrType]) (Just struct)
 
-createStructs structs = C.Struct Nothing False [C.Int 32 (toInteger len), array]
+createStructs structs = C.Struct Nothing False [constInt len, array]
   where
     len = length structs
     array = C.Array ptrType refs
@@ -506,7 +506,7 @@ genStructs defs = do
   defineStructs defs
   let structs = createStructs defs
   defineConst "Structs" (T.StructureType False [T.i32, T.ArrayType (fromIntegral len) ptrType]) (Just structs)
-  forM_ defs $ \(DataDef tid name constrs)  -> forM_ constrs $ \ (S.DataConst _ args) -> 
+  forM_ defs $ \(DataDef tid name constrs)  -> forM_ constrs $ \ (S.DataConst _ args) ->
     defineConstructor name tid args
   where
     defineNames defs =
@@ -514,7 +514,7 @@ genStructs defs = do
       \ (S.DataConst name args) ->
         do defineStringLit name
            forM_ args $ \ (S.Arg name _) -> defineStringLit name
-           
+
     defineConstructor name tid args = do
           modState <- get
           let codeGenResult = codeGen modState
@@ -529,16 +529,16 @@ genStructs defs = do
             codeGen modState = execCodegen [] modState $ do
               entry <- addBlock entryBlockName
               setBlock entry
---              nullptr <- getelementptr (constNull tpe) [constInt 1]
+--              nullptr <- getelementptr (constNull tpe) [constIntOp 1]
 --              sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
               let len = length args
-              ptr <- callFn ptrType "gcMalloc" [constInt (ptrSize * len)]
+              ptr <- callFn ptrType "gcMalloc" [constIntOp (ptrSize * len)]
               arrayPtr <- bitcast ptr (T.ptr (T.ArrayType (fromIntegral len) ptrType))
               let argsWithId = zip args [0..]
               forM_ argsWithId $ \(S.Arg n t, i) -> do
-                p <- getelementptr arrayPtr [constInt 0, constInt i]
+                p <- getelementptr arrayPtr [constIntOp 0, constIntOp i]
                 store p (local n)
-              boxed <- callFn ptrType "box" [constInt tid, ptr]
+              boxed <- callFn ptrType "box" [constIntOp tid, ptr]
               ret boxed
 
 genFunctionMap :: [S.Expr] -> LLVM ()
@@ -571,7 +571,7 @@ genFunctionMap fns = do
     struct1 = C.Struct Nothing False [C.Int 32 (toInteger len), array]
 
     struct name arity = C.Struct Nothing False
-                            [globalStringRefAsPtr name, constRef name, C.Int 32 (toInteger arity)]
+                            [globalStringRefAsPtr name, constRef name, constInt arity]
 
 
     funcsWithArities = foldl go [] fns where
