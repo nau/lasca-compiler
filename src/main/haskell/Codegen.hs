@@ -95,7 +95,7 @@ defineGlobal name tpe body = addDefn $
 
 defineConst name tpe body = addDefn $
   AST.GlobalDefinition $ AST.globalVariableDefaults {
-    LLVM.AST.Global.name        = name
+    LLVM.AST.Global.name        = AST.Name name
   , LLVM.AST.Global.isConstant  = True
   , LLVM.AST.Global.type' = tpe
   , LLVM.AST.Global.initializer = body

@@ -486,7 +486,7 @@ defineStructs defs =
     let struct = createStruct d
     let (S.DataConst _ args) = head constrs
     let len = length args
-    defineConst (AST.Name ("Struct." ++ name)) (T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral len) ptrType]) (Just struct)
+    defineConst ("Struct." ++ name) (T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral len) ptrType]) (Just struct)
 
 createStructs structs = C.Struct Nothing False [C.Int 32 (toInteger len), array]
   where
@@ -508,7 +508,7 @@ genStructs defs = do
   defineNames defs
   defineStructs defs
   let structs = createStructs defs
-  defineConst (AST.Name "Structs") (T.StructureType False [T.i32, T.ArrayType (fromIntegral len) ptrType]) (Just structs)
+  defineConst "Structs" (T.StructureType False [T.i32, T.ArrayType (fromIntegral len) ptrType]) (Just structs)
   forM_ defs $ \(DataDef tid name constrs)  -> forM_ constrs $ \ (S.DataConst _ args) -> 
     defineConstructor name tid args
   where
@@ -519,8 +519,6 @@ genStructs defs = do
            forM_ args $ \ (S.Arg name _) -> defineStringLit name
            
     defineConstructor name tid args = do
-          addDefn $ AST.TypeDefinition (AST.Name "Field") Nothing
-          addDefn $ AST.TypeDefinition structTypeName (Just tpe)
           modState <- get
           let codeGenResult = codeGen modState
           let blocks = createBlocks codeGenResult
@@ -549,7 +547,7 @@ genStructs defs = do
 genFunctionMap :: [S.Expr] -> LLVM ()
 genFunctionMap fns = do
   defineNames
-  defineConst (AST.Name "Functions") (functionsStructType len) (Just struct1)
+  defineConst "Functions" (functionsStructType len) (Just struct1)
 --   Debug.traceM (show mapping)
 --   Debug.traceM (show array)
   modify (\s -> s { functions = mapping })
@@ -591,7 +589,7 @@ genFunctionMap fns = do
 
 runtimeStructType = T.StructureType False [ptrType, ptrType, ptrType]
 
-genRuntime = defineConst (AST.Name "Runtime") runtimeStructType (Just runtime)
+genRuntime = defineConst "Runtime" runtimeStructType (Just runtime)
   where
       runtime = C.Struct Nothing False [constRef "Functions", constRef "Structs", constNullPtr]
 
