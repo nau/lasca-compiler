@@ -64,8 +64,8 @@ emptyCtx = Context {
   typeId = 1000
 }
 
-one = constant $ C.Float (F.Double 1.0)
-zero = constant $ C.Float (F.Double 0.0)
+one = constOp $ C.Float (F.Double 1.0)
+zero = constOp $ C.Float (F.Double 0.0)
 false = zero
 true = one
 
@@ -371,7 +371,7 @@ box :: S.Lit -> Codegen AST.Operand
 box (S.BoolLit b) = call (global boxFuncType (AST.Name "boxBool")) [constInt (boolToInt b)]
 box (S.IntLit  n) = call (global boxFuncType (AST.Name "boxInt")) [constInt n]
 box (S.FloatLit  n) = call (global boxFuncType (AST.Name "boxFloat64")) [constFloat n]
-box S.UnitLit = call (global boxFuncType (AST.Name "box")) [constInt 0,  constant constNullPtr]
+box S.UnitLit = call (global boxFuncType (AST.Name "box")) [constInt 0,  constOp constNullPtr]
 box (S.StringLit s) = do
   let name = getStringLitASTName s
   let len = ByteString.length . UTF8.fromString $ s

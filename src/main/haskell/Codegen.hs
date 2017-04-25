@@ -322,26 +322,26 @@ local ::  Name -> Operand
 local = LocalReference ptrType
 
 global :: Type -> Name -> Operand
-global tpe name = constant (C.GlobalReference tpe name)
+global tpe name = constOp (C.GlobalReference tpe name)
 
 
 
-constant :: C.Constant -> Operand
-constant = ConstantOperand
+constOp :: C.Constant -> Operand
+constOp = ConstantOperand
 
 constNull tpe = (C.IntToPtr (C.Int 32 0) (T.ptr tpe))
 constNullPtr = constNull T.i8
 
 constInt :: Int -> Operand
-constInt i = constant (C.Int 32 (toInteger i))
+constInt i = constOp (C.Int 32 (toInteger i))
 
-constFloat i = constant (C.Float (F.Double i))
+constFloat i = constOp (C.Float (F.Double i))
 
-constByte b = constant (C.Int 8 b)
-constTrue = constant (C.Int 1 1)
-constFalse = constant (C.Int 1 0)
+constByte b = constOp (C.Int 8 b)
+constTrue = constOp (C.Int 1 1)
+constFalse = constOp (C.Int 1 0)
 constRef name = let ptr = C.GlobalReference ptrType (AST.Name name) in C.BitCast ptr ptrType
-constRefOperand name = constant (constRef name)
+constRefOperand name = constOp (constRef name)
 
 uitofp :: Type -> Operand -> Codegen Operand
 uitofp ty a = instr $ UIToFP a ty []
