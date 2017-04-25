@@ -186,7 +186,7 @@ codegenTop ctx (S.Function name tpe args body) = do
 --       Debug.traceM ("Generating function2 " ++ name)
       forM_ args $ \(S.Arg n t) -> do
         var <- alloca ptrType
-        store var (local (AST.Name n))
+        store var (local n)
         assign n var
       cgen ctx body >>= ret
 
@@ -215,7 +215,7 @@ codegenStartFunc ctx = do
         entry <- addBlock entryBlockName
         setBlock entry
         call (global initLascaRuntimeFuncType (AST.Name "initLascaRuntime")) [constRefOperand "Runtime"]
-        call (global (funcType T.void [intType, ptrType]) (AST.Name "initEnvironment")) [local (AST.Name "argc"), local (AST.Name "argv")]
+        call (global (funcType T.void [intType, ptrType]) (AST.Name "initEnvironment")) [local "argc", local "argv"]
         initGlobals
         call (global mainFuncType (AST.Name "main")) []
         terminator $ I.Do $ I.Ret Nothing []
@@ -543,7 +543,7 @@ genStructs defs = do
               let argsWithId = zip args [0..]
               forM_ argsWithId $ \(S.Arg n t, i) -> do
                 p <- getelementptr arrayPtr [constInt 0, constInt i]
-                store p (local (AST.Name n))
+                store p (local n)
               boxed <- call (global ptrType (AST.Name "box")) [constInt tid, ptr]
               ret boxed
 

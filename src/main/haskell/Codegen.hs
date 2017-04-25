@@ -238,7 +238,7 @@ instr ins = do
   blk <- current
   let i = stack blk
   modifyBlock (blk { stack = i ++ [ref := ins] } )
-  return $ local ref
+  return $ localName ref
 
 instr2 :: Type -> Instruction -> Codegen Operand
 instr2 tpe ins = do
@@ -261,7 +261,7 @@ named iname m = m >> do
   let b = Name iname
       (_ := x) = last (stack blk)
   modifyBlock $ blk { stack = init (stack blk) ++ [b := x] }
-  return $ local b
+  return $ localName b
 
 -- icmp :: Operand -> Operand -> Codegen (Operand)
 -- icmp lhs rhs = instr2 T.i1 (ICmp)
@@ -318,18 +318,18 @@ getvar var = do
 -------------------------------------------------------------------------------
 
 -- References
-local ::  Name -> Operand
-local = LocalReference ptrType
+localName ::  Name -> Operand
+localName = LocalReference ptrType
+
+local name = localName (AST.Name name)
 
 global :: Type -> Name -> Operand
 global tpe name = constOp (C.GlobalReference tpe name)
 
-
-
 constOp :: C.Constant -> Operand
 constOp = ConstantOperand
 
-constNull tpe = (C.IntToPtr (C.Int 32 0) (T.ptr tpe))
+constNull tpe = C.IntToPtr (C.Int 32 0) (T.ptr tpe)
 constNullPtr = constNull T.i8
 
 constInt :: Int -> Operand
