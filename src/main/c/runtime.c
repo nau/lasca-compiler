@@ -92,7 +92,7 @@ typedef struct {
 
 typedef struct {
   int typeId;
-  int tag;
+//  int tag;   // it's not set now. Not sure we need this
   String* name;
   int numFields;
   String* fields[];

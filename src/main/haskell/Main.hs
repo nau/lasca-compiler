@@ -95,7 +95,7 @@ genModule opts modo source = case parseToplevel source of
         then case typeCheck ex of
           Right env -> do
             when (verboseMode opts) $ putStrLn "typechecked OK"
---            when (printTypes opts) $ print env
+            when (printTypes opts) $ print env
             return (Just (codegenModule modo ex))
           Left e -> die $ show e
         else return (Just (codegenModule modo ex))

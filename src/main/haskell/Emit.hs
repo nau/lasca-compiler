@@ -457,7 +457,7 @@ genData defs = sequence [genDataStruct d | d <- defs]
           let numConstructors = length constrs
           constructors <- genConstructors dd
           let arrayOfConstructors = C.Array ptrType constructors
-          let struct = C.Struct Nothing False [constInt tid, globalStringRefAsPtr name, constInt numConstructors, arrayOfConstructors]
+          let struct = C.Struct Nothing False [constInt tid, globalStringRefAsPtr name, constInt numConstructors, arrayOfConstructors] -- struct Data
           defineConst literalName (T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral numConstructors) ptrType]) (Just struct)
           return (constRef literalName)
 
@@ -465,14 +465,29 @@ genConstructors (DataDef tid name constrs) = do
   forM (zip constrs [0..]) $ \ ((S.DataConst n args), tag) ->
     defineConstructor name n tid tag args
 
+boxStructType = T.StructureType False [T.i32, ptrType]
+
 defineConstructor typeName name tid tag args = do
   -- TODO optimize for zero args
   modState <- get
   let codeGenResult = codeGen modState
   let blocks = createBlocks codeGenResult
-  define ptrType name fargs blocks -- define constructor function
 
-  forM_ args $ \ (S.Arg name _) -> defineStringLit name -- define fields names as strings
+  if null args
+  then do
+    let singletonName = name ++ ".Singleton"
+    let dataValue = C.Struct Nothing False [constInt tag, C.Array ptrType []]
+    defineConst singletonName tpe (Just dataValue)
+
+    let boxed = C.Struct Nothing False [constInt tid, constRef singletonName]
+    defineConst (singletonName ++ ".Boxed") boxStructType (Just boxed)
+
+    let boxedRef = C.GlobalReference boxStructType (AST.Name (singletonName ++ ".Boxed"))
+    let ptrRef = C.BitCast boxedRef ptrType
+    defineConst (name) ptrType (Just ptrRef)
+  else do
+    define ptrType name fargs blocks -- define constructor function
+    forM_ args $ \ (S.Arg name _) -> defineStringLit name -- define fields names as strings
   
   let structType = T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral len) ptrType]
   let struct =  C.Struct Nothing False [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, constInt len, fieldsArray]
@@ -572,11 +587,16 @@ createGlobalContext exprs = execState (loop exprs) emptyCtx
       names (S.Data name consts) = do
         id <- gets typeId
         globFuncs <- gets globalFunctions
+        globVals <- gets globalVals
         let dataDef = DataDef id name consts
-        let m = foldl (\acc (S.DataConst n _) -> n : acc) [] consts
+        let (funcs, vals) = foldl (\(funcs, vals) (S.DataConst n args) ->
+                              if null args
+                              then (funcs, n : vals)
+                              else (n : funcs, vals)) ([], []) consts
         modify (\s -> s {
           dataDefs =  dataDef : dataDefs s,
-          globalFunctions = globFuncs `Set.union` Set.fromList m,
+          globalVals = globVals `Set.union` Set.fromList vals,
+          globalFunctions = globFuncs `Set.union` Set.fromList funcs,
           typeId = id + 1
           })
       names (S.Extern name _ _) = do
