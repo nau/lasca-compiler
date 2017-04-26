@@ -4,9 +4,14 @@ data Test = Test(a: Int)
 
 data Point = Point(x: Int, y: Int, z: Test)
 
+data Expr = Ident(n: String) | Num(n: Int)
+
 def main() = {
   t = Test(3);
   p1 = Point(12, 2, t);
+  ident = Ident("test");
+  num = Num(1);
+  println(num.toString);
   x = p1.x + p1.y - p1.z.a;
   println(x.toString);
   println("Hello")

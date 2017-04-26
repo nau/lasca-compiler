@@ -4,9 +4,9 @@ packages:
 flags:
 apply-ghc-options: everything
 ghc-options:
-  "*": -O0
+  "*": -O2
   lasca:
-#   -O2
+    -O0
     -rtsopts
 #    -prof
 #    -fprof-auto

@@ -92,15 +92,23 @@ typedef struct {
 
 typedef struct {
   int typeId;
+  int tag;
   String* name;
   int numFields;
   String* fields[];
 } Struct;
 
 typedef struct {
+  int typeId;
+  String* name;
+  int numValues;
+  Struct* constructors[];
+} Data;
+
+typedef struct {
   int size;
-  Struct* structs[];
-} Structs;
+  Data* data[];
+} Types;
 
 typedef struct {
   int argc;
@@ -109,9 +117,14 @@ typedef struct {
 
 typedef struct {
   Functions* functions;
-  Structs* structs;
+  Types* types;
   Environment* environment;
 } Runtime;
+
+typedef struct {
+  int tag;
+  Box* values[];
+} DataValue;
 
 Environment ENV;
 Runtime* RUNTIME;
@@ -383,23 +396,24 @@ Box* runtimeApply(Box* val, int argc, Box* argv[]) {
 
 Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident) {
   Functions* fs = RUNTIME->functions;
-  Structs* structs = RUNTIME->structs;
+  Types* types = RUNTIME->types;
   if (tree->type >= 1000) {
-//    printf("Found struct %d\n", tree->type);
 //    printf("Found structs %d\n", structs->size);
 
+    DataValue* dataValue = tree->value.ptr;
     // if rhs is not a local ident, nor a function, try to find this field in lhs data structure
     if (ident->type == -1) {
       String* name = ident->value.ptr; // should be identifier name
 //      printf("Ident name %.*s\n", name->length, name->bytes);
-      Struct* strct = structs->structs[tree->type - 1000]; // find struct in global array of structs
-      int numFields = strct->numFields;
+      Data* data = types->data[tree->type - 1000]; // find struct in global array of structs
+//      printf("Found data type %.*s %d, tag %d\n", data->name->length, data->name->bytes, tree->type, dataValue->tag);
+      Struct* constr = data->constructors[dataValue->tag];
+      int numFields = constr->numFields;
       for (int i = 0; i < numFields; i++) {
-        String* field = strct->fields[i];
+        String* field = constr->fields[i];
 //        printf("Check field %d %.*s\n", field->length, field->length, field->bytes);
         if (field->length == name->length && strncmp(field->bytes, name->bytes, name->length) == 0) {
-          Box** values = tree->value.ptr;
-          Box* value = values[i];
+          Box* value = dataValue->values[i];
 //          printf("Found value %d at index %d\n", value->type, i);
 //          println(toString(value));
           return value;
@@ -528,7 +542,8 @@ Box* __attribute__ ((pure)) arrayToString(Box* arrayValue)  {
 Box* __attribute__ ((pure)) toString(Box* value) {
   char buf[100];
 
-  switch (value->type) {
+  int type = value->type;
+  switch (type) {
     case UNIT: return UNIT_STRING;
     case BOOL: return makeString(value->value.num == 0 ? "false" : "true");
     case INT:
@@ -546,8 +561,16 @@ Box* __attribute__ ((pure)) toString(Box* value) {
       exit(1);
     }
     default:
-      printf("Unsupported type %d", value->type);
-      exit(1);
+      if (type >= 1000 && type < 1000 + RUNTIME->types->size) {
+        DataValue* dataValue = value->value.ptr;
+        Data* metaData = RUNTIME->types->data[type - 1000];
+        Struct* constr = metaData->constructors[dataValue->tag];
+        snprintf(buf, 100, "%.*s", constr->name->length, constr->name->bytes);
+        return makeString(buf);
+      } else {
+        printf("Unsupported type %d", value->type);
+        exit(1);
+      }
   }
 }
 
@@ -610,5 +633,5 @@ void initLascaRuntime(Runtime* runtime) {
       INT_ARRAY[i].type = INT;
       INT_ARRAY[i].value.num = i;
     }
-//    printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %d, # structs = %d\n", RUNTIME->functions->size, RUNTIME->structs->size);
+    printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %d, # structs = %d\n", RUNTIME->functions->size, RUNTIME->types->size);
 }

@@ -15,7 +15,7 @@ bench:
 	time lasca -O2 -e src/main/lasca/gen.lasca +RTS -sstderr
 
 rts:
-	$(CC) -shared -fPIC -g -O2 -I/usr/local/include -L/usr/local/lib -lgc -lstdc++ src/main/c/*.c* -o liblascart.so
+	$(CC) -shared -fPIC -g -O3 -I/usr/local/include -L/usr/local/lib -lgc -lstdc++ src/main/c/*.c* -o liblascart.so
 
 rtsDebug:
 	$(CC) -shared -fPIC -g -O0 -I/usr/local/include -L/usr/local/lib -lgc -lstdc++ src/main/c/*.c* -o liblascart.so

@@ -188,12 +188,13 @@ dataDef = do
   reserved "data"
   typeName <- identifier
   reservedOp "="
-  constructors <- dataConstructor `sepBy` reservedOp "|"
+  optional $ reservedOp "|"
+  constructors <-  dataConstructor `sepBy` reservedOp "|"
   return (Data typeName constructors)
 
 dataConstructor = do
   name <- identifier
-  args <- parens (arg `sepEndBy` comma)
+  args <- option [] $ parens (arg `sepEndBy` comma)
   return (DataConst name args)
 
 factor :: Parser Expr
