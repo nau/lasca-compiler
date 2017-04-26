@@ -507,40 +507,45 @@ Box* __attribute__ ((pure)) makeString(char * str) {
   return box(STRING, val);
 }
 
+Box* joinValues(int size, Box* values[], char* start, char* end) {
+  int seps = size * 2;
+  size_t resultSize = size * 32; // assume 32 bytes per array element. No reason, just guess
+  char * result = gcMalloc(resultSize);
+  strcat(result, start);
+  size_t curSize = strlen(start) + strlen(end);
+  for (int i = 0; i < size; i++) {
+    Box* elem = values[i];
+    String* value = unbox(STRING, toString(elem));
+    // realloc if we don't fit it the result buffer
+    if (curSize + value->length >= resultSize + 10) { // reserve 10 bytes for trailing ']' etc
+      size_t newSize = resultSize * 1.5;
+      result = gcRealloc(result, newSize);
+      resultSize = newSize;
+    }
+    strncat(result, value->bytes, value->length);
+    curSize += value->length;
+    if (i + 1 < size) {
+      strcat(result, ", ");
+      curSize += 2;
+    }
+  }
+  strcat(result, end);
+  return makeString(result);
+}
+
 Box* __attribute__ ((pure)) arrayToString(Box* arrayValue)  {
   Array* array = unbox(ARRAY, arrayValue);
   if (array->length == 0) {
     return makeString("[]");
   } else {
-    int seps = array->length * 2;
-    size_t resultSize = array->length * 32; // assume 32 bytes per array element. No reason, just guess
-    char * result = gcMalloc(resultSize);
-    strcat(result, "[");
-    size_t curSize = 1;
-    for (int i = 0; i < array->length; i++) {
-      Box* elem = array->data[i];
-      String* value = unbox(STRING, toString(elem));
-      if (curSize + value->length >= resultSize + 10) { // reserve 10 bytes for trailing ']' etc
-        size_t newSize = resultSize * 1.5;
-        result = gcRealloc(result, newSize);
-        resultSize = newSize;
-      }
-      strncat(result, value->bytes, value->length);
-      curSize += value->length;
-      if (i + 1 < array->length) {
-        strcat(result, ", ");
-        curSize += 2;
-      }
-    }
-    strcat(result, "]");
-    return makeString(result);
+    return joinValues(array->length, array->data, "[", "]");
   }
 }
 
 /* =============== Strings ============= */
 
 Box* __attribute__ ((pure)) toString(Box* value) {
-  char buf[100];
+  char buf[100]; // 100 chars is enough for all (c)
 
   int type = value->type;
   switch (type) {
@@ -565,8 +570,13 @@ Box* __attribute__ ((pure)) toString(Box* value) {
         DataValue* dataValue = value->value.ptr;
         Data* metaData = RUNTIME->types->data[type - 1000];
         Struct* constr = metaData->constructors[dataValue->tag];
-        snprintf(buf, 100, "%.*s", constr->name->length, constr->name->bytes);
-        return makeString(buf);
+        int startlen = constr->name->length + 2; // ending 0 and possibly "(" if constructor has parameters
+        char start[startlen];
+        snprintf(start, startlen, "%.*s", constr->name->length, constr->name->bytes);
+        if (constr->numFields > 0) {
+          strcat(start, "(");
+          return joinValues(constr->numFields, dataValue->values, start, ")");
+        } else return makeString(start);
       } else {
         printf("Unsupported type %d", value->type);
         exit(1);
