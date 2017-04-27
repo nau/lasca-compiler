@@ -2,6 +2,7 @@
 module Syntax where
 
 import           Data.Text
+import           Text.Megaparsec
 import           Type
 
 type Name = String
@@ -17,8 +18,17 @@ data LascaOpts = LascaOpts
   , optimization :: Int
   }
 
+data Position = NoPosition | Position SourcePos deriving (Eq, Ord, Show)
+
+data Meta = Meta {
+  pos :: Position,
+  symbolType :: Scheme
+} deriving (Eq, Ord, Show)
+
+emptyMeta = Meta { pos = NoPosition, symbolType = schemaAny }
+
 data Expr
-  = Literal Lit
+  = Literal Lit Meta
   | Ident Name
   | Val Name Expr
   | Apply Expr [Expr]

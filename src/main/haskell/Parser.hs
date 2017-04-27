@@ -6,6 +6,9 @@ module Parser (
 ) where
 
 import           Control.Applicative    ((<$>))
+import Control.Monad.State
+import           Data.List as List
+import           Data.List.NonEmpty
 import           Data.Foldable
 import           Text.Megaparsec
 import qualified Text.Megaparsec.Expr   as Ex
@@ -16,17 +19,21 @@ import           Syntax
 import           Type
 
 integerLit :: Parser Expr
-integerLit = Literal . IntLit . fromIntegral <$> signedInteger
+integerLit = do
+  state <- getParserState
+  let sp :| _ = statePos state
+  let meta = emptyMeta { pos = Position sp }
+  (`Literal` meta) . IntLit . fromIntegral <$> signedInteger
 
 floating :: Parser Expr
-floating = Literal . FloatLit <$> signedFloat
+floating = (`Literal` emptyMeta) . FloatLit <$> signedFloat
 
 strToBool :: String -> Bool
 strToBool "true" = True
 strToBool _      = False
 
 boolLit :: Parser Expr
-boolLit = Literal . BoolLit . strToBool <$> (true <|> false)
+boolLit = (`Literal` emptyMeta) . BoolLit . strToBool <$> (true <|> false)
   where
     true = reserved "true" >> return "true"
     false = reserved "false" >> return "false"
@@ -34,7 +41,7 @@ boolLit = Literal . BoolLit . strToBool <$> (true <|> false)
 arrayLit = Array <$> brackets (commaSep expr)
 
 stringLit :: Parser Expr
-stringLit = Literal . StringLit <$> stringLiteral
+stringLit = (`Literal` emptyMeta) . StringLit <$> stringLiteral
 
 binop = Ex.InfixL parser
   where parser = (\op lhs rhs -> Apply (Ident op) [lhs, rhs]) <$> anyOperatorParser
@@ -164,14 +171,14 @@ unnamedStmt = do
 
 blockStmts = do
   exprs <- (try valdef <|> unnamedStmt) `sepEndBy` semi
-  let letin = foldStmtsIntoOneLetExpr (reverse exprs)
+  let letin = foldStmtsIntoOneLetExpr (List.reverse exprs)
   return letin
   where
-        foldStmtsIntoOneLetExpr [] = Literal UnitLit
+        foldStmtsIntoOneLetExpr [] = Literal UnitLit emptyMeta
         foldStmtsIntoOneLetExpr exprs@(lst : init) = do
           let (init', last') = case lst of
                                 (Stmt e)    -> (init, e)
-                                (Named _ _) -> (exprs, Literal UnitLit)
+                                (Named _ _) -> (exprs, Literal UnitLit emptyMeta)
           let namedExprs = go init' 1
           foldl' (\acc (name, e) -> Let name e acc) last' namedExprs
 

@@ -37,7 +37,12 @@ data TypeError
   | InfiniteType TVar Type
   | UnboundVariable String
   | UnificationMismatch [Type] [Type]
-  deriving Show
+
+instance Show TypeError where
+  show (UnificationFail t1 t2) = "Unification Fail " ++ show t1 ++ " " ++ show t2
+  show (InfiniteType t1 t2) = "InfiniteType " ++ show t1 ++ " " ++ show t2
+  show (UnboundVariable s) = "UnboundVariable " ++ s
+  show (UnificationMismatch t1 t2) = "UnificationMismatch " ++ show t1 ++ " " ++ show t2
 
 runInfer :: Infer (Subst, Type) -> Either TypeError Scheme
 runInfer m = case evalState (runExceptT m) initUnique of
@@ -244,11 +249,11 @@ infer env ex = case ex of
     let tpe = foldr (\_ t -> tv `TypeFunc` t) (typeArray tv) exprs
     inferPrim env exprs tpe
 
-  Literal (IntLit _)  -> return (nullSubst, typeInt)
-  Literal (FloatLit _)  -> return (nullSubst, typeFloat)
-  Literal (BoolLit _) -> return (nullSubst, typeBool)
-  Literal (StringLit _) -> return (nullSubst, typeString)
-  Literal UnitLit -> return (nullSubst, typeUnit)
+  Literal (IntLit _)    meta -> return (nullSubst, typeInt)
+  Literal (FloatLit _)  meta -> return (nullSubst, typeFloat)
+  Literal (BoolLit _)   meta -> return (nullSubst, typeBool)
+  Literal (StringLit _) meta -> return (nullSubst, typeString)
+  Literal UnitLit       meta -> return (nullSubst, typeUnit)
   e -> error ("Wat? " ++ show e)
 
 inferPrim :: TypeEnv -> [Expr] -> Type -> Infer (Subst, Type)

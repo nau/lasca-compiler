@@ -47,5 +47,7 @@ typeUnit = TypeIdent "Unit"
 typeArray t = TypeApply (TypeIdent "Array") [t]
 typeArrayInt = typeArray typeInt
 
+schemaAny = Forall [] typeAny
+
 isAny (TypeIdent "Any") = True
 isAny _ = False

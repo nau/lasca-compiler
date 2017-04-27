@@ -1,3 +1,5 @@
+def foo(i) = i + 2
+
 def returnArray() = {
   array = [];
   array1 = append(array, "Hello");
@@ -5,8 +7,9 @@ def returnArray() = {
   array3 = prepend(array2, 1);
   println(toString(array3(2)));
   println(toString(array3));
-
+--  foo(false)
 }
+
 
 def main() = {
   returnArray()

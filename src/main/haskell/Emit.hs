@@ -116,7 +116,7 @@ transformExpr transformer expr = case expr of
 
 
 defineStringConstants :: S.Expr -> LLVM ()
-defineStringConstants (S.Literal (S.StringLit s)) = defineStringLit s
+defineStringConstants (S.Literal (S.StringLit s) meta) = defineStringLit s
 defineStringConstants (S.If cond true false) = do
   defineStringConstants cond
   defineStringConstants true
@@ -241,7 +241,9 @@ cgen ctx (S.Ident name) = do
     Nothing | name `Set.member` _globalFunctions ctx -> boxFunc name mapping
             | name `Set.member` _globalVals ctx -> load (global ptrType name)
             | otherwise -> boxError name
-cgen ctx (S.Literal l) = box l
+cgen ctx (S.Literal l meta) = do
+  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)
+  box l
 cgen ctx (S.Array exprs) = do
   vs <- values
   boxArray vs
@@ -250,8 +252,8 @@ cgen ctx (S.Select tree expr) = do
   tree <- cgen ctx tree
   e <- cgen ctx expr
   callFn runtimeSelectFuncType "runtimeSelect" [tree, e]
-cgen ctx (S.Apply (S.Ident "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True)) rhs)
-cgen ctx (S.Apply (S.Ident "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False)))
+cgen ctx (S.Apply (S.Ident "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True) S.emptyMeta) rhs)
+cgen ctx (S.Apply (S.Ident "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False) S.emptyMeta))
 cgen ctx (S.Apply (S.Ident fn) [lhs, rhs]) | fn `Map.member` binops = do
   llhs <- cgen ctx lhs
   lrhs <- cgen ctx rhs
