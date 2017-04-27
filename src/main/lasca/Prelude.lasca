@@ -1,10 +1,10 @@
-extern def runtimePutchar(d: Any): Any
-extern def println(s: String): Any
+extern def runtimePutchar(d: Int): Unit
+extern def println(s: String): Any -- FIXME this is Any, because currently we assume every function returns a result and can't be Unit
 extern def append(array: Any, v: Any): Any
 extern def prepend(array: Any, v: Any): Any
-extern def arrayApply(array: Any, i: Any): Any
-extern def arrayLength(array: Any): Any
+extern def arrayApply(array: Any, i: Int): Any
+extern def arrayLength(array: Any): Int
 extern def toString(a: Any): String
-extern def lasqrt(a: Any): Any
+extern def lasqrt(a: Float): Float
 extern def getArgs(): Any
-extern def toInt(s: Any): Any
+extern def toInt(s: Any): Int

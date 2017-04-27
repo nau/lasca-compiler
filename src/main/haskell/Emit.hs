@@ -146,12 +146,9 @@ codegenTop ctx (S.Function name tpe args body) = do
   let codeGenResult = codeGen modState
   let blocks = createBlocks codeGenResult
   mapM_ defineStringLit (generatedStrings codeGenResult)
-  define retType name largs blocks
+  define ptrType name largs blocks
   where
     largs = toSig args
-
-    retType = ptrType -- typeMapping tpe
-
     codeGen modState = execCodegen [] modState $ do
       entry <- addBlock entryBlockName
       setBlock entry
@@ -204,17 +201,10 @@ codegenStartFunc ctx = do
       return v
 
 
--- Static mode
-typeMapping :: Type -> AST.Type
-typeMapping (TypeIdent "Any") = ptrType
-typeMapping (TypeIdent "Unit") = T.void
-typeMapping (TypeIdent "Bool") = T.i1
-typeMapping (TypeIdent "Int") = T.i32
-typeMapping (TypeIdent "Float") = T.double
-typeMapping (TypeIdent "String") = ptrType
-
 -- Dynamic mode
--- typeMapping _ = typeInfoType
+typeMapping :: Type -> AST.Type
+typeMapping (TypeIdent "Unit") = T.void
+typeMapping _ = ptrType
 -------------------------------------------------------------------------------
 -- Operations
 -------------------------------------------------------------------------------
