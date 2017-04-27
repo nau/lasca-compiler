@@ -197,22 +197,22 @@ infer env ex = case ex of
 
   Ident x -> lookupEnv env x
 
-  Apply (Ident op) [e1, e2] | op `Map.member` ops -> do
+  Apply meta (Ident op) [e1, e2] | op `Map.member` ops -> do
     (s1, t1) <- infer env e1
     (s2, t2) <- infer env e2
     tv <- fresh
     s3 <- unify (TypeFunc t1 (TypeFunc t2 tv)) (ops Map.! op)
     return (s1 `compose` s2 `compose` s3, apply s3 tv)
 
-  Apply e1 [arg] -> do
+  Apply meta e1 [arg] -> do
     tv <- fresh
     (s1, t1) <- infer env e1
     (s2, t2) <- infer (apply s1 env) arg
     s3       <- unify (apply s2 t1) (TypeFunc t2 tv)
     return (s3 `compose` s2 `compose` s1, apply s3 tv)
 
-  Apply e1 args -> do
-     let curried = foldl (\expr arg -> Apply expr [arg]) e1 args
+  Apply meta e1 args -> do
+     let curried = foldl (\expr arg -> Apply meta expr [arg]) e1 args
      infer env curried
 
   Let x e1 e2 -> do
@@ -250,7 +250,7 @@ infer env ex = case ex of
     infer env ({-Debug.trace ("Func " ++ show curried)-} curried)
 
   Data name constructors -> error "Shouldn't happen!"
-  Select meta tree expr -> infer env (Apply expr [tree])
+  Select meta tree expr -> infer env (Apply meta expr [tree])
 
   Array exprs -> do
     tv <- fresh

@@ -312,7 +312,7 @@ String s = {
   .bytes = "Unimplemented select"
 };
 
-Box* runtimeApply(Box* val, int argc, Box* argv[]) {
+Box* runtimeApply(Box* val, int argc, Box* argv[], Position pos) {
   Functions* fs = RUNTIME->functions;
   // Handle array(idx) call
   if (val->type == ARRAY && argc == 1 && argv[0]->type == INT) {
@@ -320,13 +320,13 @@ Box* runtimeApply(Box* val, int argc, Box* argv[]) {
   }
   Closure *closure = unbox(CLOSURE, val);
   if (closure->funcIdx >= fs->size) {
-    printf("AAAA!!! No such function with id %d, max id is %d", (int) closure->funcIdx, fs->size);
+    printf("AAAA!!! No such function with id %d, max id is %d at line: %d\n", (int) closure->funcIdx, fs->size, pos.line);
     exit(1);
   }
   Function f = fs->functions[closure->funcIdx];
   if (f.arity != argc + closure->argc) {
-    printf("AAAA!!! Function %.*s takes %d params, but passed %d enclosed params and %d params instead",
-      f.name->length, f.name->bytes, f.arity, closure->argc, argc);
+    printf("AAAA!!! Function %.*s takes %d params, but passed %d enclosed params and %d params instead at line: %d\n",
+      f.name->length, f.name->bytes, f.arity, closure->argc, argc, pos.line);
     exit(1);
   }
   // TODO: use platform ABI, like it should be.
@@ -391,7 +391,7 @@ Box* runtimeApply(Box* val, int argc, Box* argv[]) {
       }
     }
     default:
-      printf("AAAA! Unsupported arity %d", f.arity);
+      printf("AAAA! Unsupported arity %d at line: %d\n", f.arity, pos.line);
       exit(1);
       break;
   };
@@ -429,13 +429,13 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
       // FIXME fix for closure?  check arity?
       Closure* f = unbox(CLOSURE, ident);
       assert(fs->functions[f->funcIdx].arity == 1);
-      return runtimeApply(ident, 1, &tree);
+      return runtimeApply(ident, 1, &tree, pos);
     }
   } else if (ident->type == CLOSURE) {
     // FIXME fix for closure?  check arity?
     Closure* f = unbox(CLOSURE, ident);
     assert(fs->functions[f->funcIdx].arity == 1);
-    return runtimeApply(ident, 1, &tree);
+    return runtimeApply(ident, 1, &tree, pos);
   }
   return boxError(&s);
 }

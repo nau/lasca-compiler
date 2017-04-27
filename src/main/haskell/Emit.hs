@@ -98,14 +98,14 @@ transformExpr transformer expr = case expr of
     body' <- go body
     transformer (S.Let n e' body')
   (S.Lam n e) -> do
-    modify (\s -> s { _outers = s^.modStateLocals } )
+    modify (\s -> s { _outers = _locals s } )
     modStateLocals .= Set.singleton n
     e' <- go e
     transformer (S.Lam n e')
-  (S.Apply e args) -> do
+  (S.Apply meta e args) -> do
     e' <- go e
     args' <- sequence [go arg | arg <- args]
-    transformer (S.Apply e' args')
+    transformer (S.Apply meta e' args')
   (S.Function name tpe args e1) -> do
     let argNames = Set.fromList (map (\(S.Arg n _) -> n) args)
     modify (\s -> s { _locals = argNames, _outers = Set.empty, _usedVars = Set.empty } )
@@ -123,7 +123,7 @@ defineStringConstants (S.If cond true false) = do
   defineStringConstants true
   defineStringConstants false
   return ()
-defineStringConstants (S.Apply _ exprs) = do
+defineStringConstants (S.Apply meta _ exprs) = do
   mapM_ defineStringConstants exprs
   return ()
 defineStringConstants (S.Let _ e body) = do
@@ -254,15 +254,15 @@ cgen ctx (S.Select meta tree expr) = do
   e <- cgen ctx expr
   let pos = createPosition $ S.pos meta
   callFn runtimeSelectFuncType "runtimeSelect" [tree, e, constOp pos]
-cgen ctx (S.Apply (S.Ident "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True) S.emptyMeta) rhs)
-cgen ctx (S.Apply (S.Ident "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False) S.emptyMeta))
-cgen ctx (S.Apply (S.Ident fn) [lhs, rhs]) | fn `Map.member` binops = do
+cgen ctx (S.Apply meta (S.Ident "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True) S.emptyMeta) rhs)
+cgen ctx (S.Apply meta (S.Ident "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False) S.emptyMeta))
+cgen ctx (S.Apply meta (S.Ident fn) [lhs, rhs]) | fn `Map.member` binops = do
   llhs <- cgen ctx lhs
   lrhs <- cgen ctx rhs
   let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
   let codeOp = constIntOp code
   callFn runtimeBinOpFuncType "runtimeBinOp" [codeOp, llhs, lrhs]
-cgen ctx (S.Apply expr args) = do
+cgen ctx (S.Apply meta expr args) = do
   syms <- gets symtab
   largs <- mapM (cgen ctx) args
   let symMap = Map.fromList syms
@@ -285,7 +285,8 @@ cgen ctx (S.Apply expr args) = do
       sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
       -- cdecl calling convension, arguments passed right to left
       sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0 .. len] largs]
-      callFn runtimeApplyFuncType "runtimeApply" [e, argc, sargs]
+      let pos = createPosition $ S.pos meta
+      callFn runtimeApplyFuncType "runtimeApply" [e, argc, sargs, constOp pos]
 cgen ctx (S.BoxFunc funcName enclosedVars) = do
   modState <- gets moduleState
   let mapping = functions modState
@@ -336,7 +337,7 @@ mainFuncType = funcType ptrType []
 boxFuncType = funcType ptrType [T.i32]
 boxArrayFuncType = T.FunctionType ptrType [T.i32] True
 runtimeBinOpFuncType = funcType ptrType [T.i32, ptrType, ptrType]
-runtimeApplyFuncType = funcType ptrType [ptrType, T.i32, ptrType]
+runtimeApplyFuncType = funcType ptrType [ptrType, T.i32, ptrType, positionStructType]
 runtimeSelectFuncType = funcType ptrType [ptrType, ptrType, positionStructType]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
 
@@ -427,8 +428,8 @@ declareStdFuncs = do
   external ptrType "boxFloat64" [("d", T.double)] False [FA.GroupID 0]
   external ptrType "boxArray" [("size", intType)] True [FA.GroupID 0]
   external ptrType "runtimeBinOp"  [("code",  intType), ("lhs",  ptrType), ("rhs", ptrType)] False [FA.GroupID 0]
-  external ptrType "runtimeApply"  [("func", ptrType), ("argc", intType), ("argv", ptrType)] False []
-  external ptrType "runtimeSelect" [("tree", ptrType), ("expr", ptrType), ("pos", positionStructType)] False []
+  external ptrType "runtimeApply"  [("func", ptrType), ("argc", intType), ("argv", ptrType), ("pos", positionStructType)] False []
+  external ptrType "runtimeSelect" [("tree", ptrType), ("expr", ptrType), ("pos", positionStructType)] False [FA.GroupID 0]
   external T.void  "initEnvironment" [("argc", intType), ("argv", ptrType)] False []
   addDefn $ AST.FunctionAttributes (FA.GroupID 0) [FA.ReadOnly]
 

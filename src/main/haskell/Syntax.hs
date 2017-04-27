@@ -31,7 +31,7 @@ data Expr
   = Literal Lit Meta
   | Ident Name
   | Val Name Expr
-  | Apply Expr [Expr]
+  | Apply Meta Expr [Expr]
   | Lam String Expr
   | Select Meta Expr Expr
   | Fix Expr        -- typechecker only

@@ -51,13 +51,19 @@ stringLit :: Parser Expr
 stringLit = (`Literal` emptyMeta) . StringLit <$> stringLiteral
 
 binop = Ex.InfixL parser
-  where parser = (\op lhs rhs -> Apply (Ident op) [lhs, rhs]) <$> anyOperatorParser
+  where parser = do
+          meta <- getMeta
+          (\op lhs rhs -> Apply meta (Ident op) [lhs, rhs]) <$> anyOperatorParser
 
 unop = Ex.Prefix parser
-  where parser = (\op expr -> Apply (Ident ("unary" ++ op)) [expr]) <$> anyOperatorParser
+  where parser = do
+          meta <- getMeta
+          (\op expr -> Apply meta (Ident ("unary" ++ op)) [expr]) <$> anyOperatorParser
 
 binary s = Ex.InfixL parser
-  where parser = reservedOp s >> return (\lhs rhs -> Apply (Ident s) [lhs, rhs])
+  where parser = do
+           meta <- getMeta
+           reservedOp s >> return (\lhs rhs -> Apply meta (Ident s) [lhs, rhs])
 
 anyOperatorParser = do
   traverse_ (notFollowedBy . reservedOp) ops
@@ -67,7 +73,8 @@ anyOperatorParser = do
 postfixApply = Ex.Postfix parser
   where parser = do
           argss <- many argsApply
-          let apply e = foldl (\acc args -> Apply acc args) e argss
+          meta <- getMeta
+          let apply e = foldl (Apply meta) e argss
           return apply
 
 
