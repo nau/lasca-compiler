@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE Strict #-}
 
 module Emit (
@@ -242,16 +243,17 @@ cgen ctx (S.Ident name) = do
             | name `Set.member` _globalVals ctx -> load (global ptrType name)
             | otherwise -> boxError name
 cgen ctx (S.Literal l meta) = do
-  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)
-  box l
+--  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)
+  box l meta
 cgen ctx (S.Array exprs) = do
   vs <- values
   boxArray vs
   where values = sequence [cgen ctx e | e <- exprs]
-cgen ctx (S.Select tree expr) = do
+cgen ctx (S.Select meta tree expr) = do
   tree <- cgen ctx tree
   e <- cgen ctx expr
-  callFn runtimeSelectFuncType "runtimeSelect" [tree, e]
+  let pos = createPosition $ S.pos meta
+  callFn runtimeSelectFuncType "runtimeSelect" [tree, e, constOp pos]
 cgen ctx (S.Apply (S.Ident "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal (S.BoolLit True) S.emptyMeta) rhs)
 cgen ctx (S.Apply (S.Ident "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal (S.BoolLit False) S.emptyMeta))
 cgen ctx (S.Apply (S.Ident fn) [lhs, rhs]) | fn `Map.member` binops = do
@@ -335,22 +337,26 @@ boxFuncType = funcType ptrType [T.i32]
 boxArrayFuncType = T.FunctionType ptrType [T.i32] True
 runtimeBinOpFuncType = funcType ptrType [T.i32, ptrType, ptrType]
 runtimeApplyFuncType = funcType ptrType [ptrType, T.i32, ptrType]
-runtimeSelectFuncType = funcType ptrType [ptrType, ptrType]
+runtimeSelectFuncType = funcType ptrType [ptrType, ptrType, positionStructType]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
 
 gcMalloc size = callFn (funcType ptrType [T.i32]) "gcMalloc" [constIntOp size]
 
-box :: S.Lit -> Codegen AST.Operand
-box (S.BoolLit b) = callFn boxFuncType "boxBool" [constIntOp (boolToInt b)]
-box (S.IntLit  n) = callFn boxFuncType "boxInt" [constIntOp n]
-box (S.FloatLit  n) = callFn boxFuncType "boxFloat64" [constFloat n]
-box S.UnitLit = callFn boxFuncType "box" [constIntOp 0,  constOp constNullPtr]
-box (S.StringLit s) = do
+box (S.BoolLit b) meta = callFn boxFuncType "boxBool" [constIntOp (boolToInt b)]
+box (S.IntLit  n) meta = callFn boxFuncType "boxInt" [constIntOp n]
+box (S.FloatLit  n) meta = callFn boxFuncType "boxFloat64" [constFloat n]
+box S.UnitLit meta = callFn boxFuncType "box" [constIntOp 0,  constOp constNullPtr]
+box (S.StringLit s) meta = do
   let name = getStringLitName s
   let len = ByteString.length . UTF8.fromString $ s
   let ref = global (stringStructType len) name
   ref' <- bitcast ref ptrType
   callFn boxFuncType "box" [constIntOp 4, ref']
+
+createPosition S.NoPosition = createStruct [constInt 0, constInt 0] -- Postion (0, 0) means No Position. Why not.
+createPosition S.Position{S.sourceLine, S.sourceColumn} = createStruct [C.Int 32 (toInteger sourceLine), C.Int 32 (toInteger sourceColumn)]
+
+positionStructType = T.StructureType False [T.i32, T.i32]
 
 boxArray values = callFn boxFuncType "boxArray" (constIntOp (length values) : values)
 
@@ -422,7 +428,7 @@ declareStdFuncs = do
   external ptrType "boxArray" [("size", intType)] True [FA.GroupID 0]
   external ptrType "runtimeBinOp"  [("code",  intType), ("lhs",  ptrType), ("rhs", ptrType)] False [FA.GroupID 0]
   external ptrType "runtimeApply"  [("func", ptrType), ("argc", intType), ("argv", ptrType)] False []
-  external ptrType "runtimeSelect" [("tree", ptrType), ("expr", ptrType)] False [FA.GroupID 0]
+  external ptrType "runtimeSelect" [("tree", ptrType), ("expr", ptrType), ("pos", positionStructType)] False []
   external T.void  "initEnvironment" [("argc", intType), ("argv", ptrType)] False []
   addDefn $ AST.FunctionAttributes (FA.GroupID 0) [FA.ReadOnly]
 
@@ -453,7 +459,7 @@ genTypesStruct defs = do
   let array = C.Array ptrType types
   defineConst "Types" structType (Just (struct array))
   where len = length defs
-        struct a = C.Struct Nothing False [constInt len, a]
+        struct a = createStruct [constInt len, a]
         structType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) ptrType]
 
 genData :: [DataDef] -> LLVM ([C.Constant])
@@ -465,7 +471,7 @@ genData defs = sequence [genDataStruct d | d <- defs]
           let numConstructors = length constrs
           constructors <- genConstructors dd
           let arrayOfConstructors = C.Array ptrType constructors
-          let struct = C.Struct Nothing False [constInt tid, globalStringRefAsPtr name, constInt numConstructors, arrayOfConstructors] -- struct Data
+          let struct = createStruct [constInt tid, globalStringRefAsPtr name, constInt numConstructors, arrayOfConstructors] -- struct Data
           defineConst literalName (T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral numConstructors) ptrType]) (Just struct)
           return (constRef literalName)
 
@@ -484,10 +490,10 @@ defineConstructor typeName name tid tag args = do
   if null args
   then do
     let singletonName = name ++ ".Singleton"
-    let dataValue = C.Struct Nothing False [constInt tag, C.Array ptrType []]
+    let dataValue = createStruct [constInt tag, C.Array ptrType []]
     defineConst singletonName tpe (Just dataValue)
 
-    let boxed = C.Struct Nothing False [constInt tid, constRef singletonName]
+    let boxed = createStruct [constInt tid, constRef singletonName]
     defineConst (singletonName ++ ".Boxed") boxStructType (Just boxed)
 
     let boxedRef = C.GlobalReference boxStructType (AST.Name (singletonName ++ ".Boxed"))
@@ -498,7 +504,7 @@ defineConstructor typeName name tid tag args = do
     forM_ args $ \ (S.Arg name _) -> defineStringLit name -- define fields names as strings
   
   let structType = T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral len) ptrType]
-  let struct =  C.Struct Nothing False [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, constInt len, fieldsArray]
+  let struct =  createStruct [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, constInt len, fieldsArray]
   let literalName = typeName ++ "." ++ name
   defineConst literalName structType (Just struct)
 
@@ -555,9 +561,9 @@ genFunctionMap fns = do
 
     entries = fmap (\(name, arity) -> (name, struct name arity)) funcsWithArities
 
-    struct1 = C.Struct Nothing False [C.Int 32 (toInteger len), array]
+    struct1 = createStruct [C.Int 32 (toInteger len), array]
 
-    struct name arity = C.Struct Nothing False
+    struct name arity = createStruct
                             [globalStringRefAsPtr name, constRef name, constInt arity]
 
 
@@ -575,7 +581,7 @@ runtimeStructType = T.StructureType False [ptrType, ptrType, boolType]
 
 genRuntime opts = defineConst "Runtime" runtimeStructType (Just runtime)
   where
-      runtime = C.Struct Nothing False [constRef "Functions", constRef "Types", constBool $ S.verboseMode opts]
+      runtime = createStruct [constRef "Functions", constRef "Types", constBool $ S.verboseMode opts]
 
 createGlobalContext :: [S.Expr] -> Ctx
 createGlobalContext exprs = execState (loop exprs) emptyCtx

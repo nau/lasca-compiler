@@ -126,6 +126,11 @@ typedef struct {
   Box* values[];
 } DataValue;
 
+typedef struct {
+  int line;
+  int column;
+} Position;
+
 Environment ENV;
 Runtime* RUNTIME;
 
@@ -394,7 +399,7 @@ Box* runtimeApply(Box* val, int argc, Box* argv[]) {
 
 }
 
-Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident) {
+Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
   Functions* fs = RUNTIME->functions;
   Types* types = RUNTIME->types;
   if (tree->type >= 1000) {
@@ -419,7 +424,7 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident) {
           return value;
         }
       }
-      printf("Couldn't find field %.*s\n", name->length, name->bytes);
+      printf("Couldn't find field %.*s at line: %d\n", name->length, name->bytes, pos.line);
     } else if (ident->type == CLOSURE) {
       // FIXME fix for closure?  check arity?
       Closure* f = unbox(CLOSURE, ident);

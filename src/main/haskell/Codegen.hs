@@ -420,7 +420,9 @@ getStringLitName s = name
     name = take 15 s ++ "." ++ show hash
     hash = hash32 s
 
-createString s = (C.Struct Nothing False [constInt len, C.Array T.i8 bytes], len)
+createStruct args = C.Struct Nothing False args
+
+createString s = (createStruct [constInt len, C.Array T.i8 bytes], len)
   where
     bytestring = UTF8.fromString s
     constByte b = C.Int 8 (toInteger b)

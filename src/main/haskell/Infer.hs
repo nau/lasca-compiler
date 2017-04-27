@@ -13,6 +13,8 @@ import Syntax
 
 import Control.Monad.State
 import Control.Monad.Except
+import qualified Control.Lens as Lens
+import Control.Lens.Operators
 
 import Data.Monoid
 import qualified Data.List as List
@@ -27,9 +29,15 @@ instance Show TypeEnv where
   show (TypeEnv subst) = "Γ = {\n" ++ elems ++ "}"
     where elems = List.foldl (\s (name, scheme) -> s ++ name ++ " : " ++ show scheme ++ "\n") "" (Map.toList subst)
 
-newtype Unique = Unique{count :: Int}
+data InferState = InferState {
+  _count :: Int,
+  ast :: [Expr]
+}
 
-type Infer = ExceptT TypeError (State Unique)
+count :: Lens.Lens' InferState Int
+count = Lens.lens _count (\c e -> c { _count = e } )
+
+type Infer = ExceptT TypeError (State InferState)
 type Subst = Map.Map TVar Type
 
 data TypeError
@@ -45,16 +53,16 @@ instance Show TypeError where
   show (UnificationMismatch t1 t2) = "UnificationMismatch " ++ show t1 ++ " " ++ show t2
 
 runInfer :: Infer (Subst, Type) -> Either TypeError Scheme
-runInfer m = case evalState (runExceptT m) initUnique of
-  Left err  -> Left err
-  Right res -> Right $ closeOver res
+runInfer m = case runState (runExceptT m) initState of
+  (Left err, st)  -> Left err
+  (Right res, st) -> Right $ closeOver res
 
 closeOver :: (Map.Map TVar Type, Type) -> Scheme
 closeOver (sub, ty) = normalize sc
   where sc = generalize defaultTyenv (apply sub ty)
 
-initUnique :: Unique
-initUnique = Unique { count = 0 }
+initState :: InferState
+initState = InferState { _count = 0, ast = [] }
 
 extend :: TypeEnv -> (String, Scheme) -> TypeEnv
 extend (TypeEnv env) (x, s) = TypeEnv $ Map.insert x s env
@@ -74,9 +82,6 @@ defaultTyenv = TypeEnv (Map.fromList [
   ])
   where a = TV "a"
         ta = TVar a
-
-typeof :: TypeEnv -> String -> Maybe Type.Scheme
-typeof (TypeEnv env) name = Map.lookup name env
 
 class Substitutable a where
   apply :: Subst -> a -> a
@@ -158,8 +163,8 @@ letters = [1..] >>= flip replicateM ['a'..'z']
 fresh :: Infer Type
 fresh = do
   s <- get
-  put s{count = count s + 1}
-  return $ TVar $ TV (letters !! count s)
+  count += 1
+  return $ TVar $ TV (letters !! _count s)
 
 instantiate ::  Scheme -> Infer Type
 instantiate (Forall as t) = do
@@ -185,7 +190,10 @@ lookupEnv (TypeEnv env) x =
 
 infer :: TypeEnv -> Expr -> Infer (Subst, Type)
 infer env ex = case ex of
-  Val n e -> infer env e
+  Val n e -> do
+    (s, t) <- infer env e
+--    Debug.trace ("Val " ++ n ++ " " ++ show s ++ " " ++ show t) return (s, t)
+    return (s, t)
 
   Ident x -> lookupEnv env x
 
@@ -242,19 +250,23 @@ infer env ex = case ex of
     infer env ({-Debug.trace ("Func " ++ show curried)-} curried)
 
   Data name constructors -> error "Shouldn't happen!"
-  Select tree expr -> infer env (Apply expr [tree])
+  Select meta tree expr -> infer env (Apply expr [tree])
 
   Array exprs -> do
     tv <- fresh
     let tpe = foldr (\_ t -> tv `TypeFunc` t) (typeArray tv) exprs
     inferPrim env exprs tpe
 
-  Literal (IntLit _)    meta -> return (nullSubst, typeInt)
-  Literal (FloatLit _)  meta -> return (nullSubst, typeFloat)
-  Literal (BoolLit _)   meta -> return (nullSubst, typeBool)
-  Literal (StringLit _) meta -> return (nullSubst, typeString)
-  Literal UnitLit       meta -> return (nullSubst, typeUnit)
+  Literal lit meta ->
+    return (nullSubst, litType lit)
   e -> error ("Wat? " ++ show e)
+
+litType (IntLit _)    = typeInt
+litType (FloatLit _)  = typeFloat
+litType (BoolLit _)   = typeBool
+litType (StringLit _) = typeString
+litType UnitLit       = typeUnit
+
 
 inferPrim :: TypeEnv -> [Expr] -> Type -> Infer (Subst, Type)
 inferPrim env l t = do
@@ -279,7 +291,7 @@ inferTop env ((name, ex):xs) = case inferExpr env ex of
 normalize :: Scheme -> Scheme
 normalize (Forall ts body) = Forall (fmap snd ord) (normtype body)
   where
-    ord = zip (List.nub $ fv body) (fmap TV letters)
+    ord = zip (List.nub $ fv body) (fmap TV letters)  -- from [b, c, c, d, f, e, g] -> [a, b, c, d, e, f]
 
     fv (TVar a)   = [a]
     fv (TypeFunc a b) = fv a ++ fv b

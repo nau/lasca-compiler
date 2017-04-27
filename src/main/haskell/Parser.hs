@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE Strict            #-}
 module Parser (
   parseExpr,
@@ -10,19 +11,25 @@ import Control.Monad.State
 import           Data.List as List
 import           Data.List.NonEmpty
 import           Data.Foldable
-import           Text.Megaparsec
+import           Text.Megaparsec as Megaparsec
 import qualified Text.Megaparsec.Expr   as Ex
 import           Text.Megaparsec.String
+import Text.Megaparsec.Pos
+
 
 import           Lexer
-import           Syntax
+import Syntax
 import           Type
+
+getMeta = do
+  state <- getParserState
+  let (SourcePos _ sl sc) :| _ = statePos state
+  let meta = emptyMeta { pos = Position {Syntax.sourceLine = unPos sl, Syntax.sourceColumn = unPos sc} }
+  return meta
 
 integerLit :: Parser Expr
 integerLit = do
-  state <- getParserState
-  let sp :| _ = statePos state
-  let meta = emptyMeta { pos = Position sp }
+  meta <- getMeta
   (`Literal` meta) . IntLit . fromIntegral <$> signedInteger
 
 floating :: Parser Expr
@@ -64,8 +71,13 @@ postfixApply = Ex.Postfix parser
           return apply
 
 
+select = do
+  reservedOp "."
+  meta <- getMeta
+  return $ Select meta
+
 binops = [
-          [Ex.InfixL (reservedOp "." >> return Select), postfixApply],
+          [Ex.InfixL select, postfixApply],
           [binary "*", binary "/" ],
           [binary "+", binary "-" ],
           [binary "<=", binary ">=", binary "<", binary ">", binary "==" , binary "!="],

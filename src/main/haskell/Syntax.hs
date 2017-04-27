@@ -2,7 +2,7 @@
 module Syntax where
 
 import           Data.Text
-import           Text.Megaparsec
+import qualified Text.Megaparsec as Megaparsec
 import           Type
 
 type Name = String
@@ -18,7 +18,7 @@ data LascaOpts = LascaOpts
   , optimization :: Int
   }
 
-data Position = NoPosition | Position SourcePos deriving (Eq, Ord, Show)
+data Position = NoPosition | Position {sourceLine :: Word, sourceColumn :: Word} deriving (Eq, Ord, Show)
 
 data Meta = Meta {
   pos :: Position,
@@ -33,7 +33,7 @@ data Expr
   | Val Name Expr
   | Apply Expr [Expr]
   | Lam String Expr
-  | Select Expr Expr
+  | Select Meta Expr Expr
   | Fix Expr        -- typechecker only
   | BoxFunc Name [Arg]   -- LLVM codegen only
   | Function Name Type [Arg] Expr
