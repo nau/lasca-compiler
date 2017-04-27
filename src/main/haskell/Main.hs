@@ -84,38 +84,36 @@ codegen opts modo fns = do
   runJIT opts ast
   return ast
 
-genModule :: LascaOpts -> AST.Module -> String -> IO (Maybe AST.Module)
-genModule opts modo source = case parseToplevel source of
-    Left err -> die e where e = Megaparsec.parseErrorPretty err
-    Right ex -> do
-        when (verboseMode opts) $ putStrLn "Parsed OK"
-        when (printAst opts) $ print ex
-        when (verboseMode opts) $ putStrLn("Compiler mode is " ++ mode opts)
-        if mode opts == "static"
-        then case typeCheck ex of
-          Right env -> do
-            when (verboseMode opts) $ putStrLn "typechecked OK"
-            when (printTypes opts) $ print env
-            return (Just (codegenModule opts modo ex))
-          Left e -> die $ show e
-        else return (Just (codegenModule opts modo ex))
+genModule :: LascaOpts -> AST.Module -> String -> IO AST.Module
+genModule opts modo source = do
+  p <- readFile "src/main/lasca/Prelude.lasca"
+  case parseToplevel p of
+    Left err -> die $ Megaparsec.parseErrorPretty err
+    Right preludeExprs -> case parseToplevel source of
+      Left err -> die $ Megaparsec.parseErrorPretty err
+      Right exprs -> do
+          let ex = preludeExprs ++ exprs
+          when (verboseMode opts) $ putStrLn "Parsed OK"
+          when (printAst opts) $ print ex
+          when (verboseMode opts) $ putStrLn("Compiler mode is " ++ mode opts)
+          if mode opts == "static"
+          then case typeCheck ex of
+            Right env -> do
+              when (verboseMode opts) $ putStrLn "typechecked OK"
+              when (printTypes opts) $ print env
+              return $ codegenModule opts modo ex
+            Left e -> die $ show e
+          else return $ codegenModule opts modo ex
 
-
-prelude = readFile "src/main/lasca/Prelude.lasca"
--- prelude = return ""
-
-readMod :: LascaOpts -> String -> IO (Maybe AST.Module)
+readMod :: LascaOpts -> String -> IO AST.Module
 readMod opts fname = do
-  pre  <- prelude
   file <- readFile fname
-  genModule opts (initModule fname) (pre ++ "\n" ++file)
+  genModule opts (initModule fname) file
 
 processFile :: LascaOpts -> String -> IO ()
 processFile opts fname = do
   mod <- readMod opts fname
-  case mod of
-    Just mod -> processModule opts mod fname
-    Nothing -> die "Couldn't compile a module"
+  processModule opts mod fname
 
 processModule :: LascaOpts -> AST.Module -> String -> IO ()
 processModule opts mod fname = if exec opts then
