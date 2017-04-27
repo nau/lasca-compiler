@@ -118,7 +118,7 @@ typedef struct {
 typedef struct {
   Functions* functions;
   Types* types;
-  Environment* environment;
+  int verbose;
 } Runtime;
 
 typedef struct {
@@ -643,5 +643,7 @@ void initLascaRuntime(Runtime* runtime) {
       INT_ARRAY[i].type = INT;
       INT_ARRAY[i].value.num = i;
     }
-    printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %d, # structs = %d\n", RUNTIME->functions->size, RUNTIME->types->size);
+    if (runtime->verbose)
+      printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %d, # structs = %d\n",
+        RUNTIME->functions->size, RUNTIME->types->size);
 }

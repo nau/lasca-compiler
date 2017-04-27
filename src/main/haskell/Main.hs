@@ -80,7 +80,7 @@ process opts modo source = do
 
 codegen :: LascaOpts -> AST.Module -> [Expr] -> IO AST.Module
 codegen opts modo fns = do
-  let ast = codegenModule modo fns
+  let ast = codegenModule opts modo fns
   runJIT opts ast
   return ast
 
@@ -96,9 +96,9 @@ genModule opts modo source = case parseToplevel source of
           Right env -> do
             when (verboseMode opts) $ putStrLn "typechecked OK"
             when (printTypes opts) $ print env
-            return (Just (codegenModule modo ex))
+            return (Just (codegenModule opts modo ex))
           Left e -> die $ show e
-        else return (Just (codegenModule modo ex))
+        else return (Just (codegenModule opts modo ex))
 
 
 prelude = readFile "src/main/lasca/Prelude.lasca"

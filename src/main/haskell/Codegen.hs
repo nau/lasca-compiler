@@ -19,7 +19,7 @@ import qualified Data.ByteString.UTF8 as UTF8
 
 import Control.Monad.State
 import Control.Applicative
--- import Control.Lens
+import Control.Lens
 
 import LLVM.AST
 import LLVM.AST.Global
@@ -58,6 +58,10 @@ data ModuleState = ModuleState {
   functions :: Map.Map String Int,
   structs :: Map.Map Int Int
 } deriving (Show)
+
+
+modStateLocals :: Lens' ModuleState (Set.Set String)
+modStateLocals = lens _locals (\ms l -> ms { _locals = l } )
 
 -- makeLenses ''ModuleState
 
@@ -344,8 +348,9 @@ constIntOp i = constOp (C.Int 32 (toInteger i))
 constFloat i = constOp (C.Float (F.Double i))
 
 constByte b = constOp (C.Int 8 b)
-constTrue = constOp (C.Int 1 1)
-constFalse = constOp (C.Int 1 0)
+constBool b = C.Int 1 (if b then 1 else 0)
+constTrue = constOp (constBool True)
+constFalse = constOp (constBool False)
 constRef name = let ptr = C.GlobalReference ptrType (AST.Name name) in C.BitCast ptr ptrType
 constRefOperand name = constOp (constRef name)
 

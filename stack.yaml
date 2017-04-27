@@ -1,4 +1,4 @@
-resolver:  nightly-2017-04-21 #lts-6.9
+resolver:  nightly-2017-04-05 #lts-6.9
 packages:
 - '.'
 flags:

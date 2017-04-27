@@ -38,6 +38,8 @@ import Data.Int
 import Control.Monad.State
 import Control.Monad.Except
 import Control.Applicative
+import qualified Control.Lens as Lens
+import Control.Lens.Operators
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
@@ -51,15 +53,21 @@ data DataDef = DataDef Int String [S.DataConst]
   deriving (Show, Eq)
 
 data Ctx = Context {
-  globalFunctions :: Set.Set String,
-  globalVals :: Set.Set String,
+  _globalFunctions :: Set.Set String,
+  _globalVals :: Set.Set String,
   dataDefs :: [DataDef],
   typeId :: Int -- TODO remove this. Needed for type id generation. Move to ModuleState?
 } deriving (Show, Eq)
 
+globalFunctions :: Lens.Lens' Ctx (Set.Set String)
+globalFunctions = Lens.lens _globalFunctions (\c e -> c { _globalFunctions = e } )
+
+globalVals :: Lens.Lens' Ctx (Set.Set String)
+globalVals = Lens.lens _globalVals (\c e -> c { _globalVals = e } )
+
 emptyCtx = Context {
-  globalFunctions = Set.empty,
-  globalVals = Set.empty,
+  _globalFunctions = Set.empty,
+  _globalVals = Set.empty,
   dataDefs = [],
   typeId = 1000
 }
@@ -84,13 +92,13 @@ transformExpr transformer expr = case expr of
     false' <- go false
     transformer (S.If cond' true' false')
   (S.Let n e body) -> do
-    modify (\s -> s { _locals = Set.insert n (_locals s) } )
+    modStateLocals %= Set.insert n
     e' <- go e
     body' <- go body
     transformer (S.Let n e' body')
   (S.Lam n e) -> do
-    modify (\s -> s { _outers = _locals s } )
-    modify (\s -> s { _locals = Set.singleton n } )
+    modify (\s -> s { _outers = s^.modStateLocals } )
+    modStateLocals .= Set.singleton n
     e' <- go e
     transformer (S.Lam n e')
   (S.Apply e args) -> do
@@ -230,8 +238,8 @@ cgen ctx (S.Ident name) = do
     Just x ->
 --       Debug.trace ("Local " ++ show name)
       load x
-    Nothing | name `Set.member` globalFunctions ctx -> boxFunc name mapping
-            | name `Set.member` globalVals ctx -> load (global ptrType name)
+    Nothing | name `Set.member` _globalFunctions ctx -> boxFunc name mapping
+            | name `Set.member` _globalVals ctx -> load (global ptrType name)
             | otherwise -> boxError name
 cgen ctx (S.Literal l) = box l
 cgen ctx (S.Array exprs) = do
@@ -254,7 +262,7 @@ cgen ctx (S.Apply expr args) = do
   syms <- gets symtab
   largs <- mapM (cgen ctx) args
   let symMap = Map.fromList syms
-  let isGlobal fn = (fn `Set.member` globalFunctions ctx) && not (fn `Map.member` symMap)
+  let isGlobal fn = (fn `Set.member` _globalFunctions ctx) && not (fn `Map.member` symMap)
   case expr of
      -- TODO Here are BUGZZZZ!!!! :)
      -- TODO check arguments!
@@ -378,17 +386,15 @@ boxClosure name mapping enclosedVars = do
 boolToInt True = 1
 boolToInt False = 0
 
-codegenModule :: AST.Module -> [S.Expr] -> AST.Module
-codegenModule modo exprs = modul
+codegenModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> AST.Module
+codegenModule opts modo exprs = modul
     where
         ctx = createGlobalContext exprs
         modul = runLLVM modo genModule
         genModule = do
-          st <- gets _llvmModule
           fns' <- transform extractLambda exprs
           syn <- gets _syntacticAst
           let fns'' = fns' ++ syn
-          st' <- gets _llvmModule
 --           Debug.traceM ("Rewritten exprs: " ++ show fns'')
 --           Debug.traceM ("Rewritten exprs: " ++ show st')
 --           Debug.traceM ("Rewritten exprs: " ++ show st')
@@ -396,7 +402,7 @@ codegenModule modo exprs = modul
           genFunctionMap fns''
           let defs = reverse (dataDefs ctx)
           genTypesStruct defs
-          genRuntime
+          genRuntime opts
           mapM_ (codegenTop ctx) fns''
           codegenStartFunc ctx
 
@@ -563,11 +569,11 @@ genFunctionMap fns = do
       go s _ = s
 
 
-runtimeStructType = T.StructureType False [ptrType, ptrType, ptrType]
+runtimeStructType = T.StructureType False [ptrType, ptrType, boolType]
 
-genRuntime = defineConst "Runtime" runtimeStructType (Just runtime)
+genRuntime opts = defineConst "Runtime" runtimeStructType (Just runtime)
   where
-      runtime = C.Struct Nothing False [constRef "Functions", constRef "Types", constNullPtr]
+      runtime = C.Struct Nothing False [constRef "Functions", constRef "Types", constBool $ S.verboseMode opts]
 
 createGlobalContext :: [S.Expr] -> Ctx
 createGlobalContext exprs = execState (loop exprs) emptyCtx
@@ -578,27 +584,16 @@ createGlobalContext exprs = execState (loop exprs) emptyCtx
         loop exprs
 
       names :: S.Expr -> State Ctx ()
-      names (S.Val name _) = do
-        globVals <- gets globalVals
-        modify (\s -> s { globalVals = Set.insert name globVals } )
-      names (S.Function name _ _ _) = do
-        globFuncs <- gets globalFunctions
-        modify (\s -> s { globalFunctions = Set.insert name globFuncs } )
+      names (S.Val name _) = globalVals %= Set.insert name
+      names (S.Function name _ _ _) = globalFunctions %= Set.insert name
       names (S.Data name consts) = do
         id <- gets typeId
-        globFuncs <- gets globalFunctions
-        globVals <- gets globalVals
         let dataDef = DataDef id name consts
         let (funcs, vals) = foldl (\(funcs, vals) (S.DataConst n args) ->
                               if null args
                               then (funcs, n : vals)
                               else (n : funcs, vals)) ([], []) consts
-        modify (\s -> s {
-          dataDefs =  dataDef : dataDefs s,
-          globalVals = globVals `Set.union` Set.fromList vals,
-          globalFunctions = globFuncs `Set.union` Set.fromList funcs,
-          typeId = id + 1
-          })
-      names (S.Extern name _ _) = do
-        globFuncs <- gets globalFunctions
-        modify (\s -> s { globalFunctions = Set.insert name globFuncs } )
+        modify (\s -> s { dataDefs =  dataDef : dataDefs s, typeId = id + 1 })
+        globalVals %= Set.union (Set.fromList vals)
+        globalFunctions %= Set.union (Set.fromList funcs)
+      names (S.Extern name _ _) = globalFunctions %= Set.insert name
