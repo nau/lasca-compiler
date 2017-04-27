@@ -148,7 +148,7 @@ void *gcRealloc(void* old, size_t s) {
 }
 
 Box* toString(Box* value);
-void * println(Box* val);
+void println(Box* val);
 
 const char * __attribute__ ((const)) typeIdToName(int typeId) {
   switch (typeId) {
@@ -460,10 +460,9 @@ void * runtimePutchar(Box* ch) {
   return 0;
 }
 
-void * println(Box* val) {
+void println(Box* val) {
   String * str = unbox(STRING, val);
   printf("%.*s\n", str->length, str->bytes);
-  return NULL;
 }
 
 
@@ -506,9 +505,11 @@ Box* prepend(Box* arrayValue, Box* value) {
 }
 
 Box* __attribute__ ((pure)) makeString(char * str) {
-  String* val = gcMalloc(sizeof(String));
-  val->length = strlen(str);
-  strncpy(val->bytes, str, val->length);
+  int len = strlen(str);
+  String* val = gcMalloc(sizeof(String) + len); // no +1, we don't 0 terminate strings
+  val->length = len;
+  memcpy(val->bytes, str, len); // memcpy instead of strncpy because we don't 0 terminate strings
+  printf("Made string %.*s\n", val->length, val->bytes);
   return box(STRING, val);
 }
 
