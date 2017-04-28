@@ -18,12 +18,19 @@ data LascaOpts = LascaOpts
   , optimization :: Int
   }
 
-data Position = NoPosition | Position {sourceLine :: Word, sourceColumn :: Word} deriving (Eq, Ord, Show)
+data Position = NoPosition | Position {sourceLine :: Word, sourceColumn :: Word} deriving (Eq, Ord)
 
 data Meta = Meta {
   pos :: Position,
   symbolType :: Scheme
-} deriving (Eq, Ord, Show)
+} deriving (Eq, Ord)
+
+instance Show Meta where
+  show (Meta pos tpe) = "Meta{pos=" ++ show pos ++ ", tpe=" ++ show tpe ++ "}"
+  
+instance Show Position where
+  show NoPosition = "<unknown>"
+  show Position{sourceLine = sl, sourceColumn = sc} = show sl ++ ":" ++ show sc
 
 emptyMeta = Meta { pos = NoPosition, symbolType = schemaAny }
 

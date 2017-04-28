@@ -20,7 +20,7 @@ instance Show Type where
   show (TVar (TV n)) = n
   show (TypeIdent s) = s
   show (TypeFunc l r) = "(" ++ show l ++ " -> " ++ show r ++ ")"
-  show (TypeApply t args) = "(" ++ show t ++ foldl (\acc a -> " " ++ acc ++ show a) "" args ++ ")"
+  show (TypeApply t args) = "(" ++ show t ++ foldl (\acc a -> acc ++ " " ++ show a) "" args ++ ")"
 
 
 infixr `TypeFunc`

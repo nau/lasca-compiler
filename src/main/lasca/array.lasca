@@ -1,6 +1,7 @@
-def foo(i) = i + 2
+def foo(i: M -> F a (b c -> d)) = i
 
-def returnArray() = {
+-- @ IO,
+def returnArray(): Array Int = {
   array = [];
   array1 = append(array, "Hello");
   array2 = append(array1, 10.5 * 1.0);

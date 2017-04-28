@@ -8,6 +8,7 @@ module Parser (
 
 import           Control.Applicative    ((<$>))
 import Control.Monad.State
+import qualified Data.Char as Char
 import           Data.List as List
 import           Data.List.NonEmpty
 import           Data.Foldable
@@ -23,7 +24,7 @@ import           Type
 
 getMeta = do
   state <- getParserState
-  let (SourcePos _ sl sc) :| _ = statePos state
+  let SourcePos _ sl sc :| _ = statePos state
   let meta = emptyMeta { pos = Position {Syntax.sourceLine = unPos sl, Syntax.sourceColumn = unPos sc} }
   return meta
 
@@ -70,7 +71,7 @@ anyOperatorParser = do
   x <- identOp
   fail $ "operator (" ++ x ++ ") is not defined"
 
-postfixApply = Ex.Postfix parser
+postfixApply = Ex.Postfix parser  -- FIXME shouldn't it be InfixL?
   where parser = do
           argss <- many argsApply
           meta <- getMeta
@@ -100,11 +101,29 @@ expr =  Ex.makeExprParser factor operatorTable
 variable :: Parser Expr
 variable = Ident <$> identifier
 
+makeType name = if Char.isLower $ List.head name then TVar $ TV name else TypeIdent name
+
+typeTerm = makeType <$> identifier
+       <|> parens typeExpr
+
+typeFunc =  do
+  reservedOp "->"
+  return TypeFunc
+
+typeApply = do
+--  args <- typeExpr
+  let apply (TypeApply ll rr) r = TypeApply ll (rr ++ [r])
+      apply l r = TypeApply l [r]
+  return apply
+
+typeOperatorTable = [[Ex.InfixL typeApply], [Ex.InfixR typeFunc]]
+
+typeExpr = Ex.makeExprParser typeTerm typeOperatorTable
+
 typeAscription :: Parser Type
 typeAscription = do
   reservedOp ":"
-  name <- identifier
-  return $ TypeIdent name
+  typeExpr
 
 funcArgument :: Parser Name
 funcArgument = do
@@ -128,9 +147,8 @@ extern = do
   reserved "def"
   name <- identifier
   args <- parens $ commaSep arg
-  reservedOp ":"
-  tpe <- identifier
-  return (Extern name (TypeIdent tpe) args)
+  tpe <- typeAscription
+  return (Extern name tpe args)
 
 arg :: Parser Arg
 arg = do
@@ -172,24 +190,18 @@ closure = do braces cls
 
 data LetVal = Named Name Expr | Stmt Expr
 
-valdef = do
+valdef f = do
   id <- identifier
   reservedOp "="
   e <- expr
-  return (Named id e)
-
-valdef1 = do
-  id <- identifier
-  reservedOp "="
-  e <- expr
-  return (Val id e)
+  return (f id e)
 
 unnamedStmt = do
   e <- expr
   return (Stmt e)
 
 blockStmts = do
-  exprs <- (try valdef <|> unnamedStmt) `sepEndBy` semi
+  exprs <- (try (valdef Named) <|> unnamedStmt) `sepEndBy` semi
   let letin = foldStmtsIntoOneLetExpr (List.reverse exprs)
   return letin
   where
@@ -201,8 +213,8 @@ blockStmts = do
           let namedExprs = go init' 1
           foldl' (\acc (name, e) -> Let name e acc) last' namedExprs
 
-        go ((Stmt e) : exprs) idx = ('_' : show idx, e) : go exprs (idx + 1)
-        go ((Named id e) : exprs) idx = (id, e) : go exprs idx
+        go (Stmt e : exprs) idx = ('_' : show idx, e) : go exprs (idx + 1)
+        go (Named id e : exprs) idx = (id, e) : go exprs idx
         go [] _ = []
 
 
@@ -223,7 +235,7 @@ dataConstructor = do
   args <- option [] $ parens (arg `sepEndBy` comma)
   return (DataConst name args)
 
-factor :: Parser Expr
+factor :: Parser Expr -- TODO remove unneeded try's, reorder
 factor = try floating
       <|> try boolLit
       <|> try letins
@@ -234,14 +246,13 @@ factor = try floating
       <|> try closure
       <|> ifthen
       <|> block
-      <|> (parens expr)
+      <|> parens expr
 
 defn :: Parser Expr
 defn = try extern
     <|> try function
     <|> try dataDef
-    <|> try valdef1
-    <|> expr
+    <|> (valdef Val)
 
 contents p = between sc eof p
 

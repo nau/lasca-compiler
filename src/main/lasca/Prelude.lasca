@@ -1,10 +1,10 @@
 extern def runtimePutchar(d: Int): Unit
 extern def println(s: String): Unit
-extern def append(array: Any, v: Any): Any
-extern def prepend(array: Any, v: Any): Any
-extern def arrayApply(array: Any, i: Int): Any
-extern def arrayLength(array: Any): Int
-extern def toString(a: Any): String
+extern def append(array: Array a, v: a): Array a
+extern def prepend(array: Array a, v: a): Array a
+extern def arrayApply(array: Array a, i: Int): a
+extern def arrayLength(array: Array a): Int
+extern def toString(a: a): String
 extern def lasqrt(a: Float): Float
-extern def getArgs(): Any
-extern def toInt(s: Any): Int
+extern def getArgs(): Array String
+extern def toInt(s: a): Int
