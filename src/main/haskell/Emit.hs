@@ -203,7 +203,8 @@ codegenStartFunc ctx = do
 
 -- Dynamic mode
 typeMapping :: Type -> AST.Type
-typeMapping (TypeIdent "Unit") = T.void
+-- FIXME currently we assume every function returns a result and can't be Unit/void
+--typeMapping (TypeIdent "Unit") = T.void
 typeMapping _ = ptrType
 -------------------------------------------------------------------------------
 -- Operations
