@@ -173,6 +173,7 @@ letins = do
   reserved "let"
   defs <- commaSep $ do
     var <- identifier
+    typeAsc <- option typeAny typeAscription
     reservedOp "="
     val <- expr
     return (var, val)
@@ -192,6 +193,7 @@ data LetVal = Named Name Expr | Stmt Expr
 
 valdef f = do
   id <- identifier
+  typeAsc <- option typeAny typeAscription
   reservedOp "="
   e <- expr
   return (f id e)
@@ -252,14 +254,12 @@ defn :: Parser Expr
 defn = try extern
     <|> try function
     <|> try dataDef
-    <|> (valdef Val)
+    <|> valdef Val
 
 contents p = between sc eof p
 
 toplevel :: Parser [Expr]
-toplevel = many $ do
-    def <- defn
-    return def
+toplevel = many $ defn
 
 parseExpr s = parse (contents expr) "<stdin>" s
 

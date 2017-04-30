@@ -515,7 +515,7 @@ Box* __attribute__ ((pure)) makeString(char * str) {
 Box* joinValues(int size, Box* values[], char* start, char* end) {
   int seps = size * 2;
   size_t resultSize = size * 32; // assume 32 bytes per array element. No reason, just guess
-  char * result = gcMalloc(resultSize);
+  char * result = gcMalloc(resultSize); // zero-initialized, safe to use
   strcat(result, start);
   size_t curSize = strlen(start) + strlen(end);
   for (int i = 0; i < size; i++) {
