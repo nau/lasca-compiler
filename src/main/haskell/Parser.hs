@@ -31,17 +31,17 @@ getMeta = do
 integerLit :: Parser Expr
 integerLit = do
   meta <- getMeta
-  (`Literal` meta) . IntLit . fromIntegral <$> signedInteger
+  Literal meta . IntLit . fromIntegral <$> signedInteger
 
 floating :: Parser Expr
-floating = (`Literal` emptyMeta) . FloatLit <$> signedFloat
+floating = Literal emptyMeta . FloatLit <$> signedFloat
 
 strToBool :: String -> Bool
 strToBool "true" = True
 strToBool _      = False
 
 boolLit :: Parser Expr
-boolLit = (`Literal` emptyMeta) . BoolLit . strToBool <$> (true <|> false)
+boolLit = Literal emptyMeta . BoolLit . strToBool <$> (true <|> false)
   where
     true = reserved "true" >> return "true"
     false = reserved "false" >> return "false"
@@ -49,7 +49,7 @@ boolLit = (`Literal` emptyMeta) . BoolLit . strToBool <$> (true <|> false)
 arrayLit = Array <$> brackets (commaSep expr)
 
 stringLit :: Parser Expr
-stringLit = (`Literal` emptyMeta) . StringLit <$> stringLiteral
+stringLit = Literal emptyMeta . StringLit <$> stringLiteral
 
 binop = Ex.InfixL parser
   where parser = do
@@ -125,12 +125,6 @@ typeAscription = do
   reservedOp ":"
   typeExpr
 
-funcArgument :: Parser Name
-funcArgument = do
-  name <- identifier
-  typeAsc <- option typeAny typeAscription
-  return name
-
 function :: Parser Expr
 function = do
   reserved "def"
@@ -173,7 +167,7 @@ letins = do
   reserved "let"
   defs <- commaSep $ do
     var <- identifier
-    typeAsc <- option typeAny typeAscription
+    option typeAny typeAscription
     reservedOp "="
     val <- expr
     return (var, val)
@@ -181,7 +175,7 @@ letins = do
   body <- expr
   return $ foldr (uncurry Let) body defs
 
-closure = do braces cls
+closure = braces cls
     where cls = do
             args <- commaSep arg
             reservedOp "->"
@@ -193,7 +187,7 @@ data LetVal = Named Name Expr | Stmt Expr
 
 valdef f = do
   id <- identifier
-  typeAsc <- option typeAny typeAscription
+  option typeAny typeAscription
   reservedOp "="
   e <- expr
   return (f id e)
@@ -207,11 +201,11 @@ blockStmts = do
   let letin = foldStmtsIntoOneLetExpr (List.reverse exprs)
   return letin
   where
-        foldStmtsIntoOneLetExpr [] = Literal UnitLit emptyMeta
+        foldStmtsIntoOneLetExpr [] = Literal emptyMeta UnitLit
         foldStmtsIntoOneLetExpr exprs@(lst : init) = do
           let (init', last') = case lst of
                                 (Stmt e)    -> (init, e)
-                                (Named _ _) -> (exprs, Literal UnitLit emptyMeta)
+                                (Named _ _) -> (exprs, Literal emptyMeta UnitLit)
           let namedExprs = go init' 1
           foldl' (\acc (name, e) -> Let name e acc) last' namedExprs
 

@@ -93,6 +93,7 @@ instance Substitutable Type where
   apply s t@(TVar a)     = Map.findWithDefault t a s
   apply s (t1 `TypeFunc` t2) = apply s t1 `TypeFunc` apply s t2
   apply s (TypeApply t [args]) = TypeApply (apply s t) [args] -- TODO do proper substitution
+  apply s t = error $ "Wat? " ++ show s ++ ", " ++ show t
 
   ftv TypeIdent{}         = Set.empty
   ftv (TVar a)       = Set.singleton a
@@ -257,7 +258,7 @@ infer env ex = case ex of
     let tpe = foldr (\_ t -> tv `TypeFunc` t) (typeArray tv) exprs
     inferPrim env exprs tpe
 
-  Literal lit meta ->
+  Literal meta lit ->
     return (nullSubst, litType lit)
   e -> error ("Wat? " ++ show e)
 

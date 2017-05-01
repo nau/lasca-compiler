@@ -35,7 +35,7 @@ instance Show Position where
 emptyMeta = Meta { pos = NoPosition, symbolType = schemaAny }
 
 data Expr
-  = Literal Lit Meta
+  = Literal Meta Lit
   | Ident Name
   | Val Name Expr
   | Apply Meta Expr [Expr]
