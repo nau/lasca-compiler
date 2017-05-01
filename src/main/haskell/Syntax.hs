@@ -34,6 +34,8 @@ instance Show Position where
 
 emptyMeta = Meta { pos = NoPosition, symbolType = schemaAny }
 
+withMetaPos line col = emptyMeta { pos = Position {sourceLine = line, sourceColumn = col} }
+
 data Expr
   = Literal Meta Lit
   | Ident Name
