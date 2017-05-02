@@ -53,7 +53,7 @@ stringLit :: Parser Expr
 stringLit = Literal emptyMeta . StringLit <$> stringLiteral
 
 pTemplate :: Parser [Either String String] -- Left = text, Right = variable
-pTemplate = char '\"' *> some piece <* char '\"'
+pTemplate = char '\"' *> manyTill piece (char '\"')
   where
     -- piece of text or interpolated variable
     piece =
@@ -61,7 +61,7 @@ pTemplate = char '\"' *> some piece <* char '\"'
       (Right <$> var)
 
     -- interpolated variable
-    var = string "${" *> pVar <* char '}'
+    var = string "${" *> between sc (char '}') pVar
 
     -- normal character, plain or escaped
     ch =
@@ -70,7 +70,7 @@ pTemplate = char '\"' *> some piece <* char '\"'
     -- set of escapable characters
     escapable = ['"', '\\', '$']
 
-    pVar = some letterChar
+    pVar = identifier
 
 binop = Ex.InfixL parser
   where parser = do
