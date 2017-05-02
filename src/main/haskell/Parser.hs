@@ -58,13 +58,12 @@ interpolatedString = do
   list <- pTemplate
   return $ go list
   where go [] = Literal emptyMeta (StringLit "")
-        go p@(Right e : ps) = go (Left "" : p)
-        go list = case foldl go' ([], []) list of
-                    ([s], []) -> s
-                    (strings, exprs) -> Apply emptyMeta (Ident "interpolate") [Array strings, Array exprs]
+        go list = case foldr go' [] list of
+                    [s] -> s
+                    strings -> Apply emptyMeta (Ident "concat") [Array strings]
 
-        go' acc (Left s)  = acc `mappend` ([Literal emptyMeta (StringLit s)], [])
-        go' acc (Right e) = acc `mappend` ([], [e])
+        go' (Left s) acc  = Literal emptyMeta (StringLit s) : acc
+        go' (Right e) acc = Apply emptyMeta (Ident "toString") [e] : acc
 
 
 pTemplate :: Parser [Either String Expr] -- Left = text, Right = variable

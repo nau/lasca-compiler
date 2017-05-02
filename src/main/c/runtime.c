@@ -45,24 +45,6 @@ typedef struct {
   } value;
 } Box;
 
-Box TRUE_SINGLETON = {
-  .type = BOOL,
-  .value.num = 1
-};
-Box FALSE_SINGLETON = {
-  .type = BOOL,
-  .value.num = 0
-};
-Box UNIT_SINGLETON = {
-  .type = UNIT
-};
-Box * UNIT_STRING;
-Box  INT_ARRAY[100];
-Box  DOUBLE_ZERO = {
-  .type = DOUBLE,
-  .value.dbl = 0.0
-};
-
 typedef struct {
   int length;
   char bytes[];
@@ -131,6 +113,31 @@ typedef struct {
   int column;
 } Position;
 
+Box TRUE_SINGLETON = {
+  .type = BOOL,
+  .value.num = 1
+};
+Box FALSE_SINGLETON = {
+  .type = BOOL,
+  .value.num = 0
+};
+Box UNIT_SINGLETON = {
+  .type = UNIT
+};
+String EMPTY_STRING = {
+  .length = 0,
+  .bytes = ""
+};
+Box EMPTY_STRING_BOX = {
+  .type = STRING,
+  .value.ptr = &EMPTY_STRING
+};
+Box * UNIT_STRING;
+Box  INT_ARRAY[100];
+Box  DOUBLE_ZERO = {
+  .type = DOUBLE,
+  .value.dbl = 0.0
+};
 Environment ENV;
 Runtime* RUNTIME;
 
@@ -587,6 +594,27 @@ Box* __attribute__ ((pure)) toString(Box* value) {
         exit(1);
       }
   }
+}
+
+Box* concat(Box* arrayString) {
+  Array* array = unbox(ARRAY, arrayString);
+  Box* result = &EMPTY_STRING_BOX;
+  if (array->length > 0) {
+    int len = 0;
+    for (int i = 0; i < array->length; i++) {
+      String* s = unbox(STRING, array->data[i]);
+      len += s->length;
+    }
+    String* val = gcMalloc(sizeof(String) + len); // no +1, we don't 0 terminate strings, it's zero initialized!
+    // val->length is 0, because gcMalloc allocates zero-initialized memory
+    for (int i = 0; i < array->length; i++) {
+      String* s = unbox(STRING, array->data[i]);
+      memcpy(&val->bytes[val->length], s->bytes, s->length); // memcpy instead of strncpy because we don't 0 terminate strings
+      val->length += s->length;
+    }
+    result = box(STRING, val);
+  }
+  return result;
 }
 
 /* =========== Math ================== */
