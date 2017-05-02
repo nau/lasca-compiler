@@ -20,8 +20,9 @@ parserTests = testGroup "Parser tests"
         parseExpr "\"\"" @?= Right (Literal emptyMeta (StringLit ""))
   , testCase "Empty String Interpolator" $
         parseInterpol "\"\"" @?= Right []
-  , testCase "String Interpolation" $
+  , testCase "Character Escaping" $
       parseExpr "\"String\n\"" @?= Right (Literal emptyMeta (StringLit "String\n"))
   , testCase "String Interpolation" $
-      parseInterpol "\"Hello \\$ ${ test123 }\"" @?= Right [Left "Hello $ ", Right "test123"]
+      parseInterpol "\"Hello \\\\\\$${ test123 + 1 }\"" @?= Right [Left "Hello \\$",
+        Right "Apply Meta{pos=1:23, tpe=Any} (Ident \"+\") [Ident \"test123\",Literal Meta{pos=1:25, tpe=Any} (IntLit 1)]"]
   ]

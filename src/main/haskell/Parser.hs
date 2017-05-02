@@ -64,13 +64,14 @@ pTemplate = char '\"' *> manyTill piece (char '\"')
     var = string "${" *> between sc (char '}') pVar
 
     -- normal character, plain or escaped
-    ch =
-      noneOf escapable <|> (char '\\' *> oneOf escapable)
+    ch = noneOf escapable <|> (char '\\' *> oneOf escapable)
 
     -- set of escapable characters
     escapable = ['"', '\\', '$']
 
-    pVar = identifier
+    pVar = do
+      e <- expr
+      return $ show e
 
 binop = Ex.InfixL parser
   where parser = do
