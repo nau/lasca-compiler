@@ -30,13 +30,16 @@ getMeta = do
   let meta = emptyMeta { pos = Position {Syntax.sourceLine = unPos sl, Syntax.sourceColumn = unPos sc} }
   return meta
 
-integerLit :: Parser Expr
-integerLit = do
+integerLiteral = do
   meta <- getMeta
-  Literal meta . IntLit . fromIntegral <$> signedInteger
+  Literal meta <$> integerLit
+   
+integerLit = IntLit . fromIntegral <$> signedInteger
 
-floating :: Parser Expr
-floating = Literal emptyMeta . FloatLit <$> signedFloat
+floatingLiteral :: Parser Expr
+floatingLiteral = Literal emptyMeta <$> floatLit
+
+floatLit = FloatLit <$> signedFloat
 
 strToBool :: String -> Bool
 strToBool "true" = True
@@ -53,6 +56,8 @@ boolLit = BoolLit . strToBool <$> (true <|> false)
 
 
 arrayLit = Array <$> brackets (commaSep expr)
+
+stringLit = StringLit <$> stringLiteral
 
 interpolatedString :: Parser Expr
 interpolatedString = do
@@ -141,10 +146,21 @@ bracedCases = braces $ some acase
 
 acase = do
   reservedOp "|"
-  p <- boolLit
+  p <- ptrn
   reservedOp "->"
   e <- expr
-  return $ Case (ConstPattern p) e
+  return $ Case p e
+
+ptrn = litPattern
+  <|> (ConstrPattern <$> dataConstructor)
+  <|> (VarPattern <$> identifier)
+  <|> anyPattern
+
+anyPattern = do
+  reservedOp "_"
+  return AnyPattern
+
+litPattern = ConstPattern <$> (boolLit <|> stringLit <|> try floatLit <|> integerLit)
 
 binops = [
           [Ex.InfixL select, postfixApply],
@@ -294,12 +310,12 @@ dataConstructor = do
   return (DataConst name args)
 
 factor :: Parser Expr -- TODO remove unneeded try's, reorder
-factor = try floating
+factor =  try floatingLiteral
       <|> try boolLiteral
       <|> try letins
       <|> try arrayLit
       <|> try interpolatedString
-      <|> try integerLit
+      <|> try integerLiteral
       <|> try variable
       <|> try matchExpr
       <|> try closure

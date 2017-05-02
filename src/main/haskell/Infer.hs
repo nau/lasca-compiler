@@ -98,7 +98,8 @@ instance Substitutable Type where
   ftv TypeIdent{}         = Set.empty
   ftv (TVar a)       = Set.singleton a
   ftv (t1 `TypeFunc` t2) = ftv t1 `Set.union` ftv t2
-  ftv (TypeApply t [args])       = ftv t  -- TODO do proper substitution
+  ftv (TypeApply _ [])         = error "Should not be TypeApply without arguments!" -- TODO use NonEmpty List?
+  ftv (TypeApply t args)       = ftv t  -- TODO do proper substitution
 
 instance Substitutable Scheme where
   {-# INLINE apply #-}
@@ -297,7 +298,8 @@ normalize (Forall ts body) = Forall (fmap snd ord) (normtype body)
     fv (TVar a)   = [a]
     fv (TypeFunc a b) = fv a ++ fv b
     fv (TypeIdent _)   = []
-    fv (TypeApply t [args])   = fv t
+    fv (TypeApply t [])       = error "Should not be TypeApply without arguments!" -- TODO use NonEmpty List?
+    fv (TypeApply t args)   = fv t  -- FIXME args?
 
     normtype (TypeFunc a b)  = TypeFunc  (normtype a) (normtype b)
     normtype (TypeApply a b) = TypeApply (normtype a) b
@@ -328,7 +330,7 @@ typeCheck exprs = do
                         tpe = foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args
                         accessors = map (\(Arg n tpe) -> (n, Forall [] (TypeFunc dataTypeIdent tpe))) args
                     in (name, Forall [] tpe) : accessors
-
+            ddd e = error ("What the hell" ++ show e)
 
 
             f e@(Fix (Function name _ _ _)) = (name, e)

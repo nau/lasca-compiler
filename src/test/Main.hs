@@ -4,6 +4,7 @@ import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit
 import Parser
 import Syntax
+import Type
 
 import Data.List
 import Data.Ord
@@ -28,4 +29,13 @@ parserTests = testGroup "Parser tests"
   , testCase "Pattern matching" $
       parseExpr "match true { | true -> 1 }" @?= Right (Match (Literal emptyMeta (BoolLit True)) [
         Case (ConstPattern (BoolLit True)) (Literal (withMetaPos 1 24) (IntLit 1))])
+  , testCase "Pattern matching" $
+        parseExpr "match foo { | 0 -> 0 | Person(id, name) -> 1 | bar -> 2 | _ -> match false { | true -> 4 } }" @?= Right (
+          Match (Ident "foo") [
+            Case (ConstPattern (IntLit 0)) (Literal (withMetaPos 1 20) (IntLit 0)),
+            Case (ConstrPattern (DataConst "Person" [Arg "id" (TypeIdent "Any"), Arg "name" (TypeIdent "Any")])) (Literal (withMetaPos 1 44) (IntLit 1)),
+            Case (ConstrPattern (DataConst "bar" [])) (Literal (withMetaPos 1 55) (IntLit 2)),
+            Case AnyPattern (
+              Match (Literal emptyMeta  (BoolLit False)) [
+                Case (ConstPattern (BoolLit True)) (Literal (withMetaPos 1 88) (IntLit 4))])])
   ]

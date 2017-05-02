@@ -55,7 +55,12 @@ data Expr
   deriving (Eq, Ord, Show)
 
 data Case = Case Pattern Expr deriving (Eq, Ord, Show)
-data Pattern = ConstPattern Lit deriving (Eq, Ord, Show)
+data Pattern
+  = ConstPattern Lit
+  | ConstrPattern DataConst
+  | VarPattern String
+  | AnyPattern
+  deriving (Eq, Ord, Show)
 
 data DataConst = DataConst Name [Arg] deriving (Eq, Ord, Show)
 
