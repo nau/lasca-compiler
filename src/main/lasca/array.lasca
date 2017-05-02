@@ -9,7 +9,7 @@ def returnArray(): Array Int = {
   let z: Array (Int -> String a) = [toString] in append(z, 1);
   println(array3(2).toString);
   println(array3.toString);
---  println("2".toString); -- FIXME it's a bug
+  println("2".toString); -- FIXME it's a bug
 --  println(toString("2"));
 --  foo(false)
 }

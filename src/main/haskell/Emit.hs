@@ -123,6 +123,10 @@ defineStringConstants (S.If cond true false) = do
   defineStringConstants true
   defineStringConstants false
   return ()
+defineStringConstants (S.Select _ lhs rhs) = do
+  defineStringConstants lhs
+  defineStringConstants rhs
+  return ()
 defineStringConstants (S.Array exprs) = mapM_ defineStringConstants exprs
 defineStringConstants (S.Apply meta _ exprs) = mapM_ defineStringConstants exprs
 defineStringConstants (S.Let _ e body) = do
