@@ -43,6 +43,7 @@ data Expr
   | Apply Meta Expr [Expr]
   | Lam String Expr
   | Select Meta Expr Expr
+  | Match Expr [Case]
   | Fix Expr        -- typechecker only
   | BoxFunc Name [Arg]   -- LLVM codegen only
   | Function Name Type [Arg] Expr
@@ -52,6 +53,9 @@ data Expr
   | Array [Expr]
   | Data Name [DataConst]
   deriving (Eq, Ord, Show)
+
+data Case = Case Pattern Expr deriving (Eq, Ord, Show)
+data Pattern = ConstPattern Lit deriving (Eq, Ord, Show)
 
 data DataConst = DataConst Name [Arg] deriving (Eq, Ord, Show)
 

@@ -8,6 +8,8 @@ ghc-options:
   lasca:
     -O0
     -rtsopts
+    -Wincomplete-patterns
+#    -Wall
 #    -prof
 #    -fprof-auto
 #    -auto-all

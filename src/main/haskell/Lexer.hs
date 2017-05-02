@@ -17,9 +17,7 @@ import Control.Monad (void)
 import qualified Text.Megaparsec.Lexer as L
 
 ops = ["+","*","-","/",";", "==", "=",",",".","<",">","|",":"]
-keywords = ["data", "def", "extern", "if", "then", "else", "end", "in",
-            "binary", "unary", "let", "true", "false"
-            ]
+keywords = ["data", "def", "extern", "if", "then", "else", "in", "let", "true", "false", "match", "do", "lazy"]
 
 sc :: Parser () -- ‘sc’ stands for “space consumer”
 sc = L.space (void spaceChar) lineComment blockComment
@@ -65,7 +63,7 @@ identifier = (lexeme . try) (p >>= check)
                 else return x
 
 opChar :: Parser Char
-opChar = oneOf "!#$%&*+./<=>?@\\^|-~"
+opChar = oneOf "!$%&*+./<=>?@\\^|-~"
 
 operator :: Parser String
 operator = lexeme $ some opChar

@@ -42,16 +42,17 @@ strToBool :: String -> Bool
 strToBool "true" = True
 strToBool _      = False
 
-boolLit :: Parser Expr
-boolLit = Literal emptyMeta . BoolLit . strToBool <$> (true <|> false)
+boolLiteral :: Parser Expr
+boolLiteral = Literal emptyMeta <$> boolLit
+
+boolLit :: Parser Lit
+boolLit = BoolLit . strToBool <$> (true <|> false)
   where
     true = reserved "true" >> return "true"
     false = reserved "false" >> return "false"
 
-arrayLit = Array <$> brackets (commaSep expr)
 
-stringLit :: Parser Expr
-stringLit = Literal emptyMeta . StringLit <$> stringLiteral
+arrayLit = Array <$> brackets (commaSep expr)
 
 interpolatedString :: Parser Expr
 interpolatedString = do
@@ -125,11 +126,25 @@ postfixApply = Ex.Postfix parser  -- FIXME shouldn't it be InfixL?
           let apply e = foldl (Apply meta) e argss
           return apply
 
-
 select = do
   reservedOp "."
   meta <- getMeta
   return $ Select meta
+
+matchExpr = do
+  reserved "match"
+  ex <- expr
+  cs <- bracedCases
+  return $ Match ex cs
+
+bracedCases = braces $ some acase
+
+acase = do
+  reservedOp "|"
+  p <- boolLit
+  reservedOp "->"
+  e <- expr
+  return $ Case (ConstPattern p) e
 
 binops = [
           [Ex.InfixL select, postfixApply],
@@ -280,13 +295,13 @@ dataConstructor = do
 
 factor :: Parser Expr -- TODO remove unneeded try's, reorder
 factor = try floating
-      <|> try boolLit
+      <|> try boolLiteral
       <|> try letins
       <|> try arrayLit
---      <|> try stringLit
       <|> try interpolatedString
       <|> try integerLit
       <|> try variable
+      <|> try matchExpr
       <|> try closure
       <|> ifthen
       <|> block

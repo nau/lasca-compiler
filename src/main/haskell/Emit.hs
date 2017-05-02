@@ -600,3 +600,4 @@ createGlobalContext exprs = execState (loop exprs) emptyCtx
         globalVals %= Set.union (Set.fromList vals)
         globalFunctions %= Set.union (Set.fromList funcs)
       names (S.Extern name _ _) = globalFunctions %= Set.insert name
+      names expr = error $ "Wat? Expected toplevel expression, but got " ++ show expr
