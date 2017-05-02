@@ -18,4 +18,6 @@ parserTests = testGroup "Parser tests"
       parseExpr "true" @?= Right (Literal emptyMeta (BoolLit True))
   , testCase "String Interpolation" $
       parseExpr "\"String\n\"" @?= Right (Literal emptyMeta (StringLit "String\n"))
+  , testCase "String Interpolation" $
+      parseInterpol "\"Hello \\$ ${test}\"" @?= Right [Left "Hello $ ", Right "test"]
   ]

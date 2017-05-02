@@ -3,6 +3,7 @@
 {-# LANGUAGE Strict            #-}
 module Parser (
   parseExpr,
+  parseInterpol,
   parseToplevel
 ) where
 
@@ -50,6 +51,26 @@ arrayLit = Array <$> brackets (commaSep expr)
 
 stringLit :: Parser Expr
 stringLit = Literal emptyMeta . StringLit <$> stringLiteral
+
+pTemplate :: Parser [Either String String] -- Left = text, Right = variable
+pTemplate = char '\"' *> some piece <* char '\"'
+  where
+    -- piece of text or interpolated variable
+    piece =
+      (Left <$> some ch) <|>
+      (Right <$> var)
+
+    -- interpolated variable
+    var = string "${" *> pVar <* char '}'
+
+    -- normal character, plain or escaped
+    ch =
+      noneOf escapable <|> (char '\\' *> oneOf escapable)
+
+    -- set of escapable characters
+    escapable = ['"', '\\', '$']
+
+    pVar = some letterChar
 
 binop = Ex.InfixL parser
   where parser = do
@@ -256,5 +277,8 @@ toplevel :: Parser [Expr]
 toplevel = many $ defn
 
 parseExpr s = parse (contents expr) "<stdin>" s
+
+parseInterpol :: String -> Either (ParseError Char Dec) [Either String String]
+parseInterpol s = parse (contents pTemplate) "<stdin>" s
 
 parseToplevel s = parse (contents toplevel) "<stdin>" s
