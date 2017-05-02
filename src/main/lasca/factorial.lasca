@@ -1,7 +1,4 @@
 
 def fact(n) = if n == 1 then 1 else n * fact(n - 1)
 
-def main() = {
-  f = fact(10);
-  println("Factorial of 8 is: ${f}");
-}
+def main() = println("Factorial of 8 is: ${fact(10)}")
