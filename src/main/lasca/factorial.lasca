@@ -2,6 +2,6 @@
 def fact(n) = if n == 1 then 1 else n * fact(n - 1)
 
 def main() = {
-  i = 10;
+  i = getArgs()(1).toInt;
   println("Factorial of ${i} is: ${fact(i)}")
 }

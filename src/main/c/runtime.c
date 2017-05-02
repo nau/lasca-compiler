@@ -250,6 +250,16 @@ int __attribute__ ((pure)) unboxInt(Box* ti) {
   }
 }
 
+double __attribute__ ((pure)) unboxFloat64(Box* ti) {
+//  printf("unbox(%d, %d) ", ti->type, (int) ti->value);
+  if (ti->type == DOUBLE) {
+  	return ti->value.dbl;
+  } else {
+    printf("AAAA!!! Expected %s but got %s\n", typeIdToName(DOUBLE), typeIdToName(ti->type));
+    exit(1);
+  }
+}
+
 /* ==================== Runtime Ops ============== */
 
 
@@ -259,7 +269,7 @@ int __attribute__ ((pure)) unboxInt(Box* ti) {
 #define DO_CMP(op) switch (lhs->type){ \
                    case BOOL:    { result = boxBool (left op right); break; } \
                    case INT:     { result = boxBool (left op right); break; } \
-                   case DOUBLE:  { result = boxBool (left op right); break; } \
+                   case DOUBLE:  { result = boxBool (unboxFloat64(lhs) op unboxFloat64(rhs)); break; } \
                    default: {printf("AAAA!!! Type mismatch! Expected Bool, Int or Double but got %s\n", typeIdToName(lhs->type)); exit(1); }\
                    }
 Box* __attribute__ ((pure)) runtimeBinOp(int code, Box* lhs, Box* rhs) {
