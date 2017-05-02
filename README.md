@@ -69,7 +69,7 @@ Ideas
 - Gradual Typing (http://homes.soic.indiana.edu/jsiek/what-is-gradual-typing/)
 - Deferred Type Errors (runtime compilation mode, Haskell)
 - Linear types (Rust)?
-- Liquid Type system (refinement types) + Dependent Type system? 
+- Liquid Type system (refinement types) 
   https://github.com/pleiad/Refinements
   http://leon.epfl.ch
   https://github.com/ucsd-progsys/liquidhaskell
@@ -137,7 +137,7 @@ Practical things that matter
 - immutability as concurrently shared data
 - https://www.infoq.com/presentations/Value-Identity-State-Rich-Hickey
 - Persisted Data Structures!
-- performance! (mutable non-shared state?, mutable collections)
+- performance! (mutable non-shared state?, mutable collections, in-place updates for unique values)
 - consider language support for StateT monad.
 - sized collections in some cases
 - pure functions for concurrency and caching
@@ -342,7 +342,7 @@ IntelliJ IDEA Plugin
 lasca-intellij-plugin.zip in the project root folder is actually a IntelliJ Plugin for Lasca. 
 
 It supports
-- sysntax highlighting
+- syntax highlighting
 - Go to definition
 - Find Usages for global functions
 - Rename refactoring for global functions
@@ -351,35 +351,18 @@ To install the plugin:
 
     Preferences -> Plugins -> Install Plugin From Disk -> lasca-intellij-plugin.zip
     
-First time n-body run:
-----------------------
-
-    $ time lasca --mode static src/main/lasca/nbody.lasca --exec --print-llvm -g 2
-
-    Parsed OK
-    Compiler mode is static
-    typechecked OK
-    Read module OK
-    Running JIT
-    ; ModuleID = 'src/main/lasca/nbody.lasca'
-    
-    Init Lasca 0.0.0.1 runtime. Enjoy :)
-    -0.169075164
-    -0.169059907
-    
-    real	26m3.883s
-    user	28m14.192s
-    sys	8m36.289s
-    
-    $ find src/main/haskell -name *.hs  | xargs cat | wc -l
-        1850
-    
-Current time n-body run:
+Current n-body run:
 --------------------
-    Init Lasca 0.0.0.1 runtime. Enjoy :)
+    $ time lasca -e -O2 src/main/lasca/nbody.lasca -- 50000000
     -0.169075164
     -0.169059907
     
-    real	13m33.031s
-    user	14m26.219s
-    sys	3m48.577s
+    real	15m3.991s
+    user	18m4.411s
+    sys	4m25.523s
+
+    find src -name *.hs  | xargs cat | wc -l
+    2201
+    
+    find src -name *.c  | xargs cat | wc -l
+    682
