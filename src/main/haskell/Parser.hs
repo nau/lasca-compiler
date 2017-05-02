@@ -53,7 +53,21 @@ arrayLit = Array <$> brackets (commaSep expr)
 stringLit :: Parser Expr
 stringLit = Literal emptyMeta . StringLit <$> stringLiteral
 
-pTemplate :: Parser [Either String String] -- Left = text, Right = variable
+interpolatedString :: Parser Expr
+interpolatedString = do
+  list <- pTemplate
+  return $ go list
+  where go [] = Literal emptyMeta (StringLit "")
+        go p@(Right e : ps) = go (Left "" : p)
+        go list = case foldl go' ([], []) list of
+                    ([s], []) -> s
+                    (strings, exprs) -> Apply emptyMeta (Ident "interpolate") [Array strings, Array exprs]
+
+        go' acc (Left s)  = acc `mappend` ([Literal emptyMeta (StringLit s)], [])
+        go' acc (Right e) = acc `mappend` ([], [e])
+
+
+pTemplate :: Parser [Either String Expr] -- Left = text, Right = variable
 pTemplate = char '\"' *> manyTill piece (char '\"')
   where
     -- piece of text or interpolated variable
@@ -83,9 +97,7 @@ pTemplate = char '\"' *> manyTill piece (char '\"')
     escapesMap = Map.fromList [('n', '\n'), ('t', '\t'), ('r', '\r'), ('b', '\b'), ('0', '\0')] -- TODO complete it
     escapes = escapable ++ Map.keys escapesMap
 
-    pVar = do
-      e <- expr
-      return $ show e
+    pVar = expr
 
 binop = Ex.InfixL parser
   where parser = do
@@ -272,7 +284,8 @@ factor = try floating
       <|> try boolLit
       <|> try letins
       <|> try arrayLit
-      <|> try stringLit
+--      <|> try stringLit
+      <|> try interpolatedString
       <|> try integerLit
       <|> try variable
       <|> try closure
@@ -293,7 +306,7 @@ toplevel = many $ defn
 
 parseExpr s = parse (contents expr) "<stdin>" s
 
-parseInterpol :: String -> Either (ParseError Char Dec) [Either String String]
+parseInterpol :: String -> Either (ParseError Char Dec) [Either String Expr]
 parseInterpol s = parse (contents pTemplate) "<stdin>" s
 
 parseToplevel s = parse (contents toplevel) "<stdin>" s
