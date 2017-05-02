@@ -11,6 +11,7 @@ import           Control.Applicative    ((<$>))
 import Control.Monad.State
 import qualified Data.Char as Char
 import           Data.List as List
+import qualified Data.Map.Strict as Map
 import           Data.List.NonEmpty
 import           Data.Foldable
 import           Text.Megaparsec as Megaparsec
@@ -64,10 +65,23 @@ pTemplate = char '\"' *> manyTill piece (char '\"')
     var = string "${" *> between sc (char '}') pVar
 
     -- normal character, plain or escaped
-    ch = noneOf escapable <|> (char '\\' *> oneOf escapable)
+    ch = noneOf escapable <|> ppp
 
     -- set of escapable characters
+
+    ppp = do
+      char '\\'
+      k <- oneOf escapes
+      return $ mapping Map.! k
+
+    mapping = Map.union escapableMap escapesMap
+
     escapable = ['"', '\\', '$']
+    
+    escapableMap = Map.fromList $ List.zip escapable escapable
+    
+    escapesMap = Map.fromList [('n', '\n'), ('t', '\t'), ('r', '\r'), ('b', '\b'), ('0', '\0')] -- TODO complete it
+    escapes = escapable ++ Map.keys escapesMap
 
     pVar = do
       e <- expr

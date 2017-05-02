@@ -23,6 +23,6 @@ parserTests = testGroup "Parser tests"
   , testCase "Character Escaping" $
       parseExpr "\"String\n\"" @?= Right (Literal emptyMeta (StringLit "String\n"))
   , testCase "String Interpolation" $
-      parseInterpol "\"Hello \\\\\\$${ test123 + 1 }\"" @?= Right [Left "Hello \\$",
-        Right "Apply Meta{pos=1:23, tpe=Any} (Ident \"+\") [Ident \"test123\",Literal Meta{pos=1:25, tpe=Any} (IntLit 1)]"]
+      parseInterpol "\"Hello\\t \\\\\\$${ test123 + 1 }\"" @?= Right [Left "Hello\t \\$",
+        Right "Apply Meta{pos=1:25, tpe=Any} (Ident \"+\") [Ident \"test123\",Literal Meta{pos=1:27, tpe=Any} (IntLit 1)]"]
   ]
