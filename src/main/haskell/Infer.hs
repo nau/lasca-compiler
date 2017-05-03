@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
--- {-# LANGUAGE Strict #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Infer (
   typeCheck,
@@ -12,6 +12,7 @@ import Prelude hiding (foldr)
 
 import Type
 import Syntax
+import Emit (Ctx, DataDef(..), dataDefs)
 
 import Control.Monad.State
 import Control.Monad.Except
@@ -25,7 +26,7 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Debug.Trace as Debug
 
-newtype TypeEnv = TypeEnv (Map.Map String Scheme)
+newtype TypeEnv = TypeEnv (Map.Map String Scheme) deriving (Monoid)
 
 instance Show TypeEnv where
   show (TypeEnv subst) = "Γ = {\n" ++ elems ++ "}"
@@ -193,58 +194,49 @@ lookupEnv (TypeEnv env) x =
     Just s  -> do t <- instantiate s
                   return (nullSubst, t)
 
-infer :: TypeEnv -> Expr -> Infer (Subst, Type)
-infer env ex = case ex of
+infer :: Ctx -> TypeEnv -> Expr -> Infer (Subst, Type)
+infer ctx env ex = case ex of
   Val n e -> do
-    (s, t) <- infer env e
+    (s, t) <- infer ctx env e
 --    Debug.trace ("Val " ++ n ++ " " ++ show s ++ " " ++ show t) return (s, t)
     return (s, t)
 
   Ident x -> lookupEnv env x
 
   Apply meta (Ident op) [e1, e2] | op `Map.member` ops -> do
-    (s1, t1) <- infer env e1
-    (s2, t2) <- infer env e2
+    (s1, t1) <- infer ctx env e1
+    (s2, t2) <- infer ctx env e2
     tv <- fresh
     s3 <- unify (TypeFunc t1 (TypeFunc t2 tv)) (ops Map.! op)
     return (s1 `compose` s2 `compose` s3, apply s3 tv)
 
   Apply meta e1 [arg] -> do
     tv <- fresh
-    (s1, t1) <- infer env e1
-    (s2, t2) <- infer (apply s1 env) arg
+    (s1, t1) <- infer ctx env e1
+    (s2, t2) <- infer ctx (apply s1 env) arg
     s3       <- unify (apply s2 t1) (TypeFunc t2 tv)
     return (s3 `compose` s2 `compose` s1, apply s3 tv)
 
   Apply meta e1 args -> do
      let curried = foldl (\expr arg -> Apply meta expr [arg]) e1 args
-     infer env curried
+     infer ctx env curried
 
   Let x e1 e2 -> do
-    (s1, t1) <- infer env e1
+    (s1, t1) <- infer ctx env e1
     let env' = apply s1 env
         t'   = generalize env' t1
-    (s2, t2) <- infer (env' `extend` (x, t')) e2
+    (s2, t2) <- infer ctx (env' `extend` (x, t')) e2
     return (s2 `compose` s1, t2)
 
   If cond tr fl -> do
     tv <- fresh
-    inferPrim env [cond, tr, fl] (typeBool `TypeFunc` tv `TypeFunc` tv `TypeFunc` tv)
+    inferPrim ctx env [cond, tr, fl] (typeBool `TypeFunc` tv `TypeFunc` tv `TypeFunc` tv)
 
-  Match expr cases -> do
-    te <- fresh
-    tv <- fresh
-    let cs = foldr folded [] cases
-    let expectedType = te `TypeFunc` List.foldr (\_ t -> tv `TypeFunc` t) tv cs
---    Debug.traceM $ "Expected type " ++ show expectedType
-    inferPrim env (expr:cs) expectedType
-    where folded (Case (VarPattern name) e) acc = Let name expr e : acc
-          folded (Case p e) acc = e : acc
 
 
   Fix e1 -> do
       tv <- fresh
-      inferPrim env [e1] ((tv `TypeFunc` tv) `TypeFunc` tv)
+      inferPrim ctx env [e1] ((tv `TypeFunc` tv) `TypeFunc` tv)
 
   Extern name tpe args -> do
     let ts = map argToType args
@@ -257,21 +249,64 @@ infer env ex = case ex of
   Lam x e -> do
       tv <- fresh
       let env' = env `extend` (x, Forall [] tv)
-      (s1, t1) <- infer env' e
+      (s1, t1) <- infer ctx env' e
       return (s1, apply s1 tv `TypeFunc` t1)
 
   Function name t args e -> do
     let largs = map (\(Arg a _) -> a) args
     let curried = Fix (foldr (\arg expr -> Lam arg expr) e (name:largs))
-    infer env ({-Debug.trace ("Func " ++ show curried)-} curried)
+    infer ctx env ({-Debug.trace ("Func " ++ show curried)-} curried)
 
   Data name constructors -> error "Shouldn't happen!"
-  Select meta tree expr -> infer env (Apply meta expr [tree])
+  Select meta tree expr -> infer ctx env (Apply meta expr [tree])
 
   Array exprs -> do
     tv <- fresh
     let tpe = foldr (\_ t -> tv `TypeFunc` t) (typeArray tv) exprs
-    inferPrim env exprs tpe
+    inferPrim ctx env exprs tpe
+
+  Match expr cases -> do
+      tv <- fresh
+      {-
+        Consider data Role = Admin | Group(id: Int)
+                 data User = Person(name: String, role: Role)
+                 match Person("God", Admin) { | Person(_ ,Group(i)) -> true }
+
+                 unify: User -> User -> Bool
+                 unify: String -> Role
+                          _       Group(i)
+                                    Int
+                                     i
+      -}
+      (s1, te) <- infer ctx env expr
+      (s2, te') <- foldM (inferCase te) (s1, tv) cases
+      return (s2, te')
+      where
+            inferCase :: Type -> (Subst, Type) -> Case -> Infer (Subst, Type)
+            inferCase expectedType (s1, expectedResult) (Case pat e) = do
+              (env1, patType) <- getPatType env pat   -- (name -> String, User)
+              unify expectedType patType
+              (s2, te) <- infer ctx env1 e
+              s3 <- unify expectedResult te
+              return (s3 `compose` s2 `compose` s1, apply s3 te)
+
+            getPatType :: TypeEnv -> Pattern -> Infer (TypeEnv, Type)
+            getPatType env pat = case pat of
+                WildcardPattern -> do
+                  tv <- fresh
+                  return (env, tv)       -- (0, a)
+                (VarPattern n)    -> do                  -- (n -> a, a)
+                  tv <- fresh
+                  return (env `extend` (n, Forall [] tv), tv)
+                (LitPattern lit) -> return (env, litType lit)   -- (0, litType)
+                (ConstrPattern name args) -> do          -- (name -> a, a -> User)
+                  (_, t) <- lookupEnv env name           -- t = String -> User
+                  result <- fresh                        -- result = a
+                  (env', pattype) <- foldM (\ (accEnv, accType) pat -> do { (e, t) <- getPatType env pat; return (accEnv `mappend` e, TypeFunc t accType) }) (env, result) (reverse args)
+--                  Debug.traceM $ "Holy shit " ++ show env' ++ ", " ++ show pattype
+                  subst <- unify pattype t
+                  let restpe = apply subst result
+                  return (env', restpe)                   -- (name -> String, User)
 
   Literal meta lit ->
     return (nullSubst, litType lit)
@@ -284,8 +319,8 @@ litType (StringLit _) = typeString
 litType UnitLit       = typeUnit
 
 
-inferPrim :: TypeEnv -> [Expr] -> Type -> Infer (Subst, Type)
-inferPrim env l t = do
+inferPrim :: Ctx -> TypeEnv -> [Expr] -> Type -> Infer (Subst, Type)
+inferPrim ctx env l t = do
   tv <- fresh
   (s1, tf) <- foldM inferStep (nullSubst, id) l
   let composedType = apply s1 (tf tv)
@@ -294,17 +329,17 @@ inferPrim env l t = do
   return (s2 `compose` s1, apply s2 tv)
   where
   inferStep (s, tf) exp = do
-    (s', t) <- infer (apply s env) exp
+    (s', t) <- infer ctx (apply s env) exp
     return (s' `compose` s, tf . TypeFunc t)
 
-inferExpr :: TypeEnv -> Expr -> Either TypeError Scheme
-inferExpr env = runInfer . infer env
+inferExpr :: Ctx -> TypeEnv -> Expr -> Either TypeError Scheme
+inferExpr ctx env = runInfer . infer ctx env
 
-inferTop :: TypeEnv -> [(String, Expr)] -> Either TypeError TypeEnv
-inferTop env [] = Right env
-inferTop env ((name, ex):xs) = case inferExpr env ex of
+inferTop :: Ctx -> TypeEnv -> [(String, Expr)] -> Either TypeError TypeEnv
+inferTop ctx env [] = Right env
+inferTop ctx env ((name, ex):xs) = case inferExpr ctx env ex of
   Left err -> Left err
-  Right ty -> inferTop (extend env (name, ty)) xs
+  Right ty -> inferTop ctx (extend env (name, ty)) xs
 
 normalize :: Scheme -> Scheme
 normalize (Forall ts body) = Forall (fmap snd ord) (normtype body)
@@ -325,14 +360,14 @@ normalize (Forall ts body) = Forall (fmap snd ord) (normtype body)
         Just x -> TVar x
         Nothing -> error "type variable not in signature"
 
-typeCheck :: [Expr] -> Either TypeError TypeEnv
-typeCheck exprs = do
+typeCheck :: Ctx -> [Expr] -> Either TypeError TypeEnv
+typeCheck ctx exprs = do
   let (dat, other) = List.partition pred exprs
   let bbb = dat >>= ddd
   let a = map f other
   let (TypeEnv te) = defaultTyenv
   let typeEnv = TypeEnv (Map.union te (Map.fromList bbb))
-  inferTop typeEnv a
+  inferTop ctx typeEnv a
   where
             pred Data{} = True
             pred _      = False

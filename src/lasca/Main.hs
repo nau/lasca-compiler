@@ -97,7 +97,7 @@ genModule opts modo source = do
           when (printAst opts) $ print ex
           when (verboseMode opts) $ putStrLn("Compiler mode is " ++ mode opts)
           if mode opts == "static"
-          then case typeCheck ex of
+          then case typeCheck (createGlobalContext ex) ex of
             Right env -> do
               when (verboseMode opts) $ putStrLn "typechecked OK"
               when (printTypes opts) $ print env

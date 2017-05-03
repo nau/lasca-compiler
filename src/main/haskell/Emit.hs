@@ -3,7 +3,9 @@
 {-# LANGUAGE Strict #-}
 
 module Emit (
-  codegenModule
+  Ctx, DataDef(..), dataDefs,
+  codegenModule,
+  createGlobalContext
 ) where
 
 import LLVM.Module
@@ -293,7 +295,7 @@ cgen ctx (S.BoxFunc funcName enclosedVars) = do
   else boxClosure funcName mapping enclosedVars
 cgen ctx m@(S.Match expr cases) = do
   let result = genMatch ctx m
-  Debug.traceM $ "Generated " ++ show result
+--  Debug.traceM $ "Generated " ++ show result
   cgen ctx result
 cgen ctx (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"

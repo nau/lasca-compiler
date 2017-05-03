@@ -1,11 +1,15 @@
 def foo(i: M -> F a (b c -> d)) = i
 
+data Role = Admin | Looser(perm: Int)
+data User = Person(id: Int, name: String, role: Role)
+
 -- @ IO,
 def returnArray(): Array Int = {
-  res = match 1 {
-  | _ -> 3
+  res = match Person(1, "Alex", Looser(12)) {
+  | Person(i, n, Looser(l)) -> { println("Found user id ${i + 5} ${l}"); i}
+--  | Person(i, n, Admin) -> { println("Found user id ${i + 5} ${n}"); i}
 --  | i -> i + 1
-  | 1 -> 0
+--  | 1 -> 0
   };
   println(" Te ${res}")
 }

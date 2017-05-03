@@ -5,6 +5,7 @@ import Test.Tasty.HUnit
 import Parser
 import Syntax
 import Infer
+import Emit
 import Type
 
 import Data.List
@@ -46,5 +47,7 @@ parserTests = testGroup "Parser tests"
 typerTests = testGroup "Typer tests"
   [
     testCase "Pattern matching" $
-      inferExpr defaultTyenv (fromRight $ parseExpr "match true { | true -> 1 | false -> 2 }") @?= Right (Forall [] (TypeIdent "Int"))
+      asdf "match true { | true -> 1 | false -> 2 }" @?= Right (Forall [] (TypeIdent "Int"))
   ]
+
+asdf str = let expr = fromRight $ parseExpr str in inferExpr (createGlobalContext [expr]) defaultTyenv expr
