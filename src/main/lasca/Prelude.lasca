@@ -9,3 +9,4 @@ extern def lasqrt(a: Float): Float
 extern def getArgs(): Array String
 extern def toInt(s: a): Int
 extern def concat(strings: Array String): String
+extern def die(msg: String): Unit

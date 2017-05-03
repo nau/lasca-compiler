@@ -232,12 +232,15 @@ infer env ex = case ex of
     inferPrim env [cond, tr, fl] (typeBool `TypeFunc` tv `TypeFunc` tv `TypeFunc` tv)
 
   Match expr cases -> do
-    let cs = foldr (\(Case p expr) acc -> expr : acc) [] cases
     te <- fresh
     tv <- fresh
+    let cs = foldr folded [] cases
     let expectedType = te `TypeFunc` List.foldr (\_ t -> tv `TypeFunc` t) tv cs
 --    Debug.traceM $ "Expected type " ++ show expectedType
     inferPrim env (expr:cs) expectedType
+    where folded (Case (VarPattern name) e) acc = Let name expr e : acc
+          folded (Case p e) acc = e : acc
+
 
   Fix e1 -> do
       tv <- fresh

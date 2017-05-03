@@ -133,6 +133,10 @@ defineStringConstants (S.Let _ e body) = do
   defineStringConstants e
   defineStringConstants body
   return ()
+defineStringConstants (S.Match e cases) = do
+  defineStringConstants e
+  mapM_ (\(S.Case p e) -> defineStringConstants e) cases
+  return ()
 defineStringConstants _ = return ()
 
 -- codegenTop :: S.Expr -> LLVM ()
@@ -286,6 +290,10 @@ cgen ctx (S.BoxFunc funcName enclosedVars) = do
   let mapping = functions modState
   if null enclosedVars then boxFunc funcName mapping
   else boxClosure funcName mapping enclosedVars
+cgen ctx m@(S.Match expr cases) = do
+  let result = genMatch m
+  Debug.traceM $ "Generated " ++ show result
+  cgen ctx result
 cgen ctx (S.If cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
@@ -321,6 +329,21 @@ cgen ctx (S.If cond tr fl) = do
 
 cgen ctx e = error ("cgen shit " ++ show e)
 
+genMatch :: S.Expr -> S.Expr
+genMatch m@(S.Match expr []) = error $ "Should be at least on case in match expression: " ++ show m
+genMatch (S.Match expr cases) = foldr (\(S.Case p e) acc -> genPattern expr p e acc) genFail cases
+
+genFail = S.Apply S.emptyMeta (S.Ident "die") [S.Literal S.emptyMeta $ S.StringLit "Match error!"]
+
+genPattern lhs S.WildcardPattern rhs = const rhs
+genPattern lhs (S.VarPattern name) rhs = const (S.Let name lhs rhs)
+genPattern lhs (S.LitPattern literal) rhs = S.If (S.Apply S.emptyMeta (S.Ident "==") [lhs, S.Literal S.emptyMeta literal]) rhs
+--genPattern ctx (S.ConstrPattern name args) expr = (\fail -> S.If (cond fail) true fail)
+--  where cond f = S.If constrCheck (checkArgs f) (S.Literal S.emptyMeta $ S.BoolLit False) f
+--        constrCheck = S.Apply (S.Ident "runtimeIsConstr") [expr, S.Literal S.emptyMeta $ S.StringLit literal]
+--        checkArgs f = do
+--          dataDefs ctx
+--          foldr (\acc arg -> (genPattern p (S.Select outerExpr )))
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------
@@ -406,11 +429,12 @@ codegenModule opts modo exprs = modul
           let defs = reverse (dataDefs ctx)
           genTypesStruct defs
           genRuntime opts
+          defineStringLit "Match error!" -- TODO remove this hack
           mapM_ (codegenTop ctx) fns''
           codegenStartFunc ctx
 
 declareStdFuncs = do
-  external T.void "initLascaRuntime" [("runtime", ptrType)] False []
+  external T.void  "initLascaRuntime" [("runtime", ptrType)] False []
   external ptrType "gcMalloc" [("size", intType)] False []
   external ptrType "box" [("t", intType), ("ptr", ptrType)] False [FA.GroupID 0]
   external ptrType "unbox" [("t", intType), ("ptr", ptrType)] False [FA.GroupID 0]
@@ -425,6 +449,7 @@ declareStdFuncs = do
   external ptrType "runtimeApply"  [("func", ptrType), ("argc", intType), ("argv", ptrType), ("pos", positionStructType)] False []
   external ptrType "runtimeSelect" [("tree", ptrType), ("expr", ptrType), ("pos", positionStructType)] False [FA.GroupID 0]
   external T.void  "initEnvironment" [("argc", intType), ("argv", ptrType)] False []
+  external ptrType "runtimeIsConstr" [("value", ptrType), ("name", ptrType)] False [FA.GroupID 0]
   addDefn $ AST.FunctionAttributes (FA.GroupID 0) [FA.ReadOnly]
 
 extractLambda :: S.Expr -> LLVM S.Expr

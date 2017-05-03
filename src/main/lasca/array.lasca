@@ -2,16 +2,12 @@ def foo(i: M -> F a (b c -> d)) = i
 
 -- @ IO,
 def returnArray(): Array Int = {
-  array = [];
-  array1: Array String = append(array, "Hello");
-  array2 = append(array1, 10.5 * 1.0);
-  array3 = prepend(array2, 1);
-  let z: Array (Int -> String a) = [toString] in append(z, 1);
-  println(array3(2).toString);
-  println(array3.toString);
-  println("2".toString); -- FIXME it's a bug
---  println(toString("2"));
---  foo(false)
+  res = match 1 {
+  | _ -> 3
+--  | i -> i + 1
+  | 1 -> 0
+  };
+  println(" Te ${res}")
 }
 
 

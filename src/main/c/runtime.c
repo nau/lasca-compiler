@@ -262,14 +262,23 @@ double __attribute__ ((pure)) unboxFloat64(Box* ti) {
 
 /* ==================== Runtime Ops ============== */
 
+void die(Box* msg) {
+  println(msg);
+  exit(1);
+}
 
-#define DO_OP(op) if (lhs->type == INT) { result = boxInt(left op right); } else if (lhs->type == DOUBLE) { result = boxFloat64(lhs->value.dbl op rhs->value.dbl); } else { \
+int isUserType(Box* v) {
+  int type = v->type;
+  return type >= 1000 && (type < 1000 + RUNTIME->types->size);
+}
+
+#define DO_OP(op) if (lhs->type == INT) { result = boxInt(lhs->value.num op rhs->value.num); } else if (lhs->type == DOUBLE) { result = boxFloat64(lhs->value.dbl op rhs->value.dbl); } else { \
                         printf("AAAA!!! Type mismatch! Expected Int or Double for op but got %s\n", typeIdToName(lhs->type)); exit(1); }
 
 #define DO_CMP(op) switch (lhs->type){ \
-                   case BOOL:    { result = boxBool (left op right); break; } \
-                   case INT:     { result = boxBool (left op right); break; } \
-                   case DOUBLE:  { result = boxBool (unboxFloat64(lhs) op unboxFloat64(rhs)); break; } \
+                   case BOOL:    { result = boxBool (lhs->value.num op rhs->value.num); break; } \
+                   case INT:     { result = boxBool (lhs->value.num op rhs->value.num); break; } \
+                   case DOUBLE:  { result = boxBool (lhs->value.dbl op rhs->value.dbl); break; } \
                    default: {printf("AAAA!!! Type mismatch! Expected Bool, Int or Double but got %s\n", typeIdToName(lhs->type)); exit(1); }\
                    }
 Box* __attribute__ ((pure)) runtimeBinOp(int code, Box* lhs, Box* rhs) {
@@ -278,8 +287,6 @@ Box* __attribute__ ((pure)) runtimeBinOp(int code, Box* lhs, Box* rhs) {
   	exit(1);
   }
 
-  int left = lhs->value.num;
-  int right = rhs->value.num;
   Box* result = NULL;
 
   switch (code) {
@@ -419,7 +426,7 @@ Box* runtimeApply(Box* val, int argc, Box* argv[], Position pos) {
 Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
   Functions* fs = RUNTIME->functions;
   Types* types = RUNTIME->types;
-  if (tree->type >= 1000) {
+  if (isUserType(tree)) {
 //    printf("Found structs %d\n", structs->size);
 
     DataValue* dataValue = tree->value.ptr;
@@ -457,7 +464,17 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
   return boxError(&s);
 }
 
-
+Box* runtimeIsConstr(Box* value, Box* constrName) {
+  assert(isUserType(value));
+  String* name = unbox(STRING, constrName);
+  // TODO do this right
+  Data* data = RUNTIME->types->data[value->type - 1000];
+  for (int i = 0; i < data->numValues; i++) {
+    if (strncmp(data->constructors[i]->name->bytes, name->bytes, fmin(data->constructors[i]->name->length, name->length)) == 0)
+      return &TRUE_SINGLETON;
+  }
+  return &FALSE_SINGLETON;
+}
 /* ================== IO ================== */
 
 void putInt(int c) {
@@ -588,7 +605,7 @@ Box* __attribute__ ((pure)) toString(Box* value) {
       exit(1);
     }
     default:
-      if (type >= 1000 && type < 1000 + RUNTIME->types->size) {
+      if (isUserType(value)) {
         DataValue* dataValue = value->value.ptr;
         Data* metaData = RUNTIME->types->data[type - 1000];
         Struct* constr = metaData->constructors[dataValue->tag];
