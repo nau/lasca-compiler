@@ -28,14 +28,14 @@ parserTests = testGroup "Parser tests"
       ])
   , testCase "Pattern matching" $
       parseExpr "match true { | true -> 1 }" @?= Right (Match (Literal emptyMeta (BoolLit True)) [
-        Case (ConstPattern (BoolLit True)) (Literal (withMetaPos 1 24) (IntLit 1))])
+        Case (LitPattern (BoolLit True)) (Literal (withMetaPos 1 24) (IntLit 1))])
   , testCase "Pattern matching" $
-        parseExpr "match foo { | 0 -> 0 | Person(id, name) -> 1 | bar -> 2 | _ -> match false { | true -> 4 } }" @?= Right (
+        parseExpr "match foo { | Person(0, name, \"God\", None, _) -> 1 | _ -> match false { | true -> 4 } }" @?= Right (
           Match (Ident "foo") [
-            Case (ConstPattern (IntLit 0)) (Literal (withMetaPos 1 20) (IntLit 0)),
-            Case (ConstrPattern (DataConst "Person" [Arg "id" (TypeIdent "Any"), Arg "name" (TypeIdent "Any")])) (Literal (withMetaPos 1 44) (IntLit 1)),
-            Case (ConstrPattern (DataConst "bar" [])) (Literal (withMetaPos 1 55) (IntLit 2)),
-            Case AnyPattern (
-              Match (Literal emptyMeta  (BoolLit False)) [
-                Case (ConstPattern (BoolLit True)) (Literal (withMetaPos 1 88) (IntLit 4))])])
+            Case (ConstrPattern "Person" [LitPattern (IntLit 0),VarPattern "name",LitPattern (StringLit "God"),
+                  ConstrPattern "None" [],WildcardPattern]) (Literal (withMetaPos 1 50) (IntLit 1)),
+            Case WildcardPattern (
+              Match (Literal emptyMeta (BoolLit False)) [
+                Case (LitPattern (BoolLit True)) (Literal (withMetaPos 1 83) (IntLit 4))])
+          ])
   ]

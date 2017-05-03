@@ -152,15 +152,20 @@ acase = do
   return $ Case p e
 
 ptrn = litPattern
-  <|> (ConstrPattern <$> dataConstructor)
+  <|> constrPattern
   <|> (VarPattern <$> identifier)
-  <|> anyPattern
+  <|> wildcardPattern
 
-anyPattern = do
+constrPattern = do
+  id <- upperIdentifier
+  patterns <- option [] $ parens (ptrn `sepBy` comma)
+  return $ ConstrPattern id patterns
+
+wildcardPattern = do
   reservedOp "_"
-  return AnyPattern
+  return WildcardPattern
 
-litPattern = ConstPattern <$> (boolLit <|> stringLit <|> try floatLit <|> integerLit)
+litPattern = LitPattern <$> (boolLit <|> stringLit <|> try floatLit <|> integerLit)
 
 binops = [
           [Ex.InfixL select, postfixApply],
@@ -298,7 +303,7 @@ block = braces blockStmts
 dataDef :: Parser Expr
 dataDef = do
   reserved "data"
-  typeName <- identifier
+  typeName <- upperIdentifier
   reservedOp "="
   optional $ reservedOp "|"
   constructors <-  dataConstructor `sepBy` reservedOp "|"

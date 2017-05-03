@@ -54,6 +54,10 @@ reservedOp w = string w *> notFollowedBy opChar *> sc
 
 identOp = lexeme $ some opChar
 
+upperIdentifier = (lexeme . try) (p)
+  where
+      p       = (:) <$> upperChar <*> many alphaNumChar
+
 identifier :: Parser String
 identifier = (lexeme . try) (p >>= check)
   where
