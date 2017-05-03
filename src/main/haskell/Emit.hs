@@ -24,6 +24,7 @@ import qualified LLVM.AST.FunctionAttribute as FA
 -- import qualified Data.Text as Text
 import qualified Data.ByteString as ByteString
 import qualified Data.Text.Encoding as Encoding
+import Text.Printf
 import qualified Data.ByteString.UTF8 as UTF8
 
 import LLVM.ExecutionEngine ( withMCJIT, withModuleInEngine, getFunction )
@@ -291,7 +292,7 @@ cgen ctx (S.BoxFunc funcName enclosedVars) = do
   if null enclosedVars then boxFunc funcName mapping
   else boxClosure funcName mapping enclosedVars
 cgen ctx m@(S.Match expr cases) = do
-  let result = genMatch m
+  let result = genMatch ctx m
   Debug.traceM $ "Generated " ++ show result
   cgen ctx result
 cgen ctx (S.If cond tr fl) = do
@@ -329,21 +330,27 @@ cgen ctx (S.If cond tr fl) = do
 
 cgen ctx e = error ("cgen shit " ++ show e)
 
-genMatch :: S.Expr -> S.Expr
-genMatch m@(S.Match expr []) = error $ "Should be at least on case in match expression: " ++ show m
-genMatch (S.Match expr cases) = foldr (\(S.Case p e) acc -> genPattern expr p e acc) genFail cases
+genMatch :: Ctx -> S.Expr -> S.Expr
+genMatch ctx m@(S.Match expr []) = error $ "Should be at least on case in match expression: " ++ show m
+genMatch ctx (S.Match expr cases) = foldr (\(S.Case p e) acc -> genPattern ctx expr p e acc) genFail cases
 
 genFail = S.Apply S.emptyMeta (S.Ident "die") [S.Literal S.emptyMeta $ S.StringLit "Match error!"]
 
-genPattern lhs S.WildcardPattern rhs = const rhs
-genPattern lhs (S.VarPattern name) rhs = const (S.Let name lhs rhs)
-genPattern lhs (S.LitPattern literal) rhs = S.If (S.Apply S.emptyMeta (S.Ident "==") [lhs, S.Literal S.emptyMeta literal]) rhs
---genPattern ctx (S.ConstrPattern name args) expr = (\fail -> S.If (cond fail) true fail)
---  where cond f = S.If constrCheck (checkArgs f) (S.Literal S.emptyMeta $ S.BoolLit False) f
---        constrCheck = S.Apply (S.Ident "runtimeIsConstr") [expr, S.Literal S.emptyMeta $ S.StringLit literal]
---        checkArgs f = do
---          dataDefs ctx
---          foldr (\acc arg -> (genPattern p (S.Select outerExpr )))
+genPattern ctx lhs S.WildcardPattern rhs = const rhs
+genPattern ctx lhs (S.VarPattern name) rhs = const (S.Let name lhs rhs)
+genPattern ctx lhs (S.LitPattern literal) rhs = S.If (S.Apply S.emptyMeta (S.Ident "==") [lhs, S.Literal S.emptyMeta literal]) rhs
+genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
+  where cond fail = S.If constrCheck (checkArgs name fail) fail
+        constrCheck = S.Apply S.emptyMeta (S.Ident "runtimeIsConstr") [lhs, S.Literal S.emptyMeta $ S.StringLit name]
+        constrMap = let cs = foldr (\ (DataDef dn id constrs) acc -> constrs ++ acc) [] (dataDefs ctx)
+                        tuples = fmap (\c@(S.DataConst n args) -> (n, args)) cs
+                    in  Map.fromList tuples
+        checkArgs nm fail =  case Map.lookup nm constrMap of
+                            Nothing -> fail
+                            Just constrArgs | length args == length constrArgs -> do
+                              let argParam = zip args constrArgs
+                              foldr (\(a, S.Arg n _) acc -> genPattern ctx (S.Select S.emptyMeta lhs (S.Ident n)) a acc fail) rhs argParam
+                            Just constrArgs -> error (printf "Constructor %s has %d parameters, but %d given" nm (length constrArgs) (length args)) -- TODO box this error
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------
@@ -449,7 +456,7 @@ declareStdFuncs = do
   external ptrType "runtimeApply"  [("func", ptrType), ("argc", intType), ("argv", ptrType), ("pos", positionStructType)] False []
   external ptrType "runtimeSelect" [("tree", ptrType), ("expr", ptrType), ("pos", positionStructType)] False [FA.GroupID 0]
   external T.void  "initEnvironment" [("argc", intType), ("argv", ptrType)] False []
-  external ptrType "runtimeIsConstr" [("value", ptrType), ("name", ptrType)] False [FA.GroupID 0]
+--  external ptrType "runtimeIsConstr" [("value", ptrType), ("name", ptrType)] False [FA.GroupID 0]
   addDefn $ AST.FunctionAttributes (FA.GroupID 0) [FA.ReadOnly]
 
 extractLambda :: S.Expr -> LLVM S.Expr

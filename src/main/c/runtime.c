@@ -155,7 +155,7 @@ void *gcRealloc(void* old, size_t s) {
 }
 
 Box* toString(Box* value);
-void println(Box* val);
+Box* println(Box* val);
 
 const char * __attribute__ ((const)) typeIdToName(int typeId) {
   switch (typeId) {
@@ -465,13 +465,14 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
 }
 
 Box* runtimeIsConstr(Box* value, Box* constrName) {
-  assert(isUserType(value));
-  String* name = unbox(STRING, constrName);
-  // TODO do this right
-  Data* data = RUNTIME->types->data[value->type - 1000];
-  for (int i = 0; i < data->numValues; i++) {
-    if (strncmp(data->constructors[i]->name->bytes, name->bytes, fmin(data->constructors[i]->name->length, name->length)) == 0)
-      return &TRUE_SINGLETON;
+  if (isUserType(value)) {
+    String* name = unbox(STRING, constrName);
+    // TODO do this right
+    Data* data = RUNTIME->types->data[value->type - 1000];
+    for (int i = 0; i < data->numValues; i++) {
+      if (strncmp(data->constructors[i]->name->bytes, name->bytes, fmin(data->constructors[i]->name->length, name->length)) == 0)
+        return &TRUE_SINGLETON;
+    }
   }
   return &FALSE_SINGLETON;
 }
@@ -494,9 +495,10 @@ void * runtimePutchar(Box* ch) {
   return 0;
 }
 
-void println(Box* val) {
+Box* println(Box* val) {
   String * str = unbox(STRING, val);
   printf("%.*s\n", str->length, str->bytes);
+  return &UNIT_SINGLETON;
 }
 
 
