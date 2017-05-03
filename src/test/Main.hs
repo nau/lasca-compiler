@@ -4,6 +4,7 @@ import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit
 import Parser
 import Syntax
+import Infer
 import Type
 
 import Data.List
@@ -11,8 +12,10 @@ import Data.Ord
 
 main = defaultMain tests
 
+fromRight (Right a) = a
+
 tests :: TestTree
-tests = testGroup "Tests" [parserTests]
+tests = testGroup "Tests" [parserTests, typerTests]
 
 parserTests = testGroup "Parser tests"
   [ testCase "Parse true" $
@@ -38,4 +41,10 @@ parserTests = testGroup "Parser tests"
               Match (Literal emptyMeta (BoolLit False)) [
                 Case (LitPattern (BoolLit True)) (Literal (withMetaPos 1 83) (IntLit 4))])
           ])
+  ]
+
+typerTests = testGroup "Typer tests"
+  [
+    testCase "Pattern matching" $
+      inferExpr defaultTyenv (fromRight $ parseExpr "match true { | true -> 1 | false -> 2 }") @?= Right (Forall [] (TypeIdent "Int"))
   ]

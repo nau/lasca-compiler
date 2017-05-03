@@ -3,7 +3,9 @@
 -- {-# LANGUAGE Strict #-}
 
 module Infer (
-  typeCheck
+  typeCheck,
+  inferExpr,
+  defaultTyenv
 ) where
 
 import Prelude hiding (foldr)
@@ -45,6 +47,7 @@ data TypeError
   | InfiniteType TVar Type
   | UnboundVariable String
   | UnificationMismatch [Type] [Type]
+  deriving (Eq, Ord)
 
 instance Show TypeError where
   show (UnificationFail t1 t2) = "Unification Fail " ++ show t1 ++ " " ++ show t2
@@ -228,6 +231,14 @@ infer env ex = case ex of
     tv <- fresh
     inferPrim env [cond, tr, fl] (typeBool `TypeFunc` tv `TypeFunc` tv `TypeFunc` tv)
 
+  Match expr cases -> do
+    let cs = foldr (\(Case p expr) acc -> expr : acc) [] cases
+    te <- fresh
+    tv <- fresh
+    let expectedType = te `TypeFunc` List.foldr (\_ t -> tv `TypeFunc` t) tv cs
+--    Debug.traceM $ "Expected type " ++ show expectedType
+    inferPrim env (expr:cs) expectedType
+
   Fix e1 -> do
       tv <- fresh
       inferPrim env [e1] ((tv `TypeFunc` tv) `TypeFunc` tv)
@@ -274,12 +285,14 @@ inferPrim :: TypeEnv -> [Expr] -> Type -> Infer (Subst, Type)
 inferPrim env l t = do
   tv <- fresh
   (s1, tf) <- foldM inferStep (nullSubst, id) l
-  s2 <- unify (apply s1 (tf tv)) t
+  let composedType = apply s1 (tf tv)
+--  Debug.traceM $ "composedType " ++ show composedType
+  s2 <- unify composedType t
   return (s2 `compose` s1, apply s2 tv)
   where
   inferStep (s, tf) exp = do
     (s', t) <- infer (apply s env) exp
-    return (s' `compose` s, tf . (TypeFunc t))
+    return (s' `compose` s, tf . TypeFunc t)
 
 inferExpr :: TypeEnv -> Expr -> Either TypeError Scheme
 inferExpr env = runInfer . infer env
