@@ -334,7 +334,9 @@ cgen ctx e = error ("cgen shit " ++ show e)
 
 genMatch :: Ctx -> S.Expr -> S.Expr
 genMatch ctx m@(S.Match expr []) = error $ "Should be at least on case in match expression: " ++ show m
-genMatch ctx (S.Match expr cases) = foldr (\(S.Case p e) acc -> genPattern ctx expr p e acc) genFail cases
+genMatch ctx (S.Match expr cases) =
+  let body = foldr (\(S.Case p e) acc -> genPattern ctx (S.Ident "$match") p e acc) genFail cases
+  in  S.Let "$match" expr body  -- FIXME hack. Gen unique names
 
 genFail = S.Apply S.emptyMeta (S.Ident "die") [S.Literal S.emptyMeta $ S.StringLit "Match error!"]
 

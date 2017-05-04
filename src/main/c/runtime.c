@@ -467,12 +467,11 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
 Box* runtimeIsConstr(Box* value, Box* constrName) {
   if (isUserType(value)) {
     String* name = unbox(STRING, constrName);
-    // TODO do this right
     Data* data = RUNTIME->types->data[value->type - 1000];
-    for (int i = 0; i < data->numValues; i++) {
-      if (strncmp(data->constructors[i]->name->bytes, name->bytes, fmin(data->constructors[i]->name->length, name->length)) == 0)
-        return &TRUE_SINGLETON;
-    }
+    DataValue* dv = value->value.ptr;
+    String* realConstrName = data->constructors[dv->tag]->name;
+    if (strncmp(realConstrName->bytes, name->bytes, fmin(realConstrName->length, name->length)) == 0)
+      return &TRUE_SINGLETON;
   }
   return &FALSE_SINGLETON;
 }

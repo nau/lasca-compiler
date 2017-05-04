@@ -25,6 +25,7 @@ import Data.Foldable (foldr)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Debug.Trace as Debug
+import Text.Printf
 
 newtype TypeEnv = TypeEnv (Map.Map String Scheme) deriving (Monoid)
 
@@ -279,15 +280,20 @@ infer ctx env ex = case ex of
                                      i
       -}
       (s1, te) <- infer ctx env expr
+--      Debug.traceM $ "Matching expression type " ++ show te
       (s2, te') <- foldM (inferCase te) (s1, tv) cases
+--      Debug.traceM $ "Matching result type " ++ show te'
       return (s2, te')
       where
             inferCase :: Type -> (Subst, Type) -> Case -> Infer (Subst, Type)
             inferCase expectedType (s1, expectedResult) (Case pat e) = do
               (env1, patType) <- getPatType env pat   -- (name -> String, User)
-              unify expectedType patType
-              (s2, te) <- infer ctx env1 e
+              su <- unify expectedType patType
+              let env2 = apply su env1
+--              Debug.traceM $ printf "unify expectedType %s patType %s = %s %s" (show expectedType) (show patType) (show su) (show env2)
+              (s2, te) <- infer ctx env2 e
               s3 <- unify expectedResult te
+--              Debug.traceM $ printf "s1 = %s, s2 = %s, s3 = %s, cobined = %s" (show s1) (show s2) (show s3) (show (s3 `compose` s2 `compose` s1))
               return (s3 `compose` s2 `compose` s1, apply s3 te)
 
             getPatType :: TypeEnv -> Pattern -> Infer (TypeEnv, Type)
@@ -306,7 +312,9 @@ infer ctx env ex = case ex of
 --                  Debug.traceM $ "Holy shit " ++ show env' ++ ", " ++ show pattype
                   subst <- unify pattype t
                   let restpe = apply subst result
-                  return (env', restpe)                   -- (name -> String, User)
+                  let env'' =  apply subst env'
+--                  Debug.traceM $ printf "restpe = %s" (show restpe)
+                  return (env'', restpe)                   -- (name -> String, User)
 
   Literal meta lit ->
     return (nullSubst, litType lit)
