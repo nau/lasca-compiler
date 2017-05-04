@@ -282,7 +282,7 @@ infer ctx env ex = case ex of
       (s1, te) <- infer ctx env expr
 --      Debug.traceM $ "Matching expression type " ++ show te
       (s2, te') <- foldM (inferCase te) (s1, tv) cases
---      Debug.traceM $ "Matching result type " ++ show te'
+--      Debug.traceM $ printf "Matching result type %s in %s" (show te') (show s2)
       return (s2, te')
       where
             inferCase :: Type -> (Subst, Type) -> Case -> Infer (Subst, Type)
@@ -293,8 +293,8 @@ infer ctx env ex = case ex of
 --              Debug.traceM $ printf "unify expectedType %s patType %s = %s %s" (show expectedType) (show patType) (show su) (show env2)
               (s2, te) <- infer ctx env2 e
               s3 <- unify expectedResult te
---              Debug.traceM $ printf "s1 = %s, s2 = %s, s3 = %s, cobined = %s" (show s1) (show s2) (show s3) (show (s3 `compose` s2 `compose` s1))
-              return (s3 `compose` s2 `compose` s1, apply s3 te)
+--              Debug.traceM $ printf "s1 = %s, s2 = %s, s3 = %s, combined = %s" (show s1) (show s2) (show s3) (show (s3 `compose` s2 `compose` su `compose` s1))
+              return (s3 `compose` s2 `compose` su `compose` s1, apply s3 te)
 
             getPatType :: TypeEnv -> Pattern -> Infer (TypeEnv, Type)
             getPatType env pat = case pat of

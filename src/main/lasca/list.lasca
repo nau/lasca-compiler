@@ -1,0 +1,11 @@
+data StringList = Nil | Cons(consHead: String, consTail: StringList)
+
+def head(l) = match l {
+  | Nil -> die(" Emp")
+  | Cons(h, _) -> h
+}
+
+def main() = {
+  l = Cons("One", Nil);
+  println("Hello world! ${head(l)}");
+}
