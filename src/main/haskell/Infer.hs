@@ -12,7 +12,6 @@ import Prelude hiding (foldr)
 
 import Type
 import Syntax
-import Emit (Ctx, DataDef(..), dataDefs)
 
 import Control.Monad.State
 import Control.Monad.Except

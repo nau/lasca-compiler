@@ -3,9 +3,7 @@
 {-# LANGUAGE Strict #-}
 
 module Emit (
-  Ctx, DataDef(..), dataDefs,
-  codegenModule,
-  createGlobalContext
+  codegenModule
 ) where
 
 import LLVM.Module
@@ -52,29 +50,8 @@ import qualified Debug.Trace as Debug
 import Codegen
 import Type
 import qualified Syntax as S
+import Syntax (Ctx, createGlobalContext)
 
-data DataDef = DataDef Int String [S.DataConst]
-  deriving (Show, Eq)
-
-data Ctx = Context {
-  _globalFunctions :: Set.Set String,
-  _globalVals :: Set.Set String,
-  dataDefs :: [DataDef],
-  typeId :: Int -- TODO remove this. Needed for type id generation. Move to ModuleState?
-} deriving (Show, Eq)
-
-globalFunctions :: Lens.Lens' Ctx (Set.Set String)
-globalFunctions = Lens.lens _globalFunctions (\c e -> c { _globalFunctions = e } )
-
-globalVals :: Lens.Lens' Ctx (Set.Set String)
-globalVals = Lens.lens _globalVals (\c e -> c { _globalVals = e } )
-
-emptyCtx = Context {
-  _globalFunctions = Set.empty,
-  _globalVals = Set.empty,
-  dataDefs = [],
-  typeId = 1000
-}
 
 externArgsToSig :: [S.Arg] -> [(S.Name, AST.Type)]
 externArgsToSig = map (\(S.Arg name tpe) -> (name, typeMapping tpe))
@@ -240,8 +217,8 @@ cgen ctx (S.Ident name) = do
     Just x ->
 --       Debug.trace ("Local " ++ show name)
       load x
-    Nothing | name `Set.member` _globalFunctions ctx -> boxFunc name mapping
-            | name `Set.member` _globalVals ctx -> load (global ptrType name)
+    Nothing | name `Set.member` S._globalFunctions ctx -> boxFunc name mapping
+            | name `Set.member` S._globalVals ctx -> load (global ptrType name)
             | otherwise -> boxError name
 cgen ctx (S.Literal l meta) = do
 --  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)
@@ -267,7 +244,7 @@ cgen ctx (S.Apply meta expr args) = do
   syms <- gets symtab
   largs <- mapM (cgen ctx) args
   let symMap = Map.fromList syms
-  let isGlobal fn = (fn `Set.member` _globalFunctions ctx) && not (fn `Map.member` symMap)
+  let isGlobal fn = (fn `Set.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
   case expr of
      -- TODO Here are BUGZZZZ!!!! :)
      -- TODO check arguments!
@@ -346,7 +323,7 @@ genPattern ctx lhs (S.LitPattern literal) rhs = S.If (S.Apply S.emptyMeta (S.Ide
 genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
   where cond fail = S.If constrCheck (checkArgs name fail) fail
         constrCheck = S.Apply S.emptyMeta (S.Ident "runtimeIsConstr") [lhs, S.Literal S.emptyMeta $ S.StringLit name]
-        constrMap = let cs = foldr (\ (DataDef dn id constrs) acc -> constrs ++ acc) [] (dataDefs ctx)
+        constrMap = let cs = foldr (\ (S.DataDef dn id constrs) acc -> constrs ++ acc) [] (S.dataDefs ctx)
                         tuples = fmap (\c@(S.DataConst n args) -> (n, args)) cs
                     in  Map.fromList tuples
         checkArgs nm fail =  case Map.lookup nm constrMap of
@@ -437,7 +414,7 @@ codegenModule opts modo exprs = modul
 --           Debug.traceM ("Rewritten exprs: " ++ show st')
           declareStdFuncs
           genFunctionMap fns''
-          let defs = reverse (dataDefs ctx)
+          let defs = reverse (S.dataDefs ctx)
           genTypesStruct defs
           genRuntime opts
           defineStringLit "Match error!" -- TODO remove this hack
@@ -493,10 +470,10 @@ genTypesStruct defs = do
         struct a = createStruct [constInt len, a]
         structType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) ptrType]
 
-genData :: [DataDef] -> LLVM ([C.Constant])
+genData :: [S.DataDef] -> LLVM ([C.Constant])
 genData defs = sequence [genDataStruct d | d <- defs]
   
-  where genDataStruct dd@(DataDef tid name constrs) = do
+  where genDataStruct dd@(S.DataDef tid name constrs) = do
           defineStringLit name
           let literalName = "Data." ++ name
           let numConstructors = length constrs
@@ -506,7 +483,7 @@ genData defs = sequence [genDataStruct d | d <- defs]
           defineConst literalName (T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral numConstructors) ptrType]) (Just struct)
           return (constRef literalName)
 
-genConstructors (DataDef tid name constrs) = do
+genConstructors (S.DataDef tid name constrs) = do
   forM (zip constrs [0..]) $ \ ((S.DataConst n args), tag) ->
     defineConstructor name n tid tag args
 
@@ -614,26 +591,4 @@ genRuntime opts = defineConst "Runtime" runtimeStructType (Just runtime)
   where
       runtime = createStruct [constRef "Functions", constRef "Types", constBool $ S.verboseMode opts]
 
-createGlobalContext :: [S.Expr] -> Ctx
-createGlobalContext exprs = execState (loop exprs) emptyCtx
-  where
-      loop [] = return ()
-      loop (e:exprs) = do
-        names e
-        loop exprs
 
-      names :: S.Expr -> State Ctx ()
-      names (S.Val name _) = globalVals %= Set.insert name
-      names (S.Function name _ _ _) = globalFunctions %= Set.insert name
-      names (S.Data name consts) = do
-        id <- gets typeId
-        let dataDef = DataDef id name consts
-        let (funcs, vals) = foldl (\(funcs, vals) (S.DataConst n args) ->
-                              if null args
-                              then (funcs, n : vals)
-                              else (n : funcs, vals)) ([], []) consts
-        modify (\s -> s { dataDefs =  dataDef : dataDefs s, typeId = id + 1 })
-        globalVals %= Set.union (Set.fromList vals)
-        globalFunctions %= Set.union (Set.fromList funcs)
-      names (S.Extern name _ _) = globalFunctions %= Set.insert name
-      names expr = error $ "Wat? Expected toplevel expression, but got " ++ show expr

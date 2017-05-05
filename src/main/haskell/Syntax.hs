@@ -5,6 +5,13 @@ module Syntax where
 import           Data.List
 import           Text.Printf
 import qualified Text.Megaparsec as Megaparsec
+import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
+import Control.Monad.State
+import Control.Monad.Except
+import Control.Applicative
+import qualified Control.Lens as Lens
+import Control.Lens.Operators
 import           Type
 
 type Name = String
@@ -85,6 +92,16 @@ data Pattern
 
 data DataConst = DataConst Name [Arg] deriving (Eq, Ord, Show)
 
+data DataDef = DataDef Int String [DataConst]
+  deriving (Show, Eq)
+
+data Ctx = Context {
+  _globalFunctions :: Set.Set String,
+  _globalVals :: Set.Set String,
+  dataDefs :: [DataDef],
+  typeId :: Int -- TODO remove this. Needed for type id generation. Move to ModuleState?
+} deriving (Show, Eq)
+
 data Lit = IntLit Int
   | FloatLit Double
   | BoolLit Bool
@@ -101,3 +118,41 @@ instance Show Lit where
 
 
 data Arg = Arg Name Type deriving (Eq, Ord, Show)
+
+createGlobalContext :: [Expr] -> Ctx
+createGlobalContext exprs = execState (loop exprs) emptyCtx
+  where
+      loop [] = return ()
+      loop (e:exprs) = do
+        names e
+        loop exprs
+
+      names :: Expr -> State Ctx ()
+      names (Val name _) = globalVals %= Set.insert name
+      names (Function name _ _ _) = globalFunctions %= Set.insert name
+      names (Data name consts) = do
+        id <- gets typeId
+        let dataDef = DataDef id name consts
+        let (funcs, vals) = foldl (\(funcs, vals) (DataConst n args) ->
+                              if null args
+                              then (funcs, n : vals)
+                              else (n : funcs, vals)) ([], []) consts
+        modify (\s -> s { dataDefs =  dataDef : dataDefs s, typeId = id + 1 })
+        globalVals %= Set.union (Set.fromList vals)
+        globalFunctions %= Set.union (Set.fromList funcs)
+      names (Extern name _ _) = globalFunctions %= Set.insert name
+      names expr = error $ "Wat? Expected toplevel expression, but got " ++ show expr
+
+
+globalFunctions :: Lens.Lens' Ctx (Set.Set String)
+globalFunctions = Lens.lens _globalFunctions (\c e -> c { _globalFunctions = e } )
+
+globalVals :: Lens.Lens' Ctx (Set.Set String)
+globalVals = Lens.lens _globalVals (\c e -> c { _globalVals = e } )
+
+emptyCtx = Context {
+  _globalFunctions = Set.empty,
+  _globalVals = Set.empty,
+  dataDefs = [],
+  typeId = 1000
+}
