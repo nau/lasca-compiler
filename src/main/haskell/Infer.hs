@@ -32,10 +32,7 @@ instance Show TypeEnv where
   show (TypeEnv subst) = "Γ = {\n" ++ elems ++ "}"
     where elems = List.foldl (\s (name, scheme) -> s ++ name ++ " : " ++ show scheme ++ "\n") "" (Map.toList subst)
 
-data InferState = InferState {
-  _count :: Int,
-  ast :: [Expr]
-}
+newtype InferState = InferState {_count :: Int}
 
 count :: Lens.Lens' InferState Int
 count = Lens.lens _count (\c e -> c { _count = e } )
@@ -66,7 +63,7 @@ closeOver (sub, ty) = normalize sc
   where sc = generalize defaultTyenv (apply sub ty)
 
 initState :: InferState
-initState = InferState { _count = 0, ast = [] }
+initState = InferState { _count = 0}
 
 extend :: TypeEnv -> (String, Scheme) -> TypeEnv
 extend (TypeEnv env) (x, s) = TypeEnv $ Map.insert x s env

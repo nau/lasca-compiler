@@ -2,10 +2,10 @@ import Test.Tasty
 import Test.Tasty.SmallCheck as SC
 import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit
+import qualified Text.Megaparsec as Megaparsec
 import Parser
 import Syntax
 import Infer
-import Emit
 import Type
 
 import Data.List
@@ -47,7 +47,21 @@ parserTests = testGroup "Parser tests"
 typerTests = testGroup "Typer tests"
   [
     testCase "Pattern matching" $
-      asdf "match true { | true -> 1 | false -> 2 }" @?= Right (Forall [] (TypeIdent "Int"))
+      parseAndInferExpr "match true { | true -> 1 | false -> 2 }" @?= Right (Forall [] (TypeIdent "Int"))
   ]
 
-asdf str = let expr = fromRight $ parseExpr str in inferExpr (createGlobalContext [expr]) defaultTyenv expr
+benchTests = testGroup "Bench" [testCase "gen10k" $ parseAndInferFile "src/main/lasca/gen5k.lasca"]
+
+parseAndInferExpr str = let expr = fromRight $ parseExpr str in inferExpr (createGlobalContext [expr]) defaultTyenv expr
+
+parseAndInferFile fname = do
+  p <- readFile "src/main/lasca/Prelude.lasca"
+  let preludeExprs = fromRight $ parseToplevel p
+  file <- readFile fname
+  case parseToplevel file of
+    Left err -> error $ Megaparsec.parseErrorPretty err
+    Right ex -> do
+      let exprs = preludeExprs ++ ex
+      let typeEnv = typeCheck (createGlobalContext exprs) exprs
+      print typeEnv
+      1 @?= 1

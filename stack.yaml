@@ -2,18 +2,19 @@ resolver:  nightly-2017-04-05 #lts-6.9
 packages:
 - '.'
 flags:
-apply-ghc-options: everything
 ghc-options:
-  "*": -O2
-  lasca:
-    -O0
+  library:
+    -O2
     -rtsopts
     -Wincomplete-patterns
-#    -Wall
-#    -prof
-#    -fprof-auto
+    -fprof-auto
+  lasca-test:
+    -O2
+    -rtsopts
+    -prof
 #    -auto-all
 #    -caf-all
+#    -Wall
 #    -fforce-recomp
 #    -fdefer-type-errors
 extra-lib-dirs:
