@@ -57,8 +57,8 @@ instance Show TypeError where
 runInfer :: Expr -> Infer (Subst, Type) -> Either TypeError (Scheme, Expr)
 runInfer e m =
   case runState (runExceptT m) (initState e) of
-  (Left err, st)  -> Left err
-  (Right res, st) -> Right (closeOver res, _current st)
+    (Left err, st)  -> Left err
+    (Right res, st) -> Right (closeOver res, _current st)
 
 closeOver :: (Map.Map TVar Type, Type) -> Scheme
 closeOver (sub, ty) = normalize sc
@@ -294,7 +294,7 @@ infer ctx env ex = case ex of
       setType $ Lam (meta `withType` resultType) x e'
       return (s1, resultType)
 
-  Function name _ args e -> do
+  Function meta name tpe args e -> do
     let largs = map (\(Arg a _) -> a) args
     -- functions are recursive, so do Fixpoint for inference
     let curried = foldr (\arg expr -> Lam emptyMeta arg expr) e (name:largs)
@@ -306,20 +306,28 @@ infer ctx env ex = case ex of
 --    traceM $ "composedType " ++ show composedType
     s2 <- unify composedType ((tv `TypeFunc` tv) `TypeFunc` tv)
     let (s, t) = (s2 `compose` s1, substitute s2 tv1)
-
-    traceM $ printf "def %s(%s): %s, subs: %s" name (List.intercalate "," $ map show args) (show t) (show s)
+    e' <- gets _current
+    let uncurried = foldr (\_ (Lam _ _ e) -> e) e' (name:largs)
+    setType $ Function (meta `withType` t) name tpe args uncurried
+--    traceM $ printf "def %s(%s): %s, subs: %s" name (List.intercalate "," $ map show args) (show t) (show s)
     return (s, t)
 
 
   Data meta name constructors -> error $ "Shouldn't happen! " ++ show meta
-  Select meta tree expr -> infer ctx env (Apply meta expr [tree])
+  Select meta tree expr -> do
+    (s, t) <- infer ctx env (Apply meta expr [tree])
+    e' <- gets _current
+    setType $ Select (meta `withType` t) tree e'
+    return (s, t)
 
   Array meta exprs -> do
     tv <- fresh
     let tpe = foldr (\_ t -> tv `TypeFunc` t) (typeArray tv) exprs
-    inferPrim ctx env exprs tpe
+    (subst, t, exprs') <- inferPrim ctx env exprs tpe
+    setType $ Array (meta `withType` t) exprs'
+    return (subst, t)
 
-  Match expr cases -> do
+  this@(Match expr cases) -> do
       tv <- fresh
       {-
         Consider data Role = Admin | Group(id: Int)
@@ -336,6 +344,7 @@ infer ctx env ex = case ex of
 --      Debug.traceM $ "Matching expression type " ++ show te
       (s2, te') <- foldM (inferCase te) (s1, tv) cases
 --      Debug.traceM $ printf "Matching result type %s in %s" (show te') (show s2)
+      modify (\s -> s {_current = this}) -- FIXME !!
       return (s2, te')
       where
             inferCase :: Type -> (Subst, Type) -> Case -> Infer (Subst, Type)
@@ -382,30 +391,30 @@ litType (StringLit _) = typeString
 litType UnitLit       = typeUnit
 
 
-inferPrim :: Ctx -> TypeEnv -> [Expr] -> Type -> Infer (Subst, Type)
+inferPrim :: Ctx -> TypeEnv -> [Expr] -> Type -> Infer (Subst, Type, [Expr])
 inferPrim ctx env l t = do
   tv <- fresh
-  (s1, tf) <- foldM inferStep (nullSubst, id) l
+  (s1, tf, exprs) <- foldM inferStep (nullSubst, id, []) l
   let composedType = substitute s1 (tf tv)
 --  Debug.traceM $ "composedType " ++ show composedType
   s2 <- unify composedType t
-  return (s2 `compose` s1, substitute s2 tv)
+  return (s2 `compose` s1, substitute s2 tv, exprs)
   where
-  inferStep (s, tf) exp = do
+  inferStep (s, tf, exprs) exp = do
     (s', t) <- infer ctx (substitute s env) exp
-    return (s' `compose` s, tf . TypeFunc t)
+    exp' <- gets _current
+    return (s' `compose` s, tf . TypeFunc t, exprs ++ [exp'])
 
 inferExpr :: Ctx -> TypeEnv -> Expr -> Either TypeError (Scheme, Expr)
 inferExpr ctx env e = runInfer e $ infer ctx env e
 
-inferTop :: Ctx -> TypeEnv -> [(String, Expr)] -> Either TypeError TypeEnv
-inferTop ctx env [] = Right env
+inferTop :: Ctx -> TypeEnv -> [(String, Expr)] -> Either TypeError (TypeEnv, [Expr])
+inferTop ctx env [] = Right (env, [])
 inferTop ctx env ((name, ex):xs) = case inferExpr ctx env ex of
   Left err -> Left err
-  Right (ty, ex') -> do
-    traceM $ show ex'
-    inferTop ctx (extend env (name, ty)) xs
-
+  Right (ty, ex') -> case inferTop ctx (extend env (name, ty)) xs of
+                        Left err -> Left err
+                        Right (ty, exs) -> Right (ty, ex' : exs)
 normalize :: Scheme -> Scheme
 normalize (Forall ts body) = Forall (fmap snd ord) (normtype body)
   where
@@ -425,7 +434,7 @@ normalize (Forall ts body) = Forall (fmap snd ord) (normtype body)
         Just x -> TVar x
         Nothing -> error "type variable not in signature"
 
-typeCheck :: Ctx -> [Expr] -> Either TypeError TypeEnv
+typeCheck :: Ctx -> [Expr] -> Either TypeError (TypeEnv, [Expr])
 typeCheck ctx exprs = do
   let (dat, other) = List.partition pred exprs
   let bbb = dat >>= ddd
@@ -438,7 +447,7 @@ typeCheck ctx exprs = do
             pred _      = False
 
             ddd :: Expr -> [(String, Scheme)]
-            ddd (Data meta typeName constrs) = constrs >>= genScheme
+            ddd (Data _ typeName constrs) = constrs >>= genScheme
               where
                  genScheme :: DataConst -> [(String, Scheme)]
                  genScheme (DataConst name args) =
@@ -450,7 +459,7 @@ typeCheck ctx exprs = do
 
 
             f e@(Val _ name _) = (name, e)
-            f e@(Function name _ _ _) = (name, e)
+            f e@(Function _ name _ _ _) = (name, e)
             f e@(Extern name _ _) = (name, e)
             f e = error ("What the fuck " ++ show e)
 

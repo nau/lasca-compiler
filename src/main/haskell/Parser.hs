@@ -215,12 +215,13 @@ typeAscription = do
 function :: Parser Expr
 function = do
   reserved "def"
+  meta <- getMeta
   name <- identifier
   args <- parens (commaSep arg)
   tpe <- option typeAny typeAscription
   reservedOp "="
   body <- expr
-  return (Function name tpe args body)
+  return (Function meta name tpe args body)
 
 extern :: Parser Expr
 extern = do

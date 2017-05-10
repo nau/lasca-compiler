@@ -86,11 +86,11 @@ transformExpr transformer expr = case expr of
     e' <- go e
     args' <- sequence [go arg | arg <- args]
     transformer (S.Apply meta e' args')
-  (S.Function name tpe args e1) -> do
+  (S.Function meta name tpe args e1) -> do
     let argNames = Set.fromList (map (\(S.Arg n _) -> n) args)
     modify (\s -> s { _locals = argNames, _outers = Set.empty, _usedVars = Set.empty } )
     e' <- go e1
-    transformer (S.Function name tpe args e')
+    transformer (S.Function meta name tpe args e')
   e -> transformer e
   where go e = transformExpr transformer e
 
@@ -124,7 +124,7 @@ codegenTop ctx (S.Val _ name expr) = do
   modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
   defineGlobal (AST.Name name) ptrType (Just (C.Null ptrType))
 
-codegenTop ctx (S.Function name tpe args body) = do
+codegenTop ctx (S.Function meta name tpe args body) = do
   r1 <- defineStringConstants body
 --   Debug.traceM ("Generating function1 " ++ name ++ (show r1))
 --   defineClosures ctx name body
@@ -449,7 +449,7 @@ extractLambda (S.Lam meta name expr) = do
   let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
   let enclosedArgs = map (\n -> S.Arg n typeAny) usedOuterVars
   let (funcName, nms') = uniqueName "lambda" nms
-  let func = S.Function funcName typeAny (enclosedArgs ++ [S.Arg name typeAny]) expr
+  let func = S.Function meta funcName typeAny (enclosedArgs ++ [S.Arg name typeAny]) expr
   modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
 --   Debug.traceM ("Generated lambda " ++ show func ++ ", outerVars = " ++ show outerVars ++ ", usedOuterVars" ++ show usedOuterVars)
   return (S.BoxFunc funcName enclosedArgs)
@@ -580,7 +580,7 @@ genFunctionMap fns = do
         -- Add data constructors as global functions
         let m = foldl (\acc (S.DataConst n args) -> (n, length args) : acc) [] consts
         in m ++ s
-      go s (S.Function name tpe args body) = (name, length args) : s
+      go s (S.Function _ name tpe args body) = (name, length args) : s
       go s (S.Extern name tpe args) = (name, length args) : s
       go s _ = s
 

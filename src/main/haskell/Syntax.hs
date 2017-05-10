@@ -55,7 +55,7 @@ data Expr
   | Select Meta Expr Expr
   | Match Expr [Case]
   | BoxFunc Name [Arg]   -- LLVM codegen only
-  | Function Name Type [Arg] Expr
+  | Function Meta Name Type [Arg] Expr
   | Extern Name Type [Arg]
   | If Meta Expr Expr Expr
   | Let Meta Name Expr Expr
@@ -72,7 +72,7 @@ instance Eq Expr where
   (Select _ nl l) == (Select _ nr r) = nl == nr && l == r
   (Match nl l) == (Match nr r) = nl == nr && l == r
   (BoxFunc nl l) == (BoxFunc nr r) = nl == nr && l == r
-  (Function nl _ al l) == (Function nr _ ar r) = nl == nr && al == ar && l == r
+  (Function _ nl _ al l) == (Function _ nr _ ar r) = nl == nr && al == ar && l == r
   (Extern nl _ l) == (Extern nr _ r) = nl == nr && l == r
   (If _ nl al l) == (If _ nr ar r) = nl == nr && al == ar && l == r
   (Let _ nl al l) == (Let _ nr ar r) = nl == nr && al == ar && l == r
@@ -88,7 +88,7 @@ instance Show Expr where
   show (Select _ e f) = printf "%s.%s" (show e) (show f)
   show (Match e cs) = printf "match %s {\n%s}\n" (show e) (show cs)
   show (BoxFunc f args) = printf "BoxFunc %s($args)" (show f) (intercalate "," $ map show args)
-  show (Function f t args b) = printf "def %s(%s): %s = %s\n" f (intercalate "," $ map show args) (show t) (show b)
+  show (Function meta f t args b) = printf "def %s(%s): %s = %s\n" f (intercalate "," $ map show args) (show meta) (show b)
   show (Extern f t args) = printf "def %s(%s): %s\n" (show f) (intercalate "," $ map show args) (show t)
   show (If meta c t f) = printf "if %s then {\n%s \n} else {\n%s\n}: %s" (show c) (show t) (show f) (show meta)
   show (Let meta n e b) = printf "%s = %s;\n%s: %s" n (show e) (show b) (show meta)
@@ -144,7 +144,7 @@ createGlobalContext exprs = execState (loop exprs) emptyCtx
 
       names :: Expr -> State Ctx ()
       names (Val _ name _) = globalVals %= Set.insert name
-      names (Function name _ _ _) = globalFunctions %= Set.insert name
+      names (Function _ name _ _ _) = globalFunctions %= Set.insert name
       names (Data _ name consts) = do
         id <- gets typeId
         let dataDef = DataDef id name consts
