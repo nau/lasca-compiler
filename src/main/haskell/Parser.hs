@@ -55,7 +55,9 @@ boolLit = BoolLit . strToBool <$> (true <|> false)
     false = reserved "false" >> return "false"
 
 
-arrayLit = Array <$> brackets (commaSep expr)
+arrayLit = do
+  meta <- getMeta
+  Array meta <$> brackets (commaSep expr)
 
 stringLit = StringLit <$> stringLiteral
 
@@ -66,7 +68,7 @@ interpolatedString = do
   where go [] = Literal emptyMeta (StringLit "")
         go list = case foldr go' [] list of
                     [s] -> s
-                    strings -> Apply emptyMeta (Ident emptyMeta "concat") [Array strings]
+                    strings -> Apply emptyMeta (Ident emptyMeta "concat") [Array emptyMeta strings]
 
         go' (Left s) acc  = Literal emptyMeta (StringLit s) : acc
         go' (Right e) acc = Apply emptyMeta (Ident emptyMeta "toString") [e] : acc
@@ -308,11 +310,12 @@ block = braces blockStmts
 dataDef :: Parser Expr
 dataDef = do
   reserved "data"
+  meta <- getMeta
   typeName <- upperIdentifier
   reservedOp "="
   optional $ reservedOp "|"
   constructors <-  dataConstructor `sepBy` reservedOp "|"
-  return (Data typeName constructors)
+  return (Data meta typeName constructors)
 
 dataConstructor = do
   name <- identifier

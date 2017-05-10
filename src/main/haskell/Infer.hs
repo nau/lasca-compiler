@@ -282,10 +282,10 @@ infer ctx env ex = case ex of
     return (s, t)
 
 
-  Data name constructors -> error "Shouldn't happen!"
+  Data meta name constructors -> error $ "Shouldn't happen! " ++ show meta
   Select meta tree expr -> infer ctx env (Apply meta expr [tree])
 
-  Array exprs -> do
+  Array meta exprs -> do
     tv <- fresh
     let tpe = foldr (\_ t -> tv `TypeFunc` t) (typeArray tv) exprs
     inferPrim ctx env exprs tpe
@@ -407,7 +407,7 @@ typeCheck ctx exprs = do
             pred _      = False
 
             ddd :: Expr -> [(String, Scheme)]
-            ddd (Data typeName constrs) = constrs >>= genScheme
+            ddd (Data meta typeName constrs) = constrs >>= genScheme
               where
                  genScheme :: DataConst -> [(String, Scheme)]
                  genScheme (DataConst name args) =

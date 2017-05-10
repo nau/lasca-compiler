@@ -107,7 +107,7 @@ defineStringConstants (S.Select _ lhs rhs) = do
   defineStringConstants lhs
   defineStringConstants rhs
   return ()
-defineStringConstants (S.Array exprs) = mapM_ defineStringConstants exprs
+defineStringConstants (S.Array _ exprs) = mapM_ defineStringConstants exprs
 defineStringConstants (S.Apply meta _ exprs) = mapM_ defineStringConstants exprs
 defineStringConstants (S.Let _ _ e body) = do
   defineStringConstants e
@@ -146,7 +146,7 @@ codegenTop ctx (S.Function name tpe args body) = do
         assign n var
       cgen ctx body >>= ret
 
-codegenTop ctx (S.Data name constructors) = return ()
+codegenTop ctx (S.Data _ name constructors) = return ()
 
 
 codegenTop _ (S.Extern name tpe args) = external llvmType name fnargs False []
@@ -223,7 +223,7 @@ cgen ctx (S.Ident meta name) = do
 cgen ctx (S.Literal l meta) = do
 --  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)
   box meta l
-cgen ctx (S.Array exprs) = do
+cgen ctx (S.Array _ exprs) = do
   vs <- values
   boxArray vs
   where values = sequence [cgen ctx e | e <- exprs]
@@ -576,7 +576,7 @@ genFunctionMap fns = do
 
 
     funcsWithArities = foldl go [] fns where
-      go s (S.Data name consts) =
+      go s (S.Data _ name consts) =
         -- Add data constructors as global functions
         let m = foldl (\acc (S.DataConst n args) -> (n, length args) : acc) [] consts
         in m ++ s

@@ -58,8 +58,8 @@ data Expr
   | Extern Name Type [Arg]
   | If Meta Expr Expr Expr
   | Let Meta Name Expr Expr
-  | Array [Expr]
-  | Data Name [DataConst]
+  | Array Meta [Expr]
+  | Data Meta Name [DataConst]
   deriving (Ord)
 
 instance Eq Expr where
@@ -75,8 +75,8 @@ instance Eq Expr where
   (Extern nl _ l) == (Extern nr _ r) = nl == nr && l == r
   (If _ nl al l) == (If _ nr ar r) = nl == nr && al == ar && l == r
   (Let _ nl al l) == (Let _ nr ar r) = nl == nr && al == ar && l == r
-  (Array l) == (Array r) = l == r
-  (Data nl l) == (Data nr r) = nl == nr && l == r
+  (Array _ l) == (Array _ r) = l == r
+  (Data _ nl l) == (Data _ nr r) = nl == nr && l == r
 
 instance Show Expr where
   show (Literal _ l) = show l
@@ -91,8 +91,8 @@ instance Show Expr where
   show (Extern f t args) = printf "def %s(%s): %s\n" (show f) (intercalate "," $ map show args) (show t)
   show (If _ c t f) = printf "if %s then {\n%s \n} else {\n%s\n}" (show c) (show t) (show f)
   show (Let _ n e b) = printf "%s = %s;\n%s" n (show e) (show b)
-  show (Array es) = printf "[%s]" (intercalate "," $ map show es)
-  show (Data n cs) = printf "data %s = %s\n" n (intercalate "\n| " $ map show cs)
+  show (Array _ es) = printf "[%s]" (intercalate "," $ map show es)
+  show (Data _ n cs) = printf "data %s = %s\n" n (intercalate "\n| " $ map show cs)
 
 
 
@@ -144,7 +144,7 @@ createGlobalContext exprs = execState (loop exprs) emptyCtx
       names :: Expr -> State Ctx ()
       names (Val _ name _) = globalVals %= Set.insert name
       names (Function name _ _ _) = globalFunctions %= Set.insert name
-      names (Data name consts) = do
+      names (Data _ name consts) = do
         id <- gets typeId
         let dataDef = DataDef id name consts
         let (funcs, vals) = foldl (\(funcs, vals) (DataConst n args) ->

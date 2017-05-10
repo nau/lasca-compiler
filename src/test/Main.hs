@@ -27,7 +27,7 @@ parserTests = testGroup "Parser tests"
       parseExpr "\"String\n\"" @?= Right (Literal emptyMeta (StringLit "String\n"))
   , testCase "String Interpolation" $
       parseExpr "\"Hello\\t \\\\\\$${ test123 + 1 }\"" @?= Right (Apply emptyMeta (Ident emptyMeta "concat") [
-        Array [Literal emptyMeta $ StringLit "Hello\t \\$", 
+        Array emptyMeta [Literal emptyMeta $ StringLit "Hello\t \\$",
                Apply emptyMeta (Ident emptyMeta "toString") [Apply (withMetaPos 1 25) (Ident emptyMeta "+") [Ident emptyMeta "test123", Literal (withMetaPos 1 27) (IntLit 1)]]]
       ])
   , testCase "Pattern matching" $
