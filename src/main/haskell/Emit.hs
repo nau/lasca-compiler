@@ -67,11 +67,11 @@ transform transformer exprs = sequence [transformExpr transformer expr | expr <-
 
 transformExpr :: (S.Expr -> LLVM S.Expr) -> S.Expr -> LLVM S.Expr
 transformExpr transformer expr = case expr of
-  (S.If cond true false) -> do
+  (S.If meta cond true false) -> do
     cond' <- go cond
     true' <- go true
     false' <- go false
-    transformer (S.If cond' true' false')
+    transformer (S.If meta cond' true' false')
   (S.Let n e body) -> do
     modStateLocals %= Set.insert n
     e' <- go e
@@ -98,7 +98,7 @@ transformExpr transformer expr = case expr of
 
 defineStringConstants :: S.Expr -> LLVM ()
 defineStringConstants (S.Literal meta (S.StringLit s)) = defineStringLit s
-defineStringConstants (S.If cond true false) = do
+defineStringConstants (S.If _ cond true false) = do
   defineStringConstants cond
   defineStringConstants true
   defineStringConstants false
@@ -232,8 +232,8 @@ cgen ctx (S.Select meta tree expr) = do
   e <- cgen ctx expr
   let pos = createPosition $ S.pos meta
   callFn runtimeSelectFuncType "runtimeSelect" [tree, e, constOp pos]
-cgen ctx (S.Apply meta (S.Ident _ "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal S.emptyMeta (S.BoolLit True)) rhs)
-cgen ctx (S.Apply meta (S.Ident _ "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal S.emptyMeta (S.BoolLit False)))
+cgen ctx (S.Apply meta (S.Ident _ "or") [lhs, rhs]) = cgen ctx (S.If meta lhs (S.Literal S.emptyMeta (S.BoolLit True)) rhs)
+cgen ctx (S.Apply meta (S.Ident _ "and") [lhs, rhs]) = cgen ctx (S.If meta lhs rhs (S.Literal S.emptyMeta (S.BoolLit False)))
 cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
   llhs <- cgen ctx lhs
   lrhs <- cgen ctx rhs
@@ -274,7 +274,7 @@ cgen ctx m@(S.Match expr cases) = do
   let result = genMatch ctx m
 --  Debug.traceM $ "Generated " ++ show result
   cgen ctx result
-cgen ctx (S.If cond tr fl) = do
+cgen ctx (S.If meta cond tr fl) = do
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
   ifexit <- addBlock "if.exit"
@@ -319,9 +319,9 @@ genFail = S.Apply S.emptyMeta (S.Ident S.emptyMeta "die") [S.Literal S.emptyMeta
 
 genPattern ctx lhs S.WildcardPattern rhs = const rhs
 genPattern ctx lhs (S.VarPattern name) rhs = const (S.Let name lhs rhs)
-genPattern ctx lhs (S.LitPattern literal) rhs = S.If (S.Apply S.emptyMeta (S.Ident S.emptyMeta "==") [lhs, S.Literal S.emptyMeta literal]) rhs
+genPattern ctx lhs (S.LitPattern literal) rhs = S.If S.emptyMeta (S.Apply S.emptyMeta (S.Ident S.emptyMeta "==") [lhs, S.Literal S.emptyMeta literal]) rhs
 genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
-  where cond fail = S.If constrCheck (checkArgs name fail) fail
+  where cond fail = S.If S.emptyMeta constrCheck (checkArgs name fail) fail
         constrCheck = S.Apply S.emptyMeta (S.Ident S.emptyMeta "runtimeIsConstr") [lhs, S.Literal S.emptyMeta $ S.StringLit name]
         constrMap = let cs = foldr (\ (S.DataDef dn id constrs) acc -> constrs ++ acc) [] (S.dataDefs ctx)
                         tuples = fmap (\c@(S.DataConst n args) -> (n, args)) cs

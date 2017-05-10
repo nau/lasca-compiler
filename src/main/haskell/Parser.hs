@@ -240,12 +240,13 @@ argsApply = parens (commaSep expr)
 ifthen :: Parser Expr
 ifthen = do
   reserved "if"
+  meta <- getMeta
   cond <- expr
   reserved "then"
   tr <- expr
   reserved "else"
   fl <- expr
-  return (If cond tr fl)
+  return (If meta cond tr fl)
 
 letins :: Parser Expr
 letins = do

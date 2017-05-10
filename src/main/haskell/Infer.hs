@@ -227,7 +227,7 @@ infer ctx env ex = case ex of
     (s2, t2) <- infer ctx (env' `extend` (x, t')) e2
     return (s2 `compose` s1, t2)
 
-  If cond tr fl -> do
+  If meta cond tr fl -> do
 
     condTv <- fresh
     (s1, t1) <- infer ctx env cond

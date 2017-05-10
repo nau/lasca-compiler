@@ -56,7 +56,7 @@ data Expr
   | BoxFunc Name [Arg]   -- LLVM codegen only
   | Function Name Type [Arg] Expr
   | Extern Name Type [Arg]
-  | If Expr Expr Expr
+  | If Meta Expr Expr Expr
   | Let Name Expr Expr
   | Array [Expr]
   | Data Name [DataConst]
@@ -73,7 +73,7 @@ instance Eq Expr where
   (BoxFunc nl l) == (BoxFunc nr r) = nl == nr && l == r
   (Function nl _ al l) == (Function nr _ ar r) = nl == nr && al == ar && l == r
   (Extern nl _ l) == (Extern nr _ r) = nl == nr && l == r
-  (If nl al l) == (If nr ar r) = nl == nr && al == ar && l == r
+  (If _ nl al l) == (If _ nr ar r) = nl == nr && al == ar && l == r
   (Let nl al l) == (Let nr ar r) = nl == nr && al == ar && l == r
   (Array l) == (Array r) = l == r
   (Data nl l) == (Data nr r) = nl == nr && l == r
@@ -89,7 +89,7 @@ instance Show Expr where
   show (BoxFunc f args) = printf "BoxFunc %s($args)" (show f) (intercalate "," $ map show args)
   show (Function f t args b) = printf "def %s(%s): %s = %s\n" (show f) (intercalate "," $ map show args) (show t) (show b)
   show (Extern f t args) = printf "def %s(%s): %s\n" (show f) (intercalate "," $ map show args) (show t)
-  show (If c t f) = printf "if %s then {\n%s \n} else {\n%s\n}" (show c) (show t) (show f)
+  show (If _ c t f) = printf "if %s then {\n%s \n} else {\n%s\n}" (show c) (show t) (show f)
   show (Let n e b) = printf "%s = %s;\n%s" n (show e) (show b)
   show (Array es) = printf "[%s]" (intercalate "," $ map show es)
   show (Data n cs) = printf "data %s = %s\n" n (intercalate "\n| " $ map show cs)
