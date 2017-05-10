@@ -330,11 +330,15 @@ factor =  try floatingLiteral
       <|> block
       <|> parens expr
 
+globalValDef = do
+  meta <- getMeta
+  valdef $ Val meta
+
 defn :: Parser Expr
 defn = try extern
     <|> try function
     <|> try dataDef
-    <|> valdef Val
+    <|> globalValDef
 
 contents p = between sc eof p
 

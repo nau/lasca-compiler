@@ -48,7 +48,7 @@ withMetaPos line col = emptyMeta { pos = Position {sourceLine = line, sourceColu
 data Expr
   = Literal Meta Lit
   | Ident Meta Name
-  | Val Name Expr
+  | Val Meta Name Expr
   | Apply Meta Expr [Expr]
   | Lam String Expr
   | Select Meta Expr Expr
@@ -65,7 +65,7 @@ data Expr
 instance Eq Expr where
   (Literal _ l) == (Literal _ r) = l == r
   (Ident _ l) == (Ident _ r) = l == r
-  (Val nl l) == (Val nr r) = nl == nr && l == r
+  (Val _ nl l) == (Val _ nr r) = nl == nr && l == r
   (Apply _ nl l) == (Apply _ nr r) = nl == nr && l == r
   (Lam nl l) == (Lam nr r) = nl == nr && l == r
   (Select _ nl l) == (Select _ nr r) = nl == nr && l == r
@@ -81,7 +81,7 @@ instance Eq Expr where
 instance Show Expr where
   show (Literal _ l) = show l
   show (Ident meta n) = n
-  show (Val n e) = printf "val %s = %s\n" n (show e)
+  show (Val _ n e) = printf "val %s = %s\n" n (show e)
   show (Apply _ f e) = printf "%s(%s)" (show f) (intercalate "," $ map show e)
   show (Lam a e) = printf "{ %s -> %s}\n" (show a) (show e)
   show (Select _ e f) = printf "%s.%s" (show e) (show f)
@@ -142,7 +142,7 @@ createGlobalContext exprs = execState (loop exprs) emptyCtx
         loop exprs
 
       names :: Expr -> State Ctx ()
-      names (Val name _) = globalVals %= Set.insert name
+      names (Val _ name _) = globalVals %= Set.insert name
       names (Function name _ _ _) = globalFunctions %= Set.insert name
       names (Data name consts) = do
         id <- gets typeId

@@ -120,7 +120,7 @@ defineStringConstants (S.Match e cases) = do
 defineStringConstants _ = return ()
 
 -- codegenTop :: S.Expr -> LLVM ()
-codegenTop ctx (S.Val name expr) = do
+codegenTop ctx (S.Val _ name expr) = do
   modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
   defineGlobal (AST.Name name) ptrType (Just (C.Null ptrType))
 

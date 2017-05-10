@@ -195,7 +195,7 @@ lookupEnv (TypeEnv env) x =
 
 infer :: Ctx -> TypeEnv -> Expr -> Infer (Subst, Type)
 infer ctx env ex = case ex of
-  Val n e -> do
+  Val meta n e -> do
     (s, t) <- infer ctx env e
 --    Debug.trace ("Val " ++ n ++ " " ++ show s ++ " " ++ show t) return (s, t)
     return (s, t)
@@ -418,7 +418,7 @@ typeCheck ctx exprs = do
             ddd e = error ("What the hell" ++ show e)
 
 
-            f e@(Val name _) = (name, e)
+            f e@(Val _ name _) = (name, e)
             f e@(Function name _ _ _) = (name, e)
             f e@(Extern name _ _) = (name, e)
             f e = error ("What the fuck " ++ show e)
