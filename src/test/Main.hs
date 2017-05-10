@@ -47,12 +47,15 @@ parserTests = testGroup "Parser tests"
 typerTests = testGroup "Typer tests"
   [
     testCase "Pattern matching" $
-      parseAndInferExpr "match true { | true -> 1 | false -> 2 }" @?= Right (Forall [] (TypeIdent "Int"))
+      parseAndInferExpr "match true { | true -> 1 | false -> 2 }" @?= Forall [] (TypeIdent "Int")
   ]
 
 benchTests = testGroup "Bench" [testCase "gen10k" $ parseAndInferFile "src/main/lasca/gen5k.lasca"]
 
-parseAndInferExpr str = let expr = fromRight $ parseExpr str in inferExpr (createGlobalContext [expr]) defaultTyenv expr
+parseAndInferExpr str = let
+    expr = fromRight $ parseExpr str
+    Right (infered, _) = inferExpr (createGlobalContext [expr]) defaultTyenv expr
+  in infered
 
 parseAndInferFile fname = do
   p <- readFile "src/main/lasca/Prelude.lasca"

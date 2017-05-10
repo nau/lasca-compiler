@@ -32,7 +32,7 @@ instance Show TypeEnv where
   show (TypeEnv subst) = "Γ = {\n" ++ elems ++ "}"
     where elems = List.foldl (\s (name, scheme) -> s ++ name ++ " : " ++ show scheme ++ "\n") "" (Map.toList subst)
 
-newtype InferState = InferState {_count :: Int}
+data InferState = InferState {_count :: Int, _current :: Expr}
 
 count :: Lens.Lens' InferState Int
 count = Lens.lens _count (\c e -> c { _count = e } )
@@ -53,17 +53,19 @@ instance Show TypeError where
   show (UnboundVariable s) = "UnboundVariable " ++ s
   show (UnificationMismatch t1 t2) = "UnificationMismatch " ++ show t1 ++ " " ++ show t2
 
-runInfer :: Infer (Subst, Type) -> Either TypeError Scheme
-runInfer m = case runState (runExceptT m) initState of
+
+runInfer :: Expr -> Infer (Subst, Type) -> Either TypeError (Scheme, Expr)
+runInfer e m =
+  case runState (runExceptT m) (initState e) of
   (Left err, st)  -> Left err
-  (Right res, st) -> Right $ closeOver res
+  (Right res, st) -> Right (closeOver res, _current st)
 
 closeOver :: (Map.Map TVar Type, Type) -> Scheme
 closeOver (sub, ty) = normalize sc
   where sc = generalize defaultTyenv (substitute sub ty)
 
-initState :: InferState
-initState = InferState { _count = 0}
+initState :: Expr -> InferState
+initState e = InferState { _count = 0, _current = e}
 
 extend :: TypeEnv -> (String, Scheme) -> TypeEnv
 extend (TypeEnv env) (x, s) = TypeEnv $ Map.insert x s env
@@ -362,14 +364,16 @@ inferPrim ctx env l t = do
     (s', t) <- infer ctx (substitute s env) exp
     return (s' `compose` s, tf . TypeFunc t)
 
-inferExpr :: Ctx -> TypeEnv -> Expr -> Either TypeError Scheme
-inferExpr ctx env = runInfer . infer ctx env
+inferExpr :: Ctx -> TypeEnv -> Expr -> Either TypeError (Scheme, Expr)
+inferExpr ctx env e = runInfer e $ infer ctx env e
 
 inferTop :: Ctx -> TypeEnv -> [(String, Expr)] -> Either TypeError TypeEnv
 inferTop ctx env [] = Right env
 inferTop ctx env ((name, ex):xs) = case inferExpr ctx env ex of
   Left err -> Left err
-  Right ty -> inferTop ctx (extend env (name, ty)) xs
+  Right (ty, ex') -> do
+--    traceM $ show ex'
+    inferTop ctx (extend env (name, ty)) xs
 
 normalize :: Scheme -> Scheme
 normalize (Forall ts body) = Forall (fmap snd ord) (normtype body)
