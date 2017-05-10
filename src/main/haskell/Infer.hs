@@ -226,8 +226,28 @@ infer ctx env ex = case ex of
     return (s2 `compose` s1, t2)
 
   If cond tr fl -> do
+
+    condTv <- fresh
+    (s1, t1) <- infer ctx env cond
+    s2 <- unify (substitute s1 t1) typeBool
+    let substCond = s2 `compose` s1
+
     tv <- fresh
-    inferPrim ctx env [cond, tr, fl] (typeBool `TypeFunc` tv `TypeFunc` tv `TypeFunc` tv)
+    let env' = substitute substCond env
+    (s3, trueType) <- infer ctx env' tr
+    s4 <- unify (substitute s3 trueType) tv
+    let substTrue = s4 `compose` s3
+
+    let env'' = substitute substTrue env'
+    (s5, falseType) <- infer ctx env'' fl
+    s6 <- unify (substitute s5 falseType) tv
+    let substFalse = s6 `compose` s5
+
+    let subst = substFalse `compose` substTrue `compose` substCond
+    let resultType = substitute subst tv
+
+--    traceM $ printf "if %s then %s else %s: %s"  (show substCond) (show substTrue) (show substFalse) (show resultType)
+    return (subst, resultType)
 
   Extern name tpe args -> do
     let ts = map argToType args
