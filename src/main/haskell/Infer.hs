@@ -60,7 +60,7 @@ runInfer m = case runState (runExceptT m) initState of
 
 closeOver :: (Map.Map TVar Type, Type) -> Scheme
 closeOver (sub, ty) = normalize sc
-  where sc = generalize defaultTyenv (apply sub ty)
+  where sc = generalize defaultTyenv (substitute sub ty)
 
 initState :: InferState
 initState = InferState { _count = 0}
@@ -85,16 +85,16 @@ defaultTyenv = TypeEnv (Map.fromList [
         ta = TVar a
 
 class Substitutable a where
-  apply :: Subst -> a -> a
+  substitute :: Subst -> a -> a
   ftv   :: a -> Set.Set TVar
 
 instance Substitutable Type where
-  {-# INLINE apply #-}
-  apply _ (TypeIdent a)       = TypeIdent a
-  apply s t@(TVar a)     = Map.findWithDefault t a s
-  apply s (t1 `TypeFunc` t2) = apply s t1 `TypeFunc` apply s t2
-  apply s (TypeApply t [args]) = TypeApply (apply s t) [args] -- TODO do proper substitution
-  apply s t = error $ "Wat? " ++ show s ++ ", " ++ show t
+  {-# INLINE substitute #-}
+  substitute _ (TypeIdent a)       = TypeIdent a
+  substitute s t@(TVar a)     = Map.findWithDefault t a s
+  substitute s (t1 `TypeFunc` t2) = substitute s t1 `TypeFunc` substitute s t2
+  substitute s (TypeApply t [args]) = TypeApply (substitute s t) [args] -- TODO do proper substitution
+  substitute s t = error $ "Wat? " ++ show s ++ ", " ++ show t
 
   ftv TypeIdent{}         = Set.empty
   ftv (TVar a)       = Set.singleton a
@@ -103,19 +103,19 @@ instance Substitutable Type where
   ftv (TypeApply t args)       = ftv t  -- TODO do proper substitution
 
 instance Substitutable Scheme where
-  {-# INLINE apply #-}
-  apply s (Forall as t)   = Forall as $ apply s' t
+  {-# INLINE substitute #-}
+  substitute s (Forall as t)   = Forall as $ substitute s' t
                             where s' = foldr Map.delete s as
   ftv (Forall as t) = ftv t `Set.difference` Set.fromList as
 
 instance Substitutable a => Substitutable [a] where
-  {-# INLINE apply #-}
-  apply s a = (fmap . apply) s a
+  {-# INLINE substitute #-}
+  substitute s a = (fmap . substitute) s a
   ftv   = foldr (Set.union . ftv) Set.empty
 
 instance Substitutable TypeEnv where
-  {-# INLINE apply #-}
-  apply s (TypeEnv env) =  TypeEnv $ Map.map (apply s) env
+  {-# INLINE substitute #-}
+  substitute s (TypeEnv env) =  TypeEnv $ Map.map (substitute s) env
   ftv (TypeEnv env) = ftv $ Map.elems env
 
 
@@ -123,12 +123,12 @@ nullSubst :: Subst
 nullSubst = Map.empty
 
 compose :: Subst -> Subst -> Subst
-s1 `compose` s2 = Map.map (apply s1) s2 `Map.union` s1
+s1 `compose` s2 = Map.map (substitute s1) s2 `Map.union` s1
 
 unify ::  Type -> Type -> Infer Subst
 unify (l `TypeFunc` r) (l' `TypeFunc` r')  = do
   s1 <- unify l l'
-  s2 <- unify (apply s1 r) (apply s1 r')
+  s2 <- unify (substitute s1 r) (substitute s1 r')
   return (s2 `compose` s1)
 
 unify (TypeIdent "Any") t = return nullSubst
@@ -147,7 +147,7 @@ unifyList [TVar _] [] = return nullSubst
 unifyList [] [] = return nullSubst
 unifyList (t1 : ts1) (t2 : ts2) =
   do su1 <- unify t1 t2
-     su2 <- unifyList (apply su1 ts1) (apply su1 ts2)
+     su2 <- unifyList (substitute su1 ts1) (substitute su1 ts2)
      return (su2 `compose` su1)
 unifyList t1 t2 = throwError $ UnificationMismatch t1 t2
 
@@ -167,13 +167,13 @@ fresh :: Infer Type
 fresh = do
   s <- get
   count += 1
-  return $ TVar $ TV (letters !! _count s)
+  return $ TVar $ TV (show $ _count s)
 
 instantiate ::  Scheme -> Infer Type
 instantiate (Forall as t) = do
   as' <- mapM (const fresh) as
   let s = Map.fromList $ zip as as'
-  return $ apply s t
+  return $ substitute s t
 
 generalize :: TypeEnv -> Type -> Scheme
 generalize env t  = Forall as t
@@ -205,14 +205,14 @@ infer ctx env ex = case ex of
     (s2, t2) <- infer ctx env e2
     tv <- fresh
     s3 <- unify (TypeFunc t1 (TypeFunc t2 tv)) (ops Map.! op)
-    return (s1 `compose` s2 `compose` s3, apply s3 tv)
+    return (s1 `compose` s2 `compose` s3, substitute s3 tv)
 
   Apply meta e1 [arg] -> do
     tv <- fresh
     (s1, t1) <- infer ctx env e1
-    (s2, t2) <- infer ctx (apply s1 env) arg
-    s3       <- unify (apply s2 t1) (TypeFunc t2 tv)
-    return (s3 `compose` s2 `compose` s1, apply s3 tv)
+    (s2, t2) <- infer ctx (substitute s1 env) arg
+    s3       <- unify (substitute s2 t1) (TypeFunc t2 tv)
+    return (s3 `compose` s2 `compose` s1, substitute s3 tv)
 
   Apply meta e1 args -> do
      let curried = foldl (\expr arg -> Apply meta expr [arg]) e1 args
@@ -220,7 +220,7 @@ infer ctx env ex = case ex of
 
   Let x e1 e2 -> do
     (s1, t1) <- infer ctx env e1
-    let env' = apply s1 env
+    let env' = substitute s1 env
         t'   = generalize env' t1
     (s2, t2) <- infer ctx (env' `extend` (x, t')) e2
     return (s2 `compose` s1, t2)
@@ -247,7 +247,7 @@ infer ctx env ex = case ex of
       tv <- fresh
       let env' = env `extend` (x, Forall [] tv)
       (s1, t1) <- infer ctx env' e
-      return (s1, apply s1 tv `TypeFunc` t1)
+      return (s1, substitute s1 tv `TypeFunc` t1)
 
   Function name t args e -> do
     let largs = map (\(Arg a _) -> a) args
@@ -285,12 +285,12 @@ infer ctx env ex = case ex of
             inferCase expectedType (s1, expectedResult) (Case pat e) = do
               (env1, patType) <- getPatType env pat   -- (name -> String, User)
               su <- unify expectedType patType
-              let env2 = apply su env1
+              let env2 = substitute su env1
 --              Debug.traceM $ printf "unify expectedType %s patType %s = %s %s" (show expectedType) (show patType) (show su) (show env2)
               (s2, te) <- infer ctx env2 e
               s3 <- unify expectedResult te
 --              Debug.traceM $ printf "s1 = %s, s2 = %s, s3 = %s, combined = %s" (show s1) (show s2) (show s3) (show (s3 `compose` s2 `compose` su `compose` s1))
-              return (s3 `compose` s2 `compose` su `compose` s1, apply s3 te)
+              return (s3 `compose` s2 `compose` su `compose` s1, substitute s3 te)
 
             getPatType :: TypeEnv -> Pattern -> Infer (TypeEnv, Type)
             getPatType env pat = case pat of
@@ -307,8 +307,8 @@ infer ctx env ex = case ex of
                   (env', pattype) <- foldM (\ (accEnv, accType) pat -> do { (e, t) <- getPatType env pat; return (accEnv `mappend` e, TypeFunc t accType) }) (env, result) (reverse args)
 --                  Debug.traceM $ "Holy shit " ++ show env' ++ ", " ++ show pattype
                   subst <- unify pattype t
-                  let restpe = apply subst result
-                  let env'' =  apply subst env'
+                  let restpe = substitute subst result
+                  let env'' =  substitute subst env'
 --                  Debug.traceM $ printf "restpe = %s" (show restpe)
                   return (env'', restpe)                   -- (name -> String, User)
 
@@ -327,13 +327,13 @@ inferPrim :: Ctx -> TypeEnv -> [Expr] -> Type -> Infer (Subst, Type)
 inferPrim ctx env l t = do
   tv <- fresh
   (s1, tf) <- foldM inferStep (nullSubst, id) l
-  let composedType = apply s1 (tf tv)
+  let composedType = substitute s1 (tf tv)
 --  Debug.traceM $ "composedType " ++ show composedType
   s2 <- unify composedType t
-  return (s2 `compose` s1, apply s2 tv)
+  return (s2 `compose` s1, substitute s2 tv)
   where
   inferStep (s, tf) exp = do
-    (s', t) <- infer ctx (apply s env) exp
+    (s', t) <- infer ctx (substitute s env) exp
     return (s' `compose` s, tf . TypeFunc t)
 
 inferExpr :: Ctx -> TypeEnv -> Expr -> Either TypeError Scheme
