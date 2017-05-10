@@ -193,14 +193,27 @@ lookupEnv (TypeEnv env) x =
     Just s  -> do t <- instantiate s
                   return (nullSubst, t)
 
+toSchema = Forall []
+
+withType meta t = meta { symbolType = toSchema t }
+
+setType :: Expr -> Infer ()
+setType e = modify (\s -> s {_current = e })
+
 infer :: Ctx -> TypeEnv -> Expr -> Infer (Subst, Type)
 infer ctx env ex = case ex of
   Val meta n e -> do
     (s, t) <- infer ctx env e
+    e' <- gets _current
+    setType $ Val (meta `withType` t) n e'
 --    Debug.trace ("Val " ++ n ++ " " ++ show s ++ " " ++ show t) return (s, t)
     return (s, t)
 
-  Ident meta x -> lookupEnv env x
+  Ident meta x -> do
+    (s, t) <- lookupEnv env x
+--    traceM $ printf "Ident %s: %s = %s" x (show t) (show s)
+    setType $ Ident (meta `withType` t) x
+    return (s, t)
 
   Apply meta (Ident _ op) [e1, e2] | op `Map.member` ops -> do
     (s1, t1) <- infer ctx env e1
@@ -212,20 +225,29 @@ infer ctx env ex = case ex of
   Apply meta e1 [arg] -> do
     tv <- fresh
     (s1, t1) <- infer ctx env e1
+    e1' <- gets _current
     (s2, t2) <- infer ctx (substitute s1 env) arg
+    e2' <- gets _current
     s3       <- unify (substitute s2 t1) (TypeFunc t2 tv)
-    return (s3 `compose` s2 `compose` s1, substitute s3 tv)
+    let tpe = substitute s3 tv
+    setType $ Apply (meta `withType` tpe) e1' [e2']
+    return (s3 `compose` s2 `compose` s1, tpe)
 
   Apply meta e1 args -> do
-     let curried = foldl (\expr arg -> Apply meta expr [arg]) e1 args
+     let curried = List.foldl' (\expr arg -> Apply meta expr [arg]) e1 args
      infer ctx env curried
 
   Let meta x e1 e2 -> do
     (s1, t1) <- infer ctx env e1
+    e1' <- gets _current
     let env' = substitute s1 env
         t'   = generalize env' t1
     (s2, t2) <- infer ctx (env' `extend` (x, t')) e2
-    return (s2 `compose` s1, t2)
+    e2' <- gets _current
+    setType $ Let (meta `withType` t2) x e1' e2'
+    let subst = s2 `compose` s1
+--    traceM $ printf "let %s: %s in %s = %s" x (show $ substitute subst t1) (show t2) (show subst)
+    return (subst, t2)
 
   If meta cond tr fl -> do
 
@@ -233,21 +255,25 @@ infer ctx env ex = case ex of
     (s1, t1) <- infer ctx env cond
     s2 <- unify (substitute s1 t1) typeBool
     let substCond = s2 `compose` s1
+    cond' <- gets _current
 
     tv <- fresh
     let env' = substitute substCond env
     (s3, trueType) <- infer ctx env' tr
     s4 <- unify (substitute s3 trueType) tv
     let substTrue = s4 `compose` s3
+    tr' <- gets _current
 
     let env'' = substitute substTrue env'
     (s5, falseType) <- infer ctx env'' fl
     s6 <- unify (substitute s5 falseType) tv
     let substFalse = s6 `compose` s5
+    fl' <- gets _current
 
     let subst = substFalse `compose` substTrue `compose` substCond
     let resultType = substitute subst tv
 
+    setType $ If (meta `withType` resultType) cond' tr' fl'
 --    traceM $ printf "if %s then %s else %s: %s"  (show substCond) (show substTrue) (show substFalse) (show resultType)
     return (subst, resultType)
 
@@ -263,7 +289,10 @@ infer ctx env ex = case ex of
       tv <- fresh
       let env' = env `extend` (x, Forall [] tv)
       (s1, t1) <- infer ctx env' e
-      return (s1, substitute s1 tv `TypeFunc` t1)
+      e' <- gets _current
+      let resultType = substitute s1 tv `TypeFunc` t1
+      setType $ Lam (meta `withType` resultType) x e'
+      return (s1, resultType)
 
   Function name _ args e -> do
     let largs = map (\(Arg a _) -> a) args
@@ -278,7 +307,7 @@ infer ctx env ex = case ex of
     s2 <- unify composedType ((tv `TypeFunc` tv) `TypeFunc` tv)
     let (s, t) = (s2 `compose` s1, substitute s2 tv1)
 
---    traceM $ printf "def %s(%s): %s, subs: %s" name (List.intercalate "," $ map show args) (show t) (show s)
+    traceM $ printf "def %s(%s): %s, subs: %s" name (List.intercalate "," $ map show args) (show t) (show s)
     return (s, t)
 
 
@@ -340,8 +369,10 @@ infer ctx env ex = case ex of
 --                  Debug.traceM $ printf "restpe = %s" (show restpe)
                   return (env'', restpe)                   -- (name -> String, User)
 
-  Literal meta lit ->
-    return (nullSubst, litType lit)
+  Literal meta lit -> do
+    let tpe = litType lit
+    setType $ Literal (meta `withType`tpe) lit
+    return (nullSubst, tpe)
   e -> error ("Wat? " ++ show e)
 
 litType (IntLit _)    = typeInt
@@ -372,7 +403,7 @@ inferTop ctx env [] = Right env
 inferTop ctx env ((name, ex):xs) = case inferExpr ctx env ex of
   Left err -> Left err
   Right (ty, ex') -> do
---    traceM $ show ex'
+    traceM $ show ex'
     inferTop ctx (extend env (name, ty)) xs
 
 normalize :: Scheme -> Scheme

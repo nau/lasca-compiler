@@ -35,8 +35,9 @@ data Meta = Meta {
 } deriving (Eq, Ord)
 
 instance Show Meta where
-  show (Meta pos tpe) = "Meta{pos=" ++ show pos ++ ", tpe=" ++ show tpe ++ "}"
-  
+--  show (Meta pos tpe) = "Meta{pos=" ++ show pos ++ ", tpe=" ++ show tpe ++ "}"
+  show (Meta _ tpe) = show tpe
+
 instance Show Position where
   show NoPosition = "<unknown>"
   show Position{sourceLine = sl, sourceColumn = sc} = show sl ++ ":" ++ show sc
@@ -80,17 +81,17 @@ instance Eq Expr where
 
 instance Show Expr where
   show (Literal _ l) = show l
-  show (Ident meta n) = n
-  show (Val _ n e) = printf "val %s = %s\n" n (show e)
-  show (Apply _ f e) = printf "%s(%s)" (show f) (intercalate "," $ map show e)
-  show (Lam _ a e) = printf "{ %s -> %s}\n" (show a) (show e)
+  show (Ident meta n) = printf "%s: %s" n (show meta)
+  show (Val meta n e) = printf "val %s: %s = %s\n" n (show meta) (show e)
+  show (Apply meta f e) = printf "%s(%s): %s" (show f) (intercalate "," $ map show e) (show meta)
+  show (Lam _ a e) = printf "{ %s -> %s }\n" (show a) (show e)
   show (Select _ e f) = printf "%s.%s" (show e) (show f)
   show (Match e cs) = printf "match %s {\n%s}\n" (show e) (show cs)
   show (BoxFunc f args) = printf "BoxFunc %s($args)" (show f) (intercalate "," $ map show args)
-  show (Function f t args b) = printf "def %s(%s): %s = %s\n" (show f) (intercalate "," $ map show args) (show t) (show b)
+  show (Function f t args b) = printf "def %s(%s): %s = %s\n" f (intercalate "," $ map show args) (show t) (show b)
   show (Extern f t args) = printf "def %s(%s): %s\n" (show f) (intercalate "," $ map show args) (show t)
-  show (If _ c t f) = printf "if %s then {\n%s \n} else {\n%s\n}" (show c) (show t) (show f)
-  show (Let _ n e b) = printf "%s = %s;\n%s" n (show e) (show b)
+  show (If meta c t f) = printf "if %s then {\n%s \n} else {\n%s\n}: %s" (show c) (show t) (show f) (show meta)
+  show (Let meta n e b) = printf "%s = %s;\n%s: %s" n (show e) (show b) (show meta)
   show (Array _ es) = printf "[%s]" (intercalate "," $ map show es)
   show (Data _ n cs) = printf "data %s = %s\n" n (intercalate "\n| " $ map show cs)
 
