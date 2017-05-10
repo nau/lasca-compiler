@@ -53,7 +53,6 @@ data Expr
   | Lam String Expr
   | Select Meta Expr Expr
   | Match Expr [Case]
-  | Fix Expr        -- typechecker only
   | BoxFunc Name [Arg]   -- LLVM codegen only
   | Function Name Type [Arg] Expr
   | Extern Name Type [Arg]
@@ -71,7 +70,6 @@ instance Show Expr where
   show (Lam a e) = printf "{ %s -> %s}\n" (show a) (show e)
   show (Select _ e f) = printf "%s.%s" (show e) (show f)
   show (Match e cs) = printf "match %s {\n%s}\n" (show e) (show cs)
-  show (Fix e) = printf "Fix %s" (show e)
   show (BoxFunc f args) = printf "BoxFunc %s($args)" (show f) (intercalate "," $ map show args)
   show (Function f t args b) = printf "def %s(%s): %s = %s\n" (show f) (intercalate "," $ map show args) (show t) (show b)
   show (Extern f t args) = printf "def %s(%s): %s\n" (show f) (intercalate "," $ map show args) (show t)

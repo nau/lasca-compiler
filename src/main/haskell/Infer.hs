@@ -23,7 +23,7 @@ import qualified Data.List as List
 import Data.Foldable (foldr)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
-import qualified Debug.Trace as Debug
+import Debug.Trace as Debug
 import Text.Printf
 
 newtype TypeEnv = TypeEnv (Map.Map String Scheme) deriving (Monoid)
@@ -229,12 +229,6 @@ infer ctx env ex = case ex of
     tv <- fresh
     inferPrim ctx env [cond, tr, fl] (typeBool `TypeFunc` tv `TypeFunc` tv `TypeFunc` tv)
 
-
-
-  Fix e1 -> do
-      tv <- fresh
-      inferPrim ctx env [e1] ((tv `TypeFunc` tv) `TypeFunc` tv)
-
   Extern name tpe args -> do
     let ts = map argToType args
     let t = foldr f tpe ts
@@ -249,10 +243,22 @@ infer ctx env ex = case ex of
       (s1, t1) <- infer ctx env' e
       return (s1, substitute s1 tv `TypeFunc` t1)
 
-  Function name t args e -> do
+  Function name _ args e -> do
     let largs = map (\(Arg a _) -> a) args
-    let curried = Fix (foldr (\arg expr -> Lam arg expr) e (name:largs))
-    infer ctx env ({-Debug.trace ("Func " ++ show curried)-} curried)
+    -- functions are recursive, so do Fixpoint for inference
+    let curried = foldr (\arg expr -> Lam arg expr) e (name:largs)
+    tv <- fresh
+    tv1 <- fresh
+    -- fixpoint
+    (s1, ttt) <- infer ctx env curried
+    let composedType = substitute s1 (TypeFunc ttt tv1)
+--    traceM $ "composedType " ++ show composedType
+    s2 <- unify composedType ((tv `TypeFunc` tv) `TypeFunc` tv)
+    let (s, t) = (s2 `compose` s1, substitute s2 tv1)
+
+--    traceM $ printf "def %s(%s): %s, subs: %s" name (List.intercalate "," $ map show args) (show t) (show s)
+    return (s, t)
+
 
   Data name constructors -> error "Shouldn't happen!"
   Select meta tree expr -> infer ctx env (Apply meta expr [tree])
@@ -388,7 +394,6 @@ typeCheck ctx exprs = do
             ddd e = error ("What the hell" ++ show e)
 
 
-            f e@(Fix (Function name _ _ _)) = (name, e)
             f e@(Val name _) = (name, e)
             f e@(Function name _ _ _) = (name, e)
             f e@(Extern name _ _) = (name, e)
