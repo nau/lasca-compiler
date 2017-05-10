@@ -209,7 +209,7 @@ cgen ctx (S.Let a b c) = do
   store i val
   assign a i
   cgen ctx c
-cgen ctx (S.Ident name) = do
+cgen ctx (S.Ident meta name) = do
   syms <- gets symtab
   modState <- gets moduleState
   let mapping = functions modState
@@ -232,9 +232,9 @@ cgen ctx (S.Select meta tree expr) = do
   e <- cgen ctx expr
   let pos = createPosition $ S.pos meta
   callFn runtimeSelectFuncType "runtimeSelect" [tree, e, constOp pos]
-cgen ctx (S.Apply meta (S.Ident "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal S.emptyMeta (S.BoolLit True)) rhs)
-cgen ctx (S.Apply meta (S.Ident "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal S.emptyMeta (S.BoolLit False)))
-cgen ctx (S.Apply meta (S.Ident fn) [lhs, rhs]) | fn `Map.member` binops = do
+cgen ctx (S.Apply meta (S.Ident _ "or") [lhs, rhs]) = cgen ctx (S.If lhs (S.Literal S.emptyMeta (S.BoolLit True)) rhs)
+cgen ctx (S.Apply meta (S.Ident _ "and") [lhs, rhs]) = cgen ctx (S.If lhs rhs (S.Literal S.emptyMeta (S.BoolLit False)))
+cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
   llhs <- cgen ctx lhs
   lrhs <- cgen ctx rhs
   let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
@@ -249,7 +249,7 @@ cgen ctx (S.Apply meta expr args) = do
      -- TODO Here are BUGZZZZ!!!! :)
      -- TODO check arguments!
      -- this is done to speed-up calls if you `a global function
-    S.Ident fn | isGlobal fn -> callFn ptrType fn largs
+    S.Ident _ fn | isGlobal fn -> callFn ptrType fn largs
     expr -> do
       modState <- gets moduleState
       e <- cgen ctx expr
@@ -312,17 +312,17 @@ cgen ctx e = error ("cgen shit " ++ show e)
 genMatch :: Ctx -> S.Expr -> S.Expr
 genMatch ctx m@(S.Match expr []) = error $ "Should be at least on case in match expression: " ++ show m
 genMatch ctx (S.Match expr cases) =
-  let body = foldr (\(S.Case p e) acc -> genPattern ctx (S.Ident "$match") p e acc) genFail cases
+  let body = foldr (\(S.Case p e) acc -> genPattern ctx (S.Ident S.emptyMeta "$match") p e acc) genFail cases
   in  S.Let "$match" expr body  -- FIXME hack. Gen unique names
 
-genFail = S.Apply S.emptyMeta (S.Ident "die") [S.Literal S.emptyMeta $ S.StringLit "Match error!"]
+genFail = S.Apply S.emptyMeta (S.Ident S.emptyMeta "die") [S.Literal S.emptyMeta $ S.StringLit "Match error!"]
 
 genPattern ctx lhs S.WildcardPattern rhs = const rhs
 genPattern ctx lhs (S.VarPattern name) rhs = const (S.Let name lhs rhs)
-genPattern ctx lhs (S.LitPattern literal) rhs = S.If (S.Apply S.emptyMeta (S.Ident "==") [lhs, S.Literal S.emptyMeta literal]) rhs
+genPattern ctx lhs (S.LitPattern literal) rhs = S.If (S.Apply S.emptyMeta (S.Ident S.emptyMeta "==") [lhs, S.Literal S.emptyMeta literal]) rhs
 genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
   where cond fail = S.If constrCheck (checkArgs name fail) fail
-        constrCheck = S.Apply S.emptyMeta (S.Ident "runtimeIsConstr") [lhs, S.Literal S.emptyMeta $ S.StringLit name]
+        constrCheck = S.Apply S.emptyMeta (S.Ident S.emptyMeta "runtimeIsConstr") [lhs, S.Literal S.emptyMeta $ S.StringLit name]
         constrMap = let cs = foldr (\ (S.DataDef dn id constrs) acc -> constrs ++ acc) [] (S.dataDefs ctx)
                         tuples = fmap (\c@(S.DataConst n args) -> (n, args)) cs
                     in  Map.fromList tuples
@@ -330,7 +330,7 @@ genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
                             Nothing -> fail
                             Just constrArgs | length args == length constrArgs -> do
                               let argParam = zip args constrArgs
-                              foldr (\(a, S.Arg n _) acc -> genPattern ctx (S.Select S.emptyMeta lhs (S.Ident n)) a acc fail) rhs argParam
+                              foldr (\(a, S.Arg n _) acc -> genPattern ctx (S.Select S.emptyMeta lhs (S.Ident S.emptyMeta n)) a acc fail) rhs argParam
                             Just constrArgs -> error (printf "Constructor %s has %d parameters, but %d given" nm (length constrArgs) (length args)) -- TODO box this error
 -------------------------------------------------------------------------------
 -- Compilation
@@ -453,7 +453,7 @@ extractLambda (S.Lam name expr) = do
   modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
 --   Debug.traceM ("Generated lambda " ++ show func ++ ", outerVars = " ++ show outerVars ++ ", usedOuterVars" ++ show usedOuterVars)
   return (S.BoxFunc funcName enclosedArgs)
-extractLambda expr@(S.Ident n) = do
+extractLambda expr@(S.Ident _ n) = do
   modify (\s -> s { _usedVars = Set.insert n (_usedVars s)})
   return expr
 extractLambda expr = return expr

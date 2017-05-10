@@ -26,16 +26,16 @@ parserTests = testGroup "Parser tests"
   , testCase "Character Escaping" $
       parseExpr "\"String\n\"" @?= Right (Literal emptyMeta (StringLit "String\n"))
   , testCase "String Interpolation" $
-      parseExpr "\"Hello\\t \\\\\\$${ test123 + 1 }\"" @?= Right (Apply emptyMeta (Ident "concat") [
+      parseExpr "\"Hello\\t \\\\\\$${ test123 + 1 }\"" @?= Right (Apply emptyMeta (Ident emptyMeta "concat") [
         Array [Literal emptyMeta $ StringLit "Hello\t \\$", 
-               Apply emptyMeta (Ident "toString") [Apply (withMetaPos 1 25) (Ident "+") [Ident "test123", Literal (withMetaPos 1 27) (IntLit 1)]]]
+               Apply emptyMeta (Ident emptyMeta "toString") [Apply (withMetaPos 1 25) (Ident emptyMeta "+") [Ident emptyMeta "test123", Literal (withMetaPos 1 27) (IntLit 1)]]]
       ])
   , testCase "Pattern matching" $
       parseExpr "match true { | true -> 1 }" @?= Right (Match (Literal emptyMeta (BoolLit True)) [
         Case (LitPattern (BoolLit True)) (Literal (withMetaPos 1 24) (IntLit 1))])
   , testCase "Pattern matching" $
         parseExpr "match foo { | Person(0, name, \"God\", None, _) -> 1 | _ -> match false { | true -> 4 } }" @?= Right (
-          Match (Ident "foo") [
+          Match (Ident emptyMeta "foo") [
             Case (ConstrPattern "Person" [LitPattern (IntLit 0),VarPattern "name",LitPattern (StringLit "God"),
                   ConstrPattern "None" [],WildcardPattern]) (Literal (withMetaPos 1 50) (IntLit 1)),
             Case WildcardPattern (

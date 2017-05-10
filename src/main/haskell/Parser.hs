@@ -66,10 +66,10 @@ interpolatedString = do
   where go [] = Literal emptyMeta (StringLit "")
         go list = case foldr go' [] list of
                     [s] -> s
-                    strings -> Apply emptyMeta (Ident "concat") [Array strings]
+                    strings -> Apply emptyMeta (Ident emptyMeta "concat") [Array strings]
 
         go' (Left s) acc  = Literal emptyMeta (StringLit s) : acc
-        go' (Right e) acc = Apply emptyMeta (Ident "toString") [e] : acc
+        go' (Right e) acc = Apply emptyMeta (Ident emptyMeta "toString") [e] : acc
 
 
 pTemplate :: Parser [Either String Expr] -- Left = text, Right = variable
@@ -107,17 +107,17 @@ pTemplate = char '\"' *> manyTill piece (char '\"')
 binop = Ex.InfixL parser
   where parser = do
           meta <- getMeta
-          (\op lhs rhs -> Apply meta (Ident op) [lhs, rhs]) <$> anyOperatorParser
+          (\op lhs rhs -> Apply meta (Ident meta op) [lhs, rhs]) <$> anyOperatorParser
 
 unop = Ex.Prefix parser
   where parser = do
           meta <- getMeta
-          (\op expr -> Apply meta (Ident ("unary" ++ op)) [expr]) <$> anyOperatorParser
+          (\op expr -> Apply meta (Ident meta ("unary" ++ op)) [expr]) <$> anyOperatorParser
 
 binary s = Ex.InfixL parser
   where parser = do
            meta <- getMeta
-           reservedOp s >> return (\lhs rhs -> Apply meta (Ident s) [lhs, rhs])
+           reservedOp s >> return (\lhs rhs -> Apply meta (Ident meta s) [lhs, rhs])
 
 anyOperatorParser = do
   traverse_ (notFollowedBy . reservedOp) ops
@@ -182,7 +182,9 @@ expr :: Parser Expr
 expr =  Ex.makeExprParser factor operatorTable
 
 variable :: Parser Expr
-variable = Ident <$> identifier
+variable = do
+  meta <- getMeta
+  Ident meta <$> identifier
 
 makeType name = if Char.isLower $ List.head name then TVar $ TV name else TypeIdent name
 

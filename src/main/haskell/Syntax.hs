@@ -47,7 +47,7 @@ withMetaPos line col = emptyMeta { pos = Position {sourceLine = line, sourceColu
 
 data Expr
   = Literal Meta Lit
-  | Ident Name
+  | Ident Meta Name
   | Val Name Expr
   | Apply Meta Expr [Expr]
   | Lam String Expr
@@ -60,11 +60,27 @@ data Expr
   | Let Name Expr Expr
   | Array [Expr]
   | Data Name [DataConst]
-  deriving (Eq, Ord)
+  deriving (Ord)
+
+instance Eq Expr where
+  (Literal _ l) == (Literal _ r) = l == r
+  (Ident _ l) == (Ident _ r) = l == r
+  (Val nl l) == (Val nr r) = nl == nr && l == r
+  (Apply _ nl l) == (Apply _ nr r) = nl == nr && l == r
+  (Lam nl l) == (Lam nr r) = nl == nr && l == r
+  (Select _ nl l) == (Select _ nr r) = nl == nr && l == r
+  (Match nl l) == (Match nr r) = nl == nr && l == r
+  (BoxFunc nl l) == (BoxFunc nr r) = nl == nr && l == r
+  (Function nl _ al l) == (Function nr _ ar r) = nl == nr && al == ar && l == r
+  (Extern nl _ l) == (Extern nr _ r) = nl == nr && l == r
+  (If nl al l) == (If nr ar r) = nl == nr && al == ar && l == r
+  (Let nl al l) == (Let nr ar r) = nl == nr && al == ar && l == r
+  (Array l) == (Array r) = l == r
+  (Data nl l) == (Data nr r) = nl == nr && l == r
 
 instance Show Expr where
   show (Literal _ l) = show l
-  show (Ident n) = n
+  show (Ident meta n) = n
   show (Val n e) = printf "val %s = %s\n" n (show e)
   show (Apply _ f e) = printf "%s(%s)" (show f) (intercalate "," $ map show e)
   show (Lam a e) = printf "{ %s -> %s}\n" (show a) (show e)

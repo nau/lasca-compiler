@@ -4,12 +4,12 @@ packages:
 flags:
 ghc-options:
   library:
-    -O2
+    -O0
     -rtsopts
     -Wincomplete-patterns
     -fprof-auto
   lasca-test:
-    -O2
+    -O0
     -rtsopts
     -prof
 #    -auto-all

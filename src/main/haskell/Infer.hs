@@ -200,9 +200,9 @@ infer ctx env ex = case ex of
 --    Debug.trace ("Val " ++ n ++ " " ++ show s ++ " " ++ show t) return (s, t)
     return (s, t)
 
-  Ident x -> lookupEnv env x
+  Ident meta x -> lookupEnv env x
 
-  Apply meta (Ident op) [e1, e2] | op `Map.member` ops -> do
+  Apply meta (Ident _ op) [e1, e2] | op `Map.member` ops -> do
     (s1, t1) <- infer ctx env e1
     (s2, t2) <- infer ctx env e2
     tv <- fresh
