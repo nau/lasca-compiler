@@ -57,7 +57,7 @@ externArgsToSig :: [S.Arg] -> [(S.Name, AST.Type)]
 externArgsToSig = map (\(S.Arg name tpe) -> (name, typeMapping tpe))
 
 uncurryLambda expr = go expr ([], expr) where
-  go (S.Lam name e) result = let (args, body) = go e result in (name : args, body)
+  go (S.Lam _ name e) result = let (args, body) = go e result in (name : args, body)
   go e (args, _) = (args, e)
 
 
@@ -77,11 +77,11 @@ transformExpr transformer expr = case expr of
     e' <- go e
     body' <- go body
     transformer (S.Let n e' body')
-  (S.Lam n e) -> do
+  (S.Lam m n e) -> do
     modify (\s -> s { _outers = _locals s } )
     modStateLocals .= Set.singleton n
     e' <- go e
-    transformer (S.Lam n e')
+    transformer (S.Lam m n e')
   (S.Apply meta e args) -> do
     e' <- go e
     args' <- sequence [go arg | arg <- args]
@@ -441,7 +441,7 @@ declareStdFuncs = do
   addDefn $ AST.FunctionAttributes (FA.GroupID 0) [FA.ReadOnly]
 
 extractLambda :: S.Expr -> LLVM S.Expr
-extractLambda (S.Lam name expr) = do
+extractLambda (S.Lam meta name expr) = do
   state <- get
   let nms = _modNames state
   let syntactic = _syntacticAst state

@@ -50,7 +50,7 @@ data Expr
   | Ident Meta Name
   | Val Meta Name Expr
   | Apply Meta Expr [Expr]
-  | Lam String Expr
+  | Lam Meta String Expr
   | Select Meta Expr Expr
   | Match Expr [Case]
   | BoxFunc Name [Arg]   -- LLVM codegen only
@@ -67,7 +67,7 @@ instance Eq Expr where
   (Ident _ l) == (Ident _ r) = l == r
   (Val _ nl l) == (Val _ nr r) = nl == nr && l == r
   (Apply _ nl l) == (Apply _ nr r) = nl == nr && l == r
-  (Lam nl l) == (Lam nr r) = nl == nr && l == r
+  (Lam _ nl l) == (Lam _ nr r) = nl == nr && l == r
   (Select _ nl l) == (Select _ nr r) = nl == nr && l == r
   (Match nl l) == (Match nr r) = nl == nr && l == r
   (BoxFunc nl l) == (BoxFunc nr r) = nl == nr && l == r
@@ -83,7 +83,7 @@ instance Show Expr where
   show (Ident meta n) = n
   show (Val _ n e) = printf "val %s = %s\n" n (show e)
   show (Apply _ f e) = printf "%s(%s)" (show f) (intercalate "," $ map show e)
-  show (Lam a e) = printf "{ %s -> %s}\n" (show a) (show e)
+  show (Lam _ a e) = printf "{ %s -> %s}\n" (show a) (show e)
   show (Select _ e f) = printf "%s.%s" (show e) (show f)
   show (Match e cs) = printf "match %s {\n%s}\n" (show e) (show cs)
   show (BoxFunc f args) = printf "BoxFunc %s($args)" (show f) (intercalate "," $ map show args)

@@ -259,7 +259,7 @@ infer ctx env ex = case ex of
           argToType (Arg _ t) = t
           f z t = z `TypeFunc` t
 
-  Lam x e -> do
+  Lam meta x e -> do
       tv <- fresh
       let env' = env `extend` (x, Forall [] tv)
       (s1, t1) <- infer ctx env' e
@@ -268,7 +268,7 @@ infer ctx env ex = case ex of
   Function name _ args e -> do
     let largs = map (\(Arg a _) -> a) args
     -- functions are recursive, so do Fixpoint for inference
-    let curried = foldr (\arg expr -> Lam arg expr) e (name:largs)
+    let curried = foldr (\arg expr -> Lam emptyMeta arg expr) e (name:largs)
     tv <- fresh
     tv1 <- fresh
     -- fixpoint

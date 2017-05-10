@@ -265,7 +265,8 @@ closure = braces cls
             args <- commaSep arg
             reservedOp "->"
             letin <- blockStmts
-            let lambdas = foldr (\(Arg a _) expr -> Lam a expr) letin args
+            meta <- getMeta
+            let lambdas = foldr (\(Arg a _) expr -> Lam meta a expr) letin args
             return lambdas
 
 data LetVal = Named Name Expr | Stmt Expr
