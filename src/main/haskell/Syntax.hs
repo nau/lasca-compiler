@@ -57,7 +57,7 @@ data Expr
   | Function Name Type [Arg] Expr
   | Extern Name Type [Arg]
   | If Meta Expr Expr Expr
-  | Let Name Expr Expr
+  | Let Meta Name Expr Expr
   | Array [Expr]
   | Data Name [DataConst]
   deriving (Ord)
@@ -74,7 +74,7 @@ instance Eq Expr where
   (Function nl _ al l) == (Function nr _ ar r) = nl == nr && al == ar && l == r
   (Extern nl _ l) == (Extern nr _ r) = nl == nr && l == r
   (If _ nl al l) == (If _ nr ar r) = nl == nr && al == ar && l == r
-  (Let nl al l) == (Let nr ar r) = nl == nr && al == ar && l == r
+  (Let _ nl al l) == (Let _ nr ar r) = nl == nr && al == ar && l == r
   (Array l) == (Array r) = l == r
   (Data nl l) == (Data nr r) = nl == nr && l == r
 
@@ -90,7 +90,7 @@ instance Show Expr where
   show (Function f t args b) = printf "def %s(%s): %s = %s\n" (show f) (intercalate "," $ map show args) (show t) (show b)
   show (Extern f t args) = printf "def %s(%s): %s\n" (show f) (intercalate "," $ map show args) (show t)
   show (If _ c t f) = printf "if %s then {\n%s \n} else {\n%s\n}" (show c) (show t) (show f)
-  show (Let n e b) = printf "%s = %s;\n%s" n (show e) (show b)
+  show (Let _ n e b) = printf "%s = %s;\n%s" n (show e) (show b)
   show (Array es) = printf "[%s]" (intercalate "," $ map show es)
   show (Data n cs) = printf "data %s = %s\n" n (intercalate "\n| " $ map show cs)
 

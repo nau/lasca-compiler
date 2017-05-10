@@ -220,7 +220,7 @@ infer ctx env ex = case ex of
      let curried = foldl (\expr arg -> Apply meta expr [arg]) e1 args
      infer ctx env curried
 
-  Let x e1 e2 -> do
+  Let meta x e1 e2 -> do
     (s1, t1) <- infer ctx env e1
     let env' = substitute s1 env
         t'   = generalize env' t1

@@ -72,11 +72,11 @@ transformExpr transformer expr = case expr of
     true' <- go true
     false' <- go false
     transformer (S.If meta cond' true' false')
-  (S.Let n e body) -> do
+  (S.Let meta n e body) -> do
     modStateLocals %= Set.insert n
     e' <- go e
     body' <- go body
-    transformer (S.Let n e' body')
+    transformer (S.Let meta n e' body')
   (S.Lam m n e) -> do
     modify (\s -> s { _outers = _locals s } )
     modStateLocals .= Set.singleton n
@@ -109,7 +109,7 @@ defineStringConstants (S.Select _ lhs rhs) = do
   return ()
 defineStringConstants (S.Array exprs) = mapM_ defineStringConstants exprs
 defineStringConstants (S.Apply meta _ exprs) = mapM_ defineStringConstants exprs
-defineStringConstants (S.Let _ e body) = do
+defineStringConstants (S.Let _ _ e body) = do
   defineStringConstants e
   defineStringConstants body
   return ()
@@ -203,7 +203,7 @@ binops = Map.fromList [("+", 10), ("-", 11), ("*", 12), ("/", 13),
 
 
 cgen :: Ctx -> S.Expr -> Codegen AST.Operand
-cgen ctx (S.Let a b c) = do
+cgen ctx (S.Let meta a b c) = do
   i <- alloca ptrType
   val <- cgen ctx b
   store i val
@@ -313,12 +313,12 @@ genMatch :: Ctx -> S.Expr -> S.Expr
 genMatch ctx m@(S.Match expr []) = error $ "Should be at least on case in match expression: " ++ show m
 genMatch ctx (S.Match expr cases) =
   let body = foldr (\(S.Case p e) acc -> genPattern ctx (S.Ident S.emptyMeta "$match") p e acc) genFail cases
-  in  S.Let "$match" expr body  -- FIXME hack. Gen unique names
+  in  S.Let S.emptyMeta "$match" expr body  -- FIXME hack. Gen unique names
 
 genFail = S.Apply S.emptyMeta (S.Ident S.emptyMeta "die") [S.Literal S.emptyMeta $ S.StringLit "Match error!"]
 
 genPattern ctx lhs S.WildcardPattern rhs = const rhs
-genPattern ctx lhs (S.VarPattern name) rhs = const (S.Let name lhs rhs)
+genPattern ctx lhs (S.VarPattern name) rhs = const (S.Let S.emptyMeta name lhs rhs)
 genPattern ctx lhs (S.LitPattern literal) rhs = S.If S.emptyMeta (S.Apply S.emptyMeta (S.Ident S.emptyMeta "==") [lhs, S.Literal S.emptyMeta literal]) rhs
 genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
   where cond fail = S.If S.emptyMeta constrCheck (checkArgs name fail) fail

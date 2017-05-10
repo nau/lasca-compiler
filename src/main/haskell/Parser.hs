@@ -251,6 +251,7 @@ ifthen = do
 letins :: Parser Expr
 letins = do
   reserved "let"
+  meta <- getMeta
   defs <- commaSep $ do
     var <- identifier
     option typeAny typeAscription
@@ -259,7 +260,7 @@ letins = do
     return (var, val)
   reserved "in"
   body <- expr
-  return $ foldr (uncurry Let) body defs
+  return $ foldr (uncurry $ Let meta) body defs
 
 closure = braces cls
     where cls = do
@@ -294,7 +295,7 @@ blockStmts = do
                                 (Stmt e)    -> (init, e)
                                 (Named _ _) -> (exprs, Literal emptyMeta UnitLit)
           let namedExprs = go init' 1
-          foldl' (\acc (name, e) -> Let name e acc) last' namedExprs
+          foldl' (\acc (name, e) -> Let emptyMeta name e acc) last' namedExprs
 
         go (Stmt e : exprs) idx = ('_' : show idx, e) : go exprs (idx + 1)
         go (Named id e : exprs) idx = (id, e) : go exprs idx
