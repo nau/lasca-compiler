@@ -20,7 +20,7 @@ import System.Process
 import System.Console.Haskeline
 import Options.Applicative
 import Data.Semigroup ((<>))
-import qualified Debug.Trace as Debug
+import Debug.Trace as Debug
 import qualified Text.Megaparsec as Megaparsec
 
 import qualified LLVM.AST as AST
@@ -98,10 +98,11 @@ genModule opts modo source = do
           when (verboseMode opts) $ putStrLn("Compiler mode is " ++ mode opts)
           if mode opts == "static"
           then case typeCheck (createGlobalContext ex) ex of
-            Right env -> do
+            Right (env, typedExprs) -> do
               when (verboseMode opts) $ putStrLn "typechecked OK"
               when (printTypes opts) $ print env
-              return $ codegenModule opts modo ex
+--              traceM $ show typedExprs
+              return $ codegenModule opts modo typedExprs
             Left e -> die $ show e
           else return $ codegenModule opts modo ex
 

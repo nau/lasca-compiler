@@ -331,7 +331,7 @@ Box* arrayLength(Box* arrayValue) {
   return boxInt(array->length);
 }
 
-String s = {
+String UNIMPLEMENTED_SELECT = {
   .length = 20,
   .bytes = "Unimplemented select"
 };
@@ -461,7 +461,7 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
     assert(fs->functions[f->funcIdx].arity == 1);
     return runtimeApply(ident, 1, &tree, pos);
   }
-  return boxError(&s);
+  return boxError(&UNIMPLEMENTED_SELECT);
 }
 
 Box* runtimeIsConstr(Box* value, Box* constrName) {

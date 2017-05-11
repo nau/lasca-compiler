@@ -235,7 +235,11 @@ infer ctx env ex = case ex of
 
   Apply meta e1 args -> do
      let curried = List.foldl' (\expr arg -> Apply meta expr [arg]) e1 args
-     infer ctx env curried
+     (subst, t) <- infer ctx env curried
+     e' <- gets _current
+     let uncurried = foldr (\_ (Apply _ e _) -> e) e' args
+     setType $ Apply (meta `withType` t) uncurried args
+     return (subst, t)
 
   Let meta x e1 e2 -> do
     (s1, t1) <- infer ctx env e1
@@ -316,8 +320,8 @@ infer ctx env ex = case ex of
   Data meta name constructors -> error $ "Shouldn't happen! " ++ show meta
   Select meta tree expr -> do
     (s, t) <- infer ctx env (Apply meta expr [tree])
-    e' <- gets _current
-    setType $ Select (meta `withType` t) tree e'
+    (Apply _ e' [tree']) <- gets _current
+    setType $ Select (meta `withType` t) tree' e'
     return (s, t)
 
   Array meta exprs -> do
@@ -437,11 +441,12 @@ normalize (Forall ts body) = Forall (fmap snd ord) (normtype body)
 typeCheck :: Ctx -> [Expr] -> Either TypeError (TypeEnv, [Expr])
 typeCheck ctx exprs = do
   let (dat, other) = List.partition pred exprs
-  let bbb = dat >>= ddd
+  let dataConstructorsEnv = dat >>= ddd
   let a = map f other
   let (TypeEnv te) = defaultTyenv
-  let typeEnv = TypeEnv (Map.union te (Map.fromList bbb))
-  inferTop ctx typeEnv a
+  let typeEnv = TypeEnv (Map.union te (Map.fromList dataConstructorsEnv))
+  let res = inferTop ctx typeEnv a
+  fmap (\(typeEnv, exprs) -> (typeEnv, dat ++ exprs)) res
   where
             pred Data{} = True
             pred _      = False

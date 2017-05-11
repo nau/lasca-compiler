@@ -61,7 +61,7 @@ data Expr
   | Let Meta Name Expr Expr
   | Array Meta [Expr]
   | Data Meta Name [DataConst]
-  deriving (Ord)
+  deriving (Ord, Show)
 
 instance Eq Expr where
   (Literal _ l) == (Literal _ r) = l == r
@@ -79,6 +79,7 @@ instance Eq Expr where
   (Array _ l) == (Array _ r) = l == r
   (Data _ nl l) == (Data _ nr r) = nl == nr && l == r
 
+{-
 instance Show Expr where
   show (Literal _ l) = show l
   show (Ident meta n) = printf "%s: %s" n (show meta)
@@ -94,6 +95,7 @@ instance Show Expr where
   show (Let meta n e b) = printf "%s = %s;\n%s: %s" n (show e) (show b) (show meta)
   show (Array _ es) = printf "[%s]" (intercalate "," $ map show es)
   show (Data _ n cs) = printf "data %s = %s\n" n (intercalate "\n| " $ map show cs)
+-}
 
 
 
