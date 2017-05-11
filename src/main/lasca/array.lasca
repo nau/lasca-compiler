@@ -7,7 +7,7 @@ data User = Person(id: Int, name: String, role: Role)
 def returnArray(): Array Int = {
   res = match Person(1, "Alex", Looser(12)) {
   | Person(i, n, Looser(l)) -> { println("Found user id ${i + 5} ${l}"); i}
---  | Person(i, n, Admin) -> { println("Found user id ${i + 5} ${n}"); i}
+  | Person(i, n, Admin) -> { println("Found user id ${i + 5} ${n}"); i}
 --  | i -> i + 1
 --  | 1 -> 0
   };

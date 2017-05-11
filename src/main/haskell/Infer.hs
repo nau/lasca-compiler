@@ -54,38 +54,6 @@ instance Show TypeError where
   show (UnificationMismatch t1 t2) = "UnificationMismatch " ++ show t1 ++ " " ++ show t2
 
 
-runInfer :: Expr -> Infer (Subst, Type) -> Either TypeError (Scheme, Expr)
-runInfer e m =
-  case runState (runExceptT m) (initState e) of
-    (Left err, st)  -> Left err
-    (Right res, st) -> Right (closeOver res, _current st)
-
-closeOver :: (Map.Map TVar Type, Type) -> Scheme
-closeOver (sub, ty) = normalize sc
-  where sc = generalize defaultTyenv (substitute sub ty)
-
-initState :: Expr -> InferState
-initState e = InferState { _count = 0, _current = e}
-
-extend :: TypeEnv -> (String, Scheme) -> TypeEnv
-extend (TypeEnv env) (x, s) = TypeEnv $ Map.insert x s env
-
-defaultTyenv :: TypeEnv
-defaultTyenv = TypeEnv (Map.fromList [
-    ("+",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
-    ("-",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
-    ("*",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
-    ("/",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
-    ("==", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
-    ("!=", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
-    ("<",  Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
-    ("<=", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
-    (">",  Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
-    (">=", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))
-  ])
-  where a = TV "a"
-        ta = TVar a
-
 class Substitutable a where
   substitute :: Subst -> a -> a
   ftv   :: a -> Set.Set TVar
@@ -95,7 +63,7 @@ instance Substitutable Type where
   substitute _ (TypeIdent a)       = TypeIdent a
   substitute s t@(TVar a)     = Map.findWithDefault t a s
   substitute s (t1 `TypeFunc` t2) = substitute s t1 `TypeFunc` substitute s t2
-  substitute s (TypeApply t [args]) = TypeApply (substitute s t) [args] -- TODO do proper substitution
+  substitute s (TypeApply t [args]) = TypeApply (substitute s t) [substitute s args]
   substitute s t = error $ "Wat? " ++ show s ++ ", " ++ show t
 
   ftv TypeIdent{}         = Set.empty
@@ -171,6 +139,83 @@ fresh = do
   count += 1
   return $ TVar $ TV (show $ _count s)
 
+runInfer :: Expr -> Infer (Subst, Type) -> Either TypeError (Scheme, Expr)
+runInfer e m =
+  case runState (runExceptT m) (initState e) of
+    (Left err, st)  -> Left err
+    (Right res, st) -> do
+      let (schema, expr) = closeOver res $ _current st
+      Right (schema, expr)
+
+closeOver :: (Subst, Type) -> Expr -> (Scheme, Expr)
+closeOver (sub, ty) e = do
+  let e' = substituteAll sub e
+  let sc = generalize emptyTyenv (substitute sub ty)
+  (normalize sc, e')
+
+substituteAll sub e = updateMeta f e
+  where f meta = meta { symbolType = substitute sub (symbolType meta) }
+
+updateMeta f e =
+  case e of
+    Literal meta lit -> Literal (f meta) lit
+    Ident meta name -> Ident (f meta) name
+    Val meta name expr -> Val (f meta) name (updateMeta f expr)
+    Apply meta expr exprs -> Apply (f meta) (updateMeta f expr) (map (updateMeta f) exprs)
+    Lam meta name expr -> Lam (f meta) name (updateMeta f expr)
+    Select meta tree expr -> Select (f meta) (updateMeta f tree) (updateMeta f expr)
+    Match meta expr cases -> Match (f meta) (updateMeta f expr) (map (\(Case pat e) -> Case pat (updateMeta f e)) cases)
+    this@BoxFunc{} -> this
+    Function meta name tpe args expr -> Function (f meta) name tpe args (updateMeta f expr)
+    this@Extern{} -> this
+    If meta cond tr fl -> If (f meta) (updateMeta f cond) (updateMeta f tr) (updateMeta f fl)
+    Let meta name expr body -> Let (f meta) name (updateMeta f expr) (updateMeta f body)
+    Array meta exprs -> Array (f meta) (map (updateMeta f) exprs)
+    this@Data{} -> this
+               
+normalize :: Scheme -> Scheme
+normalize schema@(Forall ts body) = Forall (fmap snd ord) (normtype body)
+  where
+    ord = zip (List.nub $ fv body) (fmap TV letters)  -- from [b, c, c, d, f, e, g] -> [a, b, c, d, e, f]
+
+    fv (TVar a)   = [a]
+    fv (TypeFunc a b) = fv a ++ fv b
+    fv (TypeIdent _)   = []
+    fv (TypeApply t [])       = error "Should not be TypeApply without arguments!" -- TODO use NonEmpty List?
+    fv (TypeApply t args)   = fv t  -- FIXME args?
+
+    normtype (TypeFunc a b)  = TypeFunc  (normtype a) (normtype b)
+    normtype (TypeApply a b) = TypeApply (normtype a) b
+    normtype (TypeIdent a)   = TypeIdent a
+    normtype (TVar a)        =
+      case lookup a ord of
+        Just x -> TVar x
+        Nothing -> error $ printf "Type variable %s not in signature %s" (show a) (show schema)
+
+initState :: Expr -> InferState
+initState e = InferState { _count = 0, _current = e}
+
+extend :: TypeEnv -> (String, Scheme) -> TypeEnv
+extend (TypeEnv env) (x, s) = TypeEnv $ Map.insert x s env
+
+emptyTyenv = TypeEnv Map.empty
+
+defaultTyenv :: TypeEnv
+defaultTyenv = TypeEnv (Map.fromList [
+    ("+",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
+    ("-",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
+    ("*",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
+    ("/",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
+    ("==", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
+    ("!=", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
+    ("<",  Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
+    ("<=", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
+    (">",  Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
+    (">=", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))
+  ])
+  where a = TV "a"
+        ta = TVar a
+
 instantiate ::  Scheme -> Infer Type
 instantiate (Forall as t) = do
   as' <- mapM (const fresh) as
@@ -194,6 +239,8 @@ lookupEnv (TypeEnv env) x =
                   return (nullSubst, t)
 
 toSchema = Forall []
+
+fromSchema (Forall [] t) = t
 
 withType meta t = meta { symbolType = toSchema t }
 
@@ -423,24 +470,6 @@ inferTop ctx env ((name, ex):xs) = case inferExpr ctx env ex of
   Right (ty, ex') -> case inferTop ctx (extend env (name, ty)) xs of
                         Left err -> Left err
                         Right (ty, exs) -> Right (ty, ex' : exs)
-normalize :: Scheme -> Scheme
-normalize (Forall ts body) = Forall (fmap snd ord) (normtype body)
-  where
-    ord = zip (List.nub $ fv body) (fmap TV letters)  -- from [b, c, c, d, f, e, g] -> [a, b, c, d, e, f]
-
-    fv (TVar a)   = [a]
-    fv (TypeFunc a b) = fv a ++ fv b
-    fv (TypeIdent _)   = []
-    fv (TypeApply t [])       = error "Should not be TypeApply without arguments!" -- TODO use NonEmpty List?
-    fv (TypeApply t args)   = fv t  -- FIXME args?
-
-    normtype (TypeFunc a b)  = TypeFunc  (normtype a) (normtype b)
-    normtype (TypeApply a b) = TypeApply (normtype a) b
-    normtype (TypeIdent a)   = TypeIdent a
-    normtype (TVar a)        =
-      case lookup a ord of
-        Just x -> TVar x
-        Nothing -> error "type variable not in signature"
 
 typeCheck :: Ctx -> [Expr] -> Either TypeError (TypeEnv, [Expr])
 typeCheck ctx exprs = do
