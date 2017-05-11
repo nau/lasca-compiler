@@ -140,9 +140,10 @@ select = do
 
 matchExpr = do
   reserved "match"
+  meta <- getMeta
   ex <- expr
   cs <- bracedCases
-  return $ Match ex cs
+  return $ Match meta ex cs
 
 bracedCases = braces $ some acase
 

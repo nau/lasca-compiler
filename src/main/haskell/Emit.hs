@@ -113,7 +113,7 @@ defineStringConstants (S.Let _ _ e body) = do
   defineStringConstants e
   defineStringConstants body
   return ()
-defineStringConstants (S.Match e cases) = do
+defineStringConstants (S.Match _ e cases) = do
   defineStringConstants e
   mapM_ (\(S.Case p e) -> defineStringConstants e) cases
   return ()
@@ -270,7 +270,7 @@ cgen ctx (S.BoxFunc funcName enclosedVars) = do
   let mapping = functions modState
   if null enclosedVars then boxFunc funcName mapping
   else boxClosure funcName mapping enclosedVars
-cgen ctx m@(S.Match expr cases) = do
+cgen ctx m@S.Match{} = do
   let result = genMatch ctx m
 --  Debug.traceM $ "Generated " ++ show result
   cgen ctx result
@@ -310,10 +310,10 @@ cgen ctx (S.If meta cond tr fl) = do
 cgen ctx e = error ("cgen shit " ++ show e)
 
 genMatch :: Ctx -> S.Expr -> S.Expr
-genMatch ctx m@(S.Match expr []) = error $ "Should be at least on case in match expression: " ++ show m
-genMatch ctx (S.Match expr cases) =
-  let body = foldr (\(S.Case p e) acc -> genPattern ctx (S.Ident S.emptyMeta "$match") p e acc) genFail cases
-  in  S.Let S.emptyMeta "$match" expr body  -- FIXME hack. Gen unique names
+genMatch ctx m@(S.Match meta expr []) = error $ "Should be at least on case in match expression: " ++ show m
+genMatch ctx (S.Match meta expr cases) =
+  let body = foldr (\(S.Case p e) acc -> genPattern ctx (S.Ident meta "$match") p e acc) genFail cases
+  in  S.Let meta "$match" expr body  -- FIXME hack. Gen unique names
 
 genFail = S.Apply S.emptyMeta (S.Ident S.emptyMeta "die") [S.Literal S.emptyMeta $ S.StringLit "Match error!"]
 

@@ -331,7 +331,7 @@ infer ctx env ex = case ex of
     setType $ Array (meta `withType` t) exprs'
     return (subst, t)
 
-  this@(Match expr cases) -> do
+  Match meta expr cases -> do
       tv <- fresh
       {-
         Consider data Role = Admin | Group(id: Int)
@@ -345,14 +345,16 @@ infer ctx env ex = case ex of
                                      i
       -}
       (s1, te) <- infer ctx env expr
+      e' <- gets _current
 --      Debug.traceM $ "Matching expression type " ++ show te
-      (s2, te') <- foldM (inferCase te) (s1, tv) cases
+      (s2, te', exprs') <- foldM (inferCase te) (s1, tv, []) cases
+      let cases' = map (\((Case pat e), e') -> Case pat e') (zip cases exprs')
 --      Debug.traceM $ printf "Matching result type %s in %s" (show te') (show s2)
-      modify (\s -> s {_current = this}) -- FIXME !!
+      setType $ Match (meta `withType` te') e' cases'
       return (s2, te')
       where
-            inferCase :: Type -> (Subst, Type) -> Case -> Infer (Subst, Type)
-            inferCase expectedType (s1, expectedResult) (Case pat e) = do
+            inferCase :: Type -> (Subst, Type, [Expr]) -> Case -> Infer (Subst, Type, [Expr])
+            inferCase expectedType (s1, expectedResult, exprs) (Case pat e) = do
               (env1, patType) <- getPatType env pat   -- (name -> String, User)
               su <- unify expectedType patType
               let env2 = substitute su env1
@@ -360,7 +362,9 @@ infer ctx env ex = case ex of
               (s2, te) <- infer ctx env2 e
               s3 <- unify expectedResult te
 --              Debug.traceM $ printf "s1 = %s, s2 = %s, s3 = %s, combined = %s" (show s1) (show s2) (show s3) (show (s3 `compose` s2 `compose` su `compose` s1))
-              return (s3 `compose` s2 `compose` su `compose` s1, substitute s3 te)
+              let resultType = substitute s3 te
+              e' <- gets _current
+              return (s3 `compose` s2 `compose` su `compose` s1, resultType, exprs ++ [e'])
 
             getPatType :: TypeEnv -> Pattern -> Infer (TypeEnv, Type)
             getPatType env pat = case pat of
