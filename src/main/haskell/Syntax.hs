@@ -63,6 +63,21 @@ data Expr
   | Data Meta Name [DataConst]
   deriving (Ord, Show)
 
+metaLens :: Lens.Lens' Expr Meta
+metaLens = Lens.lens (fst . getset) (snd . getset)
+    where getset expr = case expr of
+            Literal meta lit -> (meta, \ m -> Literal m lit)
+            Ident meta name -> (meta, \ m -> Ident m name)
+            Apply meta expr args -> (meta, \ m -> Apply m expr args)
+            Let meta name expr body -> (meta, \ m -> Let m name expr body)
+            Function meta name tpe args body -> (meta, \ m -> Function m name tpe args body)
+            _ -> error $ "Wat? " ++ show expr
+
+symbolTypeLens :: Lens.Lens' Meta Scheme
+symbolTypeLens = Lens.lens symbolType (\meta st -> meta { symbolType = st })
+
+getExprType expr = expr^.metaLens.symbolTypeLens
+
 instance Eq Expr where
   (Literal _ l) == (Literal _ r) = l == r
   (Ident _ l) == (Ident _ r) = l == r

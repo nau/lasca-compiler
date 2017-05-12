@@ -4,6 +4,7 @@ module Main where
 import Parser
 import Codegen
 import Emit
+import EmitStatic
 import JIT
 import Infer
 import Type
@@ -102,7 +103,7 @@ genModule opts modo source = do
               when (verboseMode opts) $ putStrLn "typechecked OK"
               when (printTypes opts) $ print env
               traceM $ show typedExprs
-              return $ codegenModule opts modo typedExprs
+              return $ codegenStaticModule opts modo typedExprs
             Left e -> die $ show e
           else return $ codegenModule opts modo ex
 

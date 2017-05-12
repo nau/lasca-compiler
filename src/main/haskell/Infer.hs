@@ -284,8 +284,8 @@ infer ctx env ex = case ex of
      let curried = List.foldl' (\expr arg -> Apply meta expr [arg]) e1 args
      (subst, t) <- infer ctx env curried
      e' <- gets _current
-     let uncurried = foldr (\_ (Apply _ e _) -> e) e' args
-     setType $ Apply (meta `withType` t) uncurried args
+     let (uncurried, args') = foldr (\_ ((Apply _ e [a']), as) -> (e, a':as)) (e', []) args
+     setType $ Apply (meta `withType` t) uncurried args'
      return (subst, t)
 
   Let meta x e1 e2 -> do
@@ -435,7 +435,7 @@ infer ctx env ex = case ex of
 
   Literal meta lit -> do
     let tpe = litType lit
-    setType $ Literal (meta `withType`tpe) lit
+    setType $ Literal (meta `withType` tpe) lit
     return (nullSubst, tpe)
   e -> error ("Wat? " ++ show e)
 

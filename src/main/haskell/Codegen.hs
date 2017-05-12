@@ -330,6 +330,8 @@ localName = LocalReference ptrType
 
 local name = localName (AST.Name name)
 
+localT name tpe = LocalReference tpe (AST.Name name)
+
 global :: Type -> String -> Operand
 global tpe name = constOp (C.GlobalReference tpe (AST.Name name))
 
@@ -366,6 +368,9 @@ ptrtoint op toTpe= instr2 toTpe (PtrToInt op toTpe [])
 inttoptr op toTpe= instr2 toTpe (IntToPtr op toTpe [])
 
 -- Effects
+add tpe lhs rhs = instr2 tpe $ Add False False lhs rhs []
+fadd lhs rhs = instr2 T.double $ FAdd NoFastMathFlags lhs rhs []
+
 call :: Operand -> [Operand] -> Codegen Operand
 call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 
