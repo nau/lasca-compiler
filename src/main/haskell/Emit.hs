@@ -350,7 +350,7 @@ gcMalloc size = callFn (funcType ptrType [T.i32]) "gcMalloc" [constIntOp size]
 
 box (S.BoolLit b) meta = callFn boxFuncType "boxBool" [constIntOp (boolToInt b)]
 box (S.IntLit  n) meta = callFn boxFuncType "boxInt" [constIntOp n]
-box (S.FloatLit  n) meta = callFn boxFuncType "boxFloat64" [constFloat n]
+box (S.FloatLit  n) meta = callFn boxFuncType "boxFloat64" [constFloatOp n]
 box S.UnitLit meta = callFn boxFuncType "box" [constIntOp 0,  constOp constNullPtr]
 box (S.StringLit s) meta = do
   let name = getStringLitName s

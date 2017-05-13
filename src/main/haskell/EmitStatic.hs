@@ -119,10 +119,18 @@ defineStringConstants (S.Match _ e cases) = do
   return ()
 defineStringConstants _ = return ()
 
+defaultValueForType tpe =
+  case tpe of
+    T.FloatingPointType 64 T.IEEE -> constFloat 0.0
+    _ -> constNull T.i8
+
+
+
 -- codegenTop :: S.Expr -> LLVM ()
-codegenTop ctx (S.Val meta name expr) = do
+codegenTop ctx this@(S.Val meta name expr) = do
   modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
-  defineGlobal (AST.Name name) ptrType (Just (C.Null ptrType))
+  let valType = llvmTypeOf this
+  defineGlobal (AST.Name name) valType (Just $ defaultValueForType valType)
 
 codegenTop ctx f@(S.Function meta name tpe args body) = do
   r1 <- defineStringConstants body
@@ -187,7 +195,9 @@ codegenStartFunc ctx = do
 
     gen (name, expr) = do
       v <- cgen ctx expr
-      store (global ptrType name) v
+      let t = llvmTypeOf expr
+      traceM $ "global type " ++ show t
+      store (global t name) v
       return v
 
 
@@ -238,7 +248,7 @@ cgen ctx (S.Literal meta l) = do
 --  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)
   case l of
     S.IntLit i -> return $ constIntOp i
-    S.FloatLit i -> return $ constFloat i
+    S.FloatLit i -> return $ constFloatOp i
     _        -> box l meta
 cgen ctx this@(S.Array meta exprs) = do
   vs <- values
@@ -270,10 +280,12 @@ cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
   lrhs <- cgen ctx rhs
   let lhsType = typeOf lhs
   let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
-  traceM $ show lhsType
   case (code, lhsType) of
     (10, TypeIdent "Int") -> add T.i32 llhs lrhs
     (10, TypeIdent "Float") -> fadd llhs lrhs
+    (11, TypeIdent "Float") -> fsub llhs lrhs
+    (12, TypeIdent "Float") -> fmul llhs lrhs
+    (13, TypeIdent "Float") -> fdiv llhs lrhs
     _  -> do
             let codeOp = constIntOp code
             callFn runtimeBinOpFuncType "runtimeBinOp" [codeOp, llhs, lrhs]
@@ -299,30 +311,19 @@ cgen ctx (S.Apply meta expr args) = do
       case typeOf this of
         TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
           arrayStructPtr <- bitcast array (T.ptr (T.StructureType False [T.i32, T.ptr T.double]))
-          traceM $ "Here 11" ++ show arrayStructPtr
           arrayPtr <- getelementptr arrayStructPtr [constIntOp 0, constIntOp 1]
           arrayPtr1 <- bitcast arrayPtr (T.ptr T.double)
-          traceM $ "Here 12" ++ show arrayPtr1
           ptr <- getelementptr arrayPtr1 [idx]
-          traceM $ "Here 13" ++ show ptr
-          traceM $ "Here " ++ show expr
           load ptr
         _ -> do
               boxedArrayPtr <- bitcast array (T.ptr $ T.StructureType False [T.i32, T.ptr $ T.StructureType False [T.i32, ptrType]]) -- Box(type, &Array(len, &data[])
-              traceM $ "Here1 " ++ show boxedArrayPtr
               arrayStructAddr <- getelementptr boxedArrayPtr [constInt64Op 0, constIntOp 1]
               arrayStructPtr <- load arrayStructAddr
-              traceM $ "Here2 " ++ show arrayStructPtr
---              arrayStruct <- bitcast arrayAddrPtr (T.ptr $ T.StructureType False [T.i32, ptrType]) -- Box(type, &Array(len, &data[])
               arraysize <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 0]
---              aa <- bitcast arraysize (T.ptr intType)
---              aa1 <- getelementptr aa [constIntOp 0]
               size <- load arraysize
---              s <- ptrtoint sptr intType
-              callFn ptrType "putInt" [size]
+              -- TODO check idx is in bounds, eliminatable
               arrayDataAddr <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 1]
               arraDataPtr <- load arrayDataAddr
-              traceM $ "Here3 " ++ show arrayDataAddr
               arrayDataArray <- bitcast arraDataPtr (T.ptr (T.ArrayType 0 ptrType))
               ptr' <- getelementptr arrayDataArray [constInt64Op 0, idx]
               load ptr'
@@ -427,7 +428,7 @@ gcMalloc size = callFn (funcType ptrType [T.i32]) "gcMalloc" [constIntOp size]
 
 box (S.BoolLit b) meta = callFn boxFuncType "boxBool" [constIntOp (boolToInt b)]
 box (S.IntLit  n) meta = callFn boxFuncType "boxInt" [constIntOp n]
-box (S.FloatLit  n) meta = callFn boxFuncType "boxFloat64" [constFloat n]
+box (S.FloatLit  n) meta = callFn boxFuncType "boxFloat64" [constFloatOp n]
 box S.UnitLit meta = callFn boxFuncType "box" [constIntOp 0,  constOp constNullPtr]
 box (S.StringLit s) meta = do
   let name = getStringLitName s

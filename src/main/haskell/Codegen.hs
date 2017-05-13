@@ -348,7 +348,8 @@ constIntOp :: Int -> Operand
 constIntOp i = constOp (C.Int 32 (toInteger i))
 constInt64Op i = constOp (C.Int 64 (toInteger i))
 
-constFloat i = constOp (C.Float (F.Double i))
+constFloat i = C.Float (F.Double i)
+constFloatOp = constOp . constFloat
 
 constByte b = constOp (C.Int 8 b)
 constBool b = C.Int 1 (if b then 1 else 0)
@@ -371,6 +372,9 @@ inttoptr op toTpe= instr2 toTpe (IntToPtr op toTpe [])
 -- Effects
 add tpe lhs rhs = instr2 tpe $ Add False False lhs rhs []
 fadd lhs rhs = instr2 T.double $ FAdd NoFastMathFlags lhs rhs []
+fsub lhs rhs = instr2 T.double $ FSub NoFastMathFlags lhs rhs []
+fmul lhs rhs = instr2 T.double $ FMul NoFastMathFlags lhs rhs []
+fdiv lhs rhs = instr2 T.double $ FDiv NoFastMathFlags lhs rhs []
 
 call :: Operand -> [Operand] -> Codegen Operand
 call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []

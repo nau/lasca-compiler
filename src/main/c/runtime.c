@@ -522,7 +522,6 @@ Box* boxArray(size_t size, ...) {
     array->data[i] = arg;
   }
   va_end (argp);                  /* Clean up. */
-  printf("Created array %d at %p with data at %p length at %p\n", array->length, (void *)array, array->data, &array->length);
   return box(ARRAY, array);
 }
 
