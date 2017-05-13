@@ -272,7 +272,7 @@ closure = braces cls
             reservedOp "->"
             letin <- blockStmts
             meta <- getMeta
-            let lambdas = foldr (\(Arg a _) expr -> Lam meta a expr) letin args
+            let lambdas = foldr (Lam meta) letin args
             return lambdas
 
 data LetVal = Named Name Expr | Stmt Expr

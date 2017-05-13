@@ -331,6 +331,11 @@ Box* arrayLength(Box* arrayValue) {
   return boxInt(array->length);
 }
 
+int arrayLength32(Box* arrayValue) {
+  Array* array = unbox(ARRAY, arrayValue);
+  return array->length;
+}
+
 String UNIMPLEMENTED_SELECT = {
   .length = 20,
   .bytes = "Unimplemented select"
@@ -696,6 +701,23 @@ Box* toInt(Box* s) {
   }
   free(cstr);
   return boxInt(i);
+}
+
+int toInt32(Box* s) {
+  String* str = unbox(STRING, s);
+//  println(s);
+  char* cstr = malloc(str->length + 1);
+  memcpy(cstr, str->bytes, str->length);
+  cstr[str->length] = 0;
+//  printf("cstr = %s\n", cstr);
+  char *ep;
+  long i = strtol(cstr, &ep, 10);
+  if (cstr == ep) {
+    printf("Couldn't convert %s to int", cstr);
+    exit( EXIT_FAILURE );
+  }
+  free(cstr);
+  return (int) i;
 }
 
 void initLascaRuntime(Runtime* runtime) {

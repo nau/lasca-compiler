@@ -32,6 +32,7 @@ import qualified LLVM.AST.CallingConvention as CC
 import qualified LLVM.AST.FloatingPointPredicate as FP
 import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.FunctionAttribute as FA
+import qualified LLVM.AST.IntegerPredicate as IPred
 
 import Data.Digest.Murmur32
 
@@ -371,6 +372,10 @@ inttoptr op toTpe= instr2 toTpe (IntToPtr op toTpe [])
 
 -- Effects
 add tpe lhs rhs = instr2 tpe $ Add False False lhs rhs []
+sub tpe lhs rhs = instr2 tpe $ Sub False False lhs rhs []
+intEq lhs rhs = do
+  bool <- instr2 T.i32 $ ICmp IPred.EQ lhs rhs []
+  instr2 T.i32 $ ZExt bool T.i32 []
 fadd lhs rhs = instr2 T.double $ FAdd NoFastMathFlags lhs rhs []
 fsub lhs rhs = instr2 T.double $ FSub NoFastMathFlags lhs rhs []
 fmul lhs rhs = instr2 T.double $ FMul NoFastMathFlags lhs rhs []

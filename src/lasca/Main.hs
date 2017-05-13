@@ -94,6 +94,7 @@ genModule opts modo source = do
       Left err -> die $ Megaparsec.parseErrorPretty err
       Right exprs -> do
           let ex = preludeExprs ++ exprs
+          print exprs
           when (verboseMode opts) $ putStrLn "Parsed OK"
           when (printAst opts) $ print ex
           when (verboseMode opts) $ putStrLn("Compiler mode is " ++ mode opts)

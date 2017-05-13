@@ -77,11 +77,11 @@ transformExpr transformer expr = case expr of
     e' <- go e
     body' <- go body
     transformer (S.Let meta n e' body')
-  (S.Lam m n e) -> do
+  (S.Lam m a@(S.Arg n t) e) -> do
     modify (\s -> s { _outers = _locals s } )
     modStateLocals .= Set.singleton n
     e' <- go e
-    transformer (S.Lam m n e')
+    transformer (S.Lam m a e')
   (S.Apply meta e args) -> do
     e' <- go e
     args' <- sequence [go arg | arg <- args]
@@ -282,6 +282,12 @@ cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
   let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
   case (code, lhsType) of
     (10, TypeIdent "Int") -> add T.i32 llhs lrhs
+    (11, TypeIdent "Int") -> sub T.i32 llhs lrhs
+    (42, TypeIdent "Int") -> do
+      bool <- intEq llhs lrhs
+      traceM "Here"
+      callFn boxFuncType "boxBool" [bool]
+--      return constTrue
     (10, TypeIdent "Float") -> fadd llhs lrhs
     (11, TypeIdent "Float") -> fsub llhs lrhs
     (12, TypeIdent "Float") -> fmul llhs lrhs
@@ -304,7 +310,7 @@ cgen ctx (S.Apply meta expr args) = do
      -- FIXME Here are BUGZZZZ!!!! :)
     this@(S.Ident meta fn) | isGlobal fn ->
       callFn ptrType fn largs
-    this@(S.Ident meta fn) | isArray this && length args == 1 && isIntType (head args) -> do
+    this | isArray this && length args == 1 && isIntType (head args) -> do
       -- this must be arrayApply
       idx <- cgen ctx (head args) -- must be T.i32. TODO should be platform-dependent
       array <- cgen ctx this -- should be a pointer to either boxed or unboxed array
@@ -519,7 +525,7 @@ declareStdFuncs = do
   addDefn $ AST.FunctionAttributes (FA.GroupID 0) [FA.ReadOnly]
 
 extractLambda :: S.Expr -> LLVM S.Expr
-extractLambda (S.Lam meta name expr) = do
+extractLambda (S.Lam meta arg expr) = do
   state <- get
   let nms = _modNames state
   let syntactic = _syntacticAst state
@@ -527,7 +533,7 @@ extractLambda (S.Lam meta name expr) = do
   let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
   let enclosedArgs = map (\n -> S.Arg n typeAny) usedOuterVars
   let (funcName, nms') = uniqueName "lambda" nms
-  let func = S.Function meta funcName typeAny (enclosedArgs ++ [S.Arg name typeAny]) expr
+  let func = S.Function meta funcName typeAny (enclosedArgs ++ [arg]) expr
   modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
 --   Debug.traceM ("Generated lambda " ++ show func ++ ", outerVars = " ++ show outerVars ++ ", usedOuterVars" ++ show usedOuterVars)
   return (S.BoxFunc funcName enclosedArgs)

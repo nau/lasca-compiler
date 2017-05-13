@@ -336,19 +336,31 @@ infer ctx env ex = case ex of
           argToType (Arg _ t) = t
           f z t = z `TypeFunc` t
 
-  Lam meta x e -> do
-      tv <- fresh
-      let env' = env `extend` (x, Forall [] tv)
-      (s1, t1) <- infer ctx env' e
-      e' <- gets _current
-      let resultType = substitute s1 tv `TypeFunc` t1
-      setType $ Lam (meta `withType` resultType) x e'
-      return (s1, resultType)
+  Lam meta arg@(Arg x argType) e -> do
+      case argType of
+        TypeIdent "Any" -> do
+          tv <- fresh
+          let env' = env `extend` (x, Forall [] tv)
+          (s1, t1) <- infer ctx env' e
+          e' <- gets _current
+          let resultType = substitute s1 tv `TypeFunc` t1
+          setType $ Lam (meta `withType` resultType) arg e'
+          return (s1, resultType)
+        _ -> do
+          let generalizedArgType = generalize env argType
+          let env' = env `extend` (x, generalizedArgType)
+          (s1, t1) <- infer ctx env' e
+          e' <- gets _current
+          intstantiatedArgType <- instantiate generalizedArgType
+          let resultType = substitute s1 intstantiatedArgType `TypeFunc` t1
+          setType $ Lam (meta `withType` resultType) arg e'
+          return (s1, resultType)
+
 
   Function meta name tpe args e -> do
-    let largs = map (\(Arg a _) -> a) args
     -- functions are recursive, so do Fixpoint for inference
-    let curried = foldr (\arg expr -> Lam emptyMeta arg expr) e (name:largs)
+    let nameArg = Arg name typeAny
+    let curried = foldr (Lam meta) e (nameArg : args)
     tv <- fresh
     tv1 <- fresh
     -- fixpoint
@@ -358,7 +370,7 @@ infer ctx env ex = case ex of
     s2 <- unify composedType ((tv `TypeFunc` tv) `TypeFunc` tv)
     let (s, t) = (s2 `compose` s1, substitute s2 tv1)
     e' <- gets _current
-    let uncurried = foldr (\_ (Lam _ _ e) -> e) e' (name:largs)
+    let uncurried = foldr (\_ (Lam _ _ e) -> e) e' (nameArg : args)
     setType $ Function (meta `withType` t) name tpe args uncurried
 --    traceM $ printf "def %s(%s): %s, subs: %s" name (List.intercalate "," $ map show args) (show t) (show s)
     return (s, t)

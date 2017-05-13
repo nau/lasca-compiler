@@ -77,11 +77,11 @@ transformExpr transformer expr = case expr of
     e' <- go e
     body' <- go body
     transformer (S.Let meta n e' body')
-  (S.Lam m n e) -> do
+  (S.Lam m a@(S.Arg n t) e) -> do
     modify (\s -> s { _outers = _locals s } )
     modStateLocals .= Set.singleton n
     e' <- go e
-    transformer (S.Lam m n e')
+    transformer (S.Lam m a e')
   (S.Apply meta e args) -> do
     e' <- go e
     args' <- sequence [go arg | arg <- args]
@@ -441,7 +441,7 @@ declareStdFuncs = do
   addDefn $ AST.FunctionAttributes (FA.GroupID 0) [FA.ReadOnly]
 
 extractLambda :: S.Expr -> LLVM S.Expr
-extractLambda (S.Lam meta name expr) = do
+extractLambda (S.Lam meta arg expr) = do
   state <- get
   let nms = _modNames state
   let syntactic = _syntacticAst state
@@ -449,7 +449,7 @@ extractLambda (S.Lam meta name expr) = do
   let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
   let enclosedArgs = map (\n -> S.Arg n typeAny) usedOuterVars
   let (funcName, nms') = uniqueName "lambda" nms
-  let func = S.Function meta funcName typeAny (enclosedArgs ++ [S.Arg name typeAny]) expr
+  let func = S.Function meta funcName typeAny (enclosedArgs ++ [arg]) expr
   modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
 --   Debug.traceM ("Generated lambda " ++ show func ++ ", outerVars = " ++ show outerVars ++ ", usedOuterVars" ++ show usedOuterVars)
   return (S.BoxFunc funcName enclosedArgs)

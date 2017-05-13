@@ -44,8 +44,13 @@ Neptune = [
 
 Sun = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, SolarMass]
 
-def go(bodies, i, pxyz) = {
+
+def go(bodies: Array (Array Float), i, pxyz) = {
+  arrayLength(bodies);
   body = bodies(i);
+  arrayLength(body);
+  arrayLength(pxyz);
+  pxyz(0) + 0.0;
   updatedPs = [
     pxyz(0) + body(3) * body(6),
     pxyz(1) + body(4) * body(6),
@@ -53,7 +58,7 @@ def go(bodies, i, pxyz) = {
   ];
   if i == 0 then updatedPs else go(bodies, i - 1, updatedPs)
 }
-
+{-
 def offsetMomentum(object, px, py, pz) = {
   vx = (0.0 - px) / SolarMass;
   vy = (0.0 - py) / SolarMass;
@@ -211,13 +216,18 @@ def energy(bodies) = {
 }
 
 def calculate(i, bodies) = if i > 0 then calculate(i - 1, advance(bodies, 0.01)) else bodies
+-}
 
 def main() = {
   -- set to 50000000 for real benchmark
-  numIterations = getArgs()(1).toInt;
+  arg = getArgs()(1);
+  numIterations = toInt32(arg);
   bodies = [Sun, Jupiter, Saturn, Uranus, Neptune];
-  initedBodies = init(bodies);
-  println(toString(energy(initedBodies)));
-  advanced = calculate(numIterations, initedBodies);
-  println(toString(energy(advanced)));
+  len = arrayLength32(bodies);
+  putInt(len);
+--  initedBodies = init(bodies);
+--  println(toString(energy(initedBodies)));
+--  advanced = calculate(numIterations, initedBodies);
+--  println(toString(energy(advanced)));
+  println("2")
 }

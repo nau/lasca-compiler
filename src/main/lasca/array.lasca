@@ -1,18 +1,9 @@
-Pi = 3.141592653589793
-SolarMass = 4.0 * Pi * Pi
-DaysPerYear = 365.24
-Jupiter = [
-   4.84143144246472090e+00,                  -- x
-  -1.16032004402742839e+00,                  -- y
-  -1.03622044471123109e-01,                  -- z
-   1.66007664274403694e-03 * DaysPerYear,    -- vx
-   7.69901118419740425e-03 * DaysPerYear,    -- vy
-  -6.90460016972063023e-05 * DaysPerYear,    -- vz
-   9.54791938424326609e-04 * SolarMass       -- mass
-]
-
 def returnArray(s) = {
 --  a = [2.0, 3.0];
+--  args = ["12", "13"];
+  first = getArgs();
+  ff = first(0);
+  println(ff);
 --  b = [a, [4.0, 5.5, s]];
 --  c = b(1);
 --  putchard(c(2));

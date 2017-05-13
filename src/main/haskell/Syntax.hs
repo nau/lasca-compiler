@@ -51,7 +51,7 @@ data Expr
   | Ident Meta Name
   | Val Meta Name Expr
   | Apply Meta Expr [Expr]
-  | Lam Meta String Expr
+  | Lam Meta Arg Expr
   | Select Meta Expr Expr
   | Match Meta Expr [Case]
   | BoxFunc Name [Arg]   -- LLVM codegen only
