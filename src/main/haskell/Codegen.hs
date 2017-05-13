@@ -346,6 +346,7 @@ constInt i = C.Int 32 (toInteger i)
 
 constIntOp :: Int -> Operand
 constIntOp i = constOp (C.Int 32 (toInteger i))
+constInt64Op i = constOp (C.Int 64 (toInteger i))
 
 constFloat i = constOp (C.Float (F.Double i))
 

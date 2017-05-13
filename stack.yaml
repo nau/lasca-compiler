@@ -3,15 +3,17 @@ packages:
 - '.'
 flags:
 ghc-options:
+  lasca:
+    -O0
   library:
     -O0
     -rtsopts
     -Wincomplete-patterns
-    -fprof-auto
+#    -fprof-auto
   lasca-test:
     -O0
     -rtsopts
-    -prof
+#    -prof
 #    -auto-all
 #    -caf-all
 #    -Wall

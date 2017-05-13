@@ -1,11 +1,21 @@
 def returnArray(s) = {
-  a = 2;
-  a + 2 + s;
+  a = [2.0, 3.0];
+  b = [a, [4.0, 5.5, s]];
+  c = b(1);
+  putchard(c(2));
+--  println(b.toString);
+--  b = a(1);
+--  putchard(a(0));
+--  println(b(0).toString);
+--  array = [a];
+--  array1 = array(0);
+--  array1(1);
+  s + 1.5
 }
 
 
 def main() = {
-  res = returnArray(3);
+  res = returnArray(3.14);
   println("Hello")
 }
 

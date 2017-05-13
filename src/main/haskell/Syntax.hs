@@ -68,10 +68,17 @@ metaLens = Lens.lens (fst . getset) (snd . getset)
     where getset expr = case expr of
             Literal meta lit -> (meta, \ m -> Literal m lit)
             Ident meta name -> (meta, \ m -> Ident m name)
+            Val meta name expr -> (meta, \ m -> Val m name expr)
             Apply meta expr args -> (meta, \ m -> Apply m expr args)
-            Let meta name expr body -> (meta, \ m -> Let m name expr body)
+            Lam meta name expr -> (meta, \ m -> Lam m name expr)
+            Select meta tree expr -> (meta, \ m -> Select m tree expr)
+            Match meta expr cases -> (meta, \ m -> Match m expr cases)
             Function meta name tpe args body -> (meta, \ m -> Function m name tpe args body)
-            _ -> error $ "Wat? " ++ show expr
+            If meta cond tr fl -> (meta, \ m -> If m cond tr fl)
+            Let meta name expr body -> (meta, \ m -> Let m name expr body)
+            Array meta exprs -> (meta, \ m -> Array m exprs)
+            Data meta name constrs -> (meta, \ m -> Data m name constrs)
+            _ -> error $ "Should not happen :) " ++ show expr
 
 symbolTypeLens :: Lens.Lens' Meta Scheme
 symbolTypeLens = Lens.lens symbolType (\meta st -> meta { symbolType = st })

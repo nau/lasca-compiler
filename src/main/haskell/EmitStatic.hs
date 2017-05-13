@@ -240,9 +240,23 @@ cgen ctx (S.Literal meta l) = do
     S.IntLit i -> return $ constIntOp i
     S.FloatLit i -> return $ constFloat i
     _        -> box l meta
-cgen ctx (S.Array _ exprs) = do
+cgen ctx this@(S.Array meta exprs) = do
   vs <- values
-  boxArray vs
+  case typeOf this of
+     TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
+       let len = length vs
+       let arrayType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.double]
+       nullptr <- getelementptr (constOp (constNull arrayType)) [constIntOp 1]
+       sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
+       ptr <- callFn (funcType ptrType [T.i32]) "gcMalloc" [sizeof]
+       arrayPtr <- bitcast ptr (T.ptr arrayType)
+       sizePtr <- getelementptr arrayPtr [constIntOp 0, constIntOp 0]
+       store sizePtr (constIntOp len)
+       forM_ (zip vs [0..]) $ \(v, i) -> do
+         p <- getelementptr arrayPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, ith element]
+         store p v
+       return ptr
+     _ -> boxArray vs
   where values = sequence [cgen ctx e | e <- exprs]
 cgen ctx (S.Select meta tree expr) = do
   tree <- cgen ctx tree
@@ -268,13 +282,51 @@ cgen ctx (S.Apply meta expr args) = do
   largs <- mapM (cgen ctx) args
   let symMap = Map.fromList syms
   let isGlobal fn = (fn `Set.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
+  let isArray expr = case typeOf expr of
+                       TypeApply (TypeIdent "Array") _ -> True
+                       _ -> False
+  let isIntType expr = case typeOf expr of
+                          TypeIdent "Int" -> True
+                          _ -> False
   case expr of
-     -- TODO Here are BUGZZZZ!!!! :)
-     -- TODO check arguments!
-     -- this is done to speed-up calls if you `a global function
-    S.Ident meta fn | isGlobal fn ->
-      
+     -- FIXME Here are BUGZZZZ!!!! :)
+    this@(S.Ident meta fn) | isGlobal fn ->
       callFn ptrType fn largs
+    this@(S.Ident meta fn) | isArray this && length args == 1 && isIntType (head args) -> do
+      -- this must be arrayApply
+      idx <- cgen ctx (head args) -- must be T.i32. TODO should be platform-dependent
+      array <- cgen ctx this -- should be a pointer to either boxed or unboxed array
+      case typeOf this of
+        TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
+          arrayStructPtr <- bitcast array (T.ptr (T.StructureType False [T.i32, T.ptr T.double]))
+          traceM $ "Here 11" ++ show arrayStructPtr
+          arrayPtr <- getelementptr arrayStructPtr [constIntOp 0, constIntOp 1]
+          arrayPtr1 <- bitcast arrayPtr (T.ptr T.double)
+          traceM $ "Here 12" ++ show arrayPtr1
+          ptr <- getelementptr arrayPtr1 [idx]
+          traceM $ "Here 13" ++ show ptr
+          traceM $ "Here " ++ show expr
+          load ptr
+        _ -> do
+              boxedArrayPtr <- bitcast array (T.ptr $ T.StructureType False [T.i32, T.ptr $ T.StructureType False [T.i32, ptrType]]) -- Box(type, &Array(len, &data[])
+              traceM $ "Here1 " ++ show boxedArrayPtr
+              arrayStructAddr <- getelementptr boxedArrayPtr [constInt64Op 0, constIntOp 1]
+              arrayStructPtr <- load arrayStructAddr
+              traceM $ "Here2 " ++ show arrayStructPtr
+--              arrayStruct <- bitcast arrayAddrPtr (T.ptr $ T.StructureType False [T.i32, ptrType]) -- Box(type, &Array(len, &data[])
+              arraysize <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 0]
+--              aa <- bitcast arraysize (T.ptr intType)
+--              aa1 <- getelementptr aa [constIntOp 0]
+              size <- load arraysize
+--              s <- ptrtoint sptr intType
+              callFn ptrType "putInt" [size]
+              arrayDataAddr <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 1]
+              arraDataPtr <- load arrayDataAddr
+              traceM $ "Here3 " ++ show arrayDataAddr
+              arrayDataArray <- bitcast arraDataPtr (T.ptr (T.ArrayType 0 ptrType))
+              ptr' <- getelementptr arrayDataArray [constInt64Op 0, idx]
+              load ptr'
+          
     expr -> do
       modState <- gets moduleState
       e <- cgen ctx expr

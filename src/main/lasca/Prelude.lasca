@@ -1,3 +1,5 @@
+extern def putchard(x: Float): Unit
+extern def putInt(d: Int): Unit
 extern def runtimePutchar(d: Int): Unit
 extern def println(s: String): Unit
 extern def append(array: Array a, v: a): Array a

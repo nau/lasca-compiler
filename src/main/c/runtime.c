@@ -477,12 +477,14 @@ Box* runtimeIsConstr(Box* value, Box* constrName) {
 }
 /* ================== IO ================== */
 
-void putInt(int c) {
-  putchar(c + 48);
+void* putInt(int c) {
+  printf("%d\n", c);
+  fflush(stdout);
+  return 0;
 }
 
-double putchard(double X) {
-  putchar((char)X);
+void* putchard(double X) {
+  printf("%12.9lf\n", X);
   fflush(stdout);
   return 0;
 }
@@ -520,6 +522,7 @@ Box* boxArray(size_t size, ...) {
     array->data[i] = arg;
   }
   va_end (argp);                  /* Clean up. */
+  printf("Created array %d at %p with data at %p length at %p\n", array->length, (void *)array, array->data, &array->length);
   return box(ARRAY, array);
 }
 
