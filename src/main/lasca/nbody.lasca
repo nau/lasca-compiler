@@ -45,7 +45,7 @@ Neptune = [
 Sun = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, SolarMass]
 
 
-def go(bodies: Array (Array Float), i: Int, pxyz: Array Float) = {
+def go(bodies: [[Float]], i: Int, pxyz: [Float]) = {
   body = bodies(i);
   updatedPs = [
     pxyz(0) + body(3) * body(6),
@@ -55,7 +55,7 @@ def go(bodies: Array (Array Float), i: Int, pxyz: Array Float) = {
   if i == 0 then updatedPs else go(bodies, i - 1, updatedPs);
 }
 
-def offsetMomentum(object: Array Float, px, py, pz) = {
+def offsetMomentum(object: [Float], px, py, pz) = {
   vx = (0.0 - px) / SolarMass;
   vy = (0.0 - py) / SolarMass;
   vz = (0.0 - pz) / SolarMass;
@@ -65,7 +65,7 @@ def offsetMomentum(object: Array Float, px, py, pz) = {
   ]
 }
 
-def init(bodies: Array (Array Float)) = {
+def init(bodies: [[Float]]) = {
   len = arrayLength32(bodies);
   pxyzInit = [0.0, 0.0, 0.0];
   offsets = go(bodies, len - 1, pxyzInit);
@@ -73,7 +73,7 @@ def init(bodies: Array (Array Float)) = {
   [sun, bodies(1), bodies(2), bodies(3), bodies(4)]
 }
 
-def advanceInner(from: Array Float, to: Array Float, dt) = {
+def advanceInner(from: [Float], to: [Float], dt) = {
   dx = from(0) - to(0);
   dy = from(1) - to(1);
   dz = from(2) - to(2);
@@ -96,7 +96,7 @@ def advanceInner(from: Array Float, to: Array Float, dt) = {
   ]
 }
 
-def advance(bodies: Array (Array Float), dt) = {
+def advance(bodies: [[Float]], dt) = {
   r01 = advanceInner(bodies(0), bodies(1), dt);
   r02 = advanceInner(r01(0),    bodies(2), dt);
   r03 = advanceInner(r02(0),    bodies(3), dt);
@@ -153,7 +153,7 @@ def advance(bodies: Array (Array Float), dt) = {
 
 def squared(x: Float, y, z) = x * x + y * y + z * z
 
-def energyInner(bodies: Array (Array Float), from: Array Float, to: Array Float) = {
+def energyInner(bodies: [[Float]], from: [Float], to: [Float]) = {
   dx = from(0) - to(0);
   dy = from(1) - to(1);
   dz = from(2) - to(2);
@@ -161,7 +161,7 @@ def energyInner(bodies: Array (Array Float), from: Array Float, to: Array Float)
   from(6) * to(6) / distance;
 }
 
-def energy(bodies: Array (Array Float)) = {
+def energy(bodies: [[Float]]) = {
   sun = bodies(0);
   sunVx = sun(3);
   sunVy = sun(4);

@@ -191,8 +191,9 @@ variable = do
 
 makeType name = if Char.isLower $ List.head name then TVar $ TV name else TypeIdent name
 
-typeTerm = makeType <$> identifier
+typeTerm = ((\t -> TypeApply (TypeIdent "Array") [t]) <$> brackets typeExpr)
        <|> parens typeExpr
+       <|> (makeType <$> identifier)
 
 typeFunc =  do
   reservedOp "->"
