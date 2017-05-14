@@ -55,7 +55,7 @@ def go(bodies: Array (Array Float), i: Int, pxyz: Array Float) = {
   if i == 0 then updatedPs else go(bodies, i - 1, updatedPs);
 }
 
-def offsetMomentum(object: Array Float, px: Float, py, pz) = {
+def offsetMomentum(object: Array Float, px, py, pz) = {
   vx = (0.0 - px) / SolarMass;
   vy = (0.0 - py) / SolarMass;
   vz = (0.0 - pz) / SolarMass;
@@ -64,15 +64,15 @@ def offsetMomentum(object: Array Float, px: Float, py, pz) = {
     object(6)
   ]
 }
-{-
-def init(bodies) = {
-  len = arrayLength(bodies);
+
+def init(bodies: Array (Array Float)) = {
+  len = arrayLength32(bodies);
   pxyzInit = [0.0, 0.0, 0.0];
   offsets = go(bodies, len - 1, pxyzInit);
   sun = offsetMomentum(bodies(0), offsets(0), offsets(1), offsets(2));
   [sun, bodies(1), bodies(2), bodies(3), bodies(4)]
 }
-
+{-
 def advanceInner(from, to, dt) = {
   dx = from(0) - to(0);
   dy = from(1) - to(1);

@@ -146,7 +146,7 @@ codegenTop ctx f@(S.Function meta name tpe args body) = do
   where
     funcType = typeOf f
     largs = map (\(n, t) -> (t, AST.Name n)) argsWithTypes
-    argsWithTypes = snd $ foldr (\(S.Arg name _) (TypeFunc a b, acc) -> (b, (name, typeMapping a) : acc)) (funcType, []) (reverse args)
+    argsWithTypes = reverse $ snd $ foldr (\(S.Arg name _) (TypeFunc a b, acc) -> (b, (name, typeMapping a) : acc)) (funcType, []) (reverse args)
     codeGen modState = execCodegen [] modState $ do
 --      Debug.traceM $ printf "argsWithTypes %s" (show argsWithTypes)
       entry <- addBlock entryBlockName
