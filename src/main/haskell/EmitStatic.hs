@@ -197,7 +197,7 @@ codegenStartFunc ctx = do
     gen (name, expr) = do
       v <- cgen ctx expr
       let t = llvmTypeOf expr
-      traceM $ "global type " ++ show t
+--      traceM $ "global type " ++ show t
       store (global t name) v
       return v
 
@@ -286,6 +286,9 @@ cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
     (11, TypeIdent "Int") -> sub T.i32 llhs lrhs
     (42, TypeIdent "Int") -> do
       bool <- intEq llhs lrhs
+      callFn boxFuncType "boxBool" [bool]
+    (47, TypeIdent "Int") -> do
+      bool <- intGt llhs lrhs
       callFn boxFuncType "boxBool" [bool]
     (10, TypeIdent "Float") -> fadd llhs lrhs
     (11, TypeIdent "Float") -> fsub llhs lrhs

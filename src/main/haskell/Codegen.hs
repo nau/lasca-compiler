@@ -376,6 +376,9 @@ sub tpe lhs rhs = instr2 tpe $ Sub False False lhs rhs []
 intEq lhs rhs = do
   bool <- instr2 T.i32 $ ICmp IPred.EQ lhs rhs []
   instr2 T.i32 $ ZExt bool T.i32 []
+intGt lhs rhs = do
+  bool <- instr2 T.i32 $ ICmp IPred.SGT lhs rhs []
+  instr2 T.i32 $ ZExt bool T.i32 []
 fadd lhs rhs = instr2 T.double $ FAdd NoFastMathFlags lhs rhs []
 fsub lhs rhs = instr2 T.double $ FSub NoFastMathFlags lhs rhs []
 fmul lhs rhs = instr2 T.double $ FMul NoFastMathFlags lhs rhs []

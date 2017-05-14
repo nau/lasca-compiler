@@ -9,6 +9,7 @@ extern def arrayLength(array: Array a): Int
 extern def arrayLength32(array: Array a): Int
 extern def toString(a: a): String
 extern def lasqrt(a: Float): Float
+extern def sqrt(a: Float): Float
 extern def getArgs(): Array String
 extern def toInt(s: a): Int
 extern def toInt32(s: a): Int
