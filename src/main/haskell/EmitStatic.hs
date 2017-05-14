@@ -146,14 +146,15 @@ codegenTop ctx f@(S.Function meta name tpe args body) = do
   where
     funcType = typeOf f
     largs = map (\(n, t) -> (t, AST.Name n)) argsWithTypes
-    argsWithTypes = snd $ foldr (\(S.Arg name _) (TypeFunc a b, acc) -> (b, (name, typeMapping a) : acc)) (funcType, []) args
+    argsWithTypes = snd $ foldr (\(S.Arg name _) (TypeFunc a b, acc) -> (b, (name, typeMapping a) : acc)) (funcType, []) (reverse args)
     codeGen modState = execCodegen [] modState $ do
+--      Debug.traceM $ printf "argsWithTypes %s" (show argsWithTypes)
       entry <- addBlock entryBlockName
       setBlock entry
---       Debug.traceM ("Generating function2 " ++ name)
       forM_ argsWithTypes $ \(n, t) -> do
         var <- alloca t
         store var (localT n t)
+--        Debug.traceM $ printf "assign %s: %s = %s" n (show t) (show var)
         assign n var
       cgen ctx body >>= ret
 
@@ -285,9 +286,7 @@ cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
     (11, TypeIdent "Int") -> sub T.i32 llhs lrhs
     (42, TypeIdent "Int") -> do
       bool <- intEq llhs lrhs
-      traceM "Here"
       callFn boxFuncType "boxBool" [bool]
---      return constTrue
     (10, TypeIdent "Float") -> fadd llhs lrhs
     (11, TypeIdent "Float") -> fsub llhs lrhs
     (12, TypeIdent "Float") -> fmul llhs lrhs
