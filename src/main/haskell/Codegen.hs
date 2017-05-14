@@ -373,6 +373,8 @@ inttoptr op toTpe= instr2 toTpe (IntToPtr op toTpe [])
 -- Effects
 add tpe lhs rhs = instr2 tpe $ Add False False lhs rhs []
 sub tpe lhs rhs = instr2 tpe $ Sub False False lhs rhs []
+mul tpe lhs rhs = instr2 tpe $ Mul False False lhs rhs []
+div tpe lhs rhs = instr2 tpe $ SDiv True lhs rhs []
 intEq lhs rhs = do
   bool <- instr2 T.i32 $ ICmp IPred.EQ lhs rhs []
   instr2 T.i32 $ ZExt bool T.i32 []

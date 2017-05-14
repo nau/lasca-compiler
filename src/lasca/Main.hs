@@ -3,7 +3,7 @@ module Main where
 
 import Parser
 import Codegen
-import Emit
+import EmitDynamic
 import EmitStatic
 import JIT
 import Infer

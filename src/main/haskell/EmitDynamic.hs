@@ -2,8 +2,8 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE Strict #-}
 
-module EmitStatic (
-  codegenStaticModule
+module EmitDynamic (
+  codegenModule
 ) where
 
 import LLVM.Module
@@ -45,13 +45,13 @@ import Control.Lens.Operators
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
-import Debug.Trace as Debug
+import qualified Debug.Trace as Debug
 
 import Codegen
 import Type
-import Emit
 import qualified Syntax as S
 import Syntax (Ctx, createGlobalContext)
+import Emit
 
 
 externArgsToSig :: [S.Arg] -> [(S.Name, AST.Type)]
@@ -61,21 +61,12 @@ uncurryLambda expr = go expr ([], expr) where
   go (S.Lam _ name e) result = let (args, body) = go e result in (name : args, body)
   go e (args, _) = (args, e)
 
-
-defaultValueForType tpe =
-  case tpe of
-    T.FloatingPointType 64 T.IEEE -> constFloat 0.0
-    _ -> constNull T.i8
-
-
-
 -- codegenTop :: S.Expr -> LLVM ()
-codegenTop ctx this@(S.Val meta name expr) = do
+codegenTop ctx (S.Val _ name expr) = do
   modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
-  let valType = llvmTypeOf this
-  defineGlobal (AST.Name name) valType (Just $ defaultValueForType valType)
+  defineGlobal (AST.Name name) ptrType (Just (C.Null ptrType))
 
-codegenTop ctx f@(S.Function meta name tpe args body) = do
+codegenTop ctx (S.Function meta name tpe args body) = do
   r1 <- defineStringConstants body
 --   Debug.traceM ("Generating function1 " ++ name ++ (show r1))
 --   defineClosures ctx name body
@@ -84,20 +75,16 @@ codegenTop ctx f@(S.Function meta name tpe args body) = do
   let codeGenResult = codeGen modState
   let blocks = createBlocks codeGenResult
   mapM_ defineStringLit (generatedStrings codeGenResult)
-  let retType = mappedReturnType args funcType
-  define retType name largs blocks
+  define ptrType name largs blocks
   where
-    funcType = typeOf f
-    largs = map (\(n, t) -> (t, AST.Name n)) argsWithTypes
-    argsWithTypes = reverse $ snd $ foldr (\(S.Arg name _) (TypeFunc a b, acc) -> (b, (name, typeMapping a) : acc)) (funcType, []) (reverse args)
+    largs = toSig args
     codeGen modState = execCodegen [] modState $ do
---      Debug.traceM $ printf "argsWithTypes %s" (show argsWithTypes)
       entry <- addBlock entryBlockName
       setBlock entry
-      forM_ argsWithTypes $ \(n, t) -> do
-        var <- alloca t
-        store var (localT n t)
---        Debug.traceM $ printf "assign %s: %s = %s" n (show t) (show var)
+--       Debug.traceM ("Generating function2 " ++ name)
+      forM_ args $ \(S.Arg n t) -> do
+        var <- alloca ptrType
+        store var (local n)
         assign n var
       cgen ctx body >>= ret
 
@@ -139,35 +126,22 @@ codegenStartFunc ctx = do
 
     gen (name, expr) = do
       v <- cgen ctx expr
-      let t = llvmTypeOf expr
---      traceM $ "global type " ++ show t
-      store (global t name) v
+      store (global ptrType name) v
       return v
 
 
+-- Dynamic mode
 typeMapping :: Type -> AST.Type
-typeMapping t = case t of
-                  TypeIdent "Int" -> T.i32
-                  TypeIdent "Float" -> T.double
---                  TypeIdent "Unit" -> T.void
-                  _                -> ptrType
-
-fromSchema (Forall [] t) = t
-fromSchema t = error $ "Unsupported type " ++ show t
-
-typeOf = fromSchema . S.getExprType
-llvmTypeOf = typeMapping . typeOf
-mappedReturnType args t = typeMapping $ returnType args t
-returnType args t = foldr f t args
-  where f arg (TypeFunc a b) = b
-        f arg t = t
+-- FIXME currently we assume every function returns a result and can't be Unit/void
+--typeMapping (TypeIdent "Unit") = T.void
+typeMapping _ = ptrType
 -------------------------------------------------------------------------------
 -- Operations
 -------------------------------------------------------------------------------
 
 cgen :: Ctx -> S.Expr -> Codegen AST.Operand
 cgen ctx (S.Let meta a b c) = do
-  i <- alloca $ llvmTypeOf b
+  i <- alloca ptrType
   val <- cgen ctx b
   store i val
   assign a i
@@ -183,29 +157,12 @@ cgen ctx (S.Ident meta name) = do
     Nothing | name `Set.member` S._globalFunctions ctx -> boxFunc name mapping
             | name `Set.member` S._globalVals ctx -> load (global ptrType name)
             | otherwise -> boxError name
-cgen ctx (S.Literal meta l) = do
+cgen ctx (S.Literal l meta) = do
 --  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)
-  case l of
-    S.IntLit i -> return $ constIntOp i
-    S.FloatLit i -> return $ constFloatOp i
-    _        -> box l meta
-cgen ctx this@(S.Array meta exprs) = do
+  box meta l
+cgen ctx (S.Array _ exprs) = do
   vs <- values
-  case typeOf this of
-     TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
-       let len = length vs
-       let arrayType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.double]
-       nullptr <- getelementptr (constOp (constNull arrayType)) [constIntOp 1]
-       sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
-       ptr <- callFn (funcType ptrType [T.i32]) "gcMalloc" [sizeof]
-       arrayPtr <- bitcast ptr (T.ptr arrayType)
-       sizePtr <- getelementptr arrayPtr [constIntOp 0, constIntOp 0]
-       store sizePtr (constIntOp len)
-       forM_ (zip vs [0..]) $ \(v, i) -> do
-         p <- getelementptr arrayPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, ith element]
-         store p v
-       return ptr
-     _ -> boxArray vs
+  boxArray vs
   where values = sequence [cgen ctx e | e <- exprs]
 cgen ctx (S.Select meta tree expr) = do
   tree <- cgen ctx tree
@@ -217,65 +174,19 @@ cgen ctx (S.Apply meta (S.Ident _ "and") [lhs, rhs]) = cgen ctx (S.If meta lhs r
 cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
   llhs <- cgen ctx lhs
   lrhs <- cgen ctx rhs
-  let lhsType = typeOf lhs
   let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
-  case (code, lhsType) of
-    (10, TypeIdent "Int") -> add T.i32 llhs lrhs
-    (11, TypeIdent "Int") -> sub T.i32 llhs lrhs
-    (12, TypeIdent "Int") -> mul T.i32 llhs lrhs
-    (13, TypeIdent "Int") -> Codegen.div T.i32 llhs lrhs
-    (42, TypeIdent "Int") -> do
-      bool <- intEq llhs lrhs
-      callFn boxFuncType "boxBool" [bool]
-    (47, TypeIdent "Int") -> do
-      bool <- intGt llhs lrhs
-      callFn boxFuncType "boxBool" [bool]
-    (10, TypeIdent "Float") -> fadd llhs lrhs
-    (11, TypeIdent "Float") -> fsub llhs lrhs
-    (12, TypeIdent "Float") -> fmul llhs lrhs
-    (13, TypeIdent "Float") -> fdiv llhs lrhs
-    _  -> do
-            let codeOp = constIntOp code
-            callFn runtimeBinOpFuncType "runtimeBinOp" [codeOp, llhs, lrhs]
+  let codeOp = constIntOp code
+  callFn runtimeBinOpFuncType "runtimeBinOp" [codeOp, llhs, lrhs]
 cgen ctx (S.Apply meta expr args) = do
   syms <- gets symtab
   largs <- mapM (cgen ctx) args
   let symMap = Map.fromList syms
   let isGlobal fn = (fn `Set.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
-  let isArray expr = case typeOf expr of
-                       TypeApply (TypeIdent "Array") _ -> True
-                       _ -> False
-  let isIntType expr = case typeOf expr of
-                          TypeIdent "Int" -> True
-                          _ -> False
   case expr of
-     -- FIXME Here are BUGZZZZ!!!! :)
-    this@(S.Ident meta fn) | isGlobal fn ->
-      callFn ptrType fn largs
-    this | isArray this && length args == 1 && isIntType (head args) -> do
-      -- this must be arrayApply
-      idx <- cgen ctx (head args) -- must be T.i32. TODO should be platform-dependent
-      array <- cgen ctx this -- should be a pointer to either boxed or unboxed array
-      case typeOf this of
-        TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
-          arrayStructPtr <- bitcast array (T.ptr (T.StructureType False [T.i32, T.ptr T.double]))
-          arrayPtr <- getelementptr arrayStructPtr [constIntOp 0, constIntOp 1]
-          arrayPtr1 <- bitcast arrayPtr (T.ptr T.double)
-          ptr <- getelementptr arrayPtr1 [idx]
-          load ptr
-        _ -> do
-              boxedArrayPtr <- bitcast array (T.ptr $ T.StructureType False [T.i32, T.ptr $ T.StructureType False [T.i32, ptrType]]) -- Box(type, &Array(len, &data[])
-              arrayStructAddr <- getelementptr boxedArrayPtr [constInt64Op 0, constIntOp 1]
-              arrayStructPtr <- load arrayStructAddr
-              arraysize <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 0]
-              size <- load arraysize
-              -- TODO check idx is in bounds, eliminatable
-              arrayDataAddr <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 1]
-              arraDataPtr <- load arrayDataAddr
-              arrayDataArray <- bitcast arraDataPtr (T.ptr (T.ArrayType 0 ptrType))
-              ptr' <- getelementptr arrayDataArray [constInt64Op 0, idx]
-              load ptr'
-          
+     -- TODO Here are BUGZZZZ!!!! :)
+     -- TODO check arguments!
+     -- this is done to speed-up calls if you `a global function
+    S.Ident _ fn | isGlobal fn -> callFn ptrType fn largs
     expr -> do
       modState <- gets moduleState
       e <- cgen ctx expr
@@ -301,7 +212,6 @@ cgen ctx m@S.Match{} = do
 --  Debug.traceM $ "Generated " ++ show result
   cgen ctx result
 cgen ctx (S.If meta cond tr fl) = do
-  let resultType = llvmTypeOf tr
   ifthen <- addBlock "if.then"
   ifelse <- addBlock "if.else"
   ifexit <- addBlock "if.exit"
@@ -332,7 +242,7 @@ cgen ctx (S.If meta cond tr fl) = do
   -- if.exit
   ------------------
   setBlock ifexit
-  phi resultType [(trval, ifthen), (flval, ifelse)]
+  phi ptrType [(trval, ifthen), (flval, ifelse)]
 
 cgen ctx e = error ("cgen shit " ++ show e)
 
@@ -363,8 +273,8 @@ genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
 -- Compilation
 -------------------------------------------------------------------------------
 
-codegenStaticModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> AST.Module
-codegenStaticModule opts modo exprs = modul
+codegenModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> AST.Module
+codegenModule opts modo exprs = modul
     where
         ctx = createGlobalContext exprs
         modul = runLLVM modo genModule
