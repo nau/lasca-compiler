@@ -164,6 +164,14 @@ returnType args t = foldr f t args
 -------------------------------------------------------------------------------
 -- Operations
 -------------------------------------------------------------------------------
+isDataType tpe | tpe `Set.member` lascaPrimitiveTypes = False
+isDataType (TypeApply (TypeIdent "Array") _) = False
+isDataType _ = True
+
+isFuncType (TypeFunc _ _) = True
+isFuncType _ = False
+
+lascaPrimitiveTypes = Set.fromList [TypeIdent "Int", TypeIdent "Float", TypeIdent "Bool", TypeIdent "String", TypeIdent "Any", TypeIdent "Unit"]
 
 cgen :: Ctx -> S.Expr -> Codegen AST.Operand
 cgen ctx (S.Let meta a b c) = do
@@ -207,11 +215,20 @@ cgen ctx this@(S.Array meta exprs) = do
        return ptr
      _ -> boxArray vs
   where values = sequence [cgen ctx e | e <- exprs]
-cgen ctx (S.Select meta tree expr) = do
-  tree <- cgen ctx tree
-  e <- cgen ctx expr
-  let pos = createPosition $ S.pos meta
-  callFn runtimeSelectFuncType "runtimeSelect" [tree, e, constOp pos]
+cgen ctx this@(S.Select meta tree expr) = do
+  let treeType = typeOf tree
+  let identType = typeOf expr
+  case expr of
+    _ | isDataType treeType -> do
+      let pos = createPosition $ S.pos meta
+      tree <- cgen ctx tree
+      e <- cgen ctx expr
+      callFn runtimeSelectFuncType "runtimeSelect" [tree, e, constOp pos]
+    (S.Ident _ name) | isFuncType identType -> do
+      traceM $ printf "Method call %s: %s" name (show identType)
+      cgen ctx (S.Apply meta expr [tree])
+    _ -> error $ printf "Unsupported select: %s at %s" (show this) (show $ S.pos meta)
+      
 cgen ctx (S.Apply meta (S.Ident _ "or") [lhs, rhs]) = cgen ctx (S.If meta lhs (S.Literal S.emptyMeta (S.BoolLit True)) rhs)
 cgen ctx (S.Apply meta (S.Ident _ "and") [lhs, rhs]) = cgen ctx (S.If meta lhs rhs (S.Literal S.emptyMeta (S.BoolLit False)))
 cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do

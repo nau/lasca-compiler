@@ -220,8 +220,7 @@ def calculate(i, bodies) = if i > 0 then calculate(i - 1, advance(bodies, 0.01))
 
 def main() = {
   -- set to 50000000 for real benchmark
-  arg = getArgs()(1);
-  numIterations = toInt32(arg);
+  numIterations = getArgs()(1).toInt32;
   bodies = [Sun, Jupiter, Saturn, Uranus, Neptune];
   initedBodies = init(bodies);
   putchard(energy(initedBodies));
