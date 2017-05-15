@@ -203,10 +203,7 @@ cgen ctx this@(S.Array meta exprs) = do
      TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
        let len = length vs
        let arrayType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.double]
-       nullptr <- getelementptr (constOp (constNull arrayType)) [constIntOp 1]
-       sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
-       ptr <- callFn (funcType ptrType [T.i32]) "gcMalloc" [sizeof]
-       arrayPtr <- bitcast ptr (T.ptr arrayType)
+       (ptr, arrayPtr) <- gcMallocType arrayType
        sizePtr <- getelementptr arrayPtr [constIntOp 0, constIntOp 0]
        store sizePtr (constIntOp len)
        forM_ (zip vs [0..]) $ \(v, i) -> do
@@ -225,7 +222,7 @@ cgen ctx this@(S.Select meta tree expr) = do
       e <- cgen ctx expr
       callFn runtimeSelectFuncType "runtimeSelect" [tree, e, constOp pos]
     (S.Ident _ name) | isFuncType identType -> do
-      traceM $ printf "Method call %s: %s" name (show identType)
+--      traceM $ printf "Method call %s: %s" name (show identType)
       cgen ctx (S.Apply meta expr [tree])
     _ -> error $ printf "Unsupported select: %s at %s" (show this) (show $ S.pos meta)
       

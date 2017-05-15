@@ -136,7 +136,19 @@ runtimeApplyFuncType = funcType ptrType [ptrType, T.i32, ptrType, positionStruct
 runtimeSelectFuncType = funcType ptrType [ptrType, ptrType, positionStructType]
 unboxFuncType = funcType ptrType [ptrType, T.i32]
 
-gcMalloc size = callFn (funcType ptrType [T.i32]) "gcMalloc" [constIntOp size]
+sizeOfType tpe = do
+  nullptr <- getelementptr (constOp (constNull tpe)) [constIntOp 1]
+  sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
+  return sizeof
+
+gcMalloc size = callFn (funcType ptrType [T.i32]) "gcMalloc" [size]
+
+gcMallocType tpe = do
+  size <- sizeOfType tpe
+  ptr <- gcMalloc size
+  casted <- bitcast ptr (T.ptr tpe)
+  return (ptr, casted)
+
 
 box (S.BoolLit b) meta = callFn boxFuncType "boxBool" [constIntOp (boolToInt b)]
 box (S.IntLit  n) meta = callFn boxFuncType "boxInt" [constIntOp n]
@@ -175,7 +187,7 @@ boxClosure name mapping enclosedVars = do
   let argc = length enclosedVars
   let findArg n = fromMaybe (error ("Couldn't find " ++ n ++ " variable in symbols " ++ show syms)) (lookup n syms)
   let args = map (\(S.Arg n _) -> findArg n) enclosedVars
-  sargsPtr <- gcMalloc (ptrSize * argc)
+  sargsPtr <- gcMalloc (constIntOp $ ptrSize * argc)
   sargsPtr1 <- bitcast sargsPtr (T.ptr ptrType)
   let asdf (idx, arg) = do
        p <- getelementptr sargsPtr1 [idx]
@@ -298,10 +310,7 @@ defineConstructor typeName name tid tag args = do
     codeGen modState = execCodegen [] modState $ do
       entry <- addBlock entryBlockName
       setBlock entry
-      nullptr <- getelementptr (constOp (constNull tpe)) [constIntOp 1]
-      sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
-      ptr <- callFn ptrType "gcMalloc" [sizeof]
-      structPtr <- bitcast ptr (T.ptr tpe)
+      (ptr, structPtr) <- gcMallocType tpe
       tagAddr <- getelementptr structPtr [constIntOp 0, constIntOp 0] -- [dereference, 1st field] {tag, [arg1, arg2 ...]}
       store tagAddr (constIntOp tag)
       let argsWithId = zip args [0..]

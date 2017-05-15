@@ -13,7 +13,7 @@ Jupiter = Body(
   -6.90460016972063023e-05 * DaysPerYear,    -- vz
    9.54791938424326609e-04 * SolarMass       -- mass
 )
-
+{-
 Saturn = Body(
    8.34336671824457987e+00,
    4.12479856412430479e+00,
@@ -149,11 +149,11 @@ def energyInner(bodies, from, to) = {
   dx = from.x - to.x;
   dy = from.y - to.y;
   dz = from.z - to.z;
-  distance = lasqrt(squared(dx, dy, dz));
+  distance = sqrt(squared(dx, dy, dz));
   from.mass * to.mass / distance;
 }
 
-def energy(bodies) = {
+def energy(bodies: [[Float]]) = {
   sun = bodies(0);
   jupiter = bodies(1);
   saturn = bodies(2);
@@ -182,18 +182,18 @@ def energy(bodies) = {
   e = e - energyInner(bodies, bodies(3), bodies(4));
 
   e
-}
+}-}
 
-def calculate(i, bodies) = if i > 0 then calculate(i - 1, advance(bodies, 0.01)) else bodies
+--def calculate(i, bodies) = if i > 0 then calculate(i - 1, advance(bodies, 0.01)) else bodies
 
 def main() = {
   -- set to 50000000 for real benchmark
-  numIterations = getArgs()(1).toInt;
-  bodies = [Sun, Jupiter, Saturn, Uranus, Neptune];
-  initedBodies = bodies.init;
-  println(initedBodies.energy.toString);
-  advance(initedBodies, 0.01);
-  advanced = calculate(numIterations, initedBodies);
-  println(advanced.energy.toString);
+  numIterations = getArgs()(1).toInt32;
+--  bodies = [Sun, Jupiter, Saturn, Uranus, Neptune];
+--  initedBodies = bodies.init;
+--  println(initedBodies.energy.toString);
+--  advance(initedBodies, 0.01);
+--  advanced = calculate(numIterations, initedBodies);
+--  println(advanced.energy.toString);
   println("Done")
 }
