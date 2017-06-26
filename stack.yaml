@@ -1,6 +1,9 @@
-resolver:  nightly-2017-04-05 #lts-6.9
+resolver:  nightly-2017-05-27 #lts-6.9
 packages:
-- '.'
+- location: '.'
+#- location:
+#    git: https://github.com/llvm-hs/llvm-hs-pretty.git
+#    commit: bb56f12e348aa1e19ec6111cecd200d4e0ffced9
 flags:
 ghc-options:
   lasca:
@@ -19,6 +22,8 @@ ghc-options:
 #    -Wall
 #    -fforce-recomp
 #    -fdefer-type-errors
+#extra-deps:
+# - llvm-hs-4.1.0.0
 extra-lib-dirs:
  - /usr/local/Cellar/libffi/3.0.13/lib
  - /Users/nau/projects/lasca/lasca-compiler

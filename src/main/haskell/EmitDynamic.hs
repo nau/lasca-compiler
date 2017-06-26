@@ -26,6 +26,10 @@ import qualified Data.ByteString as ByteString
 import qualified Data.Text.Encoding as Encoding
 import Text.Printf
 import qualified Data.ByteString.UTF8 as UTF8
+import Data.String
+import qualified Data.ByteString.Char8 as Char8
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as SBS
 
 import LLVM.ExecutionEngine ( withMCJIT, withModuleInEngine, getFunction )
 
@@ -54,8 +58,8 @@ import Syntax (Ctx, createGlobalContext)
 import Emit
 
 
-externArgsToSig :: [S.Arg] -> [(S.Name, AST.Type)]
-externArgsToSig = map (\(S.Arg name tpe) -> (name, typeMapping tpe))
+externArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
+externArgsToSig = map (\(S.Arg name tpe) -> (fromString name, typeMapping tpe))
 
 uncurryLambda expr = go expr ([], expr) where
   go (S.Lam _ name e) result = let (args, body) = go e result in (name : args, body)
@@ -64,7 +68,7 @@ uncurryLambda expr = go expr ([], expr) where
 -- codegenTop :: S.Expr -> LLVM ()
 codegenTop ctx (S.Val _ name expr) = do
   modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
-  defineGlobal (AST.Name name) ptrType (Just (C.Null ptrType))
+  defineGlobal (AST.Name (fromString name)) ptrType (Just (C.Null ptrType))
 
 codegenTop ctx (S.Function meta name tpe args body) = do
   r1 <- defineStringConstants body
@@ -75,7 +79,7 @@ codegenTop ctx (S.Function meta name tpe args body) = do
   let codeGenResult = codeGen modState
   let blocks = createBlocks codeGenResult
   mapM_ defineStringLit (generatedStrings codeGenResult)
-  define ptrType name largs blocks
+  define ptrType (fromString name) largs blocks
   where
     largs = toSig args
     codeGen modState = execCodegen [] modState $ do
@@ -84,14 +88,14 @@ codegenTop ctx (S.Function meta name tpe args body) = do
 --       Debug.traceM ("Generating function2 " ++ name)
       forM_ args $ \(S.Arg n t) -> do
         var <- alloca ptrType
-        store var (local n)
+        store var (local $ fromString n)
         assign n var
       cgen ctx body >>= ret
 
 codegenTop ctx (S.Data _ name constructors) = return ()
 
 
-codegenTop _ (S.Extern name tpe args) = external llvmType name fnargs False []
+codegenTop _ (S.Extern name tpe args) = external llvmType (fromString name ) fnargs False []
   where
     llvmType = typeMapping tpe
     fnargs = externArgsToSig args
@@ -126,7 +130,7 @@ codegenStartFunc ctx = do
 
     gen (name, expr) = do
       v <- cgen ctx expr
-      store (global ptrType name) v
+      store (global ptrType (fromString name)) v
       return v
 
 
@@ -155,7 +159,7 @@ cgen ctx (S.Ident meta name) = do
 --       Debug.trace ("Local " ++ show name)
       load x
     Nothing | name `Set.member` S._globalFunctions ctx -> boxFunc name mapping
-            | name `Set.member` S._globalVals ctx -> load (global ptrType name)
+            | name `Set.member` S._globalVals ctx -> load (global ptrType (fromString name))
             | otherwise -> boxError name
 cgen ctx (S.Literal l meta) = do
 --  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)

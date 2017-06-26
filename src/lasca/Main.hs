@@ -121,10 +121,7 @@ processFile opts fname = do
 processModule :: LascaOpts -> AST.Module -> String -> IO ()
 processModule opts mod fname = if exec opts then
   do when (verboseMode opts) $ putStrLn "Running JIT"
-     res <- runJIT opts mod
-     case res of
-         Left err -> die $ show err
-         Right m -> return ()
+     m <- runJIT opts mod
      return ()
   else
   do Just asm <- getLLAsString mod

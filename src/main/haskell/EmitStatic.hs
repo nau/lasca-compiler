@@ -22,10 +22,13 @@ import qualified LLVM.AST.FloatingPointPredicate as FP
 import qualified LLVM.AST.FunctionAttribute as FA
 
 -- import qualified Data.Text as Text
-import qualified Data.ByteString as ByteString
 import qualified Data.Text.Encoding as Encoding
 import Text.Printf
 import qualified Data.ByteString.UTF8 as UTF8
+import Data.String
+import qualified Data.ByteString.Char8 as Char8
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as SBS
 
 import LLVM.ExecutionEngine ( withMCJIT, withModuleInEngine, getFunction )
 
@@ -54,8 +57,8 @@ import qualified Syntax as S
 import Syntax (Ctx, createGlobalContext)
 
 
-externArgsToSig :: [S.Arg] -> [(S.Name, AST.Type)]
-externArgsToSig = map (\(S.Arg name tpe) -> (name, typeMapping tpe))
+externArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
+externArgsToSig = map (\(S.Arg name tpe) -> (fromString name, typeMapping tpe))
 
 uncurryLambda expr = go expr ([], expr) where
   go (S.Lam _ name e) result = let (args, body) = go e result in (name : args, body)
@@ -64,7 +67,7 @@ uncurryLambda expr = go expr ([], expr) where
 
 defaultValueForType tpe =
   case tpe of
-    T.FloatingPointType 64 T.IEEE -> constFloat 0.0
+    T.FloatingPointType T.DoubleFP -> constFloat 0.0
     _ -> constNull T.i8
 
 
@@ -73,7 +76,7 @@ defaultValueForType tpe =
 codegenTop ctx this@(S.Val meta name expr) = do
   modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
   let valType = llvmTypeOf this
-  defineGlobal (AST.Name name) valType (Just $ defaultValueForType valType)
+  defineGlobal (AST.Name $ fromString name) valType (Just $ defaultValueForType valType)
 
 codegenTop ctx f@(S.Function meta name tpe args body) = do
   r1 <- defineStringConstants body
@@ -85,10 +88,10 @@ codegenTop ctx f@(S.Function meta name tpe args body) = do
   let blocks = createBlocks codeGenResult
   mapM_ defineStringLit (generatedStrings codeGenResult)
   let retType = mappedReturnType args funcType
-  define retType name largs blocks
+  define retType (fromString name) largs blocks
   where
     funcType = typeOf f
-    largs = map (\(n, t) -> (t, AST.Name n)) argsWithTypes
+    largs = map (\(n, t) -> (t, AST.Name $ fromString n)) argsWithTypes
     argsWithTypes = reverse $ snd $ foldr (\(S.Arg name _) (TypeFunc a b, acc) -> (b, (name, typeMapping a) : acc)) (funcType, []) (reverse args)
     codeGen modState = execCodegen [] modState $ do
 --      Debug.traceM $ printf "argsWithTypes %s" (show argsWithTypes)
@@ -96,7 +99,7 @@ codegenTop ctx f@(S.Function meta name tpe args body) = do
       setBlock entry
       forM_ argsWithTypes $ \(n, t) -> do
         var <- alloca t
-        store var (localT n t)
+        store var (localT (fromString n) t)
 --        Debug.traceM $ printf "assign %s: %s = %s" n (show t) (show var)
         assign n var
       cgen ctx body >>= ret
@@ -104,7 +107,7 @@ codegenTop ctx f@(S.Function meta name tpe args body) = do
 codegenTop ctx (S.Data _ name constructors) = return ()
 
 
-codegenTop _ (S.Extern name tpe args) = external llvmType name fnargs False []
+codegenTop _ (S.Extern name tpe args) = external llvmType (fromString name) fnargs False []
   where
     llvmType = typeMapping tpe
     fnargs = externArgsToSig args
@@ -141,7 +144,7 @@ codegenStartFunc ctx = do
       v <- cgen ctx expr
       let t = llvmTypeOf expr
 --      traceM $ "global type " ++ show t
-      store (global t name) v
+      store (global t (fromString name)) v
       return v
 
 
@@ -189,7 +192,7 @@ cgen ctx (S.Ident meta name) = do
 --       Debug.trace ("Local " ++ show name)
       load x
     Nothing | name `Set.member` S._globalFunctions ctx -> boxFunc name mapping
-            | name `Set.member` S._globalVals ctx -> load (global ptrType name)
+            | name `Set.member` S._globalVals ctx -> load (global ptrType (fromString name))
             | otherwise -> boxError name
 cgen ctx (S.Literal meta l) = do
 --  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)

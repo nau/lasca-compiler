@@ -8,6 +8,7 @@
 -- Portability: non-portable
 --
 --------------------------------------------------------------------
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Strict #-}
 module JIT (
   jit,
@@ -36,6 +37,9 @@ import           LLVM.Analysis
 import           LLVM.PassManager
 import           LLVM.Transforms
 
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as Char8
+
 import qualified LLVM.ExecutionEngine as EE
 
 foreign import ccall "dynamic" startFun :: FunPtr (Int -> Ptr CString -> IO ()) -> Int -> Ptr CString -> IO ()
@@ -51,10 +55,10 @@ jit c = EE.withMCJIT c optlevel model ptrelim fastins
 passes :: Int -> PassSetSpec
 passes level = defaultCuratedPassSetSpec { optLevel = Just (fromIntegral level) }
 
-runJIT :: LascaOpts -> AST.Module -> IO (Either String AST.Module)
+runJIT :: LascaOpts -> AST.Module -> IO AST.Module
 runJIT opts mod = withContext $ \context ->
     jit context $ \executionEngine ->
-      runExceptT $ withModuleFromAST context mod $ \m ->
+      withModuleFromAST context mod $ \m ->
         withPassManager (passes (optimization opts)) $ \pm -> do
           -- Optimization Pass
           runPassManager pm m
@@ -62,7 +66,7 @@ runJIT opts mod = withContext $ \context ->
 
           when (printLLVMAsm opts) $ do
             s <- moduleLLVMAssembly m
-            putStrLn s
+            Char8.putStrLn s
           let args = lascaFiles opts
           let len = length args
           EE.withModuleInEngine executionEngine m $ \ee -> do
@@ -81,13 +85,9 @@ runJIT opts mod = withContext $ \context ->
 
 getLLAsString :: AST.Module -> IO (Maybe String)
 getLLAsString mod = do
-    eith <- withContext $ \context ->
-        runExceptT $ withModuleFromAST context mod $ \m -> do
+    s <- withContext $ \context ->
+        withModuleFromAST context mod $ \m -> do
           putStrLn "Getting LLVM assembly..."
           moduleLLVMAssembly m
-    case eith of
-        Left err -> do
-            putStrLn err
-            return Nothing
-        Right s -> return $ Just s
+    return $ Just (Char8.unpack s)
 

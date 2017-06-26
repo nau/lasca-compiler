@@ -16,6 +16,8 @@ import qualified Data.ByteString as ByteString
 import qualified Data.ByteString.Char8 as Char8
 import qualified Data.Text.Encoding as Encoding
 import qualified Data.ByteString.UTF8 as UTF8
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as SBS
 
 import Control.Monad.State
 import Control.Applicative
@@ -84,7 +86,8 @@ initModuleState modl = ModuleState {
 }
 
 emptyModule :: String -> AST.Module
-emptyModule label = defaultModule { moduleName = label, moduleSourceFileName = label }
+emptyModule label = defaultModule { moduleName = l, moduleSourceFileName = l }
+  where l = fromString label
 
 addDefn :: Definition -> LLVM ()
 addDefn d = do
@@ -110,7 +113,7 @@ defineConst name tpe body = addDefn $
   , LLVM.AST.Global.initializer = body
   }
 
-define ::  Type -> String -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
+define ::  Type -> SBS.ShortByteString -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
 define retty label argtys body = addDefn $
   GlobalDefinition $ functionDefaults {
     name        = Name label
@@ -119,7 +122,7 @@ define retty label argtys body = addDefn $
   , basicBlocks = body
   }
 
-external ::  Type -> String -> [(String, Type)] -> Bool -> [A.GroupID] -> LLVM ()
+external ::  Type -> SBS.ShortByteString -> [(SBS.ShortByteString, Type)] -> Bool -> [A.GroupID] -> LLVM ()
 external retty label argtys vararg funcAttrs = addDefn $
   GlobalDefinition $ functionDefaults {
     name        = Name label
@@ -148,13 +151,13 @@ ptrSize = 8 -- 64 bit architecture, TODO this is hardcode
 -- Names
 -------------------------------------------------------------------------------
 
-type Names = Map.Map String Int
+type Names = Map.Map SBS.ShortByteString Int
 
-uniqueName :: String -> Names -> (String, Names)
+uniqueName :: SBS.ShortByteString -> Names -> (SBS.ShortByteString, Names)
 uniqueName nm ns =
   case Map.lookup nm ns of
     Nothing -> (nm,  Map.insert nm 1 ns)
-    Just ix -> (nm ++ show ix, Map.insert nm (ix+1) ns)
+    Just ix -> (fromString $ show nm ++ show ix, Map.insert nm (ix+1) ns)
 
 -------------------------------------------------------------------------------
 -- Codegen State
@@ -200,7 +203,6 @@ makeBlock (l, BlockState _ s t) = BasicBlock l s (maketerm t)
     maketerm (Just x) = x
     maketerm Nothing = error $ "Block has no terminator: " ++ show l
 
-entryBlockName :: String
 entryBlockName = "entry"
 
 emptyBlock :: Int -> BlockState
@@ -263,7 +265,7 @@ terminator trm = do
   modifyBlock (blk { term = Just trm })
   return trm
 
-named :: String -> Codegen a -> Codegen Operand
+named :: SBS.ShortByteString -> Codegen a -> Codegen Operand
 named iname m = m >> do
   blk <- current
   let b = Name iname
@@ -281,7 +283,7 @@ named iname m = m >> do
 entry :: Codegen Name
 entry = gets currentBlock
 
-addBlock :: String -> Codegen Name
+addBlock :: SBS.ShortByteString -> Codegen Name
 addBlock bname = do
   bls <- gets blocks
   ix <- gets blockCount
@@ -333,7 +335,7 @@ local name = localName (AST.Name name)
 
 localT name tpe = LocalReference tpe (AST.Name name)
 
-global :: Type -> String -> Operand
+global :: Type -> SBS.ShortByteString -> Operand
 global tpe name = constOp (C.GlobalReference tpe (AST.Name name))
 
 constOp :: C.Constant -> Operand
@@ -389,7 +391,7 @@ fdiv lhs rhs = instr2 T.double $ FDiv NoFastMathFlags lhs rhs []
 call :: Operand -> [Operand] -> Codegen Operand
 call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 
-callFn tpe name args = call (global tpe name) args
+callFn tpe name args = call (global tpe (fromString name)) args
 
 alloca :: Type -> Codegen Operand
 alloca ty = instr $ Alloca ty Nothing 0 []
@@ -419,6 +421,7 @@ getelementptr addr indices = instr $ GetElementPtr False addr indices []
 
 insertValue ptr val indices = instr $ InsertValue ptr val indices []
 
+globalStringRef :: String -> C.Constant
 globalStringRef name = C.GlobalReference (stringStructType (length name)) (AST.Name (getStringLitName name))
 
 globalStringRefAsPtr name = C.BitCast (globalStringRef name) ptrType
@@ -429,15 +432,16 @@ false = zero
 true = one
 
 toSig :: [S.Arg] -> [(AST.Type, AST.Name)]
-toSig = map (\(S.Arg name tpe) -> (ptrType, AST.Name name))
+toSig = map (\(S.Arg name tpe) -> (ptrType, AST.Name (fromString name)))
 
 
 stringStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
 applyStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
 
+getStringLitName :: String -> SBS.ShortByteString
 getStringLitName s = name
   where
-    name = take 15 s ++ "." ++ show hash
+    name = fromString $ take 15 s ++ "." ++ show hash
     hash = hash32 s
 
 createStruct args = C.Struct Nothing False args

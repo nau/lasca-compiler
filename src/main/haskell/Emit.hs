@@ -24,6 +24,10 @@ import qualified Data.ByteString as ByteString
 import qualified Data.Text.Encoding as Encoding
 import Text.Printf
 import qualified Data.ByteString.UTF8 as UTF8
+import Data.String
+import qualified Data.ByteString.Char8 as Char8
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as SBS
 
 import LLVM.ExecutionEngine ( withMCJIT, withModuleInEngine, getFunction )
 
@@ -229,7 +233,8 @@ extractLambda (S.Lam meta arg expr) = do
   let outerVars = _outers state
   let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
   let enclosedArgs = map (\n -> S.Arg n typeAny) usedOuterVars
-  let (funcName, nms') = uniqueName "lambda" nms
+  let (funcName', nms') = uniqueName "lambda" nms
+  let funcName = show funcName'
   let func = S.Function meta funcName typeAny (enclosedArgs ++ [arg]) expr
   modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
 --   Debug.traceM ("Generated lambda " ++ show func ++ ", outerVars = " ++ show outerVars ++ ", usedOuterVars" ++ show usedOuterVars)
@@ -256,7 +261,7 @@ genData defs = sequence [genDataStruct d | d <- defs]
   
   where genDataStruct dd@(S.DataDef tid name constrs) = do
           defineStringLit name
-          let literalName = "Data." ++ name
+          let literalName = fromString $ "Data." ++ name
           let numConstructors = length constrs
           constructors <- genConstructors dd
           let arrayOfConstructors = C.Array ptrType constructors
@@ -266,7 +271,7 @@ genData defs = sequence [genDataStruct d | d <- defs]
 
 genConstructors (S.DataDef tid name constrs) = do
   forM (zip constrs [0..]) $ \ ((S.DataConst n args), tag) ->
-    defineConstructor name n tid tag args
+    defineConstructor (fromString name) n tid tag args
 
 boxStructType = T.StructureType False [T.i32, ptrType]
 
@@ -280,21 +285,21 @@ defineConstructor typeName name tid tag args = do
   then do
     let singletonName = name ++ ".Singleton"
     let dataValue = createStruct [constInt tag, C.Array ptrType []]
-    defineConst singletonName tpe (Just dataValue)
+    defineConst (fromString singletonName) tpe (Just dataValue)
 
-    let boxed = createStruct [constInt tid, constRef singletonName]
-    defineConst (singletonName ++ ".Boxed") boxStructType (Just boxed)
+    let boxed = createStruct [constInt tid, constRef (fromString singletonName)]
+    defineConst (fromString $ singletonName ++ ".Boxed") boxStructType (Just boxed)
 
-    let boxedRef = C.GlobalReference boxStructType (AST.Name (singletonName ++ ".Boxed"))
+    let boxedRef = C.GlobalReference boxStructType (AST.Name (fromString $ singletonName ++ ".Boxed"))
     let ptrRef = C.BitCast boxedRef ptrType
-    defineConst (name) ptrType (Just ptrRef)
+    defineConst (fromString name) ptrType (Just ptrRef)
   else do
-    define ptrType name fargs blocks -- define constructor function
+    define ptrType (fromString name) fargs blocks -- define constructor function
     forM_ args $ \ (S.Arg name _) -> defineStringLit name -- define fields names as strings
   
   let structType = T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral len) ptrType]
   let struct =  createStruct [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, constInt len, fieldsArray]
-  let literalName = typeName ++ "." ++ name
+  let literalName = fromString $ typeName ++ "." ++ name
   defineConst literalName structType (Just struct)
 
   return $ constRef literalName
@@ -316,7 +321,7 @@ defineConstructor typeName name tid tag args = do
       let argsWithId = zip args [0..]
       forM_ argsWithId $ \(S.Arg n t, i) -> do
         p <- getelementptr structPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, 2nd field, ith element] {tag, [arg1, arg2 ...]}
-        store p (local n)
+        store p (local $ fromString n)
       boxed <- callFn ptrType "box" [constIntOp tid, ptr]
       ret boxed
 
@@ -350,7 +355,7 @@ genFunctionMap fns = do
     struct1 = createStruct [C.Int 32 (toInteger len), array]
 
     struct name arity = createStruct
-                            [globalStringRefAsPtr name, constRef name, constInt arity]
+                            [globalStringRefAsPtr name, constRef (fromString name), constInt arity]
 
 
     funcsWithArities = foldl go [] fns where
