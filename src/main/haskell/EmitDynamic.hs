@@ -139,6 +139,7 @@ typeMapping :: Type -> AST.Type
 -- FIXME currently we assume every function returns a result and can't be Unit/void
 --typeMapping (TypeIdent "Unit") = T.void
 typeMapping (TypeIdent "Int") = T.i32
+typeMapping (TypeIdent "Float") = T.double
 typeMapping _ = ptrType
 -------------------------------------------------------------------------------
 -- Operations
@@ -205,7 +206,7 @@ cgen ctx (S.Apply meta expr args) = do
         a <- cgen ctx arg
         case tpe of
           TypeIdent "Int" -> callFn boxFuncType "unboxInt" [a]
-          TypeIdent "Float" -> callFn boxFuncType "unboxFloat64" [a]
+          TypeIdent "Float" -> callFnType ptrType T.double "unboxFloat64" [a]
           _ -> return a
       case returnType of
         TypeIdent "Int" -> do
@@ -213,8 +214,9 @@ cgen ctx (S.Apply meta expr args) = do
           Debug.traceM ("res = " ++ show res)
           callFn boxFuncType "boxInt"  [res]
         TypeIdent "Float" -> do
-          res <- callFnType ptrType T.double (fromString fn) largs
-          Debug.traceM ("res = " ++ show res)
+--          let res = constFloatOp 2.5
+          res <- callFnType T.double T.double (fromString fn) largs
+          Debug.traceM ("res = " ++ show res ++ show largs ++ fn)
           callFn boxFuncType "boxFloat64"  [res]
         _ -> callFn ptrType (fromString fn) largs
     expr -> do

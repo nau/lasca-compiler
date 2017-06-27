@@ -284,6 +284,9 @@ cgen ctx (S.Apply meta expr args) = do
           (TVar _, TypeIdent "Int") -> do
             Debug.traceM ("boxing " ++ show a)
             callFn boxFuncType "boxInt" [a]
+          (TVar _, TypeIdent "Float") -> do
+            Debug.traceM ("boxing " ++ show a)
+            callFn boxFuncType "boxFloat64" [a]
           _ -> return a
       case returnType of
         TypeIdent "Int" -> do
