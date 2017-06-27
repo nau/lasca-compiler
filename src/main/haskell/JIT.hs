@@ -18,6 +18,9 @@ module JIT (
 
 import           Data.Int
 import           Data.Word
+import qualified Data.Text.IO as T
+import qualified Data.Text.Lazy as LT
+import qualified Data.Text.IO as TIO
 import System.Environment (getArgs)
 import           Foreign.Ptr          (FunPtr, Ptr, castFunPtr)
 import           Foreign.C.String
@@ -36,6 +39,7 @@ import           LLVM.Target
 import           LLVM.Analysis
 import           LLVM.PassManager
 import           LLVM.Transforms
+--import LLVM.Pretty (ppllvm)
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as Char8
@@ -56,7 +60,10 @@ passes :: Int -> PassSetSpec
 passes level = defaultCuratedPassSetSpec { optLevel = Just (fromIntegral level) }
 
 runJIT :: LascaOpts -> AST.Module -> IO AST.Module
-runJIT opts mod = withContext $ \context ->
+runJIT opts mod = do
+--  let llvmAst = ppllvm mod
+--  TIO.putStrLn $ LT.toStrict llvmAst
+  withContext $ \context ->
     jit context $ \executionEngine ->
       withModuleFromAST context mod $ \m ->
         withPassManager (passes (optimization opts)) $ \pm -> do

@@ -191,7 +191,7 @@ cgen ctx (S.Ident meta name) = do
     Just x ->
 --       Debug.trace ("Local " ++ show name)
       load x
-    Nothing | name `Set.member` S._globalFunctions ctx -> boxFunc name mapping
+    Nothing | name `Map.member` S._globalFunctions ctx -> boxFunc name mapping
             | name `Set.member` S._globalVals ctx -> load (global ptrType (fromString name))
             | otherwise -> boxError name
 cgen ctx (S.Literal meta l) = do
@@ -258,7 +258,7 @@ cgen ctx (S.Apply meta expr args) = do
   syms <- gets symtab
   largs <- mapM (cgen ctx) args
   let symMap = Map.fromList syms
-  let isGlobal fn = (fn `Set.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
+  let isGlobal fn = (fn `Map.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
   let isArray expr = case typeOf expr of
                        TypeApply (TypeIdent "Array") _ -> True
                        _ -> False
@@ -267,8 +267,36 @@ cgen ctx (S.Apply meta expr args) = do
                           _ -> False
   case expr of
      -- FIXME Here are BUGZZZZ!!!! :)
-    this@(S.Ident meta fn) | isGlobal fn ->
-      callFn ptrType fn largs
+    this@(S.Ident meta fn) | isGlobal fn -> do
+      let (Forall _ fnType) = S._globalFunctions ctx Map.! fn
+      let fff t acc = case t of
+                        TypeFunc a b -> fff b (a : acc)
+                        a -> a : acc
+      let types = reverse $ fff fnType []
+      let paramTypes = init types
+      let returnType = last types
+      Debug.traceM $ printf "Calling %s: %s from %s, return type %s" fn (show types) (show fnType) (show returnType)
+      largs <- forM (zip args paramTypes) $ \(arg, paramType) -> do
+        a <- cgen ctx arg
+        let argType = typeOf arg
+        case (paramType, argType) of
+          (TypeIdent l, TypeIdent r) | l == r -> return a
+          (TVar _, TypeIdent "Int") -> do
+            Debug.traceM ("boxing " ++ show a)
+            callFn boxFuncType "boxInt" [a]
+          _ -> return a
+      case returnType of
+        TypeIdent "Int" -> do
+          res <- callFnType ptrType T.i32 (fromString fn) largs
+          Debug.traceM ("res = " ++ show res)
+          return res
+--          callFn boxFuncType "boxInt"  [res]
+        TypeIdent "Float" -> do
+          res <- callFnType ptrType T.double (fromString fn) largs
+          Debug.traceM ("res = " ++ show res)
+          return res
+--          callFn boxFuncType "boxFloat64"  [res]
+        _ -> callFn ptrType fn largs
     this | isArray this && length args == 1 && isIntType (head args) -> do
       -- this must be arrayApply
       idx <- cgen ctx (head args) -- must be T.i32. TODO should be platform-dependent

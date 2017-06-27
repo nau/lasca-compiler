@@ -135,7 +135,7 @@ data DataDef = DataDef Int String [DataConst]
   deriving (Show, Eq)
 
 data Ctx = Context {
-  _globalFunctions :: Set.Set String,
+  _globalFunctions :: Map.Map String Scheme,
   _globalVals :: Set.Set String,
   dataDefs :: [DataDef],
   typeId :: Int -- TODO remove this. Needed for type id generation. Move to ModuleState?
@@ -168,29 +168,33 @@ createGlobalContext exprs = execState (loop exprs) emptyCtx
 
       names :: Expr -> State Ctx ()
       names (Val _ name _) = globalVals %= Set.insert name
-      names (Function _ name _ _ _) = globalFunctions %= Set.insert name
+      names (Function meta name _ _ _) = globalFunctions %= Map.insert name (symbolType meta)
       names (Data _ name consts) = do
         id <- gets typeId
         let dataDef = DataDef id name consts
         let (funcs, vals) = foldl (\(funcs, vals) (DataConst n args) ->
                               if null args
                               then (funcs, n : vals)
-                              else (n : funcs, vals)) ([], []) consts
+                              else let dataTypeIdent = TypeIdent name
+                                       tpe = Forall [] (foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args)
+                                   in ((n, tpe) : funcs, vals)) ([], []) consts
         modify (\s -> s { dataDefs =  dataDef : dataDefs s, typeId = id + 1 })
         globalVals %= Set.union (Set.fromList vals)
-        globalFunctions %= Set.union (Set.fromList funcs)
-      names (Extern name _ _) = globalFunctions %= Set.insert name
+        globalFunctions %= Map.union (Map.fromList funcs)
+      names (Extern name tpe args) = do
+        let funcType = Forall [] (foldr (\(Arg _ t) acc -> TypeFunc t acc) tpe args)
+        globalFunctions %= Map.insert name funcType
       names expr = error $ "Wat? Expected toplevel expression, but got " ++ show expr
 
 
-globalFunctions :: Lens.Lens' Ctx (Set.Set String)
+globalFunctions :: Lens.Lens' Ctx (Map.Map String Scheme)
 globalFunctions = Lens.lens _globalFunctions (\c e -> c { _globalFunctions = e } )
 
 globalVals :: Lens.Lens' Ctx (Set.Set String)
 globalVals = Lens.lens _globalVals (\c e -> c { _globalVals = e } )
 
 emptyCtx = Context {
-  _globalFunctions = Set.empty,
+  _globalFunctions = Map.empty,
   _globalVals = Set.empty,
   dataDefs = [],
   typeId = 1000

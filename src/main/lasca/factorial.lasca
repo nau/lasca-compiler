@@ -1,7 +1,10 @@
 
 def fact(n) = if n == 1 then 1 else n * fact(n - 1)
 
+def id(x) = x
+
 def main() = {
-  i = getArgs()(1).toInt32;
+  args = getArgs();
+  i = toInt(args[1]);
   println("Factorial of ${i} is: ${fact(i)}")
 }

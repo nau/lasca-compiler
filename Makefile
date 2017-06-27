@@ -20,6 +20,9 @@ rts:
 rtsDebug:
 	$(CC) -shared -fPIC -g -O0 -I/usr/local/include -L/usr/local/lib -lgc -lstdc++ src/main/c/*.c* -o liblascart.so
 
+rusts:
+	cd src/main/rust && cargo build && cp target/debug/liblascarts.dylib ../../../
+    
 lasca:
 	stack install
 

@@ -211,6 +211,8 @@ declareStdFuncs = do
   external ptrType "gcMalloc" [("size", intType)] False []
   external ptrType "box" [("t", intType), ("ptr", ptrType)] False [FA.GroupID 0]
   external ptrType "unbox" [("t", intType), ("ptr", ptrType)] False [FA.GroupID 0]
+  external T.i32   "unboxInt" [("ptr", ptrType)] False [FA.GroupID 0]
+  external T.double "unboxFloat64" [("ptr", ptrType)] False [FA.GroupID 0]
   external ptrType "boxError" [("n", ptrType)] False [FA.GroupID 0]
   external ptrType "boxInt" [("d", intType)] False [FA.GroupID 0]
   external ptrType "boxBool" [("d", intType)] False [FA.GroupID 0]

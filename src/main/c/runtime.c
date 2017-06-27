@@ -267,7 +267,7 @@ void die(Box* msg) {
   exit(1);
 }
 
-int isUserType(Box* v) {
+static int isUserType(Box* v) {
   int type = v->type;
   return type >= 1000 && (type < 1000 + RUNTIME->types->size);
 }
@@ -686,24 +686,7 @@ Box* getArgs() {
   return ENV.argv;
 }
 
-Box* toInt(Box* s) {
-  String* str = unbox(STRING, s);
-//  println(s);
-  char* cstr = malloc(str->length + 1);
-  memcpy(cstr, str->bytes, str->length);
-  cstr[str->length] = 0;
-//  printf("cstr = %s\n", cstr);
-  char *ep;
-  long i = strtol(cstr, &ep, 10);
-  if (cstr == ep) {
-    printf("Couldn't convert %s to int", cstr);
-    exit( EXIT_FAILURE );
-  }
-  free(cstr);
-  return boxInt(i);
-}
-
-int toInt32(Box* s) {
+int toInt(Box* s) {
   String* str = unbox(STRING, s);
 //  println(s);
   char* cstr = malloc(str->length + 1);

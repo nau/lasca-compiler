@@ -133,6 +133,13 @@ postfixApply = Ex.Postfix parser  -- FIXME shouldn't it be InfixL?
           let apply e = foldl (Apply meta) e argss
           return apply
 
+
+postfixIndex = Ex.Postfix parser
+  where parser = do
+          meta <- getMeta
+          index <- brackets expr
+          return $ \e -> Apply meta e [index]
+
 select = do
   reservedOp "."
   meta <- getMeta
@@ -171,12 +178,13 @@ wildcardPattern = do
 litPattern = LitPattern <$> (boolLit <|> stringLit <|> try floatLit <|> integerLit)
 
 binops = [
-          [Ex.InfixL select, postfixApply],
+          [postfixIndex, Ex.InfixL select, postfixApply],
           [binary "*", binary "/" ],
           [binary "+", binary "-" ],
           [binary "<=", binary ">=", binary "<", binary ">", binary "==" , binary "!="],
           [binary "and"],
-          [binary "or"]
+          [binary "or"],
+          [binary ":="]
          ]
 
 operatorTable = binops ++ [[unop], [binop]]

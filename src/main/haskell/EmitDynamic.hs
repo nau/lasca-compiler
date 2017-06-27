@@ -102,7 +102,7 @@ codegenTop _ (S.Extern name tpe args) = external llvmType (fromString name ) fna
 
 codegenTop ctx exp = do
   modState <- get
-  define T.double "main" [] (bls modState)
+  define T.void "main" [] (bls modState)
   where
     bls modState = createBlocks $ execCodegen [] modState $ do
       entry <- addBlock entryBlockName
@@ -138,6 +138,7 @@ codegenStartFunc ctx = do
 typeMapping :: Type -> AST.Type
 -- FIXME currently we assume every function returns a result and can't be Unit/void
 --typeMapping (TypeIdent "Unit") = T.void
+typeMapping (TypeIdent "Int") = T.i32
 typeMapping _ = ptrType
 -------------------------------------------------------------------------------
 -- Operations
@@ -158,7 +159,7 @@ cgen ctx (S.Ident meta name) = do
     Just x ->
 --       Debug.trace ("Local " ++ show name)
       load x
-    Nothing | name `Set.member` S._globalFunctions ctx -> boxFunc name mapping
+    Nothing | name `Map.member` S._globalFunctions ctx -> boxFunc name mapping
             | name `Set.member` S._globalVals ctx -> load (global ptrType (fromString name))
             | otherwise -> boxError name
 cgen ctx (S.Literal l meta) = do
@@ -183,17 +184,43 @@ cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
   callFn runtimeBinOpFuncType "runtimeBinOp" [codeOp, llhs, lrhs]
 cgen ctx (S.Apply meta expr args) = do
   syms <- gets symtab
-  largs <- mapM (cgen ctx) args
   let symMap = Map.fromList syms
-  let isGlobal fn = (fn `Set.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
+  let isGlobal fn = (fn `Map.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
   case expr of
      -- TODO Here are BUGZZZZ!!!! :)
      -- TODO check arguments!
      -- this is done to speed-up calls if you `a global function
-    S.Ident _ fn | isGlobal fn -> callFn ptrType fn largs
+    S.Ident _ fn | isGlobal fn -> do
+      let (Forall _ fnType) = S._globalFunctions ctx Map.! fn
+      let fff t acc = case t of
+                        TypeFunc a b -> fff b (a : acc)
+                        a -> a : acc
+      let types = case fnType of
+            TypeIdent "Any" -> map (const $ TypeIdent "Any") args ++ [TypeIdent "Any"]
+            _ -> reverse $ fff fnType []
+      let argTypes = init types
+      let returnType = last types
+      Debug.traceM $ printf "Calling %s: %s from %s" fn (show types) (show fnType)
+      largs <- forM (zip args argTypes) $ \(arg, tpe) -> do
+        a <- cgen ctx arg
+        case tpe of
+          TypeIdent "Int" -> callFn boxFuncType "unboxInt" [a]
+          TypeIdent "Float" -> callFn boxFuncType "unboxFloat64" [a]
+          _ -> return a
+      case returnType of
+        TypeIdent "Int" -> do
+          res <- callFnType ptrType T.i32 (fromString fn) largs
+          Debug.traceM ("res = " ++ show res)
+          callFn boxFuncType "boxInt"  [res]
+        TypeIdent "Float" -> do
+          res <- callFnType ptrType T.double (fromString fn) largs
+          Debug.traceM ("res = " ++ show res)
+          callFn boxFuncType "boxFloat64"  [res]
+        _ -> callFn ptrType (fromString fn) largs
     expr -> do
       modState <- gets moduleState
       e <- cgen ctx expr
+      largs <- mapM (cgen ctx) args
       let funcs = functions modState
       let argc = constIntOp (length largs)
       let len = Map.size funcs

@@ -393,6 +393,8 @@ call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 
 callFn tpe name args = call (global tpe (fromString name)) args
 
+callFnType fnType retType name args = instr2 retType $ Call Nothing CC.C [] (Right (global fnType name)) (toArgs args) [] []
+
 alloca :: Type -> Codegen Operand
 alloca ty = instr $ Alloca ty Nothing 0 []
 
