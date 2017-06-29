@@ -41,6 +41,7 @@ import Data.Digest.Murmur32
 import qualified Debug.Trace as Debug
 
 import qualified Syntax as S
+import qualified Type
 
 
 -------------------------------------------------------------------------------
@@ -52,8 +53,8 @@ newtype LLVM a = LLVM { unLLVM :: State ModuleState a }
 
 data ModuleState = ModuleState {
   _llvmModule :: AST.Module,
-  _locals :: Set.Set String,
-  _outers :: Set.Set String,
+  _locals :: Map.Map String Type.Type,
+  _outers :: Map.Map String Type.Type,
   _usedVars :: Set.Set String,
   _syntacticAst :: [S.Expr],
   _globalValsInit :: [(S.Name, S.Expr)],
@@ -63,7 +64,7 @@ data ModuleState = ModuleState {
 } deriving (Show)
 
 
-modStateLocals :: Lens' ModuleState (Set.Set String)
+modStateLocals :: Lens' ModuleState (Map.Map String Type.Type)
 modStateLocals = lens _locals (\ms l -> ms { _locals = l } )
 
 -- makeLenses ''ModuleState
@@ -75,8 +76,8 @@ runLLVM modl s = result where
 
 initModuleState modl = ModuleState {
   _llvmModule = modl,
-  _locals = Set.empty,
-  _outers = Set.empty,
+  _locals = Map.empty,
+  _outers = Map.empty,
   _usedVars = Set.empty,
   _syntacticAst = [],
   _globalValsInit = [],

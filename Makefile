@@ -31,16 +31,21 @@ test:
 
 examples:
 	lasca -O2 -e src/main/lasca/array.lasca $(TEST_RTS)
+	lasca -O2 -e --mode dynamic src/main/lasca/array.lasca $(TEST_RTS)
 	lasca -O2 -e src/main/lasca/data.lasca $(TEST_RTS)
 	lasca -O2 -e --mode dynamic src/main/lasca/dynamic.lasca $(TEST_RTS)
 	lasca -O2 -e src/main/lasca/factorial.lasca $(TEST_RTS) -- 15
+	lasca -O2 -e --mode dynamic src/main/lasca/factorial.lasca $(TEST_RTS) -- 15
+	lasca -O2 -e --mode dynamic src/main/lasca/hello.lasca $(TEST_RTS)
 	lasca -O2 -e src/main/lasca/hello.lasca $(TEST_RTS)
 	lasca -O2 -e src/main/lasca/lambda.lasca $(TEST_RTS)
-	lasca -O2 -e src/main/lasca/list.lasca $(TEST_RTS)
+#	lasca -O2 -e src/main/lasca/list.lasca $(TEST_RTS)
 	lasca -O2 -e src/main/lasca/nbody.lasca $(TEST_RTS) -- 50000
-	lasca -O2 -e src/main/lasca/nbody2.lasca $(TEST_RTS) -- 50000
+	lasca -O2 -e --mode dynamic src/main/lasca/nbody.lasca $(TEST_RTS) -- 50000
+#	lasca -O2 -e src/main/lasca/nbody2.lasca $(TEST_RTS) -- 50000
+#	lasca -O2 -e --mode dynamic src/main/lasca/nbody2.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e src/main/lasca/ski.lasca $(TEST_RTS)
-	lasca -O2 -e src/main/lasca/typed.lasca $(TEST_RTS)
+#	lasca -O2 -e src/main/lasca/typed.lasca $(TEST_RTS)
 
 install_and_examples: lasca examples
 

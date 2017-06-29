@@ -54,9 +54,9 @@ data Expr
   | Lam Meta Arg Expr
   | Select Meta Expr Expr
   | Match Meta Expr [Case]
-  | BoxFunc Name [Arg]   -- LLVM codegen only
+  | BoxFunc Meta Name [Arg]   -- LLVM codegen only
   | Function Meta Name Type [Arg] Expr
-  | Extern Name Type [Arg]
+  | Extern Meta Name Type [Arg]
   | If Meta Expr Expr Expr
   | Let Meta Name Expr Expr
   | Array Meta [Expr]
@@ -74,16 +74,25 @@ metaLens = Lens.lens (fst . getset) (snd . getset)
             Select meta tree expr -> (meta, \ m -> Select m tree expr)
             Match meta expr cases -> (meta, \ m -> Match m expr cases)
             Function meta name tpe args body -> (meta, \ m -> Function m name tpe args body)
+            Extern meta name tpe args -> (meta, \ m -> Extern m name tpe args)
             If meta cond tr fl -> (meta, \ m -> If m cond tr fl)
             Let meta name expr body -> (meta, \ m -> Let m name expr body)
             Array meta exprs -> (meta, \ m -> Array m exprs)
             Data meta name constrs -> (meta, \ m -> Data m name constrs)
+            BoxFunc meta name args -> (meta, \m -> BoxFunc m name args)
             _ -> error $ "Should not happen :) " ++ show expr
 
 symbolTypeLens :: Lens.Lens' Meta Scheme
 symbolTypeLens = Lens.lens symbolType (\meta st -> meta { symbolType = st })
 
 getExprType expr = expr^.metaLens.symbolTypeLens
+
+typeOf = fromSchema . getExprType
+
+fromSchema (Forall _ t) = t
+--fromSchema t = error $ "Unsupported type " ++ show t
+
+withScheme f (Forall tv t) = Forall tv (f t)
 
 instance Eq Expr where
   (Literal _ l) == (Literal _ r) = l == r
@@ -93,9 +102,9 @@ instance Eq Expr where
   (Lam _ nl l) == (Lam _ nr r) = nl == nr && l == r
   (Select _ nl l) == (Select _ nr r) = nl == nr && l == r
   (Match _ nl l) == (Match _ nr r) = nl == nr && l == r
-  (BoxFunc nl l) == (BoxFunc nr r) = nl == nr && l == r
+  (BoxFunc _ nl l) == (BoxFunc _ nr r) = nl == nr && l == r
   (Function _ nl _ al l) == (Function _ nr _ ar r) = nl == nr && al == ar && l == r
-  (Extern nl _ l) == (Extern nr _ r) = nl == nr && l == r
+  (Extern _ nl _ l) == (Extern _ nr _ r) = nl == nr && l == r
   (If _ nl al l) == (If _ nr ar r) = nl == nr && al == ar && l == r
   (Let _ nl al l) == (Let _ nr ar r) = nl == nr && al == ar && l == r
   (Array _ l) == (Array _ r) = l == r
@@ -181,7 +190,7 @@ createGlobalContext exprs = execState (loop exprs) emptyCtx
         modify (\s -> s { dataDefs =  dataDef : dataDefs s, typeId = id + 1 })
         globalVals %= Set.union (Set.fromList vals)
         globalFunctions %= Map.union (Map.fromList funcs)
-      names (Extern name tpe args) = do
+      names (Extern _ name tpe args) = do
         let funcType = Forall [] (foldr (\(Arg _ t) acc -> TypeFunc t acc) tpe args)
         globalFunctions %= Map.insert name funcType
       names expr = error $ "Wat? Expected toplevel expression, but got " ++ show expr

@@ -262,7 +262,7 @@ double __attribute__ ((pure)) unboxFloat64(Box* ti) {
 
 /* ==================== Runtime Ops ============== */
 
-void die(Box* msg) {
+void* die(Box* msg) {
   println(msg);
   exit(1);
 }
@@ -326,12 +326,7 @@ Box* arrayApply(Box* arrayValue, Box* idx) {
   return array->data[index];
 }
 
-Box* arrayLength(Box* arrayValue) {
-  Array* array = unbox(ARRAY, arrayValue);
-  return boxInt(array->length);
-}
-
-int arrayLength32(Box* arrayValue) {
+int arrayLength(Box* arrayValue) {
   Array* array = unbox(ARRAY, arrayValue);
   return array->length;
 }
@@ -650,16 +645,6 @@ Box* concat(Box* arrayString) {
     result = box(STRING, val);
   }
   return result;
-}
-
-/* =========== Math ================== */
-
-Box* __attribute__ ((pure)) lasqrt(Box * dbl) {
-  switch (dbl->type) {
-    case INT: return boxInt((int) sqrt(dbl->value.num)); break;
-    case DOUBLE: return boxFloat64(sqrt(dbl->value.dbl)); break;
-    default: printf("AAAA!!! Type mismatch! Expected Int or Double for lasqrt but got %i\n", dbl->type); exit(1);
-  }
 }
 
 /* ============ System ================ */

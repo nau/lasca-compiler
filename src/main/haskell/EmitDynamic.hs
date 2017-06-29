@@ -95,7 +95,7 @@ codegenTop ctx (S.Function meta name tpe args body) = do
 codegenTop ctx (S.Data _ name constructors) = return ()
 
 
-codegenTop _ (S.Extern name tpe args) = external llvmType (fromString name ) fnargs False []
+codegenTop _ (S.Extern _ name tpe args) = external llvmType (fromString name ) fnargs False []
   where
     llvmType = typeMapping tpe
     fnargs = externArgsToSig args
@@ -235,7 +235,7 @@ cgen ctx (S.Apply meta expr args) = do
       sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0 .. len] largs]
       let pos = createPosition $ S.pos meta
       callFn runtimeApplyFuncType "runtimeApply" [e, argc, sargs, constOp pos]
-cgen ctx (S.BoxFunc funcName enclosedVars) = do
+cgen ctx (S.BoxFunc _ funcName enclosedVars) = do
   modState <- gets moduleState
   let mapping = functions modState
   if null enclosedVars then boxFunc funcName mapping

@@ -79,6 +79,7 @@ codegenTop ctx this@(S.Val meta name expr) = do
   defineGlobal (AST.Name $ fromString name) valType (Just $ defaultValueForType valType)
 
 codegenTop ctx f@(S.Function meta name tpe args body) = do
+  Debug.traceM $ printf "codegenTop %s: %s" (name) (show funcType)
   r1 <- defineStringConstants body
 --   Debug.traceM ("Generating function1 " ++ name ++ (show r1))
 --   defineClosures ctx name body
@@ -90,9 +91,15 @@ codegenTop ctx f@(S.Function meta name tpe args body) = do
   let retType = mappedReturnType args funcType
   define retType (fromString name) largs blocks
   where
-    funcType = typeOf f
+    funcType = S.typeOf f
     largs = map (\(n, t) -> (t, AST.Name $ fromString n)) argsWithTypes
-    argsWithTypes = reverse $ snd $ foldr (\(S.Arg name _) (TypeFunc a b, acc) -> (b, (name, typeMapping a) : acc)) (funcType, []) (reverse args)
+
+    funcTypeToLlvm (S.Arg name _) (TypeFunc a b, acc) = (b, (name, typeMapping a) : acc)
+    funcTypeToLlvm arg t = error $ "AAA2" ++ show arg ++ show t
+
+    argsWithTypes = do
+      Debug.traceM $ printf "codegenTop %s(%s): %s" (name) (show args) (show funcType)
+      reverse $ snd $ foldr funcTypeToLlvm (funcType, []) (reverse args)
     codeGen modState = execCodegen [] modState $ do
 --      Debug.traceM $ printf "argsWithTypes %s" (show argsWithTypes)
       entry <- addBlock entryBlockName
@@ -107,7 +114,7 @@ codegenTop ctx f@(S.Function meta name tpe args body) = do
 codegenTop ctx (S.Data _ name constructors) = return ()
 
 
-codegenTop _ (S.Extern name tpe args) = external llvmType (fromString name) fnargs False []
+codegenTop _ (S.Extern _ name tpe args) = external llvmType (fromString name) fnargs False []
   where
     llvmType = typeMapping tpe
     fnargs = externArgsToSig args
@@ -155,11 +162,7 @@ typeMapping t = case t of
 --                  TypeIdent "Unit" -> T.void
                   _                -> ptrType
 
-fromSchema (Forall [] t) = t
-fromSchema t = error $ "Unsupported type " ++ show t
-
-typeOf = fromSchema . S.getExprType
-llvmTypeOf = typeMapping . typeOf
+llvmTypeOf = typeMapping . S.typeOf
 mappedReturnType args t = typeMapping $ returnType args t
 returnType args t = foldr f t args
   where f arg (TypeFunc a b) = b
@@ -202,7 +205,7 @@ cgen ctx (S.Literal meta l) = do
     _        -> box l meta
 cgen ctx this@(S.Array meta exprs) = do
   vs <- values
-  case typeOf this of
+  case S.typeOf this of
      TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
        let len = length vs
        let arrayType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.double]
@@ -216,8 +219,8 @@ cgen ctx this@(S.Array meta exprs) = do
      _ -> boxArray vs
   where values = sequence [cgen ctx e | e <- exprs]
 cgen ctx this@(S.Select meta tree expr) = do
-  let treeType = typeOf tree
-  let identType = typeOf expr
+  let treeType = S.typeOf tree
+  let identType = S.typeOf expr
   case expr of
     _ | isDataType treeType -> do
       let pos = createPosition $ S.pos meta
@@ -234,7 +237,7 @@ cgen ctx (S.Apply meta (S.Ident _ "and") [lhs, rhs]) = cgen ctx (S.If meta lhs r
 cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
   llhs <- cgen ctx lhs
   lrhs <- cgen ctx rhs
-  let lhsType = typeOf lhs
+  let lhsType = S.typeOf lhs
   let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
   case (code, lhsType) of
     (10, TypeIdent "Int") -> add T.i32 llhs lrhs
@@ -259,10 +262,10 @@ cgen ctx (S.Apply meta expr args) = do
   largs <- mapM (cgen ctx) args
   let symMap = Map.fromList syms
   let isGlobal fn = (fn `Map.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
-  let isArray expr = case typeOf expr of
+  let isArray expr = case S.typeOf expr of
                        TypeApply (TypeIdent "Array") _ -> True
                        _ -> False
-  let isIntType expr = case typeOf expr of
+  let isIntType expr = case S.typeOf expr of
                           TypeIdent "Int" -> True
                           _ -> False
   case expr of
@@ -278,7 +281,7 @@ cgen ctx (S.Apply meta expr args) = do
       Debug.traceM $ printf "Calling %s: %s from %s, return type %s" fn (show types) (show fnType) (show returnType)
       largs <- forM (zip args paramTypes) $ \(arg, paramType) -> do
         a <- cgen ctx arg
-        let argType = typeOf arg
+        let argType = S.typeOf arg
         case (paramType, argType) of
           (TypeIdent l, TypeIdent r) | l == r -> return a
           (TVar _, TypeIdent "Int") -> do
@@ -304,7 +307,7 @@ cgen ctx (S.Apply meta expr args) = do
       -- this must be arrayApply
       idx <- cgen ctx (head args) -- must be T.i32. TODO should be platform-dependent
       array <- cgen ctx this -- should be a pointer to either boxed or unboxed array
-      case typeOf this of
+      case S.typeOf this of
         TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
           arrayStructPtr <- bitcast array (T.ptr (T.StructureType False [T.i32, T.ptr T.double]))
           arrayPtr <- getelementptr arrayStructPtr [constIntOp 0, constIntOp 1]
@@ -339,7 +342,7 @@ cgen ctx (S.Apply meta expr args) = do
       sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0 .. len] largs]
       let pos = createPosition $ S.pos meta
       callFn runtimeApplyFuncType "runtimeApply" [e, argc, sargs, constOp pos]
-cgen ctx (S.BoxFunc funcName enclosedVars) = do
+cgen ctx (S.BoxFunc _ funcName enclosedVars) = do
   modState <- gets moduleState
   let mapping = functions modState
   if null enclosedVars then boxFunc funcName mapping

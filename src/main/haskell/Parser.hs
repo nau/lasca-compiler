@@ -231,16 +231,19 @@ function = do
   tpe <- option typeAny typeAscription
   reservedOp "="
   body <- expr
-  return (Function meta name tpe args body)
+  let meta' = meta { symbolType = Forall [] $ foldr (TypeFunc . const typeAny) tpe args }
+  return (Function meta' name tpe args body)
 
 extern :: Parser Expr
 extern = do
   reserved "extern"
+  meta <- getMeta
   reserved "def"
   name <- identifier
   args <- parens $ commaSep arg
   tpe <- typeAscription
-  return (Extern name tpe args)
+  let meta' = meta { symbolType = Forall [] $ foldr (\(Arg n at) ft -> TypeFunc at ft) tpe (List.reverse args) }
+  return (Extern meta' name tpe args)
 
 arg :: Parser Arg
 arg = do

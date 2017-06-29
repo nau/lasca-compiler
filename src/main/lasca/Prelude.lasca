@@ -6,12 +6,10 @@ extern def println(s: String): Unit
 --extern def prepend(array: Array a, v: a): Array a
 extern def arrayApply(array: Array a, i: Int): a
 extern def arrayLength(array: Array a): Int
-extern def arrayLength32(array: Array a): Int
 extern def toString(a: a): String
-extern def lasqrt(a: Float): Float
 extern def sqrt(a: Float): Float
 extern def getArgs(): Array String
 extern def toInt(s: String): Int
 extern def concat(strings: Array String): String
-extern def die(msg: String): Unit
+extern def die(msg: String): a
 extern def runtimeIsConstr(constr: a, name: String): Bool

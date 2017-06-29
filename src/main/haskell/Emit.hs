@@ -72,22 +72,33 @@ transformExpr transformer expr = case expr of
     false' <- go false
     transformer (S.If meta cond' true' false')
   (S.Let meta n e body) -> do
-    modStateLocals %= Set.insert n
+    case S.typeOf e of
+      TypeFunc a b -> modStateLocals %= Map.insert n a
+      _ -> modStateLocals %= Map.insert n typeAny
     e' <- go e
     body' <- go body
     transformer (S.Let meta n e' body')
-  (S.Lam m a@(S.Arg n t) e) -> do
+  l@(S.Lam m a@(S.Arg n t) e) -> do
     modify (\s -> s { _outers = _locals s } )
-    modStateLocals .= Set.singleton n
+    let r = case S.typeOf l of
+              TypeFunc a b -> Map.singleton n a
+              _ -> Map.singleton n typeAny
+    modStateLocals .= r
     e' <- go e
     transformer (S.Lam m a e')
   (S.Apply meta e args) -> do
     e' <- go e
     args' <- sequence [go arg | arg <- args]
     transformer (S.Apply meta e' args')
-  (S.Function meta name tpe args e1) -> do
-    let argNames = Set.fromList (map (\(S.Arg n _) -> n) args)
-    modify (\s -> s { _locals = argNames, _outers = Set.empty, _usedVars = Set.empty } )
+  f@(S.Function meta name tpe args e1) -> do
+    let funcTypeToLlvm (S.Arg name _) (TypeFunc a b, acc) = (b, (name, a) : acc)
+        funcTypeToLlvm arg t = error $ "AAA2" ++ show arg ++ show t
+    let funcType = S.typeOf f
+    let argsWithTypes = reverse $ snd $ foldr funcTypeToLlvm (funcType, []) (reverse args)
+    let argNames = Map.fromList argsWithTypes
+
+
+    modify (\s -> s { _locals = argNames, _outers = Map.empty, _usedVars = Set.empty } )
     e' <- go e1
     transformer (S.Function meta name tpe args e')
   e -> transformer e
@@ -232,15 +243,17 @@ extractLambda (S.Lam meta arg expr) = do
   state <- get
   let nms = _modNames state
   let syntactic = _syntacticAst state
-  let outerVars = _outers state
+  let outerVars = Map.keysSet $ _outers state
   let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
-  let enclosedArgs = map (\n -> S.Arg n typeAny) usedOuterVars
+  let enclosedArgs = map (\n -> (S.Arg n typeAny, _outers state Map.! n)) usedOuterVars
   let (funcName', nms') = uniqueName "lambda" nms
   let funcName = show funcName'
-  let func = S.Function meta funcName typeAny (enclosedArgs ++ [arg]) expr
+  let asdf t = foldr (\(_, t) resultType -> TypeFunc t resultType) t enclosedArgs
+  let meta' = (S.symbolTypeLens %~ S.withScheme asdf) meta
+  let func = S.Function meta' funcName typeAny (map fst enclosedArgs ++ [arg]) expr
   modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
 --   Debug.traceM ("Generated lambda " ++ show func ++ ", outerVars = " ++ show outerVars ++ ", usedOuterVars" ++ show usedOuterVars)
-  return (S.BoxFunc funcName enclosedArgs)
+  return (S.BoxFunc meta' funcName (map fst enclosedArgs))
 extractLambda expr@(S.Ident _ n) = do
   modify (\s -> s { _usedVars = Set.insert n (_usedVars s)})
   return expr
@@ -366,7 +379,7 @@ genFunctionMap fns = do
         let m = foldl (\acc (S.DataConst n args) -> (n, length args) : acc) [] consts
         in m ++ s
       go s (S.Function _ name tpe args body) = (name, length args) : s
-      go s (S.Extern name tpe args) = (name, length args) : s
+      go s (S.Extern _ name tpe args) = (name, length args) : s
       go s _ = s
 
 

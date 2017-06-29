@@ -4,7 +4,7 @@ def id(x) = x
 -- f :: (a -> b -> c) -> a -> b -> c
 def apply(f, a) = f(a)
 
-def foo(x: Bool): Int = 48 + x
+def foo(x): Int = 48 + x
 
 def test(f) = f(foo(1))
 

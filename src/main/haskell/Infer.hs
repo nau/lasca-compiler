@@ -30,7 +30,7 @@ newtype TypeEnv = TypeEnv (Map.Map String Scheme) deriving (Monoid)
 
 instance Show TypeEnv where
   show (TypeEnv subst) = "Γ = {\n" ++ elems ++ "}"
-    where elems = List.foldl (\s (name, scheme) -> s ++ name ++ " : " ++ show scheme ++ "\n") "" (Map.toList subst)
+    where elems = List.foldl' (\s (name, scheme) -> s ++ name ++ " : " ++ show scheme ++ "\n") "" (Map.toList subst)
 
 data InferState = InferState {_count :: Int, _current :: Expr}
 
@@ -145,16 +145,29 @@ runInfer e m =
     (Left err, st)  -> Left err
     (Right res, st) -> do
       let (schema, expr) = closeOver res $ _current st
-      Right (schema, expr)
+      Right (schema, Debug.trace (show expr) expr)
 
 closeOver :: (Subst, Type) -> Expr -> (Scheme, Expr)
 closeOver (sub, ty) e = do
   let e' = substituteAll sub e
   let sc = generalize emptyTyenv (substitute sub ty)
-  (normalize sc, e')
+  let (normalized, mapping) = normalize sc
+  let e'' = closeOverInner mapping e'
+  let e''' = Lens.set (metaLens.symbolTypeLens) normalized e''
+  (normalized, Debug.trace ("Full type for" ++ show e''') e''')
 
 substituteAll sub e = updateMeta f e
   where f meta = meta { symbolType = substitute sub (symbolType meta) }
+
+
+closeOverInner mapping e = do
+  {-Debug.trace (printf "Closing over inner %s with mapping %s" (show e) (show mapping)) $-} updateMeta f e
+  where
+        schema = getExprType e
+        f :: Meta -> Meta
+        f meta = 
+          let (Forall tv t) = symbolType meta in
+          meta { symbolType = Forall tv $ substype schema t mapping }
 
 updateMeta f e =
   case e of
@@ -172,11 +185,14 @@ updateMeta f e =
     Let meta name expr body -> Let (f meta) name (updateMeta f expr) (updateMeta f body)
     Array meta exprs -> Array (f meta) (map (updateMeta f) exprs)
     this@Data{} -> this
-               
-normalize :: Scheme -> Scheme
-normalize schema@(Forall ts body) = Forall (fmap snd ord) (normtype body)
+
+--normalize :: Scheme -> Scheme
+normalize schema@(Forall ts body) =
+  let res = (Forall (fmap snd ord) (normtype body), ord)
+  in Debug.trace (show res) res
   where
-    ord = zip (List.nub $ fv body) (fmap TV letters)  -- from [b, c, c, d, f, e, g] -> [a, b, c, d, e, f]
+    ord = let a = zip (List.nub $ fv body) (fmap TV letters)
+          in Debug.trace ("mapping = " ++ show a) a   -- from [b, c, c, d, f, e, g] -> [a, b, c, d, e, f]
 
     fv (TVar a)   = [a]
     fv (TypeFunc a b) = fv a ++ fv b
@@ -191,6 +207,14 @@ normalize schema@(Forall ts body) = Forall (fmap snd ord) (normtype body)
       case lookup a ord of
         Just x -> TVar x
         Nothing -> error $ printf "Type variable %s not in signature %s" (show a) (show schema)
+
+substype schema (TypeFunc a b)  ord = TypeFunc  (substype schema a ord) (substype schema b ord)
+substype schema (TypeApply a b) ord = TypeApply (substype schema a ord) b
+substype schema (TypeIdent a)   ord = TypeIdent a
+substype schema t@(TVar a)        ord =
+  case lookup a ord of
+    Just x -> TVar x
+    Nothing -> t
 
 initState :: Expr -> InferState
 initState e = InferState { _count = 0, _current = e}
@@ -238,11 +262,7 @@ lookupEnv (TypeEnv env) x =
     Just s  -> do t <- instantiate s
                   return (nullSubst, t)
 
-toSchema = Forall []
-
-fromSchema (Forall [] t) = t
-
-withType meta t = meta { symbolType = toSchema t }
+withType meta t = meta { symbolType = Forall [] t }
 
 setType :: Expr -> Infer ()
 setType e = modify (\s -> s {_current = e })
@@ -328,7 +348,7 @@ infer ctx env ex = case ex of
 --    traceM $ printf "if %s then %s else %s: %s"  (show substCond) (show substTrue) (show substFalse) (show resultType)
     return (subst, resultType)
 
-  Extern name tpe args -> do
+  Extern meta name tpe args -> do
     let ts = map argToType args
     let t = foldr f tpe ts
     return (nullSubst, t)
@@ -463,7 +483,7 @@ inferPrim ctx env l t = do
   tv <- fresh
   (s1, tf, exprs) <- foldM inferStep (nullSubst, id, []) l
   let composedType = substitute s1 (tf tv)
---  Debug.traceM $ "composedType " ++ show composedType
+  Debug.traceM $ "composedType " ++ show composedType
   s2 <- unify composedType t
   return (s2 `compose` s1, substitute s2 tv, exprs)
   where
@@ -510,6 +530,6 @@ typeCheck ctx exprs = do
 
             f e@(Val _ name _) = (name, e)
             f e@(Function _ name _ _ _) = (name, e)
-            f e@(Extern name _ _) = (name, e)
+            f e@(Extern _ name _ _) = (name, e)
             f e = error ("What the fuck " ++ show e)
 
