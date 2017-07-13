@@ -3,231 +3,231 @@ SolarMass = 4.0 * Pi * Pi
 DaysPerYear = 365.24
 
 Jupiter = [
-   4.84143144246472090e+00,                  -- x
-  -1.16032004402742839e+00,                  -- y
-  -1.03622044471123109e-01,                  -- z
-   1.66007664274403694e-03 * DaysPerYear,    -- vx
-   7.69901118419740425e-03 * DaysPerYear,    -- vy
-  -6.90460016972063023e-05 * DaysPerYear,    -- vz
-   9.54791938424326609e-04 * SolarMass       -- mass
+     4.84143144246472090e+00,                  -- x
+    -1.16032004402742839e+00,                  -- y
+    -1.03622044471123109e-01,                  -- z
+     1.66007664274403694e-03 * DaysPerYear,    -- vx
+     7.69901118419740425e-03 * DaysPerYear,    -- vy
+    -6.90460016972063023e-05 * DaysPerYear,    -- vz
+     9.54791938424326609e-04 * SolarMass       -- mass
 ]
 
 Saturn = [
-   8.34336671824457987e+00,
-   4.12479856412430479e+00,
-  -4.03523417114321381e-01,
-  -2.76742510726862411e-03 * DaysPerYear,
-   4.99852801234917238e-03 * DaysPerYear,
-   2.30417297573763929e-05 * DaysPerYear,
-   2.85885980666130812e-04 * SolarMass
+     8.34336671824457987e+00,
+     4.12479856412430479e+00,
+    -4.03523417114321381e-01,
+    -2.76742510726862411e-03 * DaysPerYear,
+     4.99852801234917238e-03 * DaysPerYear,
+     2.30417297573763929e-05 * DaysPerYear,
+     2.85885980666130812e-04 * SolarMass
 ]
 
 Uranus = [
-   1.28943695621391310e+01,
-  -1.51111514016986312e+01,
-  -2.23307578892655734e-01,
-   2.96460137564761618e-03 * DaysPerYear,
-   2.37847173959480950e-03 * DaysPerYear,
-  -2.96589568540237556e-05 * DaysPerYear,
-   4.36624404335156298e-05 * SolarMass
+     1.28943695621391310e+01,
+    -1.51111514016986312e+01,
+    -2.23307578892655734e-01,
+     2.96460137564761618e-03 * DaysPerYear,
+     2.37847173959480950e-03 * DaysPerYear,
+    -2.96589568540237556e-05 * DaysPerYear,
+     4.36624404335156298e-05 * SolarMass
 ]
 
 Neptune = [
-   1.53796971148509165e+01,
-  -2.59193146099879641e+01,
-   1.79258772950371181e-01,
-   2.68067772490389322e-03 * DaysPerYear,
-   1.62824170038242295e-03 * DaysPerYear,
-  -9.51592254519715870e-05 * DaysPerYear,
-   5.15138902046611451e-05 * SolarMass
+     1.53796971148509165e+01,
+    -2.59193146099879641e+01,
+     1.79258772950371181e-01,
+     2.68067772490389322e-03 * DaysPerYear,
+     1.62824170038242295e-03 * DaysPerYear,
+    -9.51592254519715870e-05 * DaysPerYear,
+     5.15138902046611451e-05 * SolarMass
 ]
 
 Sun = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, SolarMass]
 
 
 def go(bodies: [[Float]], i: Int, pxyz: [Float]) = {
-  body = bodies(i);
-  updatedPs = [
-    pxyz[0] + body(3) * body(6),
-    pxyz[1] + body(4) * body(6),
-    pxyz[2] + body(5) * body(6)
-  ];
-  if i == 0 then updatedPs else go(bodies, i - 1, updatedPs);
+    body = bodies[i];
+    updatedPs = [
+        pxyz[0] + body[3] * body[6],
+        pxyz[1] + body[4] * body[6],
+        pxyz[2] + body[5] * body[6]
+    ];
+    if i == 0 then updatedPs else go(bodies, i - 1, updatedPs);
 }
 
 def offsetMomentum(object: [Float], px, py, pz) = {
-  vx = (0.0 - px) / SolarMass;
-  vy = (0.0 - py) / SolarMass;
-  vz = (0.0 - pz) / SolarMass;
-  [ object(0), object(1), object(2),
-    vx, vy, vz,
-    object(6)
-  ]
+    vx = (0.0 - px) / SolarMass;
+    vy = (0.0 - py) / SolarMass;
+    vz = (0.0 - pz) / SolarMass;
+    [ object[0], object[1], object[2],
+      vx, vy, vz,
+      object[6]
+    ]
 }
 
 def init(bodies: [[Float]]) = {
-  len = arrayLength(bodies);
-  pxyzInit = [0.0, 0.0, 0.0];
-  offsets = go(bodies, len - 1, pxyzInit);
-  sun = offsetMomentum(bodies(0), offsets(0), offsets(1), offsets(2));
-  [sun, bodies(1), bodies(2), bodies(3), bodies(4)]
+    len = arrayLength(bodies);
+    pxyzInit = [0.0, 0.0, 0.0];
+    offsets = go(bodies, len - 1, pxyzInit);
+    sun = offsetMomentum(bodies[0], offsets[0], offsets[1], offsets[2]);
+    [sun, bodies[1], bodies[2], bodies[3], bodies[4]]
 }
 
 def advanceInner(from: [Float], to: [Float], dt) = {
-  dx = from(0) - to(0);
-  dy = from(1) - to(1);
-  dz = from(2) - to(2);
-  dSquared = dx * dx + dy * dy + dz * dz;
-  distance = sqrt(dSquared);
-  mag = dt / (dSquared * distance);
-  toMass = to(6);
-  fromMass = from(6);
-  toMassMag = toMass * mag;
-  fromMassMag = fromMass * mag;
-  fromVx = from(3) - dx * toMassMag;
-  fromVy = from(4) - dy * toMassMag;
-  fromVz = from(5) - dz * toMassMag;
-  toVx   = to(3)   + dx * fromMassMag;
-  toVy   = to(4)   + dy * fromMassMag;
-  toVz   = to(5)   + dz * fromMassMag;
-  [
-    [from(0), from(1), from(2), fromVx, fromVy, fromVz, fromMass],
-    [to(0), to(1), to(2), toVx, toVy, toVz, toMass]
-  ]
+    dx = from[0] - to[0];
+    dy = from[1] - to[1];
+    dz = from[2] - to[2];
+    dSquared = dx * dx + dy * dy + dz * dz;
+    distance = sqrt(dSquared);
+    mag = dt / (dSquared * distance);
+    toMass = to[6];
+    fromMass = from[6];
+    toMassMag = toMass * mag;
+    fromMassMag = fromMass * mag;
+    fromVx = from[3] - dx * toMassMag;
+    fromVy = from[4] - dy * toMassMag;
+    fromVz = from[5] - dz * toMassMag;
+    toVx   = to[3]   + dx * fromMassMag;
+    toVy   = to[4]   + dy * fromMassMag;
+    toVz   = to[5]   + dz * fromMassMag;
+    [
+      [from[0], from[1], from[2], fromVx, fromVy, fromVz, fromMass],
+      [to[0], to[1], to[2], toVx, toVy, toVz, toMass]
+    ]
 }
 
 def advance(bodies: [[Float]], dt) = {
-  r01 = advanceInner(bodies(0), bodies(1), dt);
-  r02 = advanceInner(r01(0),    bodies(2), dt);
-  r03 = advanceInner(r02(0),    bodies(3), dt);
-  r04 = advanceInner(r03(0),    bodies(4), dt);
+    r01 = advanceInner(bodies[0], bodies[1], dt);
+    r02 = advanceInner(r01(0),    bodies[2], dt);
+    r03 = advanceInner(r02(0),    bodies[3], dt);
+    r04 = advanceInner(r03(0),    bodies[4], dt);
 
-  r12 = advanceInner(r01(1),    r02(1), dt);
-  r13 = advanceInner(r12(0),    r03(1), dt);
-  r14 = advanceInner(r13(0),    r04(1), dt);
+    r12 = advanceInner(r01(1),    r02(1), dt);
+    r13 = advanceInner(r12(0),    r03(1), dt);
+    r14 = advanceInner(r13(0),    r04(1), dt);
 
-  r23 = advanceInner(r12(1),    r13(1), dt);
-  r24 = advanceInner(r23(0),    r14(1), dt);
+    r23 = advanceInner(r12(1),    r13(1), dt);
+    r24 = advanceInner(r23(0),    r14(1), dt);
 
-  r34 = advanceInner(r23(1),    r24(1), dt);
+    r34 = advanceInner(r23(1),    r24(1), dt);
 
-  sun = bodies(0);
-  r040 = r04(0);
-  sunVx = r040(3);
-  sunVy = r040(4);
-  sunVz = r040(5);
+    sun = bodies[0];
+    r040 = r04(0);
+    sunVx = r040(3);
+    sunVy = r040(4);
+    sunVz = r040(5);
 
-  jupiter = bodies(1);
-  r140 = r14(0);
-  jupiterVx = r140(3);
-  jupiterVy = r140(4);
-  jupiterVz = r140(5);
+    jupiter = bodies[1];
+    r140 = r14(0);
+    jupiterVx = r140(3);
+    jupiterVy = r140(4);
+    jupiterVz = r140(5);
 
-  saturn = bodies(2);
-  r240 = r24(0);
-  saturnVx = r240(3);
-  saturnVy = r240(4);
-  saturnVz = r240(5);
+    saturn = bodies[2];
+    r240 = r24(0);
+    saturnVx = r240(3);
+    saturnVy = r240(4);
+    saturnVz = r240(5);
 
-  uranus = bodies(3);
-  r340 = r34(0);
-  uranusVx = r340(3);
-  uranusVy = r340(4);
-  uranusVz = r340(5);
+    uranus = bodies[3];
+    r340 = r34(0);
+    uranusVx = r340(3);
+    uranusVy = r340(4);
+    uranusVz = r340(5);
 
-  neptune = bodies(4);
-  r341 = r34(1);
-  neptuneVx = r341(3);
-  neptuneVy = r341(4);
-  neptuneVz = r341(5);
+    neptune = bodies[4];
+    r341 = r34(1);
+    neptuneVx = r341(3);
+    neptuneVy = r341(4);
+    neptuneVz = r341(5);
 
-  [
-    [sun(0) + dt * sunVx,     sun(1) + dt * sunVy,     sun(2) + dt * sunVz,     sunVx, sunVy, sunVz, sun(6)],
-    [jupiter(0) + dt * jupiterVx, jupiter(1) + dt * jupiterVy, jupiter(2) + dt * jupiterVz, jupiterVx, jupiterVy, jupiterVz, jupiter(6)],
-    [saturn(0) + dt * saturnVx,  saturn(1) + dt * saturnVy,  saturn(2) + dt * saturnVz,  saturnVx,  saturnVy,  saturnVz, saturn(6)],
-    [uranus(0) + dt * uranusVx,  uranus(1) + dt * uranusVy,  uranus(2) + dt * uranusVz,  uranusVx,  uranusVy,  uranusVz, uranus(6)],
-    [neptune(0) + dt * neptuneVx, neptune(1) + dt * neptuneVy, neptune(2) + dt * neptuneVz,  neptuneVx,  neptuneVy,  neptuneVz, neptune(6)]
-  ]
+    [
+      [sun[0] + dt * sunVx,     sun[1] + dt * sunVy,     sun[2] + dt * sunVz,     sunVx, sunVy, sunVz, sun[6]],
+      [jupiter[0] + dt * jupiterVx, jupiter[1] + dt * jupiterVy, jupiter[2] + dt * jupiterVz, jupiterVx, jupiterVy, jupiterVz, jupiter[6]],
+      [saturn[0] + dt * saturnVx,  saturn[1] + dt * saturnVy,  saturn[2] + dt * saturnVz,  saturnVx,  saturnVy,  saturnVz, saturn[6]],
+      [uranus[0] + dt * uranusVx,  uranus[1] + dt * uranusVy,  uranus[2] + dt * uranusVz,  uranusVx,  uranusVy,  uranusVz, uranus[6]],
+      [neptune[0] + dt * neptuneVx, neptune[1] + dt * neptuneVy, neptune[2] + dt * neptuneVz,  neptuneVx,  neptuneVy,  neptuneVz, neptune[6]]
+    ]
 
 }
 
 def squared(x: Float, y, z) = x * x + y * y + z * z
 
 def energyInner(bodies: [[Float]], from: [Float], to: [Float]) = {
-  dx = from(0) - to(0);
-  dy = from(1) - to(1);
-  dz = from(2) - to(2);
-  distance = sqrt(squared(dx, dy, dz));
-  from(6) * to(6) / distance;
+    dx = from[0] - to[0];
+    dy = from[1] - to[1];
+    dz = from[2] - to[2];
+    distance = sqrt(squared(dx, dy, dz));
+    from[6] * to[6] / distance;
 }
 
 def energy(bodies: [[Float]]) = {
-  sun = bodies(0);
-  sunVx = sun(3);
-  sunVy = sun(4);
-  sunVz = sun(5);
-  sunMass = sun(6);
+    sun = bodies[0];
+    sunVx = sun[3];
+    sunVy = sun[4];
+    sunVz = sun[5];
+    sunMass = sun[6];
 
-  jupiter = bodies(1);
-  jupiterVx = jupiter(3);
-  jupiterVy = jupiter(4);
-  jupiterVz = jupiter(5);
-  jupiterMass = jupiter(6);
+    jupiter = bodies[1];
+    jupiterVx = jupiter[3];
+    jupiterVy = jupiter[4];
+    jupiterVz = jupiter[5];
+    jupiterMass = jupiter[6];
 
-  saturn = bodies(2);
-  saturnVx = saturn(3);
-  saturnVy = saturn(4);
-  saturnVz = saturn(5);
-  saturnMass = saturn(6);
+    saturn = bodies[2];
+    saturnVx = saturn[3];
+    saturnVy = saturn[4];
+    saturnVz = saturn[5];
+    saturnMass = saturn[6];
 
-  uranus = bodies(3);
-  uranusVx = uranus(3);
-  uranusVy = uranus(4);
-  uranusVz = uranus(5);
-  uranusMass = uranus(6);
+    uranus = bodies[3];
+    uranusVx = uranus[3];
+    uranusVy = uranus[4];
+    uranusVz = uranus[5];
+    uranusMass = uranus[6];
 
-  neptune = bodies(4);
-  neptuneVx = neptune(3);
-  neptuneVy = neptune(4);
-  neptuneVz = neptune(5);
-  neptuneMass = neptune(6);
+    neptune = bodies[4];
+    neptuneVx = neptune[3];
+    neptuneVy = neptune[4];
+    neptuneVz = neptune[5];
+    neptuneMass = neptune[6];
 
-  -- Those are not variable reassignment, but shadowing instead, like in OCaml
-  e =     0.5 * sunMass     * squared(sunVx, sunVy, sunVz);
-  e = e + 0.5 * jupiterMass * squared(jupiterVx, jupiterVy, jupiterVz);
-  e = e + 0.5 * saturnMass  * squared(saturnVx, saturnVy, saturnVz);
-  e = e + 0.5 * uranusMass  * squared(uranusVx, uranusVy, uranusVz);
-  e = e + 0.5 * neptuneMass * squared(neptuneVx, neptuneVy, neptuneVz);
+    -- Those are not variable reassignment, but shadowing instead, like in OCaml
+    e =     0.5 * sunMass     * squared(sunVx, sunVy, sunVz);
+    e = e + 0.5 * jupiterMass * squared(jupiterVx, jupiterVy, jupiterVz);
+    e = e + 0.5 * saturnMass  * squared(saturnVx, saturnVy, saturnVz);
+    e = e + 0.5 * uranusMass  * squared(uranusVx, uranusVy, uranusVz);
+    e = e + 0.5 * neptuneMass * squared(neptuneVx, neptuneVy, neptuneVz);
 
-  e = e - energyInner(bodies, bodies(0), bodies(1));
-  e = e - energyInner(bodies, bodies(0), bodies(2));
-  e = e - energyInner(bodies, bodies(0), bodies(3));
-  e = e - energyInner(bodies, bodies(0), bodies(4));
+    e = e - energyInner(bodies, bodies[0], bodies[1]);
+    e = e - energyInner(bodies, bodies[0], bodies[2]);
+    e = e - energyInner(bodies, bodies[0], bodies[3]);
+    e = e - energyInner(bodies, bodies[0], bodies[4]);
 
-  e = e - energyInner(bodies, bodies(1), bodies(2));
-  e = e - energyInner(bodies, bodies(1), bodies(3));
-  e = e - energyInner(bodies, bodies(1), bodies(4));
+    e = e - energyInner(bodies, bodies[1], bodies[2]);
+    e = e - energyInner(bodies, bodies[1], bodies[3]);
+    e = e - energyInner(bodies, bodies[1], bodies[4]);
 
-  e = e - energyInner(bodies, bodies(2), bodies(3));
-  e = e - energyInner(bodies, bodies(2), bodies(4));
+    e = e - energyInner(bodies, bodies[2], bodies[3]);
+    e = e - energyInner(bodies, bodies[2], bodies[4]);
 
-  e = e - energyInner(bodies, bodies(3), bodies(4));
+    e = e - energyInner(bodies, bodies[3], bodies[4]);
 
-  e
+    e
 }
 
 def calculate(i, bodies) = if i > 0 then calculate(i - 1, advance(bodies, 0.01)) else bodies
 
 def main() = {
-  -- set to 50000000 for real benchmark
-  args = getArgs();
-  numIterations = toInt(args[1]);
-  bodies = [Sun, Jupiter, Saturn, Uranus, Neptune];
-  initedBodies = init(bodies);
-  putchard(energy(initedBodies));
---  println(toString(initedBodies));
---  println(toString(energy(initedBodies)));
-  advanced = calculate(numIterations, initedBodies);
-  putchard(energy(advanced));
---  println(toString(energy(advanced)));
+    -- set to 50000000 for real benchmark
+    args = getArgs();
+    numIterations = toInt(args[1]);
+    bodies = [Sun, Jupiter, Saturn, Uranus, Neptune];
+    initedBodies = init(bodies);
+    putchard(energy(initedBodies));
+    --  println(toString(initedBodies));
+    --  println(toString(energy(initedBodies)));
+    advanced = calculate(numIterations, initedBodies);
+    putchard(energy(advanced));
+    --  println(toString(energy(advanced)));
 }
