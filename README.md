@@ -124,6 +124,22 @@ Ideas
 - https://www.youtube.com/watch?v=buQNgW-voAg (future functional programming language)
 - blockchain based storage of proven software?
 
+Example
+---
+```scala
+    Sun = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, SolarMass]
+    
+    -- global type inference, type ascriptions allowed, types are unified. Here, `i` is Int, return type inferred is [[Float]]
+    def go(bodies: [[Float]], i, pxyz: [Float]) = { 
+        body = bodies[i]; -- body is an immutable val by default
+        updatedPs = [
+            pxyz[0] + body[3] * body[6],
+            pxyz[1] + body[4] * body[6],
+            pxyz[2] + body[5] * body[6]
+        ];
+        if i == 0 then updatedPs else go(bodies, i - 1, updatedPs); -- function returns result of last expression
+    }
+```
 
 Package System
 ---
