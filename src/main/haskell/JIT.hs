@@ -63,38 +63,38 @@ runJIT :: LascaOpts -> AST.Module -> IO AST.Module
 runJIT opts mod = do
 --  let llvmAst = ppllvm mod
 --  TIO.putStrLn $ LT.toStrict llvmAst
-  withContext $ \context ->
-    jit context $ \executionEngine ->
-      withModuleFromAST context mod $ \m ->
-        withPassManager (passes (optimization opts)) $ \pm -> do
-          -- Optimization Pass
-          runPassManager pm m
-          optmod <- moduleAST m
+    withContext $ \context ->
+        jit context $ \executionEngine ->
+            withModuleFromAST context mod $ \m ->
+                withPassManager (passes (optimization opts)) $ \pm -> do
+                    -- Optimization Pass
+                    runPassManager pm m
+                    optmod <- moduleAST m
 
-          when (printLLVMAsm opts) $ do
-            s <- moduleLLVMAssembly m
-            Char8.putStrLn s
-          let args = lascaFiles opts
-          let len = length args
-          EE.withModuleInEngine executionEngine m $ \ee -> do
-            initLascaRuntime <- EE.getFunction ee (AST.Name "start")
---             mainfn <- EE.getFunction ee (AST.Name "main")
-            case initLascaRuntime of
-              Just fn -> do
-                cargs <- mapM newCString args
-                array <- mallocArray len
-                pokeArray array cargs
-                startFun (castFunPtr fn :: FunPtr (Int -> Ptr CString -> IO ())) len array
-              Nothing -> putStrLn "Couldn't find initLascaRuntime!"
+                    when (printLLVMAsm opts) $ do
+                        s <- moduleLLVMAssembly m
+                        Char8.putStrLn s
+                    let args = lascaFiles opts
+                    let len = length args
+                    EE.withModuleInEngine executionEngine m $ \ee -> do
+                        initLascaRuntime <- EE.getFunction ee (AST.Name "start")
+                        -- mainfn <- EE.getFunction ee (AST.Name "main")
+                        case initLascaRuntime of
+                            Just fn -> do
+                                cargs <- mapM newCString args
+                                array <- mallocArray len
+                                pokeArray array cargs
+                                startFun (castFunPtr fn :: FunPtr (Int -> Ptr CString -> IO ())) len array
+                            Nothing -> putStrLn "Couldn't find initLascaRuntime!"
 
-          -- Return the optimized module
-          return optmod
+                    -- Return the optimized module
+                    return optmod
 
 getLLAsString :: AST.Module -> IO (Maybe String)
 getLLAsString mod = do
     s <- withContext $ \context ->
         withModuleFromAST context mod $ \m -> do
-          putStrLn "Getting LLVM assembly..."
-          moduleLLVMAssembly m
+            putStrLn "Getting LLVM assembly..."
+            moduleLLVMAssembly m
     return $ Just (Char8.unpack s)
 

@@ -17,30 +17,30 @@ import           Type
 type Name = String
 
 data LascaOpts = LascaOpts
-  { lascaFiles   :: [String]
-  , mode         :: String
-  , exec         :: Bool
-  , verboseMode  :: Bool
-  , printLLVMAsm :: Bool
-  , printAst     :: Bool
-  , printTypes   :: Bool
-  , optimization :: Int
-  }
+    { lascaFiles   :: [String]
+    , mode         :: String
+    , exec         :: Bool
+    , verboseMode  :: Bool
+    , printLLVMAsm :: Bool
+    , printAst     :: Bool
+    , printTypes   :: Bool
+    , optimization :: Int
+    }
 
 data Position = NoPosition | Position {sourceLine :: Word, sourceColumn :: Word} deriving (Eq, Ord)
 
 data Meta = Meta {
-  pos :: Position,
-  symbolType :: Scheme
+    pos :: Position,
+    symbolType :: Scheme
 } deriving (Eq, Ord)
 
 instance Show Meta where
 --  show (Meta pos tpe) = "Meta{pos=" ++ show pos ++ ", tpe=" ++ show tpe ++ "}"
-  show (Meta _ tpe) = show tpe
+    show (Meta _ tpe) = show tpe
 
 instance Show Position where
-  show NoPosition = "<unknown>"
-  show Position{sourceLine = sl, sourceColumn = sc} = show sl ++ ":" ++ show sc
+    show NoPosition = "<unknown>"
+    show Position{sourceLine = sl, sourceColumn = sc} = show sl ++ ":" ++ show sc
 
 emptyMeta = Meta { pos = NoPosition, symbolType = schemaAny }
 
@@ -49,40 +49,40 @@ withMetaPos line col = emptyMeta { pos = Position {sourceLine = line, sourceColu
 metaWithScheme s = Meta { pos = NoPosition, symbolType = s }
 
 data Expr
-  = Literal Meta Lit
-  | Ident Meta Name
-  | Val Meta Name Expr
-  | Apply Meta Expr [Expr]
-  | Lam Meta Arg Expr
-  | Select Meta Expr Expr
-  | Match Meta Expr [Case]
-  | BoxFunc Meta Name [Arg]   -- LLVM codegen only
-  | Function Meta Name Type [Arg] Expr
-  | Extern Meta Name Type [Arg]
-  | If Meta Expr Expr Expr
-  | Let Meta Name Expr Expr
-  | Array Meta [Expr]
-  | Data Meta Name [DataConst]
-  deriving (Ord, Show)
+    = Literal Meta Lit
+    | Ident Meta Name
+    | Val Meta Name Expr
+    | Apply Meta Expr [Expr]
+    | Lam Meta Arg Expr
+    | Select Meta Expr Expr
+    | Match Meta Expr [Case]
+    | BoxFunc Meta Name [Arg]   -- LLVM codegen only
+    | Function Meta Name Type [Arg] Expr
+    | Extern Meta Name Type [Arg]
+    | If Meta Expr Expr Expr
+    | Let Meta Name Expr Expr
+    | Array Meta [Expr]
+    | Data Meta Name [DataConst]
+    deriving (Ord, Show)
 
 metaLens :: Lens.Lens' Expr Meta
 metaLens = Lens.lens (fst . getset) (snd . getset)
     where getset expr = case expr of
-            Literal meta lit -> (meta, \ m -> Literal m lit)
-            Ident meta name -> (meta, \ m -> Ident m name)
-            Val meta name expr -> (meta, \ m -> Val m name expr)
-            Apply meta expr args -> (meta, \ m -> Apply m expr args)
-            Lam meta name expr -> (meta, \ m -> Lam m name expr)
-            Select meta tree expr -> (meta, \ m -> Select m tree expr)
-            Match meta expr cases -> (meta, \ m -> Match m expr cases)
-            Function meta name tpe args body -> (meta, \ m -> Function m name tpe args body)
-            Extern meta name tpe args -> (meta, \ m -> Extern m name tpe args)
-            If meta cond tr fl -> (meta, \ m -> If m cond tr fl)
-            Let meta name expr body -> (meta, \ m -> Let m name expr body)
-            Array meta exprs -> (meta, \ m -> Array m exprs)
-            Data meta name constrs -> (meta, \ m -> Data m name constrs)
-            BoxFunc meta name args -> (meta, \m -> BoxFunc m name args)
-            _ -> error $ "Should not happen :) " ++ show expr
+              Literal meta lit -> (meta, \ m -> Literal m lit)
+              Ident meta name -> (meta, \ m -> Ident m name)
+              Val meta name expr -> (meta, \ m -> Val m name expr)
+              Apply meta expr args -> (meta, \ m -> Apply m expr args)
+              Lam meta name expr -> (meta, \ m -> Lam m name expr)
+              Select meta tree expr -> (meta, \ m -> Select m tree expr)
+              Match meta expr cases -> (meta, \ m -> Match m expr cases)
+              Function meta name tpe args body -> (meta, \ m -> Function m name tpe args body)
+              Extern meta name tpe args -> (meta, \ m -> Extern m name tpe args)
+              If meta cond tr fl -> (meta, \ m -> If m cond tr fl)
+              Let meta name expr body -> (meta, \ m -> Let m name expr body)
+              Array meta exprs -> (meta, \ m -> Array m exprs)
+              Data meta name constrs -> (meta, \ m -> Data m name constrs)
+              BoxFunc meta name args -> (meta, \m -> BoxFunc m name args)
+              _ -> error $ "Should not happen :) " ++ show expr
 
 symbolTypeLens :: Lens.Lens' Meta Scheme
 symbolTypeLens = Lens.lens symbolType (\meta st -> meta { symbolType = st })
@@ -97,20 +97,20 @@ fromSchema (Forall _ t) = t
 withScheme f (Forall tv t) = Forall tv (f t)
 
 instance Eq Expr where
-  (Literal _ l) == (Literal _ r) = l == r
-  (Ident _ l) == (Ident _ r) = l == r
-  (Val _ nl l) == (Val _ nr r) = nl == nr && l == r
-  (Apply _ nl l) == (Apply _ nr r) = nl == nr && l == r
-  (Lam _ nl l) == (Lam _ nr r) = nl == nr && l == r
-  (Select _ nl l) == (Select _ nr r) = nl == nr && l == r
-  (Match _ nl l) == (Match _ nr r) = nl == nr && l == r
-  (BoxFunc _ nl l) == (BoxFunc _ nr r) = nl == nr && l == r
-  (Function _ nl _ al l) == (Function _ nr _ ar r) = nl == nr && al == ar && l == r
-  (Extern _ nl _ l) == (Extern _ nr _ r) = nl == nr && l == r
-  (If _ nl al l) == (If _ nr ar r) = nl == nr && al == ar && l == r
-  (Let _ nl al l) == (Let _ nr ar r) = nl == nr && al == ar && l == r
-  (Array _ l) == (Array _ r) = l == r
-  (Data _ nl l) == (Data _ nr r) = nl == nr && l == r
+    (Literal _ l) == (Literal _ r) = l == r
+    (Ident _ l) == (Ident _ r) = l == r
+    (Val _ nl l) == (Val _ nr r) = nl == nr && l == r
+    (Apply _ nl l) == (Apply _ nr r) = nl == nr && l == r
+    (Lam _ nl l) == (Lam _ nr r) = nl == nr && l == r
+    (Select _ nl l) == (Select _ nr r) = nl == nr && l == r
+    (Match _ nl l) == (Match _ nr r) = nl == nr && l == r
+    (BoxFunc _ nl l) == (BoxFunc _ nr r) = nl == nr && l == r
+    (Function _ nl _ al l) == (Function _ nr _ ar r) = nl == nr && al == ar && l == r
+    (Extern _ nl _ l) == (Extern _ nr _ r) = nl == nr && l == r
+    (If _ nl al l) == (If _ nr ar r) = nl == nr && al == ar && l == r
+    (Let _ nl al l) == (Let _ nr ar r) = nl == nr && al == ar && l == r
+    (Array _ l) == (Array _ r) = l == r
+    (Data _ nl l) == (Data _ nr r) = nl == nr && l == r
 
 {-
 instance Show Expr where
@@ -134,37 +134,37 @@ instance Show Expr where
 
 data Case = Case Pattern Expr deriving (Eq, Ord, Show)
 data Pattern
-  = LitPattern Lit
-  | ConstrPattern String [Pattern]
-  | VarPattern String
-  | WildcardPattern
-  deriving (Eq, Ord, Show)
+    = LitPattern Lit
+    | ConstrPattern String [Pattern]
+    | VarPattern String
+    | WildcardPattern
+    deriving (Eq, Ord, Show)
 
 data DataConst = DataConst Name [Arg] deriving (Eq, Ord, Show)
 
 data DataDef = DataDef Int String [DataConst]
-  deriving (Show, Eq)
+    deriving (Show, Eq)
 
 data Ctx = Context {
-  _globalFunctions :: Map.Map String FunDef,
-  _globalVals :: Set.Set String,
-  dataDefs :: [DataDef],
-  typeId :: Int -- TODO remove this. Needed for type id generation. Move to ModuleState?
+    _globalFunctions :: Map.Map String FunDef,
+    _globalVals :: Set.Set String,
+    dataDefs :: [DataDef],
+    typeId :: Int -- TODO remove this. Needed for type id generation. Move to ModuleState?
 } deriving (Show, Eq)
 
 data Lit = IntLit Int
-  | FloatLit Double
-  | BoolLit Bool
-  | UnitLit
-  | StringLit String
-  deriving (Eq, Ord)
+    | FloatLit Double
+    | BoolLit Bool
+    | UnitLit
+    | StringLit String
+    deriving (Eq, Ord)
 
 instance Show Lit where
-  show (IntLit i) = show i
-  show (FloatLit f) = show f
-  show (BoolLit b) = show b
-  show  UnitLit = "()"
-  show (StringLit s) = "\"" ++ s ++ "\""
+    show (IntLit i) = show i
+    show (FloatLit f) = show f
+    show (BoolLit b) = show b
+    show  UnitLit = "()"
+    show (StringLit s) = "\"" ++ s ++ "\""
 
 
 data Arg = Arg Name Type deriving (Eq, Ord, Show)
@@ -172,15 +172,15 @@ data Arg = Arg Name Type deriving (Eq, Ord, Show)
 createGlobalContext :: [Expr] -> Ctx
 createGlobalContext exprs = execState (loop exprs) emptyCtx
   where
-      loop [] = return ()
-      loop (e:exprs) = do
+    loop [] = return ()
+    loop (e:exprs) = do
         names e
         loop exprs
 
-      names :: Expr -> State Ctx ()
-      names (Val _ name _) = globalVals %= Set.insert name
-      names (Function meta name tpe args _) = globalFunctions %= Map.insert name (FunDef meta name tpe args)
-      names (Data _ name consts) = do
+    names :: Expr -> State Ctx ()
+    names (Val _ name _) = globalVals %= Set.insert name
+    names (Function meta name tpe args _) = globalFunctions %= Map.insert name (FunDef meta name tpe args)
+    names (Data _ name consts) = do
         id <- gets typeId
         let dataDef = DataDef id name consts
         let (funcs, vals) = foldl (\(funcs, vals) (DataConst n args) ->
@@ -194,10 +194,10 @@ createGlobalContext exprs = execState (loop exprs) emptyCtx
         modify (\s -> s { dataDefs =  dataDef : dataDefs s, typeId = id + 1 })
         globalVals %= Set.union (Set.fromList vals)
         globalFunctions %= Map.union (Map.fromList funcs)
-      names (Extern meta name tpe args) = do
+    names (Extern meta name tpe args) = do
 --        let funcType = Forall [] (foldr (\(Arg _ t) acc -> TypeFunc t acc) tpe args)
-        globalFunctions %= Map.insert name (ExternDef meta name tpe args)
-      names expr = error $ "Wat? Expected toplevel expression, but got " ++ show expr
+       globalFunctions %= Map.insert name (ExternDef meta name tpe args)
+    names expr = error $ "Wat? Expected toplevel expression, but got " ++ show expr
 
 
 data FunDef = FunDef Meta Name Type [Arg]
@@ -216,8 +216,8 @@ globalVals :: Lens.Lens' Ctx (Set.Set String)
 globalVals = Lens.lens _globalVals (\c e -> c { _globalVals = e } )
 
 emptyCtx = Context {
-  _globalFunctions = Map.empty,
-  _globalVals = Set.empty,
-  dataDefs = [],
-  typeId = 1000
+    _globalFunctions = Map.empty,
+    _globalVals = Set.empty,
+    dataDefs = [],
+    typeId = 1000
 }

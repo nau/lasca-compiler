@@ -25,15 +25,15 @@ import Syntax
 import           Type
 
 getMeta = do
-  state <- getParserState
-  let SourcePos _ sl sc :| _ = statePos state
-  let meta = emptyMeta { pos = Position {Syntax.sourceLine = unPos sl, Syntax.sourceColumn = unPos sc} }
-  return meta
+    state <- getParserState
+    let SourcePos _ sl sc :| _ = statePos state
+    let meta = emptyMeta { pos = Position {Syntax.sourceLine = unPos sl, Syntax.sourceColumn = unPos sc} }
+    return meta
 
 integerLiteral = do
-  meta <- getMeta
-  Literal meta <$> integerLit
-   
+    meta <- getMeta
+    Literal meta <$> integerLit
+
 integerLit = IntLit . fromIntegral <$> signedInteger
 
 floatingLiteral :: Parser Expr
@@ -56,15 +56,15 @@ boolLit = BoolLit . strToBool <$> (true <|> false)
 
 
 arrayLit = do
-  meta <- getMeta
-  Array meta <$> brackets (commaSep expr)
+    meta <- getMeta
+    Array meta <$> brackets (commaSep expr)
 
 stringLit = StringLit <$> stringLiteral
 
 interpolatedString :: Parser Expr
 interpolatedString = do
-  list <- pTemplate
-  return $ go list
+    list <- pTemplate
+    return $ go list
   where go [] = Literal emptyMeta (StringLit "")
         go list = case foldr go' [] list of
                     [s] -> s
@@ -79,8 +79,8 @@ pTemplate = char '\"' *> manyTill piece (char '\"')
   where
     -- piece of text or interpolated variable
     piece =
-      (Left <$> some ch) <|>
-      (Right <$> var)
+        (Left <$> some ch) <|>
+        (Right <$> var)
 
     -- interpolated variable
     var = string "${" *> between sc (char '}') pVar
@@ -91,9 +91,9 @@ pTemplate = char '\"' *> manyTill piece (char '\"')
     -- set of escapable characters
 
     ppp = do
-      char '\\'
-      k <- oneOf escapes
-      return $ mapping Map.! k
+        char '\\'
+        k <- oneOf escapes
+        return $ mapping Map.! k
 
     mapping = Map.union escapableMap escapesMap
 
@@ -108,72 +108,72 @@ pTemplate = char '\"' *> manyTill piece (char '\"')
 
 binop = Ex.InfixL parser
   where parser = do
-          meta <- getMeta
-          (\op lhs rhs -> Apply meta (Ident meta op) [lhs, rhs]) <$> anyOperatorParser
+            meta <- getMeta
+            (\op lhs rhs -> Apply meta (Ident meta op) [lhs, rhs]) <$> anyOperatorParser
 
 unop = Ex.Prefix parser
   where parser = do
-          meta <- getMeta
-          (\op expr -> Apply meta (Ident meta ("unary" ++ op)) [expr]) <$> anyOperatorParser
+            meta <- getMeta
+            (\op expr -> Apply meta (Ident meta ("unary" ++ op)) [expr]) <$> anyOperatorParser
 
 binary s = Ex.InfixL parser
   where parser = do
-           meta <- getMeta
-           reservedOp s >> return (\lhs rhs -> Apply meta (Ident meta s) [lhs, rhs])
+            meta <- getMeta
+            reservedOp s >> return (\lhs rhs -> Apply meta (Ident meta s) [lhs, rhs])
 
 anyOperatorParser = do
-  traverse_ (notFollowedBy . reservedOp) ops
-  x <- identOp
-  fail $ "operator (" ++ x ++ ") is not defined"
+    traverse_ (notFollowedBy . reservedOp) ops
+    x <- identOp
+    fail $ "operator (" ++ x ++ ") is not defined"
 
 postfixApply = Ex.Postfix parser  -- FIXME shouldn't it be InfixL?
   where parser = do
-          argss <- many argsApply
-          meta <- getMeta
-          let apply e = foldl (Apply meta) e argss
-          return apply
+            argss <- many argsApply
+            meta <- getMeta
+            let apply e = foldl (Apply meta) e argss
+            return apply
 
 
 postfixIndex = Ex.Postfix parser
   where parser = do
-          meta <- getMeta
-          index <- brackets expr
-          return $ \e -> Apply meta e [index]
+            meta <- getMeta
+            index <- brackets expr
+            return $ \e -> Apply meta e [index]
 
 select = do
-  reservedOp "."
-  meta <- getMeta
-  return $ Select meta
+    reservedOp "."
+    meta <- getMeta
+    return $ Select meta
 
 matchExpr = do
-  reserved "match"
-  meta <- getMeta
-  ex <- expr
-  cs <- bracedCases
-  return $ Match meta ex cs
+    reserved "match"
+    meta <- getMeta
+    ex <- expr
+    cs <- bracedCases
+    return $ Match meta ex cs
 
 bracedCases = braces $ some acase
 
 acase = do
-  reservedOp "|"
-  p <- ptrn
-  reservedOp "->"
-  e <- expr
-  return $ Case p e
+    reservedOp "|"
+    p <- ptrn
+    reservedOp "->"
+    e <- expr
+    return $ Case p e
 
 ptrn = litPattern
-  <|> constrPattern
-  <|> (VarPattern <$> identifier)
-  <|> wildcardPattern
+    <|> constrPattern
+    <|> (VarPattern <$> identifier)
+    <|> wildcardPattern
 
 constrPattern = do
-  id <- upperIdentifier
-  patterns <- option [] $ parens (ptrn `sepBy` comma)
-  return $ ConstrPattern id patterns
+    id <- upperIdentifier
+    patterns <- option [] $ parens (ptrn `sepBy` comma)
+    return $ ConstrPattern id patterns
 
 wildcardPattern = do
-  reservedOp "_"
-  return WildcardPattern
+    reservedOp "_"
+    return WildcardPattern
 
 litPattern = LitPattern <$> (boolLit <|> stringLit <|> try floatLit <|> integerLit)
 
@@ -194,8 +194,8 @@ expr =  Ex.makeExprParser factor operatorTable
 
 variable :: Parser Expr
 variable = do
-  meta <- getMeta
-  Ident meta <$> identifier
+    meta <- getMeta
+    Ident meta <$> identifier
 
 makeType name = if Char.isLower $ List.head name then TVar $ TV name else TypeIdent name
 
@@ -204,14 +204,14 @@ typeTerm = ((\t -> TypeApply (TypeIdent "Array") [t]) <$> brackets typeExpr)
        <|> (makeType <$> identifier)
 
 typeFunc =  do
-  reservedOp "->"
-  return TypeFunc
+    reservedOp "->"
+    return TypeFunc
 
 typeApply = do
 --  args <- typeExpr
-  let apply (TypeApply ll rr) r = TypeApply ll (rr ++ [r])
-      apply l r = TypeApply l [r]
-  return apply
+    let apply (TypeApply ll rr) r = TypeApply ll (rr ++ [r])
+        apply l r = TypeApply l [r]
+    return apply
 
 typeOperatorTable = [[Ex.InfixL typeApply], [Ex.InfixR typeFunc]]
 
@@ -219,67 +219,67 @@ typeExpr = Ex.makeExprParser typeTerm typeOperatorTable
 
 typeAscription :: Parser Type
 typeAscription = do
-  reservedOp ":"
-  typeExpr
+    reservedOp ":"
+    typeExpr
 
 function :: Parser Expr
 function = do
-  reserved "def"
-  meta <- getMeta
-  name <- identifier
-  args <- parens (commaSep arg)
-  tpe <- option typeAny typeAscription
-  reservedOp "="
-  body <- expr
-  let meta' = meta { symbolType = Forall [] $ foldr (TypeFunc . const typeAny) tpe args }
-  return (Function meta' name tpe args body)
+    reserved "def"
+    meta <- getMeta
+    name <- identifier
+    args <- parens (commaSep arg)
+    tpe <- option typeAny typeAscription
+    reservedOp "="
+    body <- expr
+    let meta' = meta { symbolType = Forall [] $ foldr (TypeFunc . const typeAny) tpe args }
+    return (Function meta' name tpe args body)
 
 extern :: Parser Expr
 extern = do
-  reserved "extern"
-  meta <- getMeta
-  reserved "def"
-  name <- identifier
-  args <- parens $ commaSep arg
-  tpe <- typeAscription
-  let meta' = meta { symbolType = Forall [] $ foldr (\(Arg n at) ft -> TypeFunc at ft) tpe (List.reverse args) }
-  return (Extern meta' name tpe args)
+    reserved "extern"
+    meta <- getMeta
+    reserved "def"
+    name <- identifier
+    args <- parens $ commaSep arg
+    tpe <- typeAscription
+    let meta' = meta { symbolType = Forall [] $ foldr (\(Arg n at) ft -> TypeFunc at ft) tpe (List.reverse args) }
+    return (Extern meta' name tpe args)
 
 arg :: Parser Arg
 arg = do
-  name <- identifier
-  tpe <- option typeAny typeAscription
-  return (Arg name tpe)
+    name <- identifier
+    tpe <- option typeAny typeAscription
+    return (Arg name tpe)
 
 argsApply = parens (commaSep expr)
 
 ifthen :: Parser Expr
 ifthen = do
-  reserved "if"
-  meta <- getMeta
-  cond <- expr
-  reserved "then"
-  tr <- expr
-  reserved "else"
-  fl <- expr
-  return (If meta cond tr fl)
+    reserved "if"
+    meta <- getMeta
+    cond <- expr
+    reserved "then"
+    tr <- expr
+    reserved "else"
+    fl <- expr
+    return (If meta cond tr fl)
 
 letins :: Parser Expr
 letins = do
-  reserved "let"
-  meta <- getMeta
-  defs <- commaSep $ do
-    var <- identifier
-    option typeAny typeAscription
-    reservedOp "="
-    val <- expr
-    return (var, val)
-  reserved "in"
-  body <- expr
-  return $ foldr (uncurry $ Let meta) body defs
+    reserved "let"
+    meta <- getMeta
+    defs <- commaSep $ do
+        var <- identifier
+        option typeAny typeAscription
+        reservedOp "="
+        val <- expr
+        return (var, val)
+    reserved "in"
+    body <- expr
+    return $ foldr (uncurry $ Let meta) body defs
 
 closure = braces cls
-    where cls = do
+  where cls = do
             args <- commaSep arg
             reservedOp "->"
             letin <- blockStmts
@@ -290,32 +290,32 @@ closure = braces cls
 data LetVal = Named Name Expr | Stmt Expr
 
 valdef f = do
-  id <- identifier
-  option typeAny typeAscription
-  reservedOp "="
-  e <- expr
-  return (f id e)
+    id <- identifier
+    option typeAny typeAscription
+    reservedOp "="
+    e <- expr
+    return (f id e)
 
 unnamedStmt = do
-  e <- expr
-  return (Stmt e)
+    e <- expr
+    return (Stmt e)
 
 blockStmts = do
-  exprs <- (try (valdef Named) <|> unnamedStmt) `sepEndBy` semi
-  let letin = foldStmtsIntoOneLetExpr (List.reverse exprs)
-  return letin
+    exprs <- (try (valdef Named) <|> unnamedStmt) `sepEndBy` semi
+    let letin = foldStmtsIntoOneLetExpr (List.reverse exprs)
+    return letin
   where
-        foldStmtsIntoOneLetExpr [] = Literal emptyMeta UnitLit
-        foldStmtsIntoOneLetExpr exprs@(lst : init) = do
-          let (init', last') = case lst of
-                                (Stmt e)    -> (init, e)
-                                (Named _ _) -> (exprs, Literal emptyMeta UnitLit)
-          let namedExprs = go init' 1
-          foldl' (\acc (name, e) -> Let emptyMeta name e acc) last' namedExprs
+    foldStmtsIntoOneLetExpr [] = Literal emptyMeta UnitLit
+    foldStmtsIntoOneLetExpr exprs@(lst : init) = do
+        let (init', last') = case lst of
+                              (Stmt e)    -> (init, e)
+                              (Named _ _) -> (exprs, Literal emptyMeta UnitLit)
+        let namedExprs = go init' 1
+        foldl' (\acc (name, e) -> Let emptyMeta name e acc) last' namedExprs
 
-        go (Stmt e : exprs) idx = ('_' : show idx, e) : go exprs (idx + 1)
-        go (Named id e : exprs) idx = (id, e) : go exprs idx
-        go [] _ = []
+    go (Stmt e : exprs) idx = ('_' : show idx, e) : go exprs (idx + 1)
+    go (Named id e : exprs) idx = (id, e) : go exprs idx
+    go [] _ = []
 
 
 block :: Parser Expr
@@ -323,18 +323,18 @@ block = braces blockStmts
 
 dataDef :: Parser Expr
 dataDef = do
-  reserved "data"
-  meta <- getMeta
-  typeName <- upperIdentifier
-  reservedOp "="
-  optional $ reservedOp "|"
-  constructors <-  dataConstructor `sepBy` reservedOp "|"
-  return (Data meta typeName constructors)
+    reserved "data"
+    meta <- getMeta
+    typeName <- upperIdentifier
+    reservedOp "="
+    optional $ reservedOp "|"
+    constructors <-  dataConstructor `sepBy` reservedOp "|"
+    return (Data meta typeName constructors)
 
 dataConstructor = do
-  name <- identifier
-  args <- option [] $ parens (arg `sepEndBy` comma)
-  return (DataConst name args)
+    name <- identifier
+    args <- option [] $ parens (arg `sepEndBy` comma)
+    return (DataConst name args)
 
 factor :: Parser Expr -- TODO remove unneeded try's, reorder
 factor =  try floatingLiteral
@@ -351,8 +351,8 @@ factor =  try floatingLiteral
       <|> parens expr
 
 globalValDef = do
-  meta <- getMeta
-  valdef $ Val meta
+    meta <- getMeta
+    valdef $ Val meta
 
 defn :: Parser Expr
 defn = try extern
