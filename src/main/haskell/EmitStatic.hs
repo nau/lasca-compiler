@@ -271,7 +271,10 @@ cgen ctx (S.Apply meta expr args) = do
   case expr of
      -- FIXME Here are BUGZZZZ!!!! :)
     this@(S.Ident meta fn) | isGlobal fn -> do
-      let (Forall _ fnType) = S._globalFunctions ctx Map.! fn
+      let meta = case S._globalFunctions ctx Map.! fn of
+                     (S.FunDef meta _ _ _) -> meta
+                     (S.ExternDef meta _ _ _) -> meta
+      let (Forall _ fnType) = S.symbolType meta
       let fff t acc = case t of
                         TypeFunc a b -> fff b (a : acc)
                         a -> a : acc

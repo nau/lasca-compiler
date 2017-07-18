@@ -59,7 +59,7 @@ import Emit
 
 
 externArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
-externArgsToSig = map (\(S.Arg name tpe) -> (fromString name, typeMapping tpe))
+externArgsToSig = map (\(S.Arg name tpe) -> (fromString name, externalTypeMapping tpe))
 
 uncurryLambda expr = go expr ([], expr) where
   go (S.Lam _ name e) result = let (args, body) = go e result in (name : args, body)
@@ -97,7 +97,7 @@ codegenTop ctx (S.Data _ name constructors) = return ()
 
 codegenTop _ (S.Extern _ name tpe args) = external llvmType (fromString name ) fnargs False []
   where
-    llvmType = typeMapping tpe
+    llvmType = externalTypeMapping tpe
     fnargs = externArgsToSig args
 
 codegenTop ctx exp = do
@@ -135,12 +135,12 @@ codegenStartFunc ctx = do
 
 
 -- Dynamic mode
-typeMapping :: Type -> AST.Type
+externalTypeMapping :: Type -> AST.Type
 -- FIXME currently we assume every function returns a result and can't be Unit/void
---typeMapping (TypeIdent "Unit") = T.void
-typeMapping (TypeIdent "Int") = T.i32
-typeMapping (TypeIdent "Float") = T.double
-typeMapping _ = ptrType
+--externalTypeMapping (TypeIdent "Unit") = T.void
+externalTypeMapping (TypeIdent "Int") = T.i32
+externalTypeMapping (TypeIdent "Float") = T.double
+externalTypeMapping _ = ptrType-- Dynamic mode
 -------------------------------------------------------------------------------
 -- Operations
 -------------------------------------------------------------------------------
@@ -187,21 +187,15 @@ cgen ctx (S.Apply meta expr args) = do
   syms <- gets symtab
   let symMap = Map.fromList syms
   let isGlobal fn = (fn `Map.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
+  let isExtern fn = isGlobal fn && (S.isExtern $ S._globalFunctions ctx Map.! fn)
   case expr of
      -- TODO Here are BUGZZZZ!!!! :)
      -- TODO check arguments!
      -- this is done to speed-up calls if you `a global function
-    S.Ident _ fn | isGlobal fn -> do
-      let (Forall _ fnType) = S._globalFunctions ctx Map.! fn
-      let fff t acc = case t of
-                        TypeFunc a b -> fff b (a : acc)
-                        a -> a : acc
-      let types = case fnType of
-            TypeIdent "Any" -> map (const $ TypeIdent "Any") args ++ [TypeIdent "Any"]
-            _ -> reverse $ fff fnType []
-      let argTypes = init types
-      let returnType = last types
-      Debug.traceM $ printf "Calling %s: %s from %s" fn (show types) (show fnType)
+    S.Ident _ fn | isExtern fn -> do
+      let (S.ExternDef _ _ returnType externArgs) = S._globalFunctions ctx Map.! fn
+      let argTypes = map (\(S.Arg n t) -> t) externArgs
+      Debug.traceM $ printf "Calling external %s(%s): %s" fn (show argTypes) (show returnType)
       largs <- forM (zip args argTypes) $ \(arg, tpe) -> do
         a <- cgen ctx arg
         case tpe of
@@ -219,6 +213,12 @@ cgen ctx (S.Apply meta expr args) = do
           Debug.traceM ("res = " ++ show res ++ show largs ++ fn)
           callFn boxFuncType "boxFloat64"  [res]
         _ -> callFn ptrType (fromString fn) largs
+        
+    S.Ident _ fn | isGlobal fn -> do
+      Debug.traceM $ printf "Calling %s" fn
+      largs <- forM args $ \arg -> cgen ctx arg
+      callFn ptrType (fromString fn) largs
+
     expr -> do
       modState <- gets moduleState
       e <- cgen ctx expr

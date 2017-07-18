@@ -46,6 +46,8 @@ emptyMeta = Meta { pos = NoPosition, symbolType = schemaAny }
 
 withMetaPos line col = emptyMeta { pos = Position {sourceLine = line, sourceColumn = col} }
 
+metaWithScheme s = Meta { pos = NoPosition, symbolType = s }
+
 data Expr
   = Literal Meta Lit
   | Ident Meta Name
@@ -144,7 +146,7 @@ data DataDef = DataDef Int String [DataConst]
   deriving (Show, Eq)
 
 data Ctx = Context {
-  _globalFunctions :: Map.Map String Scheme,
+  _globalFunctions :: Map.Map String FunDef,
   _globalVals :: Set.Set String,
   dataDefs :: [DataDef],
   typeId :: Int -- TODO remove this. Needed for type id generation. Move to ModuleState?
@@ -177,7 +179,7 @@ createGlobalContext exprs = execState (loop exprs) emptyCtx
 
       names :: Expr -> State Ctx ()
       names (Val _ name _) = globalVals %= Set.insert name
-      names (Function meta name _ _ _) = globalFunctions %= Map.insert name (symbolType meta)
+      names (Function meta name tpe args _) = globalFunctions %= Map.insert name (FunDef meta name tpe args)
       names (Data _ name consts) = do
         id <- gets typeId
         let dataDef = DataDef id name consts
@@ -186,17 +188,28 @@ createGlobalContext exprs = execState (loop exprs) emptyCtx
                               then (funcs, n : vals)
                               else let dataTypeIdent = TypeIdent name
                                        tpe = Forall [] (foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args)
-                                   in ((n, tpe) : funcs, vals)) ([], []) consts
+                                       meta = metaWithScheme tpe
+                                       funDef = FunDef meta n dataTypeIdent args
+                                   in ((n, funDef) : funcs, vals)) ([], []) consts
         modify (\s -> s { dataDefs =  dataDef : dataDefs s, typeId = id + 1 })
         globalVals %= Set.union (Set.fromList vals)
         globalFunctions %= Map.union (Map.fromList funcs)
-      names (Extern _ name tpe args) = do
-        let funcType = Forall [] (foldr (\(Arg _ t) acc -> TypeFunc t acc) tpe args)
-        globalFunctions %= Map.insert name funcType
+      names (Extern meta name tpe args) = do
+--        let funcType = Forall [] (foldr (\(Arg _ t) acc -> TypeFunc t acc) tpe args)
+        globalFunctions %= Map.insert name (ExternDef meta name tpe args)
       names expr = error $ "Wat? Expected toplevel expression, but got " ++ show expr
 
 
-globalFunctions :: Lens.Lens' Ctx (Map.Map String Scheme)
+data FunDef = FunDef Meta Name Type [Arg]
+            | ExternDef Meta Name Type [Arg]
+            deriving (Show, Eq)
+
+isExtern FunDef{} = False
+isExtern ExternDef{} = True
+
+
+
+globalFunctions :: Lens.Lens' Ctx (Map.Map String FunDef)
 globalFunctions = Lens.lens _globalFunctions (\c e -> c { _globalFunctions = e } )
 
 globalVals :: Lens.Lens' Ctx (Set.Set String)
