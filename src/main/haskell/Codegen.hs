@@ -370,10 +370,8 @@ fptoptr fp = do
     inttoptr int
 
 ptrtofp ptr = do
-    i64ptr <- bitcast ptr (T.ptr T.i64)
-    Debug.traceM $ show ptr
-    int <- ptrtoint i64ptr T.i64
---    let int = constInt64Op 1234
+--    i64ptr <- bitcast ptr (T.ptr T.i64)
+    int <- ptrtoint ptr T.i64
     bitcast int T.double
 
 toArgs :: [Operand] -> [(Operand, [A.ParameterAttribute])]

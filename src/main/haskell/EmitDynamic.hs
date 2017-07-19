@@ -195,7 +195,7 @@ cgen ctx (S.Apply meta expr args) = do
         S.Ident _ fn | isExtern fn -> do
             let (S.ExternDef _ _ returnType externArgs) = S._globalFunctions ctx Map.! fn
             let argTypes = map (\(S.Arg n t) -> t) externArgs
-            Debug.traceM $ printf "Calling external %s(%s): %s" fn (show argTypes) (show returnType)
+--            Debug.traceM $ printf "Calling external %s(%s): %s" fn (show argTypes) (show returnType)
             largs <- forM (zip args argTypes) $ \(arg, tpe) -> do
                 a <- cgen ctx arg
                 case tpe of
@@ -205,16 +205,16 @@ cgen ctx (S.Apply meta expr args) = do
             case returnType of
                 TypeIdent "Int" -> do
                     res <- callFnType ptrType T.i32 (fromString fn) largs
-                    Debug.traceM ("res = " ++ show res)
+--                    Debug.traceM ("res = " ++ show res)
                     callFn boxFuncType "boxInt"  [res]
                 TypeIdent "Float" -> do
                     res <- callFnType T.double T.double (fromString fn) largs
-                    Debug.traceM ("res = " ++ show res ++ show largs ++ fn)
+--                    Debug.traceM ("res = " ++ show res ++ show largs ++ fn)
                     callFn boxFuncType "boxFloat64"  [res]
                 _ -> callFn ptrType (fromString fn) largs
 
         S.Ident _ fn | isGlobal fn -> do
-            Debug.traceM $ printf "Calling %s" fn
+--            Debug.traceM $ printf "Calling %s" fn
             largs <- forM args $ \arg -> cgen ctx arg
             callFn ptrType (fromString fn) largs
 

@@ -145,7 +145,7 @@ runInfer e m =
         (Left err, st)  -> Left err
         (Right res, st) -> do
             let (schema, expr) = closeOver res $ _current st
-            Right (schema, Debug.trace (show expr) expr)
+            Right (schema, {-Debug.trace (show expr)-} expr)
 
 closeOver :: (Subst, Type) -> Expr -> (Scheme, Expr)
 closeOver (sub, ty) e = do
@@ -154,7 +154,7 @@ closeOver (sub, ty) e = do
     let (normalized, mapping) = normalize sc
     let e'' = closeOverInner mapping e'
     let e''' = Lens.set (metaLens.symbolTypeLens) normalized e''
-    (normalized, Debug.trace ("Full type for" ++ show e''') e''')
+    (normalized, {-Debug.trace ("Full type for" ++ show e''')-} e''')
 
 substituteAll sub e = updateMeta f e
   where f meta = meta { symbolType = substitute sub (symbolType meta) }
@@ -189,10 +189,10 @@ updateMeta f e =
 --normalize :: Scheme -> Scheme
 normalize schema@(Forall ts body) =
     let res = (Forall (fmap snd ord) (normtype body), ord)
-    in Debug.trace (show res) res
+    in {-Debug.trace (show res) -}res
   where
     ord = let a = zip (List.nub $ fv body) (fmap TV letters)
-          in Debug.trace ("mapping = " ++ show a) a   -- from [b, c, c, d, f, e, g] -> [a, b, c, d, e, f]
+          in {-Debug.trace ("mapping = " ++ show a)-} a   -- from [b, c, c, d, f, e, g] -> [a, b, c, d, e, f]
 
     fv (TVar a)   = [a]
     fv (TypeFunc a b) = fv a ++ fv b
@@ -482,7 +482,7 @@ inferPrim ctx env l t = do
     tv <- fresh
     (s1, tf, exprs) <- foldM inferStep (nullSubst, id, []) l
     let composedType = substitute s1 (tf tv)
-    Debug.traceM $ "composedType " ++ show composedType
+--    Debug.traceM $ "composedType " ++ show composedType
     s2 <- unify composedType t
     return (s2 `compose` s1, substitute s2 tv, exprs)
   where

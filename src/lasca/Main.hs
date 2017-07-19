@@ -103,7 +103,7 @@ genModule opts modo source = do
             Right (env, typedExprs) -> do
               when (verboseMode opts) $ putStrLn "typechecked OK"
               when (printTypes opts) $ print env
-              traceM $ show typedExprs
+--              traceM $ show typedExprs
               return $ codegenStaticModule opts modo typedExprs
             Left e -> die $ show e
           else return $ codegenModule opts modo ex

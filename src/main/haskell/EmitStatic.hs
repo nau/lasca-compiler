@@ -79,7 +79,7 @@ codegenTop ctx this@(S.Val meta name expr) = do
     defineGlobal (AST.Name $ fromString name) valType (Just $ defaultValueForType valType)
 
 codegenTop ctx f@(S.Function meta name tpe args body) = do
-    Debug.traceM $ printf "codegenTop %s: %s" (name) (show funcType)
+--    Debug.traceM $ printf "codegenTop %s: %s" (name) (show funcType)
     r1 <- defineStringConstants body
   --   Debug.traceM ("Generating function1 " ++ name ++ (show r1))
   --   defineClosures ctx name body
@@ -98,7 +98,7 @@ codegenTop ctx f@(S.Function meta name tpe args body) = do
     funcTypeToLlvm arg t = error $ "AAA2" ++ show arg ++ show t
 
     argsWithTypes = do
-        Debug.traceM $ printf "codegenTop %s(%s): %s" (name) (show args) (show funcType)
+--        Debug.traceM $ printf "codegenTop %s(%s): %s" (name) (show args) (show funcType)
         reverse $ snd $ foldr funcTypeToLlvm (funcType, []) (reverse args)
     codeGen modState = execCodegen [] modState $ do
   --      Debug.traceM $ printf "argsWithTypes %s" (show argsWithTypes)
@@ -252,7 +252,7 @@ cgen ctx this@(S.Select meta tree expr) = do
                 TypeIdent "Float" -> ptrtofp value
                 TypeIdent "Int"   -> ptrtoint value T.i32
                 _                 -> return value
-            traceM $ printf "Selecting %s: %s" (show tree) (show resultValue)
+--            Debug.traceM $ printf "Selecting %s: %s" (show tree) (show resultValue)
 --            callFn runtimeSelectFuncType "runtimeSelect" [tree, e, constOp pos]
 --            return $ constFloatOp 1234.5
             return resultValue
@@ -309,28 +309,28 @@ cgen ctx (S.Apply meta expr args) = do
             let types = reverse $ fff fnType []
             let paramTypes = init types
             let returnType = last types
-            Debug.traceM $ printf "Calling %s: %s from %s, return type %s" fn (show types) (show fnType) (show returnType)
+--            Debug.traceM $ printf "Calling %s: %s from %s, return type %s" fn (show types) (show fnType) (show returnType)
             largs <- forM (zip args paramTypes) $ \(arg, paramType) -> do
                 a <- cgen ctx arg
                 let argType = S.typeOf arg
                 case (paramType, argType) of
                     (TypeIdent l, TypeIdent r) | l == r -> return a
                     (TVar _, TypeIdent "Int") -> do
-                        Debug.traceM ("boxing " ++ show a)
+--                        Debug.traceM ("boxing " ++ show a)
                         callFn boxFuncType "boxInt" [a]
                     (TVar _, TypeIdent "Float") -> do
-                        Debug.traceM ("boxing " ++ show a)
+--                        Debug.traceM ("boxing " ++ show a)
                         callFn boxFuncType "boxFloat64" [a]
                     _ -> return a
             case returnType of
                 TypeIdent "Int" -> do
                     res <- callFnType ptrType T.i32 (fromString fn) largs
-                    Debug.traceM ("res = " ++ show res)
+--                    Debug.traceM ("res = " ++ show res)
                     return res
           --          callFn boxFuncType "boxInt"  [res]
                 TypeIdent "Float" -> do
                     res <- callFnType ptrType T.double (fromString fn) largs
-                    Debug.traceM ("res = " ++ show res)
+--                    Debug.traceM ("res = " ++ show res)
                     return res
           --          callFn boxFuncType "boxFloat64"  [res]
                 _ -> callFn ptrType fn largs
