@@ -241,13 +241,13 @@ cgen ctx this@(S.Select meta tree expr) = do
             let arrayType = T.ArrayType (fromIntegral len) ptrType
             let tpe = T.StructureType False [T.i32, arrayType] -- DataValue: {tag, values: []}
             dataStruct <- bitcast tree (T.ptr tpe)
-            tagAddr <- getelementptr2 T.i32 dataStruct [constIntOp 0, constIntOp 0]
-            tag <- load2 T.i32 tagAddr
-            callFn ptrType "putInt" [tag]
+--            tagAddr <- getelementptr2 T.i32 dataStruct [constIntOp 0, constIntOp 0]
+--            tag <- load2 T.i32 tagAddr
+--            callFn ptrType "putInt" [tag]
             array <- getelementptr dataStruct [constIntOp 0, constIntOp 1]
             valueAddr <- getelementptr array [constIntOp 0, constIntOp idx]
             value <- load valueAddr
-            traceM $ printf "AAAA %s: %s" (show array) (show value)
+--            traceM $ printf "AAAA %s: %s" (show array) (show value)
             resultValue <- case t of
                 TypeIdent "Float" -> ptrtofp value
                 TypeIdent "Int"   -> ptrtoint value T.i32

@@ -1,8 +1,7 @@
 
 def main() = {
-  b = println;
-  c = "Hello";
-  a = {s -> b(c) };
-  a("test")
+    b = println;
+    c = "Hello";
+    a = {s -> b(c) };
+    a("test")
 }
-

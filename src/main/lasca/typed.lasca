@@ -11,6 +11,6 @@ def test(f) = f(foo(1))
 def test1(a) = test(id)
 
 def main() = {
-  println("Hello World");
-  apply(runtimePutchar, test1(1));
+    println("Hello World");
+    apply(runtimePutchar, test1(1));
 }

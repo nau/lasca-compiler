@@ -2,7 +2,7 @@ def returnArray(s) = {
 --  a = [2.0, 3.0];
 --  args = ["12", "13"];
   first = getArgs();
-  ff = first(0);
+  ff = first[0];
   println(ff);
 --  b = [a, [4.0, 5.5, s]];
 --  c = b(1);
@@ -20,7 +20,7 @@ def returnArray(s) = {
 
 
 def main() = {
-  res = returnArray(3.14);
-  println("Hello")
+    res = returnArray(3.14);
+    println("Hello")
 }
 

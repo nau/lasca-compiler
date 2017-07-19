@@ -153,7 +153,7 @@ def advance(bodies: [[Float]], dt) = {
 
 def squared(x: Float, y, z) = x * x + y * y + z * z
 
-def energyInner(bodies: [[Float]], from: [Float], to: [Float]) = {
+def energyInner(from: [Float], to: [Float]) = {
     dx = from[0] - to[0];
     dy = from[1] - to[1];
     dz = from[2] - to[2];
@@ -199,19 +199,19 @@ def energy(bodies: [[Float]]) = {
     e = e + 0.5 * uranusMass  * squared(uranusVx, uranusVy, uranusVz);
     e = e + 0.5 * neptuneMass * squared(neptuneVx, neptuneVy, neptuneVz);
 
-    e = e - energyInner(bodies, bodies[0], bodies[1]);
-    e = e - energyInner(bodies, bodies[0], bodies[2]);
-    e = e - energyInner(bodies, bodies[0], bodies[3]);
-    e = e - energyInner(bodies, bodies[0], bodies[4]);
+    e = e - energyInner(bodies[0], bodies[1]);
+    e = e - energyInner(bodies[0], bodies[2]);
+    e = e - energyInner(bodies[0], bodies[3]);
+    e = e - energyInner(bodies[0], bodies[4]);
 
-    e = e - energyInner(bodies, bodies[1], bodies[2]);
-    e = e - energyInner(bodies, bodies[1], bodies[3]);
-    e = e - energyInner(bodies, bodies[1], bodies[4]);
+    e = e - energyInner(bodies[1], bodies[2]);
+    e = e - energyInner(bodies[1], bodies[3]);
+    e = e - energyInner(bodies[1], bodies[4]);
 
-    e = e - energyInner(bodies, bodies[2], bodies[3]);
-    e = e - energyInner(bodies, bodies[2], bodies[4]);
+    e = e - energyInner(bodies[2], bodies[3]);
+    e = e - energyInner(bodies[2], bodies[4]);
 
-    e = e - energyInner(bodies, bodies[3], bodies[4]);
+    e = e - energyInner(bodies[3], bodies[4]);
 
     e
 }
