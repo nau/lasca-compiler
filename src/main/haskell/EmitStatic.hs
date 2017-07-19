@@ -92,7 +92,7 @@ codegenTop ctx f@(S.Function meta name tpe args body) = do
     define retType (fromString name) largs blocks
   where
     funcType = S.typeOf f
-    largs = map (\(n, t) -> (t, AST.Name $ fromString n)) argsWithTypes
+    largs = map (\(n, t) -> (fromString n, t)) argsWithTypes
 
     funcTypeToLlvm (S.Arg name _) (TypeFunc a b, acc) = (b, (name, typeMapping a) : acc)
     funcTypeToLlvm arg t = error $ "AAA2" ++ show arg ++ show t
@@ -130,7 +130,7 @@ codegenTop ctx exp = do
 
 codegenStartFunc ctx = do
     modState <- get
-    define T.void "start" [(intType, AST.Name "argc"), (ptrType, AST.Name "argv")] (bls modState)
+    define T.void "start" [("argc", intType), ("argv", ptrType)] (bls modState)
   where
     bls modState = createBlocks $ execCodegen [] modState $ do
         entry <- addBlock entryBlockName
@@ -170,9 +170,18 @@ returnType args t = foldr f t args
 -------------------------------------------------------------------------------
 -- Operations
 -------------------------------------------------------------------------------
-isDataType tpe | tpe `Set.member` lascaPrimitiveTypes = False
-isDataType (TypeApply (TypeIdent "Array") _) = False
-isDataType _ = True
+
+dataDefsNames ctx = Set.fromList $ map (\(S.DataDef _ name _) -> name) (S.dataDefs ctx)
+
+dataDefFields ctx name = let
+    dataDefMaybe = List.find (\(S.DataDef _ n _) -> n == name) (S.dataDefs ctx)
+    (S.DataDef _ _ constrs) = fromJust dataDefMaybe -- FIXME
+    (S.DataConst _ args) = head constrs
+  in args
+
+isDataType ctx tpe = case tpe of
+    TypeIdent name | name `Set.member` (dataDefsNames ctx) -> True
+    _ -> False
 
 isFuncType (TypeFunc _ _) = True
 isFuncType _ = False
@@ -219,14 +228,34 @@ cgen ctx this@(S.Array meta exprs) = do
        _ -> boxArray vs
   where values = sequence [cgen ctx e | e <- exprs]
 cgen ctx this@(S.Select meta tree expr) = do
-    let treeType = S.typeOf tree
+    let treeType@(TypeIdent tpeName) = S.typeOf tree
     let identType = S.typeOf expr
     case expr of
-        _ | isDataType treeType -> do
+        _ | isDataType ctx treeType -> do
             let pos = createPosition $ S.pos meta
             tree <- cgen ctx tree
-            e <- cgen ctx expr
-            callFn runtimeSelectFuncType "runtimeSelect" [tree, e, constOp pos]
+            let (S.Ident _ fieldName) = expr
+            let fieldsWithIndex = zip (dataDefFields ctx tpeName) [0..]
+            let (S.Arg n t, idx) = fromJust $ List.find (\(S.Arg n t, idx) -> n == fieldName) fieldsWithIndex
+            let len = length fieldsWithIndex
+            let arrayType = T.ArrayType (fromIntegral len) ptrType
+            let tpe = T.StructureType False [T.i32, arrayType] -- DataValue: {tag, values: []}
+            dataStruct <- bitcast tree (T.ptr tpe)
+            tagAddr <- getelementptr2 T.i32 dataStruct [constIntOp 0, constIntOp 0]
+            tag <- load2 T.i32 tagAddr
+            callFn ptrType "putInt" [tag]
+            array <- getelementptr dataStruct [constIntOp 0, constIntOp 1]
+            valueAddr <- getelementptr array [constIntOp 0, constIntOp idx]
+            value <- load valueAddr
+            traceM $ printf "AAAA %s: %s" (show array) (show value)
+            resultValue <- case t of
+                TypeIdent "Float" -> ptrtofp value
+                TypeIdent "Int"   -> ptrtoint value T.i32
+                _                 -> return value
+            traceM $ printf "Selecting %s: %s" (show tree) (show resultValue)
+--            callFn runtimeSelectFuncType "runtimeSelect" [tree, e, constOp pos]
+--            return $ constFloatOp 1234.5
+            return resultValue
         (S.Ident _ name) | isFuncType identType -> do
     --      traceM $ printf "Method call %s: %s" name (show identType)
             cgen ctx (S.Apply meta expr [tree])
@@ -259,7 +288,6 @@ cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
                 callFn runtimeBinOpFuncType "runtimeBinOp" [codeOp, llhs, lrhs]
 cgen ctx (S.Apply meta expr args) = do
     syms <- gets symtab
-    largs <- mapM (cgen ctx) args
     let symMap = Map.fromList syms
     let isGlobal fn = (fn `Map.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
     let isArray expr = case S.typeOf expr of
@@ -333,6 +361,7 @@ cgen ctx (S.Apply meta expr args) = do
         expr -> do
             modState <- gets moduleState
             e <- cgen ctx expr
+            largs <- mapM (cgen ctx) args
             let funcs = functions modState
             let argc = constIntOp (length largs)
             let len = Map.size funcs
@@ -404,7 +433,7 @@ genPattern ctx lhs (S.LitPattern literal) rhs = S.If S.emptyMeta (S.Apply S.empt
 genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
   where cond fail = S.If S.emptyMeta constrCheck (checkArgs name fail) fail
         constrCheck = S.Apply S.emptyMeta (S.Ident S.emptyMeta "runtimeIsConstr") [lhs, S.Literal S.emptyMeta $ S.StringLit name]
-        constrMap = let cs = foldr (\ (S.DataDef dn id constrs) acc -> constrs ++ acc) [] (S.dataDefs ctx)
+        constrMap = let cs = foldr (\ (S.DataDef _ _ constrs) acc -> constrs ++ acc) [] (S.dataDefs ctx)
                         tuples = fmap (\c@(S.DataConst n args) -> (n, args)) cs
                     in  Map.fromList tuples
         checkArgs nm fail =  case Map.lookup nm constrMap of
@@ -420,7 +449,7 @@ genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
 codegenStaticModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> AST.Module
 codegenStaticModule opts modo exprs = modul
   where
-    ctx = createGlobalContext exprs
+    ctx = createGlobalContext opts exprs
     modul = runLLVM modo genModule
     genModule = do
         fns' <- transform extractLambda exprs
@@ -432,8 +461,87 @@ codegenStaticModule opts modo exprs = modul
         declareStdFuncs
         genFunctionMap fns''
         let defs = reverse (S.dataDefs ctx)
-        genTypesStruct defs
+        genTypesStruct ctx defs
         genRuntime opts
         defineStringLit "Match error!" -- TODO remove this hack
         mapM_ (codegenTop ctx) fns''
         codegenStartFunc ctx
+
+genTypesStruct ctx defs = do
+    types <- genData ctx defs
+    let array = C.Array ptrType types
+    defineConst "Types" structType (Just (struct array))
+  where len = length defs
+        struct a = createStruct [constInt len, a]
+        structType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) ptrType]
+
+genData :: Ctx -> [S.DataDef] -> LLVM ([C.Constant])
+genData ctx defs = sequence [genDataStruct d | d <- defs]
+  where genDataStruct dd@(S.DataDef tid name constrs) = do
+            defineStringLit name
+            let literalName = fromString $ "Data." ++ name
+            let numConstructors = length constrs
+            constructors <- genConstructors ctx dd
+            let arrayOfConstructors = C.Array ptrType constructors
+            let struct = createStruct [constInt tid, globalStringRefAsPtr name, constInt numConstructors, arrayOfConstructors] -- struct Data
+            defineConst literalName (T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral numConstructors) ptrType]) (Just struct)
+            return (constRef literalName)
+
+genConstructors ctx (S.DataDef tid name constrs) = do
+    forM (zip constrs [0..]) $ \ ((S.DataConst n args), tag) ->
+        defineConstructor ctx (fromString name) n tid tag args
+
+boxStructType = T.StructureType False [T.i32, ptrType]
+
+defineConstructor ctx typeName name tid tag args  = do
+  -- TODO optimize for zero args
+    modState <- get
+    let codeGenResult = codeGen modState
+    let blocks = createBlocks codeGenResult
+
+    if null args
+    then do
+        let singletonName = name ++ ".Singleton"
+        let dataValue = createStruct [constInt tag, C.Array ptrType []]
+        defineConst (fromString singletonName) tpe (Just dataValue)
+
+        let boxed = createStruct [constInt tid, constRef (fromString singletonName)]
+        defineConst (fromString $ singletonName ++ ".Boxed") boxStructType (Just boxed)
+
+        let boxedRef = C.GlobalReference boxStructType (AST.Name (fromString $ singletonName ++ ".Boxed"))
+        let ptrRef = C.BitCast boxedRef ptrType
+        defineConst (fromString name) ptrType (Just ptrRef)
+    else do
+        define ptrType (fromString name) fargs blocks -- define constructor function
+        forM_ args $ \ (S.Arg name _) -> defineStringLit name -- define fields names as strings
+
+    let structType = T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral len) ptrType]
+    let struct =  createStruct [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, constInt len, fieldsArray]
+    let literalName = fromString $ typeName ++ "." ++ name
+    defineConst literalName structType (Just struct)
+
+    return $ constRef literalName
+
+  where
+    len = length args
+    arrayType = T.ArrayType (fromIntegral len) ptrType
+    tpe = T.StructureType False [T.i32, arrayType] -- DataValue: {tag, values: []}
+    fargs = externArgsToSig args
+    fieldsArray = C.Array ptrType fields
+    fields = map (\(S.Arg n _) -> globalStringRefAsPtr n) args
+
+    codeGen modState = execCodegen [] modState $ do
+        entry <- addBlock entryBlockName
+        setBlock entry
+        (ptr, structPtr) <- gcMallocType tpe
+        tagAddr <- getelementptr structPtr [constIntOp 0, constIntOp 0] -- [dereference, 1st field] {tag, [arg1, arg2 ...]}
+        store tagAddr (constIntOp tag)
+        let argsWithId = zip args [0..]
+        forM_ argsWithId $ \(S.Arg n t, i) -> do
+            p <- getelementptr structPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, 2nd field, ith element] {tag, [arg1, arg2 ...]}
+            ref <- case t of
+                  TypeIdent "Float" -> fptoptr $ localT (fromString n) T.double
+                  TypeIdent "Int"   -> inttoptr $ localT (fromString n) T.i32
+                  _                 -> return $ local $ fromString n
+            store p (ref)
+        ret ptr

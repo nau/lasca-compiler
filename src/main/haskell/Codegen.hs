@@ -114,11 +114,11 @@ defineConst name tpe body = addDefn $
     , LLVM.AST.Global.initializer = body
     }
 
-define ::  Type -> SBS.ShortByteString -> [(Type, Name)] -> [BasicBlock] -> LLVM ()
+define ::  Type -> SBS.ShortByteString -> [(SBS.ShortByteString, Type)] -> [BasicBlock] -> LLVM ()
 define retty label argtys body = addDefn $
     GlobalDefinition $ functionDefaults {
       name        = Name label
-    , parameters  = ([Parameter ty nm [] | (ty, nm) <- argtys], False)
+    , parameters  = ([Parameter ty (Name nm) [] | (nm, ty) <- argtys], False)
     , returnType  = retty
     , basicBlocks = body
     }
@@ -365,13 +365,26 @@ constRefOperand name = constOp (constRef name)
 uitofp :: Type -> Operand -> Codegen Operand
 uitofp ty a = instr $ UIToFP a ty []
 
+fptoptr fp = do
+    int <- bitcast fp T.i64
+    inttoptr int
+
+ptrtofp ptr = do
+    i64ptr <- bitcast ptr (T.ptr T.i64)
+    Debug.traceM $ show ptr
+    int <- ptrtoint i64ptr T.i64
+--    let int = constInt64Op 1234
+    bitcast int T.double
+
 toArgs :: [Operand] -> [(Operand, [A.ParameterAttribute])]
 toArgs = map (\x -> (x, []))
 
 
 bitcast op toTpe= instr2 toTpe (BitCast op toTpe [])
+
 ptrtoint op toTpe= instr2 toTpe (PtrToInt op toTpe [])
-inttoptr op toTpe= instr2 toTpe (IntToPtr op toTpe [])
+
+inttoptr op = instr2 ptrType (IntToPtr op ptrType [])
 
 -- Effects
 add tpe lhs rhs = instr2 tpe $ Add False False lhs rhs []
@@ -406,6 +419,7 @@ store ptr val = instr $ Store False ptr val Nothing 0 []
 
 load :: Operand -> Codegen Operand
 load ptr = instr $ Load False ptr Nothing 0 []
+load2 tpe ptr = instr2 tpe $ Load False ptr Nothing 0 []
 
 -- Control Flow
 br :: Name -> Codegen (Named Terminator)
@@ -421,6 +435,7 @@ ret :: Operand -> Codegen (Named Terminator)
 ret val = terminator $ Do $ Ret (Just val) []
 
 getelementptr addr indices = instr $ GetElementPtr False addr indices []
+getelementptr2 tpe addr indices = instr2 tpe $ GetElementPtr False addr indices []
 
 insertValue ptr val indices = instr $ InsertValue ptr val indices []
 
@@ -434,8 +449,8 @@ zero = constOp $ C.Float (F.Double 0.0)
 false = zero
 true = one
 
-toSig :: [S.Arg] -> [(AST.Type, AST.Name)]
-toSig = map (\(S.Arg name tpe) -> (ptrType, AST.Name (fromString name)))
+toSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
+toSig = map (\(S.Arg name tpe) -> (fromString name, ptrType))
 
 
 stringStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]

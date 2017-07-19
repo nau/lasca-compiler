@@ -25,7 +25,7 @@ data LascaOpts = LascaOpts
     , printAst     :: Bool
     , printTypes   :: Bool
     , optimization :: Int
-    }
+    } deriving (Show, Eq)
 
 data Position = NoPosition | Position {sourceLine :: Word, sourceColumn :: Word} deriving (Eq, Ord)
 
@@ -146,6 +146,7 @@ data DataDef = DataDef Int String [DataConst]
     deriving (Show, Eq)
 
 data Ctx = Context {
+    _lascaOpts :: LascaOpts,
     _globalFunctions :: Map.Map String FunDef,
     _globalVals :: Set.Set String,
     dataDefs :: [DataDef],
@@ -169,8 +170,8 @@ instance Show Lit where
 
 data Arg = Arg Name Type deriving (Eq, Ord, Show)
 
-createGlobalContext :: [Expr] -> Ctx
-createGlobalContext exprs = execState (loop exprs) emptyCtx
+createGlobalContext :: LascaOpts -> [Expr] -> Ctx
+createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
   where
     loop [] = return ()
     loop (e:exprs) = do
@@ -207,7 +208,8 @@ data FunDef = FunDef Meta Name Type [Arg]
 isExtern FunDef{} = False
 isExtern ExternDef{} = True
 
-
+lascaOpts :: Lens.Lens' Ctx LascaOpts
+lascaOpts = Lens.lens _lascaOpts (\c o -> c { _lascaOpts = o } )
 
 globalFunctions :: Lens.Lens' Ctx (Map.Map String FunDef)
 globalFunctions = Lens.lens _globalFunctions (\c e -> c { _globalFunctions = e } )
@@ -215,7 +217,8 @@ globalFunctions = Lens.lens _globalFunctions (\c e -> c { _globalFunctions = e }
 globalVals :: Lens.Lens' Ctx (Set.Set String)
 globalVals = Lens.lens _globalVals (\c e -> c { _globalVals = e } )
 
-emptyCtx = Context {
+emptyCtx opts = Context {
+    _lascaOpts = opts,
     _globalFunctions = Map.empty,
     _globalVals = Set.empty,
     dataDefs = [],

@@ -33,8 +33,8 @@ optimizeOpt = option auto
            <> value 0
            <> help "Optimization level for LLVM" )
 
-lascaOpts :: Parser LascaOpts
-lascaOpts = LascaOpts
+lascaOptsParser :: Parser LascaOpts
+lascaOptsParser = LascaOpts
   <$> many (argument str (metavar "FILES..."))
   <*> strOption
       ( long "mode"
@@ -99,7 +99,7 @@ genModule opts modo source = do
           when (printAst opts) $ print ex
           when (verboseMode opts) $ putStrLn("Compiler mode is " ++ mode opts)
           if mode opts == "static"
-          then case typeCheck (createGlobalContext ex) ex of
+          then case typeCheck (createGlobalContext opts ex) ex of
             Right (env, typedExprs) -> do
               when (verboseMode opts) $ putStrLn "typechecked OK"
               when (printTypes opts) $ print env
@@ -153,7 +153,7 @@ repl opts = runInputT defaultSettings (loop (initModule "Lasca JIT"))
 main :: IO ()
 main = execParser opts >>= greet
   where
-    opts = info (helper <*> lascaOpts)
+    opts = info (helper <*> lascaOptsParser)
       ( fullDesc
      <> progDesc "Print a greeting for TARGET"
      <> header "Lasca compiler" )

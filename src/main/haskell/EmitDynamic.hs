@@ -111,7 +111,7 @@ codegenTop ctx exp = do
 
 codegenStartFunc ctx = do
     modState <- get
-    define T.void "start" [(intType, AST.Name "argc"), (ptrType, AST.Name "argv")] (bls modState)
+    define T.void "start" [("argc", intType), ("argv", ptrType)] (bls modState)
   where
     bls modState = createBlocks $ execCodegen [] modState $ do
         entry <- addBlock entryBlockName
@@ -308,7 +308,7 @@ genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
 codegenModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> AST.Module
 codegenModule opts modo exprs = modul
   where
-    ctx = createGlobalContext exprs
+    ctx = createGlobalContext opts exprs
     modul = runLLVM modo genModule
     genModule = do
         fns' <- transform extractLambda exprs
@@ -320,8 +320,84 @@ codegenModule opts modo exprs = modul
         declareStdFuncs
         genFunctionMap fns''
         let defs = reverse (S.dataDefs ctx)
-        genTypesStruct defs
+        genTypesStruct ctx defs
         genRuntime opts
         defineStringLit "Match error!" -- TODO remove this hack
         mapM_ (codegenTop ctx) fns''
         codegenStartFunc ctx
+
+genTypesStruct ctx defs = do
+    types <- genData ctx defs
+    let array = C.Array ptrType types
+    defineConst "Types" structType (Just (struct array))
+  where len = length defs
+        struct a = createStruct [constInt len, a]
+        structType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) ptrType]
+
+genData :: Ctx -> [S.DataDef] -> LLVM ([C.Constant])
+genData ctx defs = sequence [genDataStruct d | d <- defs]
+  where genDataStruct dd@(S.DataDef tid name constrs) = do
+            defineStringLit name
+            let literalName = fromString $ "Data." ++ name
+            let numConstructors = length constrs
+            constructors <- genConstructors ctx dd
+            let arrayOfConstructors = C.Array ptrType constructors
+            let struct = createStruct [constInt tid, globalStringRefAsPtr name, constInt numConstructors, arrayOfConstructors] -- struct Data
+            defineConst literalName (T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral numConstructors) ptrType]) (Just struct)
+            return (constRef literalName)
+
+genConstructors ctx (S.DataDef tid name constrs) = do
+    forM (zip constrs [0..]) $ \ ((S.DataConst n args), tag) ->
+        defineConstructor ctx (fromString name) n tid tag args
+
+boxStructType = T.StructureType False [T.i32, ptrType]
+
+defineConstructor ctx typeName name tid tag args  = do
+  -- TODO optimize for zero args
+    modState <- get
+    let codeGenResult = codeGen modState
+    let blocks = createBlocks codeGenResult
+
+    if null args
+    then do
+        let singletonName = name ++ ".Singleton"
+        let dataValue = createStruct [constInt tag, C.Array ptrType []]
+        defineConst (fromString singletonName) tpe (Just dataValue)
+
+        let boxed = createStruct [constInt tid, constRef (fromString singletonName)]
+        defineConst (fromString $ singletonName ++ ".Boxed") boxStructType (Just boxed)
+
+        let boxedRef = C.GlobalReference boxStructType (AST.Name (fromString $ singletonName ++ ".Boxed"))
+        let ptrRef = C.BitCast boxedRef ptrType
+        defineConst (fromString name) ptrType (Just ptrRef)
+    else do
+        define ptrType (fromString name) fargs blocks -- define constructor function
+        forM_ args $ \ (S.Arg name _) -> defineStringLit name -- define fields names as strings
+
+    let structType = T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral len) ptrType]
+    let struct =  createStruct [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, constInt len, fieldsArray]
+    let literalName = fromString $ typeName ++ "." ++ name
+    defineConst literalName structType (Just struct)
+
+    return $ constRef literalName
+
+  where
+    len = length args
+    arrayType = T.ArrayType (fromIntegral len) ptrType
+    tpe = T.StructureType False [T.i32, arrayType] -- DataValue: {tag, values: []}
+    fargs = toSig args
+    fieldsArray = C.Array ptrType fields
+    fields = map (\(S.Arg n _) -> globalStringRefAsPtr n) args
+
+    codeGen modState = execCodegen [] modState $ do
+        entry <- addBlock entryBlockName
+        setBlock entry
+        (ptr, structPtr) <- gcMallocType tpe
+        tagAddr <- getelementptr structPtr [constIntOp 0, constIntOp 0] -- [dereference, 1st field] {tag, [arg1, arg2 ...]}
+        store tagAddr (constIntOp tag)
+        let argsWithId = zip args [0..]
+        forM_ argsWithId $ \(S.Arg n t, i) -> do
+            p <- getelementptr structPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, 2nd field, ith element] {tag, [arg1, arg2 ...]}
+            store p (local $ fromString n)
+        boxed <- callFn ptrType "box" [constIntOp tid, ptr]
+        ret boxed
