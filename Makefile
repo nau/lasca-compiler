@@ -39,11 +39,12 @@ examples:
 	lasca -O2 -e --mode dynamic src/main/lasca/hello.lasca $(TEST_RTS)
 	lasca -O2 -e src/main/lasca/hello.lasca $(TEST_RTS)
 	lasca -O2 -e src/main/lasca/lambda.lasca $(TEST_RTS)
-#	lasca -O2 -e src/main/lasca/list.lasca $(TEST_RTS)
+	lasca -O2 -e src/main/lasca/list.lasca $(TEST_RTS)
+	lasca -O2 -e --mode dynamic src/main/lasca/list.lasca $(TEST_RTS)
 	lasca -O2 -e src/main/lasca/nbody.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e --mode dynamic src/main/lasca/nbody.lasca $(TEST_RTS) -- 50000
-#	lasca -O2 -e src/main/lasca/nbody2.lasca $(TEST_RTS) -- 50000
-#	lasca -O2 -e --mode dynamic src/main/lasca/nbody2.lasca $(TEST_RTS) -- 50000
+	lasca -O2 -e src/main/lasca/nbody2.lasca $(TEST_RTS) -- 50000
+	lasca -O2 -e --mode dynamic src/main/lasca/nbody2.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e src/main/lasca/ski.lasca $(TEST_RTS)
 #	lasca -O2 -e src/main/lasca/typed.lasca $(TEST_RTS)
 

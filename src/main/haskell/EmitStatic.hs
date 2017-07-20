@@ -177,7 +177,14 @@ dataDefFields ctx name = let
     dataDefMaybe = List.find (\(S.DataDef _ n _) -> n == name) (S.dataDefs ctx)
     (S.DataDef _ _ constrs) = fromJust dataDefMaybe -- FIXME
     (S.DataConst _ args) = head constrs
-  in args
+    argsWithIds = foldl (\acc (S.DataConst _ args) ->
+              fst $ foldl (\(acc, idx) arg@(S.Arg n t)  ->
+                  if n `Map.member` acc
+                  then error $ printf "Field %s already defined in data %s" n name
+                  else (Map.insert n (arg, idx) acc, idx + 1) -- field name -> (S.Arg, field index in constructor) mapping
+              ) (acc, 0) args
+           ) Map.empty constrs
+  in argsWithIds
 
 isDataType ctx tpe = case tpe of
     TypeIdent name | name `Set.member` (dataDefsNames ctx) -> True
@@ -230,17 +237,25 @@ cgen ctx this@(S.Array meta exprs) = do
 cgen ctx this@(S.Select meta tree expr) = do
     let treeType@(TypeIdent tpeName) = S.typeOf tree
     let identType = S.typeOf expr
+--    Debug.traceM $ printf "Selecting %s: %s" (show treeType) (show treeType)
     case expr of
         _ | isDataType ctx treeType -> do
             let pos = createPosition $ S.pos meta
             tree <- cgen ctx tree
             let (S.Ident _ fieldName) = expr
-            let fieldsWithIndex = zip (dataDefFields ctx tpeName) [0..]
-            let (S.Arg n t, idx) = fromJust $ List.find (\(S.Arg n t, idx) -> n == fieldName) fieldsWithIndex
+            let fieldsWithIndex = dataDefFields ctx tpeName
+--            Debug.traceM $ printf "fieldsWithIndex %s" (show fieldsWithIndex)
+            let (S.Arg n t, idx) = fromMaybe (error $ printf "No such field %s in %s" fieldName tpeName) (Map.lookup fieldName fieldsWithIndex)
             let len = length fieldsWithIndex
             let arrayType = T.ArrayType (fromIntegral len) ptrType
             let tpe = T.StructureType False [T.i32, arrayType] -- DataValue: {tag, values: []}
-            dataStruct <- bitcast tree (T.ptr tpe)
+
+            boxedTree <- bitcast tree (T.ptr boxStructType)
+            
+            unboxedAddr <- getelementptr boxedTree [constIntOp 0, constIntOp 1]
+            unboxed <- load unboxedAddr
+
+            dataStruct <- bitcast unboxed (T.ptr tpe)
 --            tagAddr <- getelementptr2 T.i32 dataStruct [constIntOp 0, constIntOp 0]
 --            tag <- load2 T.i32 tagAddr
 --            callFn ptrType "putInt" [tag]
@@ -253,7 +268,6 @@ cgen ctx this@(S.Select meta tree expr) = do
                 TypeIdent "Int"   -> ptrtoint value T.i32
                 _                 -> return value
 --            Debug.traceM $ printf "Selecting %s: %s" (show tree) (show resultValue)
---            callFn runtimeSelectFuncType "runtimeSelect" [tree, e, constOp pos]
 --            return $ constFloatOp 1234.5
             return resultValue
         (S.Ident _ name) | isFuncType identType -> do
@@ -422,7 +436,7 @@ cgen ctx e = error ("cgen shit " ++ show e)
 genMatch :: Ctx -> S.Expr -> S.Expr
 genMatch ctx m@(S.Match meta expr []) = error $ "Should be at least on case in match expression: " ++ show m
 genMatch ctx (S.Match meta expr cases) =
-    let body = foldr (\(S.Case p e) acc -> genPattern ctx (S.Ident meta "$match") p e acc) genFail cases
+    let body = foldr (\(S.Case p e) acc -> genPattern ctx (S.Ident (expr ^. S.metaLens) "$match") p e acc) genFail cases
     in  S.Let meta "$match" expr body  -- FIXME hack. Gen unique names
 
 genFail = S.Apply S.emptyMeta (S.Ident S.emptyMeta "die") [S.Literal S.emptyMeta $ S.StringLit "Match error!"]
@@ -544,4 +558,7 @@ defineConstructor ctx typeName name tid tag args  = do
                   TypeIdent "Int"   -> inttoptr $ localT (fromString n) T.i32
                   _                 -> return $ local $ fromString n
             store p (ref)
-        ret ptr
+        -- remove boxing after removing runtimeIsConstr from genPattern, do a proper tag check instead
+        boxed <- callFn ptrType "box" [constIntOp tid, ptr]
+        ret boxed
+--        ret ptr
