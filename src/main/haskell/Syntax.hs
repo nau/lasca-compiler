@@ -150,8 +150,20 @@ data Ctx = Context {
     _globalFunctions :: Map.Map String FunDef,
     _globalVals :: Set.Set String,
     dataDefs :: [DataDef],
+    dataDefsNames :: Set.Set String,
+    dataDefsFields :: Map.Map String (Map.Map String (Arg, Int)),
     typeId :: Int -- TODO remove this. Needed for type id generation. Move to ModuleState?
 } deriving (Show, Eq)
+
+emptyCtx opts = Context {
+    _lascaOpts = opts,
+    _globalFunctions = Map.empty,
+    _globalVals = Set.empty,
+    dataDefs = [],
+    dataDefsNames = Set.empty,
+    dataDefsFields = Map.empty,
+    typeId = 1000
+}
 
 data Lit = IntLit Int
     | FloatLit Double
@@ -192,14 +204,27 @@ createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
                                        meta = metaWithScheme tpe
                                        funDef = FunDef meta n dataTypeIdent args
                                    in ((n, funDef) : funcs, vals)) ([], []) consts
-        modify (\s -> s { dataDefs =  dataDef : dataDefs s, typeId = id + 1 })
+        -- FIXME Merge with above, create State?
+        let argsWithIds = foldl' (\acc (DataConst _ args) ->
+                                          fst $ foldl' (\(acc, idx) arg@(Arg n t)  ->
+                                              if n `Map.member` acc
+                                              then error $ printf "Field %s already defined in data %s" n name
+                                              else (Map.insert n (arg, idx) acc, idx + 1) -- field name -> (S.Arg, field index in constructor) mapping
+                                          ) (acc, 0) args
+                                      ) Map.empty consts
+
+        modify (\s -> s {
+            dataDefs =  dataDef : dataDefs s,
+            dataDefsNames = Set.insert name (dataDefsNames s),
+            dataDefsFields = Map.insert name argsWithIds (dataDefsFields s),
+            typeId = id + 1
+        })
         globalVals %= Set.union (Set.fromList vals)
         globalFunctions %= Map.union (Map.fromList funcs)
     names (Extern meta name tpe args) = do
 --        let funcType = Forall [] (foldr (\(Arg _ t) acc -> TypeFunc t acc) tpe args)
        globalFunctions %= Map.insert name (ExternDef meta name tpe args)
     names expr = error $ "Wat? Expected toplevel expression, but got " ++ show expr
-
 
 data FunDef = FunDef Meta Name Type [Arg]
             | ExternDef Meta Name Type [Arg]
@@ -216,11 +241,3 @@ globalFunctions = Lens.lens _globalFunctions (\c e -> c { _globalFunctions = e }
 
 globalVals :: Lens.Lens' Ctx (Set.Set String)
 globalVals = Lens.lens _globalVals (\c e -> c { _globalVals = e } )
-
-emptyCtx opts = Context {
-    _lascaOpts = opts,
-    _globalFunctions = Map.empty,
-    _globalVals = Set.empty,
-    dataDefs = [],
-    typeId = 1000
-}

@@ -6,21 +6,19 @@ data Point = Point(x: Int, y: Int, z: Test)
 
 data Expr = Ident(n: String) | Num(nm: Int) | No
 
-data IntList = Cons(v: Int, tail: IntList) | Nil
+data StringList = Cons(v: String, tail: StringList) | Nil
 
 def main() = {
     t = Test(3);
     p1 = Point(12, 2, t);
     ident = Ident("test");
-  --  num = Num(1);
+    num = Num(1);
     no = No;
-    list = Cons(1, Cons(2, Nil));
-  --  println(list.toString);
-  --  println(ident.toString);
---    println(ident.toString);
---    println(ident.n);
-  --  println(num.toString);
---    println(no.toString);
+    list = Cons("1", Cons("2", Nil));
+    println(list.toString);
+    println(ident.toString);
+    println(ident.n);
+    println(no.toString);
     x = p1.x + p1.y - p1.z.a;
     println(toString(x == 11));
     println("Hello")

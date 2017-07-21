@@ -67,12 +67,15 @@ def foldLeft[A, B](col: List[A], z: B, f: (B, A) => B): B =
 
 Optimal?
 ```scala
-type a = forall a. {a | len} 
-def foldl(col: Seq a, zero: b, f: (b, a) -> b)): a = {
-  | Nil zero _         -> zero                  
-  | (x cons xs) zero f -> xs.foldl(zero, f(z, x))
-}
-def toMap(col: Traversable (a, b)): Map a b = col.foldl(Map.empty, { m, pair -> m.insert pair }) 
+type Positive = Int {x > 0} 
+
+def foldl(col: Seq a, zero: b, f: (b, a) -> b)): a = match col with
+    Nil         -> zero                  
+    (x :: xs) -> xs.foldl(zero, f(z, x))
+
+def toMap(col: Traversable (a, b)): Map a b = col.foldl(Map.empty, { m, pair -> m.insert pair })
+
+def sum(a, b) = a + b 
 ```
 
 

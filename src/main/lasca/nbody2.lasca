@@ -46,7 +46,7 @@ Neptune = Body(
 
 Sun = Body(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, SolarMass)
 
-def go(bodies: [Body], i: Int, pxyz: [Float]) = {
+def go(bodies: [Body], i, pxyz: [Float]) = {
     body = bodies[i];
     updatedPs = [
         pxyz[0] + body.vx * body.mass,
@@ -147,11 +147,11 @@ def advance(bodies: [Body], dt) = {
 def squared(x: Float, y: Float, z: Float) = x * x + y * y + z * z
 
 def energyInner(from, to) = {
-  dx = from.x - to.x;
-  dy = from.y - to.y;
-  dz = from.z - to.z;
-  distance = sqrt(squared(dx, dy, dz));
-  from.mass * to.mass / distance;
+    dx = from.x - to.x;
+    dy = from.y - to.y;
+    dz = from.z - to.z;
+    distance = sqrt(squared(dx, dy, dz));
+    from.mass * to.mass / distance;
 }
 
 def energy(bodies: [Body]) = {
@@ -185,15 +185,15 @@ def energy(bodies: [Body]) = {
     e
 }
 
-def calculate(i, bodies: [Body]) = if i > 0 then calculate(i - 1, advance(bodies, 0.01)) else bodies
+def calculate(bodies: [Body], i) = if i > 0 then calculate(advance(bodies, 0.01), i - 1) else bodies
 
 def main() = {
     -- set to 50000000 for real benchmark
     args = getArgs();
     numIterations = toInt(args[1]);
     bodies = [Sun, Jupiter, Saturn, Uranus, Neptune];
-    initedBodies = init(bodies);
-    println(toString(energy(initedBodies)));
-    advanced = calculate(numIterations, initedBodies);
-    println(toString(energy(advanced)));
+    initedBodies = bodies.init;
+    println(initedBodies.energy.toString);
+    advanced = calculate(initedBodies, numIterations);
+    println(energy(advanced).toString);
 }

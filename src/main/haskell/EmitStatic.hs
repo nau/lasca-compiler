@@ -171,23 +171,11 @@ returnType args t = foldr f t args
 -- Operations
 -------------------------------------------------------------------------------
 
-dataDefsNames ctx = Set.fromList $ map (\(S.DataDef _ name _) -> name) (S.dataDefs ctx)
-
-dataDefFields ctx name = let
-    dataDefMaybe = List.find (\(S.DataDef _ n _) -> n == name) (S.dataDefs ctx)
-    (S.DataDef _ _ constrs) = fromJust dataDefMaybe -- FIXME
-    (S.DataConst _ args) = head constrs
-    argsWithIds = foldl (\acc (S.DataConst _ args) ->
-              fst $ foldl (\(acc, idx) arg@(S.Arg n t)  ->
-                  if n `Map.member` acc
-                  then error $ printf "Field %s already defined in data %s" n name
-                  else (Map.insert n (arg, idx) acc, idx + 1) -- field name -> (S.Arg, field index in constructor) mapping
-              ) (acc, 0) args
-           ) Map.empty constrs
-  in argsWithIds
+dataTypeHasField ctx typeName fieldName =
+    typeName `Set.member` (S.dataDefsNames ctx) && fieldName `Map.member` (S.dataDefsFields ctx Map.! typeName)
 
 isDataType ctx tpe = case tpe of
-    TypeIdent name | name `Set.member` (dataDefsNames ctx) -> True
+    TypeIdent name | name `Set.member` (S.dataDefsNames ctx) -> True
     _ -> False
 
 isFuncType (TypeFunc _ _) = True
@@ -235,15 +223,19 @@ cgen ctx this@(S.Array meta exprs) = do
        _ -> boxArray vs
   where values = sequence [cgen ctx e | e <- exprs]
 cgen ctx this@(S.Select meta tree expr) = do
-    let treeType@(TypeIdent tpeName) = S.typeOf tree
+--    Debug.traceM $ printf "Selecting! %s" (show this)
+    let (treeType, tpeName) = case S.typeOf tree of
+                                   treeType@(TypeIdent tpeName) -> (treeType, tpeName)
+                                   treeType@(TypeApply (TypeIdent tpeName) _) -> (treeType, tpeName)
+                                   treeType -> error $ printf "Unsupported type for selection %s" (show treeType)
     let identType = S.typeOf expr
---    Debug.traceM $ printf "Selecting %s: %s" (show treeType) (show treeType)
+--    Debug.traceM $ printf "Selecting %s: %s" (show treeType) (show identType)
     case expr of
-        _ | isDataType ctx treeType -> do
+        (S.Ident _ fieldName) | dataTypeHasField ctx tpeName fieldName -> do
             let pos = createPosition $ S.pos meta
             tree <- cgen ctx tree
             let (S.Ident _ fieldName) = expr
-            let fieldsWithIndex = dataDefFields ctx tpeName
+            let fieldsWithIndex = (S.dataDefsFields ctx) Map.! tpeName
 --            Debug.traceM $ printf "fieldsWithIndex %s" (show fieldsWithIndex)
             let (S.Arg n t, idx) = fromMaybe (error $ printf "No such field %s in %s" fieldName tpeName) (Map.lookup fieldName fieldsWithIndex)
             let len = length fieldsWithIndex
