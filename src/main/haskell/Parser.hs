@@ -231,7 +231,7 @@ function = do
     tpe <- option typeAny typeAscription
     reservedOp "="
     body <- expr
-    let meta' = meta { symbolType = foldr (TypeFunc . const typeAny) tpe args } -- FIXME forall
+    let meta' = meta { _exprType = foldr (TypeFunc . const typeAny) tpe args } -- FIXME forall
     return (Function meta' name tpe args body)
 
 extern :: Parser Expr
@@ -243,7 +243,7 @@ extern = do
     args <- parens $ commaSep arg
     tpe <- typeAscription
     let scheme = foldr (\(Arg n at) ft -> TypeFunc at ft) tpe (List.reverse args) -- FIXME forall
-    let meta' = meta { _isExternal = True, symbolType = scheme }
+    let meta' = meta { _isExternal = True, _exprType = scheme }
     return (Function meta' name tpe args EmptyExpr)
 
 arg :: Parser Arg

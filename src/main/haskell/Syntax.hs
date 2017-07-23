@@ -31,23 +31,23 @@ data Position = NoPosition | Position {sourceLine :: Word, sourceColumn :: Word}
 
 data Meta = Meta {
     pos :: Position,
-    symbolType :: Type,
+    _exprType :: Type,
     _isExternal :: Bool
 } deriving (Eq, Ord)
 
 instance Show Meta where
 --  show (Meta pos tpe) = "Meta{pos=" ++ show pos ++ ", tpe=" ++ show tpe ++ "}"
-    show meta = show (symbolType meta)
+    show meta = show (_exprType meta)
 
 instance Show Position where
     show NoPosition = "<unknown>"
     show Position{sourceLine = sl, sourceColumn = sc} = show sl ++ ":" ++ show sc
 
-emptyMeta = Meta { pos = NoPosition, symbolType = typeAny, _isExternal = False }
+emptyMeta = Meta { pos = NoPosition, _exprType = typeAny, _isExternal = False }
 
 withMetaPos line col = emptyMeta { pos = Position {sourceLine = line, sourceColumn = col} }
 
-metaWithType s = emptyMeta { symbolType = s }
+metaWithType s = emptyMeta { _exprType = s }
 
 data Expr
     = EmptyExpr
@@ -84,12 +84,12 @@ metaLens = Lens.lens (fst . getset) (snd . getset)
               BoxFunc meta name args -> (meta, \m -> BoxFunc m name args)
               _ -> error $ "Should not happen :) " ++ show expr
 
-symbolTypeLens :: Lens.Lens' Meta Type
-symbolTypeLens = Lens.lens symbolType (\meta st -> meta { symbolType = st })
+exprType :: Lens.Lens' Meta Type
+exprType = Lens.lens _exprType (\meta st -> meta { _exprType = st })
 
 isExternal = Lens.lens _isExternal (\meta ex -> meta { _isExternal = ex })
 
-getExprType expr = expr^.metaLens.symbolTypeLens
+getExprType expr = expr^.metaLens.exprType
 
 typeOf = fromSchema . getExprType
 

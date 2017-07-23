@@ -64,8 +64,8 @@ instance Substitutable Type where
     substitute s t@(TVar a)     = Map.findWithDefault t a s
     substitute s (t1 `TypeFunc` t2) = substitute s t1 `TypeFunc` substitute s t2
     substitute s (TypeApply t [args]) = TypeApply (substitute s t) [substitute s args]
-    substitute s (Forall as t) = Forall as $ substitute s' t
-                               where s' = foldr Map.delete s as
+    substitute s (Forall tvars t) = Forall tvars $ substitute s' t
+                               where s' = foldr Map.delete s tvars
     substitute s t = error $ "Wat? " ++ show s ++ ", " ++ show t
 
     ftv TypeIdent{}         = Set.empty
@@ -150,20 +150,20 @@ closeOver (sub, ty) e = do
     let sc = generalize emptyTyenv (substitute sub ty)
     let (normalized, mapping) = normalize sc
     let e'' = closeOverInner mapping e'
-    let e''' = Lens.set (metaLens.symbolTypeLens) normalized e''
+    let e''' = Lens.set (metaLens.exprType) normalized e''
     (normalized, {-Debug.trace ("Full type for" ++ show e''')-} e''')
 
 substituteAll sub e = updateMeta f e
-  where f meta = meta { symbolType = substitute sub (symbolType meta) }
+  where f meta = meta { _exprType = substitute sub (_exprType meta) }
 
 
 closeOverInner mapping e = do
   {-Debug.trace (printf "Closing over inner %s with mapping %s" (show e) (show mapping)) $-} updateMeta f e
   where
     schema = getExprType e
-    f meta = case symbolType meta of
-        Forall tv t -> meta { symbolType = Forall tv $ substype schema t mapping }
-        _ -> meta
+    f meta = case _exprType meta of
+        Forall tv t -> meta { _exprType = Forall tv $ substype schema t mapping }
+        t -> meta
 
 updateMeta f e =
     case e of
@@ -260,7 +260,7 @@ lookupEnv (TypeEnv env) x =
         Just s  -> do t <- instantiate s
                       return (nullSubst, t)
 
-withType meta t = meta { symbolType = t }
+withType meta t = meta { _exprType = t }
 
 setType :: Expr -> Infer ()
 setType e = modify (\s -> s {_current = e })
