@@ -350,7 +350,7 @@ infer ctx env ex = case ex of
         case argType of
             TypeIdent "Any" -> do
                 tv <- fresh
-                let env' = env `extend` (x, Forall [] tv)
+                let env' = env `extend` (x, tv)
                 (s1, t1) <- infer ctx env' e
                 e' <- gets _current
                 let resultType = substitute s1 tv `TypeFunc` t1

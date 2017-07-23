@@ -47,14 +47,14 @@ parserTests = testGroup "Parser tests"
 typerTests = testGroup "Typer tests"
   [
     testCase "Pattern matching" $
-      parseAndInferExpr "match true { | true -> 1 | false -> 2 }" @?= Forall [] (TypeIdent "Int")
+      parseAndInferExpr "match true { | true -> 1 | false -> 2 }" @?= (TypeIdent "Int")
   ]
 
 benchTests = testGroup "Bench" [testCase "gen10k" $ parseAndInferFile "src/main/lasca/gen5k.lasca"]
 
 parseAndInferExpr str = let
     expr = fromRight $ parseExpr str
-    Right (infered, _) = inferExpr (createGlobalContext [expr]) defaultTyenv expr
+    Right (infered, _) = inferExpr (createGlobalContext emptyLascaOpts [expr]) defaultTyenv expr
   in infered
 
 parseAndInferFile fname = do
@@ -65,6 +65,6 @@ parseAndInferFile fname = do
     Left err -> error $ Megaparsec.parseErrorPretty err
     Right ex -> do
       let exprs = preludeExprs ++ ex
-      let typeEnv = typeCheck (createGlobalContext exprs) exprs
+      let typeEnv = typeCheck (createGlobalContext emptyLascaOpts exprs) exprs
       print typeEnv
       1 @?= 1

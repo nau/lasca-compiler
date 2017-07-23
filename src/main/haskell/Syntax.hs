@@ -43,7 +43,7 @@ instance Show Position where
     show NoPosition = "<unknown>"
     show Position{sourceLine = sl, sourceColumn = sc} = show sl ++ ":" ++ show sc
 
-emptyMeta = Meta { pos = NoPosition, symbolType = schemaAny, _isExternal = False }
+emptyMeta = Meta { pos = NoPosition, symbolType = typeAny, _isExternal = False }
 
 withMetaPos line col = emptyMeta { pos = Position {sourceLine = line, sourceColumn = col} }
 
@@ -223,6 +223,17 @@ createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
         globalVals %= Set.union (Set.fromList vals)
         globalFunctions %= Map.union (Map.fromList funcs)
     names expr = error $ "Wat? Expected toplevel expression, but got " ++ show expr
+
+emptyLascaOpts = LascaOpts {
+    lascaFiles  = [],
+    mode = "static",
+    exec = False,
+    verboseMode = False,
+    printLLVMAsm = False,
+    printAst = False,
+    printTypes = False,
+    optimization = 0
+}
 
 lascaOpts :: Lens.Lens' Ctx LascaOpts
 lascaOpts = Lens.lens _lascaOpts (\c o -> c { _lascaOpts = o } )
