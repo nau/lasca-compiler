@@ -242,8 +242,9 @@ extern = do
     name <- identifier
     args <- parens $ commaSep arg
     tpe <- typeAscription
-    let meta' = meta { symbolType = Forall [] $ foldr (\(Arg n at) ft -> TypeFunc at ft) tpe (List.reverse args) }
-    return (Extern meta' name tpe args)
+    let scheme = Forall [] $ foldr (\(Arg n at) ft -> TypeFunc at ft) tpe (List.reverse args)
+    let meta' = meta { _isExternal = True, symbolType = scheme }
+    return (Function meta' name tpe args EmptyExpr)
 
 arg :: Parser Arg
 arg = do

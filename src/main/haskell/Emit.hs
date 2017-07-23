@@ -302,7 +302,6 @@ genFunctionMap fns = do
             let m = foldl (\acc (S.DataConst n args) -> (n, length args) : acc) [] consts
             in m ++ s
         go s (S.Function _ name tpe args body) = (name, length args) : s
-        go s (S.Extern _ name tpe args) = (name, length args) : s
         go s _ = s
 
 

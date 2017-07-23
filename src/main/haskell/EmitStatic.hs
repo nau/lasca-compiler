@@ -78,18 +78,21 @@ codegenTop ctx this@(S.Val meta name expr) = do
     let valType = llvmTypeOf this
     defineGlobal (AST.Name $ fromString name) valType (Just $ defaultValueForType valType)
 
-codegenTop ctx f@(S.Function meta name tpe args body) = do
---    Debug.traceM $ printf "codegenTop %s: %s" (name) (show funcType)
-    r1 <- defineStringConstants body
-  --   Debug.traceM ("Generating function1 " ++ name ++ (show r1))
-  --   defineClosures ctx name body
-  --   Debug.traceM ("Generating function2 " ++ name ++ (show r1))
-    modState <- get
-    let codeGenResult = codeGen modState
-    let blocks = createBlocks codeGenResult
-    mapM_ defineStringLit (generatedStrings codeGenResult)
-    let retType = mappedReturnType args funcType
-    define retType (fromString name) largs blocks
+codegenTop ctx f@(S.Function meta name tpe args body) =
+    if meta ^. S.isExternal then
+        external (typeMapping tpe) (fromString name ) (externArgsToSig args) False []
+    else do
+    --    Debug.traceM $ printf "codegenTop %s: %s" (name) (show funcType)
+        r1 <- defineStringConstants body
+      --   Debug.traceM ("Generating function1 " ++ name ++ (show r1))
+      --   defineClosures ctx name body
+      --   Debug.traceM ("Generating function2 " ++ name ++ (show r1))
+        modState <- get
+        let codeGenResult = codeGen modState
+        let blocks = createBlocks codeGenResult
+        mapM_ defineStringLit (generatedStrings codeGenResult)
+        let retType = mappedReturnType args funcType
+        define retType (fromString name) largs blocks
   where
     funcType = S.typeOf f
     largs = map (\(n, t) -> (fromString n, t)) argsWithTypes
@@ -112,12 +115,6 @@ codegenTop ctx f@(S.Function meta name tpe args body) = do
         cgen ctx body >>= ret
 
 codegenTop ctx (S.Data _ name constructors) = return ()
-
-
-codegenTop _ (S.Extern _ name tpe args) = external llvmType (fromString name) fnargs False []
-  where
-    llvmType = typeMapping tpe
-    fnargs = externArgsToSig args
 
 codegenTop ctx exp = do
     modState <- get
@@ -305,10 +302,8 @@ cgen ctx (S.Apply meta expr args) = do
     case expr of
          -- FIXME Here are BUGZZZZ!!!! :)
         this@(S.Ident meta fn) | isGlobal fn -> do
-            let meta = case S._globalFunctions ctx Map.! fn of
-                           (S.FunDef meta _ _ _) -> meta
-                           (S.ExternDef meta _ _ _) -> meta
-            let (Forall _ fnType) = S.symbolType meta
+            let funDecl = (ctx ^. S.globalFunctions) Map.! fn
+            let fnType = S.typeOf funDecl
             let fff t acc = case t of
                               TypeFunc a b -> fff b (a : acc)
                               a -> a : acc

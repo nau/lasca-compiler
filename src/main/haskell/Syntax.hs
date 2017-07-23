@@ -31,25 +31,27 @@ data Position = NoPosition | Position {sourceLine :: Word, sourceColumn :: Word}
 
 data Meta = Meta {
     pos :: Position,
-    symbolType :: Scheme
+    symbolType :: Scheme,
+    _isExternal :: Bool
 } deriving (Eq, Ord)
 
 instance Show Meta where
 --  show (Meta pos tpe) = "Meta{pos=" ++ show pos ++ ", tpe=" ++ show tpe ++ "}"
-    show (Meta _ tpe) = show tpe
+    show meta = show (symbolType meta)
 
 instance Show Position where
     show NoPosition = "<unknown>"
     show Position{sourceLine = sl, sourceColumn = sc} = show sl ++ ":" ++ show sc
 
-emptyMeta = Meta { pos = NoPosition, symbolType = schemaAny }
+emptyMeta = Meta { pos = NoPosition, symbolType = schemaAny, _isExternal = False }
 
 withMetaPos line col = emptyMeta { pos = Position {sourceLine = line, sourceColumn = col} }
 
-metaWithScheme s = Meta { pos = NoPosition, symbolType = s }
+metaWithScheme s = emptyMeta { symbolType = s }
 
 data Expr
-    = Literal Meta Lit
+    = EmptyExpr
+    | Literal Meta Lit
     | Ident Meta Name
     | Val Meta Name Expr
     | Apply Meta Expr [Expr]
@@ -58,7 +60,6 @@ data Expr
     | Match Meta Expr [Case]
     | BoxFunc Meta Name [Arg]   -- LLVM codegen only
     | Function Meta Name Type [Arg] Expr
-    | Extern Meta Name Type [Arg]
     | If Meta Expr Expr Expr
     | Let Meta Name Expr Expr
     | Array Meta [Expr]
@@ -76,7 +77,6 @@ metaLens = Lens.lens (fst . getset) (snd . getset)
               Select meta tree expr -> (meta, \ m -> Select m tree expr)
               Match meta expr cases -> (meta, \ m -> Match m expr cases)
               Function meta name tpe args body -> (meta, \ m -> Function m name tpe args body)
-              Extern meta name tpe args -> (meta, \ m -> Extern m name tpe args)
               If meta cond tr fl -> (meta, \ m -> If m cond tr fl)
               Let meta name expr body -> (meta, \ m -> Let m name expr body)
               Array meta exprs -> (meta, \ m -> Array m exprs)
@@ -86,6 +86,8 @@ metaLens = Lens.lens (fst . getset) (snd . getset)
 
 symbolTypeLens :: Lens.Lens' Meta Scheme
 symbolTypeLens = Lens.lens symbolType (\meta st -> meta { symbolType = st })
+
+isExternal = Lens.lens _isExternal (\meta ex -> meta { _isExternal = ex })
 
 getExprType expr = expr^.metaLens.symbolTypeLens
 
@@ -105,8 +107,7 @@ instance Eq Expr where
     (Select _ nl l) == (Select _ nr r) = nl == nr && l == r
     (Match _ nl l) == (Match _ nr r) = nl == nr && l == r
     (BoxFunc _ nl l) == (BoxFunc _ nr r) = nl == nr && l == r
-    (Function _ nl _ al l) == (Function _ nr _ ar r) = nl == nr && al == ar && l == r
-    (Extern _ nl _ l) == (Extern _ nr _ r) = nl == nr && l == r
+    (Function metal nl _ al l) == (Function metar nr _ ar r) = nl == nr && al == ar && l == r && (metal^.isExternal) == (metar^.isExternal)
     (If _ nl al l) == (If _ nr ar r) = nl == nr && al == ar && l == r
     (Let _ nl al l) == (Let _ nr ar r) = nl == nr && al == ar && l == r
     (Array _ l) == (Array _ r) = l == r
@@ -147,7 +148,7 @@ data DataDef = DataDef Int String [DataConst]
 
 data Ctx = Context {
     _lascaOpts :: LascaOpts,
-    _globalFunctions :: Map.Map String FunDef,
+    _globalFunctions :: Map.Map String Expr,
     _globalVals :: Set.Set String,
     dataDefs :: [DataDef],
     dataDefsNames :: Set.Set String,
@@ -192,7 +193,7 @@ createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
 
     names :: Expr -> State Ctx ()
     names (Val _ name _) = globalVals %= Set.insert name
-    names (Function meta name tpe args _) = globalFunctions %= Map.insert name (FunDef meta name tpe args)
+    names fun@(Function meta name tpe args _) = globalFunctions %= Map.insert name fun
     names (Data _ name consts) = do
         id <- gets typeId
         let dataDef = DataDef id name consts
@@ -202,7 +203,7 @@ createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
                               else let dataTypeIdent = TypeIdent name
                                        tpe = Forall [] (foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args)
                                        meta = metaWithScheme tpe
-                                       funDef = FunDef meta n dataTypeIdent args
+                                       funDef = Function meta n dataTypeIdent args EmptyExpr
                                    in ((n, funDef) : funcs, vals)) ([], []) consts
         -- FIXME Merge with above, create State?
         let argsWithIds = foldl' (\acc (DataConst _ args) ->
@@ -221,22 +222,12 @@ createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
         })
         globalVals %= Set.union (Set.fromList vals)
         globalFunctions %= Map.union (Map.fromList funcs)
-    names (Extern meta name tpe args) = do
---        let funcType = Forall [] (foldr (\(Arg _ t) acc -> TypeFunc t acc) tpe args)
-       globalFunctions %= Map.insert name (ExternDef meta name tpe args)
     names expr = error $ "Wat? Expected toplevel expression, but got " ++ show expr
-
-data FunDef = FunDef Meta Name Type [Arg]
-            | ExternDef Meta Name Type [Arg]
-            deriving (Show, Eq)
-
-isExtern FunDef{} = False
-isExtern ExternDef{} = True
 
 lascaOpts :: Lens.Lens' Ctx LascaOpts
 lascaOpts = Lens.lens _lascaOpts (\c o -> c { _lascaOpts = o } )
 
-globalFunctions :: Lens.Lens' Ctx (Map.Map String FunDef)
+globalFunctions :: Lens.Lens' Ctx (Map.Map String Expr)
 globalFunctions = Lens.lens _globalFunctions (\c e -> c { _globalFunctions = e } )
 
 globalVals :: Lens.Lens' Ctx (Set.Set String)

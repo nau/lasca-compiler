@@ -171,6 +171,7 @@ closeOverInner mapping e = do
 
 updateMeta f e =
     case e of
+        EmptyExpr -> e
         Literal meta lit -> Literal (f meta) lit
         Ident meta name -> Ident (f meta) name
         Val meta name expr -> Val (f meta) name (updateMeta f expr)
@@ -180,7 +181,6 @@ updateMeta f e =
         Match meta expr cases -> Match (f meta) (updateMeta f expr) (map (\(Case pat e) -> Case pat (updateMeta f e)) cases)
         this@BoxFunc{} -> this
         Function meta name tpe args expr -> Function (f meta) name tpe args (updateMeta f expr)
-        this@Extern{} -> this
         If meta cond tr fl -> If (f meta) (updateMeta f cond) (updateMeta f tr) (updateMeta f fl)
         Let meta name expr body -> Let (f meta) name (updateMeta f expr) (updateMeta f body)
         Array meta exprs -> Array (f meta) (map (updateMeta f) exprs)
@@ -348,14 +348,6 @@ infer ctx env ex = case ex of
     --    traceM $ printf "if %s then %s else %s: %s"  (show substCond) (show substTrue) (show substFalse) (show resultType)
         return (subst, resultType)
 
-    Extern meta name tpe args -> do
-        let ts = map argToType args
-        let t = foldr f tpe ts
-        return (nullSubst, t)
-      where
-        argToType (Arg _ t) = t
-        f z t = z `TypeFunc` t
-
     Lam meta arg@(Arg x argType) e -> do
         case argType of
             TypeIdent "Any" -> do
@@ -376,23 +368,31 @@ infer ctx env ex = case ex of
                 setType $ Lam (meta `withType` resultType) arg e'
                 return (s1, resultType)
 
-    Function meta name tpe args e -> do
-        -- functions are recursive, so do Fixpoint for inference
-        let nameArg = Arg name typeAny
-        let curried = foldr (Lam meta) e (nameArg : args)
-        tv <- fresh
-        tv1 <- fresh
-        -- fixpoint
-        (s1, ttt) <- infer ctx env curried
-        let composedType = substitute s1 (TypeFunc ttt tv1)
-    --    traceM $ "composedType " ++ show composedType
-        s2 <- unify composedType ((tv `TypeFunc` tv) `TypeFunc` tv)
-        let (s, t) = (s2 `compose` s1, substitute s2 tv1)
-        e' <- gets _current
-        let uncurried = foldr (\_ (Lam _ _ e) -> e) e' (nameArg : args)
-        setType $ Function (meta `withType` t) name tpe args uncurried
-    --    traceM $ printf "def %s(%s): %s, subs: %s" name (List.intercalate "," $ map show args) (show t) (show s)
-        return (s, t)
+    Function meta name tpe args e ->
+        if meta^.isExternal
+        then do
+            let argToType (Arg _ t) = t
+            let f z t = z `TypeFunc` t
+            let ts = map argToType args
+            let t = foldr f tpe ts
+            return (nullSubst, t)
+        else do
+            -- functions are recursive, so do Fixpoint for inference
+            let nameArg = Arg name typeAny
+            let curried = foldr (Lam meta) e (nameArg : args)
+            tv <- fresh
+            tv1 <- fresh
+            -- fixpoint
+            (s1, ttt) <- infer ctx env curried
+            let composedType = substitute s1 (TypeFunc ttt tv1)
+        --    traceM $ "composedType " ++ show composedType
+            s2 <- unify composedType ((tv `TypeFunc` tv) `TypeFunc` tv)
+            let (s, t) = (s2 `compose` s1, substitute s2 tv1)
+            e' <- gets _current
+            let uncurried = foldr (\_ (Lam _ _ e) -> e) e' (nameArg : args)
+            setType $ Function (meta `withType` t) name tpe args uncurried
+        --    traceM $ printf "def %s(%s): %s, subs: %s" name (List.intercalate "," $ map show args) (show t) (show s)
+            return (s, t)
 
 
     Data meta name constructors -> error $ "Shouldn't happen! " ++ show meta
@@ -529,6 +529,5 @@ typeCheck ctx exprs = do
 
     f e@(Val _ name _) = (name, e)
     f e@(Function _ name _ _ _) = (name, e)
-    f e@(Extern _ name _ _) = (name, e)
     f e = error ("What the fuck " ++ show e)
 

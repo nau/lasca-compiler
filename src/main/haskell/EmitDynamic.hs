@@ -70,16 +70,19 @@ codegenTop ctx (S.Val _ name expr) = do
     modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
     defineGlobal (AST.Name (fromString name)) ptrType (Just (C.Null ptrType))
 
-codegenTop ctx (S.Function meta name tpe args body) = do
-    r1 <- defineStringConstants body
-  --   Debug.traceM ("Generating function1 " ++ name ++ (show r1))
-  --   defineClosures ctx name body
-  --   Debug.traceM ("Generating function2 " ++ name ++ (show r1))
-    modState <- get
-    let codeGenResult = codeGen modState
-    let blocks = createBlocks codeGenResult
-    mapM_ defineStringLit (generatedStrings codeGenResult)
-    define ptrType (fromString name) largs blocks
+codegenTop ctx (S.Function meta name tpe args body) =
+    if meta ^. S.isExternal then
+        external (externalTypeMapping tpe) (fromString name ) (externArgsToSig args) False []
+    else do
+        r1 <- defineStringConstants body
+        --   Debug.traceM ("Generating function1 " ++ name ++ (show r1))
+        --   defineClosures ctx name body
+        --   Debug.traceM ("Generating function2 " ++ name ++ (show r1))
+        modState <- get
+        let codeGenResult = codeGen modState
+        let blocks = createBlocks codeGenResult
+        mapM_ defineStringLit (generatedStrings codeGenResult)
+        define ptrType (fromString name) largs blocks
   where
     largs = toSig args
     codeGen modState = execCodegen [] modState $ do
@@ -93,12 +96,6 @@ codegenTop ctx (S.Function meta name tpe args body) = do
         cgen ctx body >>= ret
 
 codegenTop ctx (S.Data _ name constructors) = return ()
-
-
-codegenTop _ (S.Extern _ name tpe args) = external llvmType (fromString name ) fnargs False []
-  where
-    llvmType = externalTypeMapping tpe
-    fnargs = externArgsToSig args
 
 codegenTop ctx exp = do
     modState <- get
@@ -187,13 +184,14 @@ cgen ctx (S.Apply meta expr args) = do
     syms <- gets symtab
     let symMap = Map.fromList syms
     let isGlobal fn = (fn `Map.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
-    let isExtern fn = isGlobal fn && (S.isExtern $ S._globalFunctions ctx Map.! fn)
+    let funDecl fn = (ctx ^. S.globalFunctions) Map.! fn
+    let isExtern fn = isGlobal fn && (funDecl fn ^. S.metaLens.S.isExternal)
     case expr of
        -- TODO Here are BUGZZZZ!!!! :)
        -- TODO check arguments!
        -- this is done to speed-up calls if you `a global function
         S.Ident _ fn | isExtern fn -> do
-            let (S.ExternDef _ _ returnType externArgs) = S._globalFunctions ctx Map.! fn
+            let (S.Function _ _ returnType externArgs _) = S._globalFunctions ctx Map.! fn
             let argTypes = map (\(S.Arg n t) -> t) externArgs
 --            Debug.traceM $ printf "Calling external %s(%s): %s" fn (show argTypes) (show returnType)
             largs <- forM (zip args argTypes) $ \(arg, tpe) -> do
