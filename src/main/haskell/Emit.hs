@@ -249,7 +249,7 @@ extractLambda (S.Lam meta arg expr) = do
     let (funcName', nms') = uniqueName "lambda" nms
     let funcName = show funcName'
     let asdf t = foldr (\(_, t) resultType -> TypeFunc t resultType) t enclosedArgs
-    let meta' = (S.symbolTypeLens %~ S.withScheme asdf) meta
+    let meta' = (S.symbolTypeLens %~ asdf) meta
     let func = S.Function meta' funcName typeAny (map fst enclosedArgs ++ [arg]) expr
     modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
   --   Debug.traceM ("Generated lambda " ++ show func ++ ", outerVars = " ++ show outerVars ++ ", usedOuterVars" ++ show usedOuterVars)

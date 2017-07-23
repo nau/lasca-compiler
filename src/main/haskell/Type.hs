@@ -14,6 +14,7 @@ data Type
   | TypeIdent !String
   | TypeFunc Type Type
   | TypeApply Type [Type]
+  | Forall [TVar] Type
   deriving (Eq, Ord)
 
 instance Show Type where
@@ -21,19 +22,9 @@ instance Show Type where
   show (TypeIdent s) = s
   show (TypeFunc l r) = "(" ++ show l ++ " -> " ++ show r ++ ")"
   show (TypeApply t args) = "(" ++ show t ++ foldl (\acc a -> acc ++ " " ++ show a) "" args ++ ")"
-
+  show (Forall targs t) = "∀(" ++ intercalate "," (map show targs) ++ ") => " ++ show t
 
 infixr `TypeFunc`
-
-data Scheme = Forall [TVar] Type
-  deriving (Eq, Ord)
-
-instance Show Scheme where
-  show (Forall [] t) = show t
-  show (Forall vars t) = "∀(" ++ intercalate "," typeVarNames ++ ") => " ++ show t
-    where
-      typeVarNames :: [String]
-      typeVarNames = (map show vars)
 
 typeInt :: Type
 typeInt  = TypeIdent "Int"

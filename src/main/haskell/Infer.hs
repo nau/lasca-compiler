@@ -26,7 +26,7 @@ import qualified Data.Set as Set
 import Debug.Trace as Debug
 import Text.Printf
 
-newtype TypeEnv = TypeEnv (Map.Map String Scheme) deriving (Monoid)
+newtype TypeEnv = TypeEnv (Map.Map String Type) deriving (Monoid)
 
 instance Show TypeEnv where
     show (TypeEnv subst) = "Γ = {\n" ++ elems ++ "}"
@@ -64,6 +64,8 @@ instance Substitutable Type where
     substitute s t@(TVar a)     = Map.findWithDefault t a s
     substitute s (t1 `TypeFunc` t2) = substitute s t1 `TypeFunc` substitute s t2
     substitute s (TypeApply t [args]) = TypeApply (substitute s t) [substitute s args]
+    substitute s (Forall as t) = Forall as $ substitute s' t
+                               where s' = foldr Map.delete s as
     substitute s t = error $ "Wat? " ++ show s ++ ", " ++ show t
 
     ftv TypeIdent{}         = Set.empty
@@ -71,11 +73,6 @@ instance Substitutable Type where
     ftv (t1 `TypeFunc` t2) = ftv t1 `Set.union` ftv t2
     ftv (TypeApply _ [])         = error "Should not be TypeApply without arguments!" -- TODO use NonEmpty List?
     ftv (TypeApply t args)       = ftv t  -- TODO do proper substitution
-
-instance Substitutable Scheme where
-    {-# INLINE substitute #-}
-    substitute s (Forall as t)   = Forall as $ substitute s' t
-                              where s' = foldr Map.delete s as
     ftv (Forall as t) = ftv t `Set.difference` Set.fromList as
 
 instance Substitutable a => Substitutable [a] where
@@ -139,7 +136,7 @@ fresh = do
     count += 1
     return $ TVar $ TV (show $ _count s)
 
-runInfer :: Expr -> Infer (Subst, Type) -> Either TypeError (Scheme, Expr)
+runInfer :: Expr -> Infer (Subst, Type) -> Either TypeError (Type, Expr)
 runInfer e m =
     case runState (runExceptT m) (initState e) of
         (Left err, st)  -> Left err
@@ -147,7 +144,7 @@ runInfer e m =
             let (schema, expr) = closeOver res $ _current st
             Right (schema, {-Debug.trace (show expr)-} expr)
 
-closeOver :: (Subst, Type) -> Expr -> (Scheme, Expr)
+closeOver :: (Subst, Type) -> Expr -> (Type, Expr)
 closeOver (sub, ty) e = do
     let e' = substituteAll sub e
     let sc = generalize emptyTyenv (substitute sub ty)
@@ -164,10 +161,9 @@ closeOverInner mapping e = do
   {-Debug.trace (printf "Closing over inner %s with mapping %s" (show e) (show mapping)) $-} updateMeta f e
   where
     schema = getExprType e
-    f :: Meta -> Meta
-    f meta =
-        let (Forall tv t) = symbolType meta in
-        meta { symbolType = Forall tv $ substype schema t mapping }
+    f meta = case symbolType meta of
+        Forall tv t -> meta { symbolType = Forall tv $ substype schema t mapping }
+        _ -> meta
 
 updateMeta f e =
     case e of
@@ -186,7 +182,6 @@ updateMeta f e =
         Array meta exprs -> Array (f meta) (map (updateMeta f) exprs)
         this@Data{} -> this
 
---normalize :: Scheme -> Scheme
 normalize schema@(Forall ts body) =
     let res = (Forall (fmap snd ord) (normtype body), ord)
     in {-Debug.trace (show res) -}res
@@ -207,6 +202,7 @@ normalize schema@(Forall ts body) =
         case lookup a ord of
             Just x -> TVar x
             Nothing -> error $ printf "Type variable %s not in signature %s" (show a) (show schema)
+normalize t = (t, [])
 
 substype schema (TypeFunc a b)  ord = TypeFunc  (substype schema a ord) (substype schema b ord)
 substype schema (TypeApply a b) ord = TypeApply (substype schema a ord) b
@@ -219,7 +215,7 @@ substype schema t@(TVar a)        ord =
 initState :: Expr -> InferState
 initState e = InferState { _count = 0, _current = e}
 
-extend :: TypeEnv -> (String, Scheme) -> TypeEnv
+extend :: TypeEnv -> (String, Type) -> TypeEnv
 extend (TypeEnv env) (x, s) = TypeEnv $ Map.insert x s env
 
 emptyTyenv = TypeEnv Map.empty
@@ -240,15 +236,17 @@ defaultTyenv = TypeEnv (Map.fromList [
   where a = TV "a"
         ta = TVar a
 
-instantiate ::  Scheme -> Infer Type
+instantiate :: Type -> Infer Type
 instantiate (Forall as t) = do
     as' <- mapM (const fresh) as
     let s = Map.fromList $ zip as as'
     return $ substitute s t
+instantiate t = return t
 
-generalize :: TypeEnv -> Type -> Scheme
-generalize env t  = Forall as t
-  where as = Set.toList $ ftv t `Set.difference` ftv env
+generalize :: TypeEnv -> Type -> Type
+generalize env t  = case Set.toList $ ftv t `Set.difference` ftv env of
+    [] -> t
+    vars -> Forall vars t
 
 ops = Map.fromList [
     ("and", typeBool `TypeFunc` typeBool `TypeFunc` typeBool),
@@ -262,7 +260,7 @@ lookupEnv (TypeEnv env) x =
         Just s  -> do t <- instantiate s
                       return (nullSubst, t)
 
-withType meta t = meta { symbolType = Forall [] t }
+withType meta t = meta { symbolType = t }
 
 setType :: Expr -> Infer ()
 setType e = modify (\s -> s {_current = e })
@@ -451,7 +449,7 @@ infer ctx env ex = case ex of
                 return (env, tv)       -- (0, a)
             (VarPattern n)    -> do                  -- (n -> a, a)
                 tv <- fresh
-                return (env `extend` (n, Forall [] tv), tv)
+                return (env `extend` (n, tv), tv)
             (LitPattern lit) -> return (env, litType lit)   -- (0, litType)
             (ConstrPattern name args) -> do          -- (name -> a, a -> User)
                 (_, t) <- lookupEnv env name           -- t = String -> User
@@ -491,7 +489,7 @@ inferPrim ctx env l t = do
         exp' <- gets _current
         return (s' `compose` s, tf . TypeFunc t, exprs ++ [exp'])
 
-inferExpr :: Ctx -> TypeEnv -> Expr -> Either TypeError (Scheme, Expr)
+inferExpr :: Ctx -> TypeEnv -> Expr -> Either TypeError (Type, Expr)
 inferExpr ctx env e = runInfer e $ infer ctx env e
 
 inferTop :: Ctx -> TypeEnv -> [(String, Expr)] -> Either TypeError (TypeEnv, [Expr])
@@ -515,15 +513,15 @@ typeCheck ctx exprs = do
     pred Data{} = True
     pred _      = False
 
-    ddd :: Expr -> [(String, Scheme)]
-    ddd (Data _ typeName constrs) = constrs >>= genScheme
+    ddd :: Expr -> [(String, Type)]
+    ddd (Data _ typeName constrs) = constrs >>= genType
       where
-        genScheme :: DataConst -> [(String, Scheme)]
-        genScheme (DataConst name args) =
+        genType :: DataConst -> [(String, Type)]
+        genType (DataConst name args) =
             let dataTypeIdent = TypeIdent typeName
                 tpe = foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args
-                accessors = map (\(Arg n tpe) -> (n, Forall [] (TypeFunc dataTypeIdent tpe))) args
-            in (name, Forall [] tpe) : accessors
+                accessors = map (\(Arg n tpe) -> (n, TypeFunc dataTypeIdent tpe)) args
+            in (name, tpe) : accessors
     ddd e = error ("What the hell" ++ show e)
 
 

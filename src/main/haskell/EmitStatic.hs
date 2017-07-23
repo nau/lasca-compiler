@@ -98,7 +98,7 @@ codegenTop ctx f@(S.Function meta name tpe args body) =
     largs = map (\(n, t) -> (fromString n, t)) argsWithTypes
 
     funcTypeToLlvm (S.Arg name _) (TypeFunc a b, acc) = (b, (name, typeMapping a) : acc)
-    funcTypeToLlvm arg t = error $ "AAA2" ++ show arg ++ show t
+    funcTypeToLlvm arg t = error $ "AAA3" ++ show arg ++ show t
 
     argsWithTypes = do
 --        Debug.traceM $ printf "codegenTop %s(%s): %s" (name) (show args) (show funcType)

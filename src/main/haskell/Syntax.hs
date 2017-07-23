@@ -31,7 +31,7 @@ data Position = NoPosition | Position {sourceLine :: Word, sourceColumn :: Word}
 
 data Meta = Meta {
     pos :: Position,
-    symbolType :: Scheme,
+    symbolType :: Type,
     _isExternal :: Bool
 } deriving (Eq, Ord)
 
@@ -47,7 +47,7 @@ emptyMeta = Meta { pos = NoPosition, symbolType = schemaAny, _isExternal = False
 
 withMetaPos line col = emptyMeta { pos = Position {sourceLine = line, sourceColumn = col} }
 
-metaWithScheme s = emptyMeta { symbolType = s }
+metaWithType s = emptyMeta { symbolType = s }
 
 data Expr
     = EmptyExpr
@@ -84,7 +84,7 @@ metaLens = Lens.lens (fst . getset) (snd . getset)
               BoxFunc meta name args -> (meta, \m -> BoxFunc m name args)
               _ -> error $ "Should not happen :) " ++ show expr
 
-symbolTypeLens :: Lens.Lens' Meta Scheme
+symbolTypeLens :: Lens.Lens' Meta Type
 symbolTypeLens = Lens.lens symbolType (\meta st -> meta { symbolType = st })
 
 isExternal = Lens.lens _isExternal (\meta ex -> meta { _isExternal = ex })
@@ -94,7 +94,7 @@ getExprType expr = expr^.metaLens.symbolTypeLens
 typeOf = fromSchema . getExprType
 
 fromSchema (Forall _ t) = t
---fromSchema t = error $ "Unsupported type " ++ show t
+fromSchema t = t
 
 withScheme f (Forall tv t) = Forall tv (f t)
 
@@ -201,8 +201,8 @@ createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
                               if null args
                               then (funcs, n : vals)
                               else let dataTypeIdent = TypeIdent name
-                                       tpe = Forall [] (foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args)
-                                       meta = metaWithScheme tpe
+                                       tpe = (foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args) -- FIXME forall
+                                       meta = metaWithType tpe
                                        funDef = Function meta n dataTypeIdent args EmptyExpr
                                    in ((n, funDef) : funcs, vals)) ([], []) consts
         -- FIXME Merge with above, create State?
