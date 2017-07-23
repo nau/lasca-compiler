@@ -1,14 +1,3 @@
---------------------------------------------------------------------
--- |
--- Module    :  Lexer
--- Copyright :  (c) Stephen Diehl 2013
--- License   :  MIT
--- Maintainer:  stephen.m.diehl@gmail.com
--- Stability :  experimental
--- Portability: non-portable
---
---------------------------------------------------------------------
-
 module Lexer where
 
 import Text.Megaparsec
@@ -67,7 +56,7 @@ identifier = (lexeme . try) (p >>= check)
                 else return x
 
 opChar :: Parser Char
-opChar = oneOf "!$%&*+./<=>?@\\^|-~"
+opChar = oneOf ("!$%&*+./<=>?@\\^|-~" :: String)
 
 operator :: Parser String
 operator = lexeme $ some opChar

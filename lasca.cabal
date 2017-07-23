@@ -9,7 +9,9 @@ extra-source-files:  README.md
 cabal-version:       >=1.10
 
 library
-  other-extensions:     GADTs
+  default-extensions:   OverloadedStrings
+                        RecordWildCards
+                        NamedFieldPuns
   build-depends:        base >=4.6,
                         text,
                         utf8-string,

@@ -8,7 +8,6 @@
 -- Portability: non-portable
 --
 --------------------------------------------------------------------
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE Strict #-}
 module JIT (
   jit,
