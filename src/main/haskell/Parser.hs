@@ -28,6 +28,12 @@ getMeta = do
     let meta = emptyMeta { pos = Position {Syntax.sourceLine = unPos sl, Syntax.sourceColumn = unPos sc} }
     return meta
 
+fv (TVar a)   = [a]
+fv (TypeFunc a b) = fv a ++ fv b
+fv (TypeIdent _)   = []
+fv (TypeApply t [])       = error "Should not be TypeApply without arguments!" -- TODO use NonEmpty List?
+fv (TypeApply t args)   = fv t  -- FIXME args?
+
 integerLiteral = do
     meta <- getMeta
     Literal meta <$> integerLit
@@ -229,7 +235,7 @@ function = do
     tpe <- option typeAny typeAscription
     reservedOp "="
     body <- expr
-    let meta' = meta { _exprType = foldr (TypeFunc . const typeAny) tpe args } -- FIXME forall
+    let meta' = meta { _exprType = foldr (TypeFunc . const typeAny) tpe args } -- TODO not sure why we need this. maybe in dynamic mode for... check and remove
     return (Function meta' name tpe args body)
 
 extern :: Parser Expr
@@ -240,7 +246,10 @@ extern = do
     name <- identifier
     args <- parens $ commaSep arg
     tpe <- typeAscription
-    let scheme = foldr (\(Arg n at) ft -> TypeFunc at ft) tpe (List.reverse args) -- FIXME forall
+    let funcType = foldr (\(Arg n at) ft -> TypeFunc at ft) tpe (List.reverse args)
+    let scheme = case fv funcType of
+                  [] -> funcType
+                  tvars -> Forall tvars funcType
     let meta' = meta { _isExternal = True, _exprType = scheme }
     return (Function meta' name tpe args EmptyExpr)
 
