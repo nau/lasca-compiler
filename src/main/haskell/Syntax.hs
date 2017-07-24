@@ -124,15 +124,17 @@ instance Show Expr where
   show (Lam _ a e) = printf "{ %s -> %s }\n" (show a) (show e)
   show (Select _ e f) = printf "%s.%s" (show e) (show f)
   show (Match _ e cs) = printf "match %s {\n%s}\n" (show e) (show cs)
-  show (BoxFunc f args) = printf "BoxFunc %s($args)" (show f) (intercalate "," $ map show args)
-  show (Function meta f t args b) = printf "def %s(%s): %s = %s\n" f (intercalate "," $ map show args) (show meta) (show b)
-  show (Extern f t args) = printf "def %s(%s): %s\n" (show f) (intercalate "," $ map show args) (show t)
+  show (BoxFunc meta f args) = printf "BoxFunc %s($args)" (show f) (intercalate "," $ map show args)
+  show (Function meta f t args b) =
+      if _isExternal meta then
+           printf "extern def %s(%s): %s\n" f (intercalate "," $ map show args) (show t)
+      else printf "%s : %s\ndef %s(%s): %s = %s\n" f (show meta) f (intercalate "," $ map show args) (show t) (show b)
   show (If meta c t f) = printf "if %s then {\n%s \n} else {\n%s\n}: %s" (show c) (show t) (show f) (show meta)
   show (Let meta n e b) = printf "%s = %s;\n%s: %s" n (show e) (show b) (show meta)
   show (Array _ es) = printf "[%s]" (intercalate "," $ map show es)
   show (Data _ n cs) = printf "data %s = %s\n" n (intercalate "\n| " $ map show cs)
+  show EmptyExpr = ""
 -}
-
 
 
 data Case = Case Pattern Expr deriving (Eq, Ord, Show)

@@ -281,7 +281,7 @@ functionsStructType len = T.StructureType False [T.i32, arrayTpe len]
 genFunctionMap :: [S.Expr] -> LLVM ()
 genFunctionMap fns = do
     defineNames
-    defineConst "Functions" (functionsStructType len) (Just struct1)
+    defineConst "Functions" (functionsStructType len) struct1
   --   Debug.traceM (show mapping)
   --   Debug.traceM (show array)
     modify (\s -> s { functions = mapping })
@@ -322,7 +322,7 @@ genFunctionMap fns = do
 
 runtimeStructType = T.StructureType False [ptrType, ptrType, boolType]
 
-genRuntime opts = defineConst "Runtime" runtimeStructType (Just runtime)
+genRuntime opts = defineConst "Runtime" runtimeStructType runtime
   where
     runtime = createStruct [constRef "Functions", constRef "Types", constBool $ S.verboseMode opts]
 

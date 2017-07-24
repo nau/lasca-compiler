@@ -298,7 +298,7 @@ codegenModule opts modo exprs = modul
 genTypesStruct ctx defs = do
     types <- genData ctx defs
     let array = C.Array ptrType types
-    defineConst "Types" structType (Just (struct array))
+    defineConst "Types" structType (struct array)
   where len = length defs
         struct a = createStruct [constInt len, a]
         structType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) ptrType]
@@ -312,7 +312,7 @@ genData ctx defs = sequence [genDataStruct d | d <- defs]
             constructors <- genConstructors ctx dd
             let arrayOfConstructors = C.Array ptrType constructors
             let struct = createStruct [constInt tid, globalStringRefAsPtr name, constInt numConstructors, arrayOfConstructors] -- struct Data
-            defineConst literalName (T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral numConstructors) ptrType]) (Just struct)
+            defineConst literalName (T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral numConstructors) ptrType]) struct
             return (constRef literalName)
 
 genConstructors ctx (S.DataDef tid name constrs) = do
@@ -331,14 +331,14 @@ defineConstructor ctx typeName name tid tag args  = do
     then do
         let singletonName = name ++ ".Singleton"
         let dataValue = createStruct [constInt tag, C.Array ptrType []]
-        defineConst (fromString singletonName) tpe (Just dataValue)
+        defineConst (fromString singletonName) tpe dataValue
 
         let boxed = createStruct [constInt tid, constRef (fromString singletonName)]
-        defineConst (fromString $ singletonName ++ ".Boxed") boxStructType (Just boxed)
+        defineConst (fromString $ singletonName ++ ".Boxed") boxStructType boxed
 
         let boxedRef = C.GlobalReference boxStructType (AST.Name (fromString $ singletonName ++ ".Boxed"))
         let ptrRef = C.BitCast boxedRef ptrType
-        defineConst (fromString name) ptrType (Just ptrRef)
+        defineConst (fromString name) ptrType ptrRef
     else do
         define ptrType (fromString name) fargs blocks -- define constructor function
         forM_ args $ \ (S.Arg name _) -> defineStringLit name -- define fields names as strings
@@ -346,7 +346,7 @@ defineConstructor ctx typeName name tid tag args  = do
     let structType = T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral len) ptrType]
     let struct =  createStruct [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, constInt len, fieldsArray]
     let literalName = fromString $ typeName ++ "." ++ name
-    defineConst literalName structType (Just struct)
+    defineConst literalName structType struct
 
     return $ constRef literalName
 

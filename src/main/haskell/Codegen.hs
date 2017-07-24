@@ -97,7 +97,7 @@ defineConst name tpe body = addDefn $
       LLVM.AST.Global.name        = AST.Name name
     , LLVM.AST.Global.isConstant  = True
     , LLVM.AST.Global.type' = tpe
-    , LLVM.AST.Global.initializer = body
+    , LLVM.AST.Global.initializer = Just body
     }
 
 define ::  Type -> SBS.ShortByteString -> [(SBS.ShortByteString, Type)] -> [BasicBlock] -> LLVM ()
@@ -459,11 +459,6 @@ createString s = (createStruct [constInt len, C.Array T.i8 bytes], len)
     len = ByteString.length bytestring
 
 defineStringLit :: String -> LLVM ()
-defineStringLit s = addDefn $ AST.GlobalDefinition $ AST.globalVariableDefaults {
-                          LLVM.AST.Global.name        = AST.Name (getStringLitName s)
-                        , LLVM.AST.Global.isConstant  = True
-                        , LLVM.AST.Global.type' = stringStructType len
-                        , LLVM.AST.Global.initializer = Just string
-                        }
+defineStringLit s = defineConst (getStringLitName s) (stringStructType len) string
   where
     (string, len) = createString s
