@@ -12,6 +12,7 @@ library
   default-extensions:   OverloadedStrings
                         RecordWildCards
                         NamedFieldPuns
+                        FlexibleContexts
   build-depends:        base >=4.6,
                         text,
                         utf8-string,

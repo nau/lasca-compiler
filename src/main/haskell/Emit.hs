@@ -57,12 +57,29 @@ uncurryLambda expr = go expr ([], expr) where
     go (S.Lam _ name e) result = let (args, body) = go e result in (name : args, body)
     go e (args, _) = (args, e)
 
+data Trans = Trans {
+    _modNames :: Names,
+    _locals :: Map.Map String Type.Type,
+    _outers :: Map.Map String Type.Type,
+    _usedVars :: Set.Set String,
+    _syntacticAst :: [S.Expr]
+} deriving (Show)
 
+modStateLocals :: Lens.Lens' Trans (Map.Map String Type.Type)
+modStateLocals = Lens.lens _locals (\ms l -> ms { _locals = l } )
 
-transform :: (S.Expr -> LLVM S.Expr) -> [S.Expr] -> LLVM [S.Expr]
+emptyTrans = Trans {
+    _modNames = Map.empty,
+    _locals = Map.empty,
+    _outers = Map.empty,
+    _usedVars = Set.empty,
+    _syntacticAst = []
+}
+
+--transform :: (S.Expr -> LLVM S.Expr) -> [S.Expr] -> LLVM [S.Expr]
 transform transformer exprs = sequence [transformExpr transformer expr | expr <- exprs]
 
-transformExpr :: (S.Expr -> LLVM S.Expr) -> S.Expr -> LLVM S.Expr
+--transformExpr :: (S.Expr -> LLVM S.Expr) -> S.Expr -> LLVM S.Expr
 transformExpr transformer expr = case expr of
     (S.If meta cond true false) -> do
         cond' <- go cond
@@ -99,7 +116,7 @@ transformExpr transformer expr = case expr of
         modify (\s -> s { _locals = argNames, _outers = Map.empty, _usedVars = Set.empty } )
         e' <- go e1
         transformer (S.Function meta name tpe args e')
-    e -> transformer e
+    e -> transformer e -- FIXME add Val/Match support!
   where go e = transformExpr transformer e
 
 
@@ -236,7 +253,7 @@ declareStdFuncs = do
   --  external ptrType "runtimeIsConstr" [("value", ptrType), ("name", ptrType)] False [FA.GroupID 0]
     addDefn $ AST.FunctionAttributes (FA.GroupID 0) [FA.ReadOnly]
 
-extractLambda :: S.Expr -> LLVM S.Expr
+--extractLambda :: S.Expr -> LLVM S.Expr
 extractLambda (S.Lam meta arg expr) = do
     state <- get
     let nms = _modNames state
@@ -310,3 +327,32 @@ genRuntime opts = defineConst "Runtime" runtimeStructType (Just runtime)
     runtime = createStruct [constRef "Functions", constRef "Types", constBool $ S.verboseMode opts]
 
 
+--genMatch :: Ctx -> S.Expr -> S.Expr
+genMatch ctx m@(S.Match meta expr []) = error $ "Should be at least on case in match expression: " ++ show m
+genMatch ctx (S.Match meta expr cases) = do
+    let body = foldr (\(S.Case p e) acc -> genPattern ctx (S.Ident (expr ^. S.metaLens) "$match") p e acc) genFail cases
+    return $ S.Let meta "$match" expr body  -- FIXME hack. Gen unique names
+genMatch ctx expr = return expr
+
+genFail = S.Apply S.emptyMeta (S.Ident S.emptyMeta "die") [S.Literal S.emptyMeta $ S.StringLit "Match error!"]
+
+genPattern ctx lhs S.WildcardPattern rhs = const rhs
+genPattern ctx lhs (S.VarPattern name) rhs = const (S.Let S.emptyMeta name lhs rhs)
+genPattern ctx lhs (S.LitPattern literal) rhs = S.If S.emptyMeta (S.Apply S.emptyMeta (S.Ident S.emptyMeta "==") [lhs, S.Literal S.emptyMeta literal]) rhs
+genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
+  where cond fail = S.If S.emptyMeta constrCheck (checkArgs name fail) fail
+        constrCheck = S.Apply S.emptyMeta (S.Ident S.emptyMeta "runtimeIsConstr") [lhs, S.Literal S.emptyMeta $ S.StringLit name]
+        constrMap = let cs = foldr (\ (S.DataDef _ _ constrs) acc -> constrs ++ acc) [] (S.dataDefs ctx)
+                        tuples = fmap (\c@(S.DataConst n args) -> (n, args)) cs
+                    in  Map.fromList tuples
+        checkArgs nm fail =  case Map.lookup nm constrMap of
+                            Nothing -> fail
+                            Just constrArgs | length args == length constrArgs -> do
+                                let argParam = zip args constrArgs
+                                foldr (\(a, S.Arg n _) acc -> genPattern ctx (S.Select S.emptyMeta lhs (S.Ident S.emptyMeta n)) a acc fail) rhs argParam
+                            Just constrArgs -> error (printf "Constructor %s has %d parameters, but %d given" nm (length constrArgs) (length args)) -- TODO box this error
+
+desugar ctx expr = do
+    expr' <- extractLambda expr
+    expr'' <- genMatch ctx expr'
+    return expr''

@@ -381,10 +381,8 @@ cgen ctx (S.BoxFunc _ funcName enclosedVars) = do
     let mapping = functions modState
     if null enclosedVars then boxFunc funcName mapping
     else boxClosure funcName mapping enclosedVars
-cgen ctx m@S.Match{} = do
-    let result = genMatch ctx m
-  --  Debug.traceM $ "Generated " ++ show result
-    cgen ctx result
+cgen ctx m@S.Match{} =
+    error $ printf "Match expressions should be already desugared! %s at: %s" (show m) (show $ S.exprPosition m)
 cgen ctx (S.If meta cond tr fl) = do
     let resultType = llvmTypeOf tr
     ifthen <- addBlock "if.then"
@@ -421,29 +419,7 @@ cgen ctx (S.If meta cond tr fl) = do
 
 cgen ctx e = error ("cgen shit " ++ show e)
 
-genMatch :: Ctx -> S.Expr -> S.Expr
-genMatch ctx m@(S.Match meta expr []) = error $ "Should be at least on case in match expression: " ++ show m
-genMatch ctx (S.Match meta expr cases) =
-    let body = foldr (\(S.Case p e) acc -> genPattern ctx (S.Ident (expr ^. S.metaLens) "$match") p e acc) genFail cases
-    in  S.Let meta "$match" expr body  -- FIXME hack. Gen unique names
 
-genFail = S.Apply S.emptyMeta (S.Ident S.emptyMeta "die") [S.Literal S.emptyMeta $ S.StringLit "Match error!"]
-
-genPattern ctx lhs S.WildcardPattern rhs = const rhs
-genPattern ctx lhs (S.VarPattern name) rhs = const (S.Let S.emptyMeta name lhs rhs)
-genPattern ctx lhs (S.LitPattern literal) rhs = S.If S.emptyMeta (S.Apply S.emptyMeta (S.Ident S.emptyMeta "==") [lhs, S.Literal S.emptyMeta literal]) rhs
-genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
-  where cond fail = S.If S.emptyMeta constrCheck (checkArgs name fail) fail
-        constrCheck = S.Apply S.emptyMeta (S.Ident S.emptyMeta "runtimeIsConstr") [lhs, S.Literal S.emptyMeta $ S.StringLit name]
-        constrMap = let cs = foldr (\ (S.DataDef _ _ constrs) acc -> constrs ++ acc) [] (S.dataDefs ctx)
-                        tuples = fmap (\c@(S.DataConst n args) -> (n, args)) cs
-                    in  Map.fromList tuples
-        checkArgs nm fail =  case Map.lookup nm constrMap of
-                            Nothing -> fail
-                            Just constrArgs | length args == length constrArgs -> do
-                                let argParam = zip args constrArgs
-                                foldr (\(a, S.Arg n _) acc -> genPattern ctx (S.Select S.emptyMeta lhs (S.Ident S.emptyMeta n)) a acc fail) rhs argParam
-                            Just constrArgs -> error (printf "Constructor %s has %d parameters, but %d given" nm (length constrArgs) (length args)) -- TODO box this error
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------
@@ -452,11 +428,11 @@ codegenStaticModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> AST.Module
 codegenStaticModule opts modo exprs = modul
   where
     ctx = createGlobalContext opts exprs
+    (desugared, st) = runState (transform (desugar ctx) exprs) emptyTrans
+    syn = _syntacticAst st
     modul = runLLVM modo genModule
     genModule = do
-        fns' <- transform extractLambda exprs
-        syn <- gets _syntacticAst
-        let fns'' = fns' ++ syn
+        let fns'' = desugared ++ syn
   --           Debug.traceM ("Rewritten exprs: " ++ show fns'')
   --           Debug.traceM ("Rewritten exprs: " ++ show st')
   --           Debug.traceM ("Rewritten exprs: " ++ show st')
@@ -465,7 +441,6 @@ codegenStaticModule opts modo exprs = modul
         let defs = reverse (S.dataDefs ctx)
         genTypesStruct ctx defs
         genRuntime opts
-        defineStringLit "Match error!" -- TODO remove this hack
         mapM_ (codegenTop ctx) fns''
         codegenStartFunc ctx
 

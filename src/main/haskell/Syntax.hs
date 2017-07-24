@@ -87,6 +87,8 @@ metaLens = Lens.lens (fst . getset) (snd . getset)
 exprType :: Lens.Lens' Meta Type
 exprType = Lens.lens _exprType (\meta st -> meta { _exprType = st })
 
+exprPosition expr = pos (expr ^. metaLens)
+
 isExternal = Lens.lens _isExternal (\meta ex -> meta { _isExternal = ex })
 
 getExprType expr = expr^.metaLens.exprType

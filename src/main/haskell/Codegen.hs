@@ -52,19 +52,11 @@ newtype LLVM a = LLVM { unLLVM :: State ModuleState a }
 
 data ModuleState = ModuleState {
     _llvmModule :: AST.Module,
-    _locals :: Map.Map String Type.Type,
-    _outers :: Map.Map String Type.Type,
-    _usedVars :: Set.Set String,
-    _syntacticAst :: [S.Expr],
     _globalValsInit :: [(S.Name, S.Expr)],
-    _modNames :: Names,
     functions :: Map.Map String Int,
     structs :: Map.Map Int Int
 } deriving (Show)
 
-
-modStateLocals :: Lens' ModuleState (Map.Map String Type.Type)
-modStateLocals = lens _locals (\ms l -> ms { _locals = l } )
 
 -- makeLenses ''ModuleState
 
@@ -75,12 +67,7 @@ runLLVM modl s = result where
 
 initModuleState modl = ModuleState {
     _llvmModule = modl,
-    _locals = Map.empty,
-    _outers = Map.empty,
-    _usedVars = Set.empty,
-    _syntacticAst = [],
     _globalValsInit = [],
-    _modNames = Map.empty,
     functions = Map.empty,
     structs = Map.empty
 }
