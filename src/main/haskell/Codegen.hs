@@ -371,7 +371,6 @@ store ptr val = instr ptrType $ Store False ptr val Nothing 0 []
 
 load :: Operand -> Codegen Operand
 load ptr = instr ptrType $ Load False ptr Nothing 0 []
-load2 tpe ptr = instr tpe $ Load False ptr Nothing 0 []
 
 -- Control Flow
 br :: Name -> Codegen (Named Terminator)
@@ -401,10 +400,6 @@ true = one
 toSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
 toSig = map (\(S.Arg name tpe) -> (fromString name, ptrType))
 
-
-stringStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
-applyStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
-
 getStringLitName :: String -> SBS.ShortByteString
 getStringLitName s = name
   where
@@ -423,3 +418,22 @@ createString s = (createStruct [constInt len, C.Array T.i8 bytes], len)
 defineStringLit :: String -> LLVM ()
 defineStringLit s = defineConst (getStringLitName s) (stringStructType len) string
   where (string, len) = createString s
+
+--            Lasca Runtime Data Representation Types
+
+stringStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
+
+boxStructOfType boxedType = T.StructureType False [T.i32, boxedType]
+
+boxStructType = boxStructOfType ptrType
+
+arrayStructType elemType = T.StructureType False [T.i32, T.ptr elemType]
+
+positionStructType = T.StructureType False [T.i32, T.i32]
+
+functionStructType = T.StructureType False [ptrType, ptrType, T.i32]
+
+functionsStructType len = T.StructureType False [T.i32, arrayTpe len]
+  where arrayTpe len = T.ArrayType len functionStructType
+
+runtimeStructType = T.StructureType False [ptrType, ptrType, boolType]

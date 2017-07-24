@@ -319,8 +319,6 @@ genConstructors ctx (S.DataDef tid name constrs) = do
     forM (zip constrs [0..]) $ \ ((S.DataConst n args), tag) ->
         defineConstructor ctx (fromString name) n tid tag args
 
-boxStructType = T.StructureType False [T.i32, ptrType]
-
 defineConstructor ctx typeName name tid tag args  = do
   -- TODO optimize for zero args
     modState <- get

@@ -203,7 +203,7 @@ cgen ctx (S.Literal meta l) = do
         S.FloatLit i -> return $ constFloatOp i
         _        -> box l meta
 cgen ctx this@(S.Array meta exprs) = do
-    vs <- values
+    vs <- sequence [cgen ctx e | e <- exprs]
     case S.typeOf this of
        TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
            let len = length vs
@@ -216,7 +216,6 @@ cgen ctx this@(S.Array meta exprs) = do
                store p v
            return ptr
        _ -> boxArray vs
-  where values = sequence [cgen ctx e | e <- exprs]
 cgen ctx this@(S.Select meta tree expr) = do
 --    Debug.traceM $ printf "Selecting! %s" (show this)
     let (treeType, tpeName) = case S.typeOf tree of
@@ -339,13 +338,13 @@ cgen ctx (S.Apply meta expr args) = do
             array <- cgen ctx this -- should be a pointer to either boxed or unboxed array
             case S.typeOf this of
                 TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
-                    arrayStructPtr <- bitcast array (T.ptr (T.StructureType False [T.i32, T.ptr T.double]))
+                    arrayStructPtr <- bitcast array (T.ptr (arrayStructType T.double))
                     arrayPtr <- getelementptr arrayStructPtr [constIntOp 0, constIntOp 1]
                     arrayPtr1 <- bitcast arrayPtr (T.ptr T.double)
                     ptr <- getelementptr arrayPtr1 [idx]
                     load ptr
                 _ -> do
-                    boxedArrayPtr <- bitcast array (T.ptr $ T.StructureType False [T.i32, T.ptr $ T.StructureType False [T.i32, ptrType]]) -- Box(type, &Array(len, &data[])
+                    boxedArrayPtr <- bitcast array (T.ptr $ boxStructOfType (T.ptr $ arrayStructType ptrType)) -- Box(type, &Array(len, &data[])
                     arrayStructAddr <- getelementptr boxedArrayPtr [constInt64Op 0, constIntOp 1]
                     arrayStructPtr <- load arrayStructAddr
                     arraysize <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 0]
@@ -464,8 +463,6 @@ genData ctx defs = sequence [genDataStruct d | d <- defs]
 genConstructors ctx (S.DataDef tid name constrs) = do
     forM (zip constrs [0..]) $ \ ((S.DataConst n args), tag) ->
         defineConstructor ctx (fromString name) n tid tag args
-
-boxStructType = T.StructureType False [T.i32, ptrType]
 
 defineConstructor ctx typeName name tid tag args  = do
   -- TODO optimize for zero args

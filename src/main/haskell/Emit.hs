@@ -194,8 +194,6 @@ box (S.StringLit s) meta = do
 createPosition S.NoPosition = createStruct [constInt 0, constInt 0] -- Postion (0, 0) means No Position. Why not.
 createPosition S.Position{S.sourceLine, S.sourceColumn} = createStruct [C.Int 32 (toInteger sourceLine), C.Int 32 (toInteger sourceColumn)]
 
-positionStructType = T.StructureType False [T.i32, T.i32]
-
 boxArray values = callFn boxFuncType "boxArray" (constIntOp (length values) : values)
 
 boxFunc name mapping = do
@@ -274,10 +272,6 @@ extractLambda expr@(S.Ident _ n) = do
     return expr
 extractLambda expr = return expr
 
-functionStructType = T.StructureType False [ptrType, ptrType, T.i32]
-functionsStructType len = T.StructureType False [T.i32, arrayTpe len]
-  where arrayTpe len = T.ArrayType len functionStructType
-
 genFunctionMap :: [S.Expr] -> LLVM ()
 genFunctionMap fns = do
     defineNames
@@ -290,9 +284,6 @@ genFunctionMap fns = do
     defineNames = mapM (\(name, _) -> defineStringLit name) funcsWithArities
 
     len = fromIntegral (length funcsWithArities)
-
-
---     structType = T.StructureType False [stringStructType, T.i32]
 
     array = C.Array functionStructType (fmap snd entries)
 
@@ -318,9 +309,6 @@ genFunctionMap fns = do
             in m ++ s
         go s (S.Function _ name tpe args body) = (name, length args) : s
         go s _ = s
-
-
-runtimeStructType = T.StructureType False [ptrType, ptrType, boolType]
 
 genRuntime opts = defineConst "Runtime" runtimeStructType runtime
   where
