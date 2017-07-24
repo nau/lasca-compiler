@@ -248,7 +248,7 @@ cgen ctx (S.If meta cond tr fl) = do
     voidPtrCond <- callFn unboxFuncType "unbox" [constIntOp 1, cond]
     bool <- ptrtoint voidPtrCond T.i1
 
-    test <- instr2 T.i1 (I.ICmp IP.EQ bool constTrue [])
+    test <- instr T.i1 (I.ICmp IP.EQ bool constTrue [])
     cbr test ifthen ifelse -- Branch based on the condition
 
     -- if.then

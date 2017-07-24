@@ -219,18 +219,8 @@ current = do
         Just x -> return x
         Nothing -> error $ "No such block: " ++ show c
 
-instr :: Instruction -> Codegen Operand
-{-# INLINE instr #-}
-instr ins = do
-    n <- fresh
-    let ref = UnName n
-    blk <- current
-    let i = stack blk
-    modifyBlock (blk { stack = i ++ [ref := ins] } )
-    return $ localName ref
-
-instr2 :: Type -> Instruction -> Codegen Operand
-instr2 tpe ins = do
+instr :: Type -> Instruction -> Codegen Operand
+instr tpe ins = do
     n <- fresh
     let ref = UnName n
     blk <- current
@@ -243,17 +233,6 @@ terminator trm = do
     blk <- current
     modifyBlock (blk { term = Just trm })
     return trm
-
-named :: SBS.ShortByteString -> Codegen a -> Codegen Operand
-named iname m = m >> do
-    blk <- current
-    let b = Name iname
-        (_ := x) = last (stack blk)
-    modifyBlock $ blk { stack = init (stack blk) ++ [b := x] }
-    return $ localName b
-
--- icmp :: Operand -> Operand -> Codegen (Operand)
--- icmp lhs rhs = instr2 T.i1 (ICmp)
 
 -------------------------------------------------------------------------------
 -- Block Stack
@@ -340,9 +319,6 @@ constFalse = constOp (constBool False)
 constRef name = let ptr = C.GlobalReference ptrType (AST.Name name) in C.BitCast ptr ptrType
 constRefOperand name = constOp (constRef name)
 
-uitofp :: Type -> Operand -> Codegen Operand
-uitofp ty a = instr $ UIToFP a ty []
-
 fptoptr fp = do
     int <- bitcast fp T.i64
     inttoptr int
@@ -356,49 +332,49 @@ toArgs :: [Operand] -> [(Operand, [A.ParameterAttribute])]
 toArgs = map (\x -> (x, []))
 
 
-bitcast op toTpe= instr2 toTpe (BitCast op toTpe [])
+bitcast op toTpe= instr toTpe (BitCast op toTpe [])
 
-ptrtoint op toTpe= instr2 toTpe (PtrToInt op toTpe [])
+ptrtoint op toTpe= instr toTpe (PtrToInt op toTpe [])
 
-inttoptr op = instr2 ptrType (IntToPtr op ptrType [])
+inttoptr op = instr ptrType (IntToPtr op ptrType [])
 
 -- Effects
-add tpe lhs rhs = instr2 tpe $ Add False False lhs rhs []
-sub tpe lhs rhs = instr2 tpe $ Sub False False lhs rhs []
-mul tpe lhs rhs = instr2 tpe $ Mul False False lhs rhs []
-div tpe lhs rhs = instr2 tpe $ SDiv True lhs rhs []
+add tpe lhs rhs = instr tpe $ Add False False lhs rhs []
+sub tpe lhs rhs = instr tpe $ Sub False False lhs rhs []
+mul tpe lhs rhs = instr tpe $ Mul False False lhs rhs []
+div tpe lhs rhs = instr tpe $ SDiv True lhs rhs []
 intEq lhs rhs = do
-    bool <- instr2 T.i32 $ ICmp IPred.EQ lhs rhs []
-    instr2 T.i32 $ ZExt bool T.i32 []
+    bool <- instr T.i32 $ ICmp IPred.EQ lhs rhs []
+    instr T.i32 $ ZExt bool T.i32 []
 intLt lhs rhs = do
-    bool <- instr2 T.i32 $ ICmp IPred.SLT lhs rhs []
-    instr2 T.i32 $ ZExt bool T.i32 []
+    bool <- instr T.i32 $ ICmp IPred.SLT lhs rhs []
+    instr T.i32 $ ZExt bool T.i32 []
 intGt lhs rhs = do
-    bool <- instr2 T.i32 $ ICmp IPred.SGT lhs rhs []
-    instr2 T.i32 $ ZExt bool T.i32 []
-fadd lhs rhs = instr2 T.double $ FAdd NoFastMathFlags lhs rhs []
-fsub lhs rhs = instr2 T.double $ FSub NoFastMathFlags lhs rhs []
-fmul lhs rhs = instr2 T.double $ FMul NoFastMathFlags lhs rhs []
-fdiv lhs rhs = instr2 T.double $ FDiv NoFastMathFlags lhs rhs []
+    bool <- instr T.i32 $ ICmp IPred.SGT lhs rhs []
+    instr T.i32 $ ZExt bool T.i32 []
+fadd lhs rhs = instr T.double $ FAdd NoFastMathFlags lhs rhs []
+fsub lhs rhs = instr T.double $ FSub NoFastMathFlags lhs rhs []
+fmul lhs rhs = instr T.double $ FMul NoFastMathFlags lhs rhs []
+fdiv lhs rhs = instr T.double $ FDiv NoFastMathFlags lhs rhs []
 
 call :: Operand -> [Operand] -> Codegen Operand
-call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
+call fn args = instr ptrType $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 
 callFn tpe name args = call (global tpe (fromString name)) args
 
-callFnType fnType retType name args = instr2 retType $ Call Nothing CC.C [] (Right (global fnType name)) (toArgs args) [] []
+callFnType fnType retType name args = instr retType $ Call Nothing CC.C [] (Right (global fnType name)) (toArgs args) [] []
 
 alloca :: Type -> Codegen Operand
-alloca ty = instr $ Alloca ty Nothing 0 []
+alloca ty = instr ty $ Alloca ty Nothing 0 []
 
-allocaSize ty size = instr $ Alloca ty (Just size) 0 []
+allocaSize ty size = instr ty $ Alloca ty (Just size) 0 []
 
 store :: Operand -> Operand -> Codegen Operand
-store ptr val = instr $ Store False ptr val Nothing 0 []
+store ptr val = instr ptrType $ Store False ptr val Nothing 0 []
 
 load :: Operand -> Codegen Operand
-load ptr = instr $ Load False ptr Nothing 0 []
-load2 tpe ptr = instr2 tpe $ Load False ptr Nothing 0 []
+load ptr = instr ptrType $ Load False ptr Nothing 0 []
+load2 tpe ptr = instr tpe $ Load False ptr Nothing 0 []
 
 -- Control Flow
 br :: Name -> Codegen (Named Terminator)
@@ -408,15 +384,12 @@ cbr :: Operand -> Name -> Name -> Codegen (Named Terminator)
 cbr cond tr fl = terminator $ Do $ CondBr cond tr fl []
 
 phi :: Type -> [(Operand, Name)] -> Codegen Operand
-phi ty incoming = instr $ Phi ty incoming []
+phi ty incoming = instr ty $ Phi ty incoming []
 
 ret :: Operand -> Codegen (Named Terminator)
 ret val = terminator $ Do $ Ret (Just val) []
 
-getelementptr addr indices = instr $ GetElementPtr False addr indices []
-getelementptr2 tpe addr indices = instr2 tpe $ GetElementPtr False addr indices []
-
-insertValue ptr val indices = instr $ InsertValue ptr val indices []
+getelementptr addr indices = instr ptrType $ GetElementPtr False addr indices []
 
 globalStringRef :: String -> C.Constant
 globalStringRef name = C.GlobalReference (stringStructType (length name)) (AST.Name (getStringLitName name))

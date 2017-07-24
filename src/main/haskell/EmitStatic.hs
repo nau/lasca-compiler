@@ -243,9 +243,6 @@ cgen ctx this@(S.Select meta tree expr) = do
             unboxed <- load unboxedAddr
 
             dataStruct <- bitcast unboxed (T.ptr tpe)
---            tagAddr <- getelementptr2 T.i32 dataStruct [constIntOp 0, constIntOp 0]
---            tag <- load2 T.i32 tagAddr
---            callFn ptrType "putInt" [tag]
             array <- getelementptr dataStruct [constIntOp 0, constIntOp 1]
             valueAddr <- getelementptr array [constIntOp 0, constIntOp idx]
             value <- load valueAddr
@@ -395,7 +392,7 @@ cgen ctx (S.If meta cond tr fl) = do
     voidPtrCond <- callFn unboxFuncType "unbox" [constIntOp 1, cond]
     bool <- ptrtoint voidPtrCond T.i1
 
-    test <- instr2 T.i1 (I.ICmp IP.EQ bool constTrue [])
+    test <- instr T.i1 (I.ICmp IP.EQ bool constTrue [])
     cbr test ifthen ifelse -- Branch based on the condition
 
     -- if.then
