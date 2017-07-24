@@ -391,6 +391,9 @@ div tpe lhs rhs = instr2 tpe $ SDiv True lhs rhs []
 intEq lhs rhs = do
     bool <- instr2 T.i32 $ ICmp IPred.EQ lhs rhs []
     instr2 T.i32 $ ZExt bool T.i32 []
+intLt lhs rhs = do
+    bool <- instr2 T.i32 $ ICmp IPred.SLT lhs rhs []
+    instr2 T.i32 $ ZExt bool T.i32 []
 intGt lhs rhs = do
     bool <- instr2 T.i32 $ ICmp IPred.SGT lhs rhs []
     instr2 T.i32 $ ZExt bool T.i32 []

@@ -277,6 +277,9 @@ cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
         (42, TypeIdent "Int") -> do
           bool <- intEq llhs lrhs
           callFn boxFuncType "boxBool" [bool]
+        (44, TypeIdent "Int") -> do
+          bool <- intLt llhs lrhs
+          callFn boxFuncType "boxBool" [bool]
         (47, TypeIdent "Int") -> do
           bool <- intGt llhs lrhs
           callFn boxFuncType "boxBool" [bool]

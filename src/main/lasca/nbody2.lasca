@@ -95,6 +95,43 @@ def advanceInner(from, to, dt) = {
     ]
 }
 
+def updateIdx(bodies: [Body], i, j, from: Body, to: Body) = [
+    if i == 0 then from else if j == 0 then to else bodies[0],
+    if i == 1 then from else if j == 1 then to else bodies[1],
+    if i == 2 then from else if j == 2 then to else bodies[2],
+    if i == 3 then from else if j == 3 then to else bodies[3],
+    if i == 4 then from else if j == 4 then to else bodies[4]
+]
+
+def loop2(bodies: [Body], i: Int, j: Int, dt: Float) =
+    if j < 5 then {
+        res = advanceInner(bodies[i], bodies[j], dt);
+        newBodies = updateIdx(bodies, i, j, res[0], res[1]);
+        loop2(newBodies, i, j + 1, dt);
+    } else bodies
+
+def loop1(bodies, i, dt) =
+    if i < 5 then {
+        res = loop2(bodies, i, i + 1, dt);
+        loop1(res, i + 1, dt);
+    } else bodies
+
+
+def update(body: Body, dt: Float) = Body(
+    body.x + dt * body.vx, body.y + dt * body.y, body.z + dt * body.vz,
+    body.vx, body.vy, body.vz, body.mass)
+
+def advance2(bodies: [Body], dt) = {
+    bodies1 = loop1(bodies, 0, dt); -- FIXME
+    [
+      update(bodies[0], dt),
+      update(bodies[1], dt),
+      update(bodies[2], dt),
+      update(bodies[3], dt),
+      update(bodies[4], dt)
+    ]
+}
+
 def advance(bodies: [Body], dt) = {
     r01 = advanceInner(bodies[0], bodies[1], dt);
     r02 = advanceInner(r01[0],    bodies[2], dt);
