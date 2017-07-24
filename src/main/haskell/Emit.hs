@@ -122,27 +122,39 @@ transformExpr transformer expr = case expr of
 
 
 defineStringConstants :: S.Expr -> LLVM ()
-defineStringConstants (S.Literal meta (S.StringLit s)) = defineStringLit s
-defineStringConstants (S.If _ cond true false) = do
-    defineStringConstants cond
-    defineStringConstants true
-    defineStringConstants false
-    return ()
-defineStringConstants (S.Select _ lhs rhs) = do
-    defineStringConstants lhs
-    defineStringConstants rhs
-    return ()
-defineStringConstants (S.Array _ exprs) = mapM_ defineStringConstants exprs
-defineStringConstants (S.Apply meta _ exprs) = mapM_ defineStringConstants exprs
-defineStringConstants (S.Let _ _ e body) = do
-    defineStringConstants e
-    defineStringConstants body
-    return ()
-defineStringConstants (S.Match _ e cases) = do
-    defineStringConstants e
-    mapM_ (\(S.Case p e) -> defineStringConstants e) cases
-    return ()
-defineStringConstants _ = return ()
+defineStringConstants expr = case expr of
+    S.Literal _ (S.StringLit s) -> defineStringLit s
+    S.Literal _ _ -> return ()
+    S.Ident{} -> return ()
+    S.If _ cond true false -> do
+        defineStringConstants cond
+        defineStringConstants true
+        defineStringConstants false
+        return ()
+    S.Select _ lhs rhs -> do
+        defineStringConstants lhs
+        defineStringConstants rhs
+        return ()
+    S.Array _ exprs -> mapM_ defineStringConstants exprs
+    S.Apply meta _ exprs -> mapM_ defineStringConstants exprs
+    S.Let _ _ e body -> do
+        defineStringConstants e
+        defineStringConstants body
+        return ()
+    S.Match _ e cases -> do
+         defineStringConstants e
+         mapM_ (\(S.Case p e) -> defineStringConstants e) cases
+         return ()
+    S.Lam{} -> error $ printf "defineStringConstants should be called after lambda lift! %s" (show expr)
+    S.Val meta name expr -> do
+        defineStringConstants expr
+        return ()
+    S.Function meta name retType args expr -> do
+        defineStringConstants expr
+        return ()
+    S.EmptyExpr -> return ()
+    S.BoxFunc{} -> return ()
+    S.Data{} -> return ()
 
 -------------------------------------------------------------------------------
 -- Operations
@@ -340,7 +352,12 @@ genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
                                 foldr (\(a, S.Arg n _) acc -> genPattern ctx (S.Select S.emptyMeta lhs (S.Ident S.emptyMeta n)) a acc fail) rhs argParam
                             Just constrArgs -> error (printf "Constructor %s has %d parameters, but %d given" nm (length constrArgs) (length args)) -- TODO box this error
 
-desugar ctx expr = do
+desugarExpr ctx expr = do
     expr' <- extractLambda expr
     expr'' <- genMatch ctx expr'
     return expr''
+
+desugarExprs ctx exprs = let
+    (desugared, st) = runState (transform (desugarExpr ctx) exprs) emptyTrans
+    syn = _syntacticAst st
+  in desugared ++ syn

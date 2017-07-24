@@ -72,10 +72,6 @@ codegenTop ctx (S.Function meta name tpe args body) =
     if meta ^. S.isExternal then
         external (externalTypeMapping tpe) (fromString name ) (externArgsToSig args) False []
     else do
-        r1 <- defineStringConstants body
-        --   Debug.traceM ("Generating function1 " ++ name ++ (show r1))
-        --   defineClosures ctx name body
-        --   Debug.traceM ("Generating function2 " ++ name ++ (show r1))
         modState <- get
         let codeGenResult = codeGen modState
         let blocks = createBlocks codeGenResult
@@ -279,20 +275,17 @@ codegenModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> AST.Module
 codegenModule opts modo exprs = modul
   where
     ctx = createGlobalContext opts exprs
-    (desugared, st) = runState (transform (desugar ctx) exprs) emptyTrans
-    syn = _syntacticAst st
+    desugared = desugarExprs ctx exprs
     modul = runLLVM modo genModule
     genModule = do
-        let fns'' = desugared ++ syn
-    --           Debug.traceM ("Rewritten exprs: " ++ show fns'')
-    --           Debug.traceM ("Rewritten exprs: " ++ show st')
-    --           Debug.traceM ("Rewritten exprs: " ++ show st')
         declareStdFuncs
-        genFunctionMap fns''
+        genFunctionMap desugared
         let defs = reverse (S.dataDefs ctx)
         genTypesStruct ctx defs
         genRuntime opts
-        mapM_ (codegenTop ctx) fns''
+        forM_ desugared $ \expr -> do
+            defineStringConstants expr
+            codegenTop ctx expr
         codegenStartFunc ctx
 
 genTypesStruct ctx defs = do
