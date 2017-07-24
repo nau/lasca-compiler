@@ -89,7 +89,7 @@ codegenTop ctx (S.Function meta name tpe args body) =
   --       Debug.traceM ("Generating function2 " ++ name)
         forM_ args $ \(S.Arg n t) -> do
             var <- alloca ptrType
-            store var (local $ fromString n)
+            store var (localPtr $ fromString n)
             assign n var
         cgen ctx body >>= ret
 
@@ -112,7 +112,7 @@ codegenStartFunc ctx = do
         entry <- addBlock entryBlockName
         setBlock entry
         callFn initLascaRuntimeFuncType "initLascaRuntime" [constRefOperand "Runtime"]
-        callFn (funcType T.void [intType, ptrType]) "initEnvironment" [local "argc", local "argv"]
+        callFn (funcType T.void [intType, ptrType]) "initEnvironment" [localPtr "argc", localPtr "argv"]
         initGlobals
         callFn mainFuncType "main" []
         terminator $ I.Do $ I.Ret Nothing []
@@ -367,6 +367,6 @@ defineConstructor ctx typeName name tid tag args  = do
         let argsWithId = zip args [0..]
         forM_ argsWithId $ \(S.Arg n t, i) -> do
             p <- getelementptr structPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, 2nd field, ith element] {tag, [arg1, arg2 ...]}
-            store p (local $ fromString n)
+            store p (localPtr $ fromString n)
         boxed <- callFn ptrType "box" [constIntOp tid, ptr]
         ret boxed

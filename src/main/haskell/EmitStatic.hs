@@ -107,7 +107,7 @@ codegenTop ctx f@(S.Function meta name tpe args body) =
         setBlock entry
         forM_ argsWithTypes $ \(n, t) -> do
             var <- alloca t
-            store var (localT (fromString n) t)
+            store var (local t (fromString n))
     --        Debug.traceM $ printf "assign %s: %s = %s" n (show t) (show var)
             assign n var
         cgen ctx body >>= ret
@@ -131,7 +131,7 @@ codegenStartFunc ctx = do
         entry <- addBlock entryBlockName
         setBlock entry
         callFn initLascaRuntimeFuncType "initLascaRuntime" [constRefOperand "Runtime"]
-        callFn (funcType T.void [intType, ptrType]) "initEnvironment" [local "argc", local "argv"]
+        callFn (funcType T.void [intType, ptrType]) "initEnvironment" [localPtr "argc", localPtr "argv"]
         initGlobals
         callFn mainFuncType "main" []
         terminator $ I.Do $ I.Ret Nothing []
@@ -514,9 +514,9 @@ defineConstructor ctx typeName name tid tag args  = do
         forM_ argsWithId $ \(S.Arg n t, i) -> do
             p <- getelementptr structPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, 2nd field, ith element] {tag, [arg1, arg2 ...]}
             ref <- case t of
-                  TypeIdent "Float" -> fptoptr $ localT (fromString n) T.double
-                  TypeIdent "Int"   -> inttoptr $ localT (fromString n) T.i32
-                  _                 -> return $ local $ fromString n
+                  TypeIdent "Float" -> fptoptr $ local T.double (fromString n)
+                  TypeIdent "Int"   -> inttoptr $ local T.i32 (fromString n)
+                  _                 -> return $ localPtr $ fromString n
             store p (ref)
         -- remove boxing after removing runtimeIsConstr from genPattern, do a proper tag check instead
         boxed <- callFn ptrType "box" [constIntOp tid, ptr]

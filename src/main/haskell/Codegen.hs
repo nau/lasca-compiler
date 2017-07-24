@@ -286,12 +286,9 @@ getvar var = do
 -------------------------------------------------------------------------------
 
 -- References
-localName ::  Name -> Operand
-localName = LocalReference ptrType
+local tpe name = LocalReference tpe (AST.Name name)
 
-local name = localName (AST.Name name)
-
-localT name tpe = LocalReference tpe (AST.Name name)
+localPtr name = local ptrType name
 
 global :: Type -> SBS.ShortByteString -> Operand
 global tpe name = constOp (C.GlobalReference tpe (AST.Name name))
@@ -425,5 +422,4 @@ createString s = (createStruct [constInt len, C.Array T.i8 bytes], len)
 
 defineStringLit :: String -> LLVM ()
 defineStringLit s = defineConst (getStringLitName s) (stringStructType len) string
-  where
-    (string, len) = createString s
+  where (string, len) = createString s

@@ -124,11 +124,11 @@ def update(body: Body, dt: Float) = Body(
 def advance2(bodies: [Body], dt) = {
     bodies1 = loop1(bodies, 0, dt); -- FIXME
     [
-      update(bodies[0], dt),
-      update(bodies[1], dt),
-      update(bodies[2], dt),
-      update(bodies[3], dt),
-      update(bodies[4], dt)
+      update(arrayApply(bodies1, 0), dt),
+      update(arrayApply(bodies1, 1), dt),
+      update(arrayApply(bodies1, 2), dt),
+      update(arrayApply(bodies1, 3), dt),
+      update(arrayApply(bodies1, 4), dt)
     ]
 }
 
