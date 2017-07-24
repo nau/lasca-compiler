@@ -84,40 +84,32 @@ addDefn d = do
     then modify id
     else modify $ \s -> s { _llvmModule = (_llvmModule s) { moduleDefinitions = defs ++ [d] } }
 
-defineGlobal name tpe body = addDefn $
+defineGlobalVar name tpe body isConst = addDefn $
     AST.GlobalDefinition $ AST.globalVariableDefaults {
-      LLVM.AST.Global.name        = name
-    , LLVM.AST.Global.isConstant  = False
+      LLVM.AST.Global.name        = AST.Name name
+    , LLVM.AST.Global.isConstant  = isConst
     , LLVM.AST.Global.type' = tpe
     , LLVM.AST.Global.initializer = body
     }
 
-defineConst name tpe body = addDefn $
-    AST.GlobalDefinition $ AST.globalVariableDefaults {
-      LLVM.AST.Global.name        = AST.Name name
-    , LLVM.AST.Global.isConstant  = True
-    , LLVM.AST.Global.type' = tpe
-    , LLVM.AST.Global.initializer = Just body
-    }
+defineGlobal name tpe body = defineGlobalVar name tpe body False
 
-define ::  Type -> SBS.ShortByteString -> [(SBS.ShortByteString, Type)] -> [BasicBlock] -> LLVM ()
-define retty label argtys body = addDefn $
-    GlobalDefinition $ functionDefaults {
-      name        = Name label
-    , parameters  = ([Parameter ty (Name nm) [] | (nm, ty) <- argtys], False)
-    , returnType  = retty
-    , basicBlocks = body
-    }
+defineConst name tpe body = defineGlobalVar name tpe (Just body) True
 
-external ::  Type -> SBS.ShortByteString -> [(SBS.ShortByteString, Type)] -> Bool -> [A.GroupID] -> LLVM ()
-external retty label argtys vararg funcAttrs = addDefn $
+defineFunction retty label argtys blocks vararg funcAttrs = addDefn $
     GlobalDefinition $ functionDefaults {
       name        = Name label
     , LLVM.AST.Global.functionAttributes = map Left funcAttrs
     , parameters  = ([Parameter ty (Name nm) [] | (nm, ty) <- argtys], vararg)
     , returnType  = retty
-    , basicBlocks = []
+    , basicBlocks = blocks
     }
+
+define ::  Type -> SBS.ShortByteString -> [(SBS.ShortByteString, Type)] -> [BasicBlock] -> LLVM ()
+define retty label argtys body = defineFunction retty label argtys body False []
+
+external ::  Type -> SBS.ShortByteString -> [(SBS.ShortByteString, Type)] -> Bool -> [A.GroupID] -> LLVM ()
+external retty label argtys vararg funcAttrs = defineFunction retty label argtys [] vararg funcAttrs
 
 ---------------------------------------------------------------------------------
 -- Types

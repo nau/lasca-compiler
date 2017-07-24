@@ -74,7 +74,7 @@ defaultValueForType tpe =
 codegenTop ctx this@(S.Val meta name expr) = do
     modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
     let valType = llvmTypeOf this
-    defineGlobal (AST.Name $ fromString name) valType (Just $ defaultValueForType valType)
+    defineGlobal (fromString name) valType (Just $ defaultValueForType valType)
 
 codegenTop ctx f@(S.Function meta name tpe args body) =
     if meta ^. S.isExternal then

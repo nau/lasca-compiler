@@ -66,7 +66,7 @@ uncurryLambda expr = go expr ([], expr) where
 -- codegenTop :: S.Expr -> LLVM ()
 codegenTop ctx (S.Val _ name expr) = do
     modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
-    defineGlobal (AST.Name (fromString name)) ptrType (Just (C.Null ptrType))
+    defineGlobal (fromString name) ptrType (Just (C.Null ptrType))
 
 codegenTop ctx (S.Function meta name tpe args body) =
     if meta ^. S.isExternal then
