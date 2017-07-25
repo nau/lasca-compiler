@@ -319,9 +319,8 @@ Box* __attribute__ ((pure)) runtimeBinOp(int code, Box* lhs, Box* rhs) {
     return result;
 }
 
-Box* arrayApply(Box* arrayValue, Box* idx) {
+Box* arrayApply(Box* arrayValue, int index) {
     Array* array = unbox(ARRAY, arrayValue);
-    int index = unboxInt(idx);
     assert(array->length > index);
     return array->data[index];
 }
@@ -338,10 +337,6 @@ String UNIMPLEMENTED_SELECT = {
 
 Box* runtimeApply(Box* val, int argc, Box* argv[], Position pos) {
     Functions* fs = RUNTIME->functions;
-    // Handle array(idx) call
-    if (val->type == ARRAY && argc == 1 && argv[0]->type == INT) {
-        return arrayApply(val, argv[0]);
-    }
     Closure *closure = unbox(CLOSURE, val);
     if (closure->funcIdx >= fs->size) {
         printf("AAAA!!! No such function with id %d, max id is %d at line: %d\n", (int) closure->funcIdx, fs->size, pos.line);

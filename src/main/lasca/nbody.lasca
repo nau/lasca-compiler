@@ -98,48 +98,48 @@ def advanceInner(from: [Float], to: [Float], dt) = {
 
 def advance(bodies: [[Float]], dt) = {
     r01 = advanceInner(bodies[0], bodies[1], dt);
-    r02 = advanceInner(r01(0),    bodies[2], dt);
-    r03 = advanceInner(r02(0),    bodies[3], dt);
-    r04 = advanceInner(r03(0),    bodies[4], dt);
+    r02 = advanceInner(r01[0],    bodies[2], dt);
+    r03 = advanceInner(r02[0],    bodies[3], dt);
+    r04 = advanceInner(r03[0],    bodies[4], dt);
 
-    r12 = advanceInner(r01(1),    r02(1), dt);
-    r13 = advanceInner(r12(0),    r03(1), dt);
-    r14 = advanceInner(r13(0),    r04(1), dt);
+    r12 = advanceInner(r01[1],    r02[1], dt);
+    r13 = advanceInner(r12[0],    r03[1], dt);
+    r14 = advanceInner(r13[0],    r04[1], dt);
 
-    r23 = advanceInner(r12(1),    r13(1), dt);
-    r24 = advanceInner(r23(0),    r14(1), dt);
+    r23 = advanceInner(r12[1],    r13[1], dt);
+    r24 = advanceInner(r23[0],    r14[1], dt);
 
-    r34 = advanceInner(r23(1),    r24(1), dt);
+    r34 = advanceInner(r23[1],    r24[1], dt);
 
     sun = bodies[0];
-    r040 = r04(0);
-    sunVx = r040(3);
-    sunVy = r040(4);
-    sunVz = r040(5);
+    r040 = r04[0];
+    sunVx = r040[3];
+    sunVy = r040[4];
+    sunVz = r040[5];
 
     jupiter = bodies[1];
-    r140 = r14(0);
-    jupiterVx = r140(3);
-    jupiterVy = r140(4);
-    jupiterVz = r140(5);
+    r140 = r14[0];
+    jupiterVx = r140[3];
+    jupiterVy = r140[4];
+    jupiterVz = r140[5];
 
     saturn = bodies[2];
-    r240 = r24(0);
-    saturnVx = r240(3);
-    saturnVy = r240(4);
-    saturnVz = r240(5);
+    r240 = r24[0];
+    saturnVx = r240[3];
+    saturnVy = r240[4];
+    saturnVz = r240[5];
 
     uranus = bodies[3];
-    r340 = r34(0);
-    uranusVx = r340(3);
-    uranusVy = r340(4);
-    uranusVz = r340(5);
+    r340 = r34[0];
+    uranusVx = r340[3];
+    uranusVy = r340[4];
+    uranusVz = r340[5];
 
     neptune = bodies[4];
-    r341 = r34(1);
-    neptuneVx = r341(3);
-    neptuneVy = r341(4);
-    neptuneVz = r341(5);
+    r341 = r34[1];
+    neptuneVx = r341[3];
+    neptuneVy = r341[4];
+    neptuneVz = r341[5];
 
     [
       [sun[0] + dt * sunVx,     sun[1] + dt * sunVy,     sun[2] + dt * sunVz,     sunVx, sunVy, sunVz, sun[6]],

@@ -255,6 +255,29 @@ cgen ctx (S.Apply meta expr args) = do
                             _ -> False
     case expr of
          -- FIXME Here are BUGZZZZ!!!! :)
+        this@(S.Ident meta "arrayApply") -> do
+            let [arrayExpr, indexExpr] = args
+            array <- cgen ctx arrayExpr -- should be a pointer to either boxed or unboxed array
+            idx <- cgen ctx indexExpr -- must be T.i32. TODO should be platform-dependent
+            case S.typeOf arrayExpr of
+                TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
+                    arrayStructPtr <- bitcast array (T.ptr (arrayStructType T.double))
+                    arrayPtr <- getelementptr arrayStructPtr [constIntOp 0, constIntOp 1]
+                    arrayPtr1 <- bitcast arrayPtr (T.ptr T.double)
+                    ptr <- getelementptr arrayPtr1 [idx]
+                    load ptr
+                _ -> do
+                    boxedArrayPtr <- bitcast array (T.ptr $ boxStructOfType (T.ptr $ arrayStructType ptrType)) -- Box(type, &Array(len, &data[])
+                    arrayStructAddr <- getelementptr boxedArrayPtr [constInt64Op 0, constIntOp 1]
+                    arrayStructPtr <- load arrayStructAddr
+                    arraysize <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 0]
+                    size <- load arraysize
+                    -- TODO check idx is in bounds, eliminatable
+                    arrayDataAddr <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 1]
+                    arraDataPtr <- load arrayDataAddr
+                    arrayDataArray <- bitcast arraDataPtr (T.ptr (T.ArrayType 0 ptrType))
+                    ptr' <- getelementptr arrayDataArray [constInt64Op 0, idx]
+                    load ptr'
         this@(S.Ident meta fn) | isGlobal fn -> do
             let funDecl = (ctx ^. S.globalFunctions) Map.! fn
             let fnType = S.typeOf funDecl
@@ -289,30 +312,6 @@ cgen ctx (S.Apply meta expr args) = do
                     return res
           --          callFn "boxFloat64"  [res]
                 _ -> callFn fn largs
-        this | isArray this && length args == 1 && isIntType (head args) -> do
-            -- this must be arrayApply
-            idx <- cgen ctx (head args) -- must be T.i32. TODO should be platform-dependent
-            array <- cgen ctx this -- should be a pointer to either boxed or unboxed array
-            case S.typeOf this of
-                TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
-                    arrayStructPtr <- bitcast array (T.ptr (arrayStructType T.double))
-                    arrayPtr <- getelementptr arrayStructPtr [constIntOp 0, constIntOp 1]
-                    arrayPtr1 <- bitcast arrayPtr (T.ptr T.double)
-                    ptr <- getelementptr arrayPtr1 [idx]
-                    load ptr
-                _ -> do
-                    boxedArrayPtr <- bitcast array (T.ptr $ boxStructOfType (T.ptr $ arrayStructType ptrType)) -- Box(type, &Array(len, &data[])
-                    arrayStructAddr <- getelementptr boxedArrayPtr [constInt64Op 0, constIntOp 1]
-                    arrayStructPtr <- load arrayStructAddr
-                    arraysize <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 0]
-                    size <- load arraysize
-                    -- TODO check idx is in bounds, eliminatable
-                    arrayDataAddr <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 1]
-                    arraDataPtr <- load arrayDataAddr
-                    arrayDataArray <- bitcast arraDataPtr (T.ptr (T.ArrayType 0 ptrType))
-                    ptr' <- getelementptr arrayDataArray [constInt64Op 0, idx]
-                    load ptr'
-
         expr -> do
             modState <- gets moduleState
             e <- cgen ctx expr

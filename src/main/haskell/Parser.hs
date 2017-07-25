@@ -11,6 +11,7 @@ import qualified Data.Char as Char
 import           Data.List as List
 import qualified Data.Map.Strict as Map
 import           Data.List.NonEmpty
+import qualified Data.Set as Set
 import           Data.Foldable
 import           Text.Megaparsec as Megaparsec
 import qualified Text.Megaparsec.Expr   as Ex
@@ -21,18 +22,13 @@ import Text.Megaparsec.Pos
 import           Lexer
 import Syntax
 import           Type
+import Infer
 
 getMeta = do
     state <- getParserState
     let SourcePos _ sl sc :| _ = statePos state
     let meta = emptyMeta { pos = Position {Syntax.sourceLine = unPos sl, Syntax.sourceColumn = unPos sc} }
     return meta
-
-fv (TVar a)   = [a]
-fv (TypeFunc a b) = fv a ++ fv b
-fv (TypeIdent _)   = []
-fv (TypeApply t [])       = error "Should not be TypeApply without arguments!" -- TODO use NonEmpty List?
-fv (TypeApply t args)   = fv t  -- FIXME args?
 
 integerLiteral = do
     meta <- getMeta
@@ -142,7 +138,7 @@ postfixIndex = Ex.Postfix parser
   where parser = do
             meta <- getMeta
             index <- brackets expr
-            return $ \e -> Apply meta e [index]
+            return $ \e -> Apply meta (Ident meta "arrayApply") [e, index]
 
 select = do
     reservedOp "."
@@ -247,7 +243,7 @@ extern = do
     args <- parens $ commaSep arg
     tpe <- typeAscription
     let funcType = foldr (\(Arg n at) ft -> TypeFunc at ft) tpe (List.reverse args)
-    let scheme = case fv funcType of
+    let scheme = case Set.toList $ ftv funcType of
                   [] -> funcType
                   tvars -> Forall tvars funcType
     let meta' = meta { _isExternal = True, _exprType = scheme }

@@ -3,6 +3,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Infer (
+  Substitutable,
+  ftv,
   typeCheck,
   inferExpr,
   defaultTyenv
@@ -72,7 +74,7 @@ instance Substitutable Type where
     ftv (TVar a)       = Set.singleton a
     ftv (t1 `TypeFunc` t2) = ftv t1 `Set.union` ftv t2
     ftv (TypeApply _ [])         = error "Should not be TypeApply without arguments!" -- TODO use NonEmpty List?
-    ftv (TypeApply t args)       = ftv t  -- TODO do proper substitution
+    ftv (TypeApply t args)       = Set.unions (ftv t : List.map ftv args)
     ftv (Forall as t) = ftv t `Set.difference` Set.fromList as
 
 instance Substitutable a => Substitutable [a] where
@@ -103,8 +105,6 @@ unify t (TypeIdent "Any") = return nullSubst
 unify t (TVar a) = bind a t
 unify (TVar a) t = bind a t
 unify (TypeIdent a) (TypeIdent b) | a == b = return nullSubst
-unify (TypeApply (TypeIdent "Array") [t]) (TypeFunc typeInt r) = unify t r -- FIXME special case of array(idx) syntax. Hack.
-unify (TypeFunc typeInt t) (TypeApply (TypeIdent "Array") [r]) = unify r t -- FIXME special case of array(idx) syntax. Hack.
 unify (TypeApply (TypeIdent lhs) largs) (TypeApply (TypeIdent rhs) rargs) | lhs == rhs = unifyList largs rargs
 unify t1 t2 = throwError $ UnificationFail t1 t2
 
