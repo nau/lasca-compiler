@@ -51,13 +51,10 @@ import qualified Debug.Trace as Debug
 
 import Codegen
 import Type
+import Emit
 import qualified Syntax as S
 import Syntax (Ctx, createGlobalContext)
-import Emit
 
-
-externArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
-externArgsToSig = map (\(S.Arg name tpe) -> (fromString name, externalTypeMapping tpe))
 
 uncurryLambda expr = go expr ([], expr) where
     go (S.Lam _ name e) result = let (args, body) = go e result in (name : args, body)
@@ -100,38 +97,6 @@ codegenTop ctx exp = do
         setBlock entry
         cgen ctx exp >>= ret
 
-codegenStartFunc ctx = do
-    modState <- get
-    define T.void "start" [("argc", intType), ("argv", ptrType)] (bls modState)
-  where
-    bls modState = createBlocks $ execCodegen [] modState $ do
-        entry <- addBlock entryBlockName
-        setBlock entry
-        callFn "initLascaRuntime" [constRefOperand "Runtime"]
-        callFn "initEnvironment" [localPtr "argc", localPtr "argv"]
-        initGlobals
-        callFn "main" []
-        terminator $ I.Do $ I.Ret Nothing []
-        return ()
-
-    initGlobals = do
-        modState <- gets moduleState
-        let globalValsInit = _globalValsInit modState
-        mapM gen globalValsInit
-
-    gen (name, expr) = do
-        v <- cgen ctx expr
-        store (global ptrType (fromString name)) v
-        return v
-
-
--- Dynamic mode
-externalTypeMapping :: Type -> AST.Type
--- FIXME currently we assume every function returns a result and can't be Unit/void
---externalTypeMapping (TypeIdent "Unit") = T.void
-externalTypeMapping (TypeIdent "Int") = T.i32
-externalTypeMapping (TypeIdent "Float") = T.double
-externalTypeMapping _ = ptrType-- Dynamic mode
 -------------------------------------------------------------------------------
 -- Operations
 -------------------------------------------------------------------------------
@@ -286,7 +251,7 @@ codegenModule opts modo exprs = modul
         forM_ desugared $ \expr -> do
             defineStringConstants expr
             codegenTop ctx expr
-        codegenStartFunc ctx
+        codegenStartFunc ctx cgen
 
 genTypesStruct ctx defs = do
     types <- genData ctx defs

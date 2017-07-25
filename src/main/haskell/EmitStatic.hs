@@ -20,6 +20,7 @@ import qualified LLVM.AST.FloatingPointPredicate as FP
 import qualified LLVM.AST.FunctionAttribute as FA
 
 -- import qualified Data.Text as Text
+import qualified Data.ByteString as ByteString
 import qualified Data.Text.Encoding as Encoding
 import Text.Printf
 import qualified Data.ByteString.UTF8 as UTF8
@@ -46,7 +47,7 @@ import Control.Lens.Operators
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
-import Debug.Trace as Debug
+import qualified Debug.Trace as Debug
 
 import Codegen
 import Type
@@ -55,20 +56,12 @@ import qualified Syntax as S
 import Syntax (Ctx, createGlobalContext)
 
 
-externArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
-externArgsToSig = map (\(S.Arg name tpe) -> (fromString name, typeMapping tpe))
+staticArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
+staticArgsToSig = map (\(S.Arg name tpe) -> (fromString name, typeMapping tpe))
 
 uncurryLambda expr = go expr ([], expr) where
     go (S.Lam _ name e) result = let (args, body) = go e result in (name : args, body)
     go e (args, _) = (args, e)
-
-
-defaultValueForType tpe =
-    case tpe of
-        T.FloatingPointType T.DoubleFP -> constFloat 0.0
-        _ -> constNull T.i8
-
-
 
 -- codegenTop :: S.Expr -> LLVM ()
 codegenTop ctx this@(S.Val meta name expr) = do
@@ -111,38 +104,12 @@ codegenTop ctx (S.Data _ name constructors) = return ()
 
 codegenTop ctx exp = do
     modState <- get
-    define T.double "main" [] (bls modState)
+    define T.void "main" [] (bls modState)
   where
     bls modState = createBlocks $ execCodegen [] modState $ do
         entry <- addBlock entryBlockName
         setBlock entry
         cgen ctx exp >>= ret
-
-codegenStartFunc ctx = do
-    modState <- get
-    define T.void "start" [("argc", intType), ("argv", ptrType)] (bls modState)
-  where
-    bls modState = createBlocks $ execCodegen [] modState $ do
-        entry <- addBlock entryBlockName
-        setBlock entry
-        callFn "initLascaRuntime" [constRefOperand "Runtime"]
-        callFn "initEnvironment" [localPtr "argc", localPtr "argv"]
-        initGlobals
-        callFn "main" []
-        terminator $ I.Do $ I.Ret Nothing []
-        return ()
-
-    initGlobals = do
-        modState <- gets moduleState
-        let globalValsInit = _globalValsInit modState
-        mapM gen globalValsInit
-
-    gen (name, expr) = do
-        v <- cgen ctx expr
-        let t = llvmTypeOf expr
-  --      traceM $ "global type " ++ show t
-        store (global t (fromString name)) v
-        return v
 
 
 typeMapping :: Type -> AST.Type
@@ -430,7 +397,7 @@ codegenStaticModule opts modo exprs = modul
         forM_ desugared $ \expr -> do
             defineStringConstants expr
             codegenTop ctx expr
-        codegenStartFunc ctx
+        codegenStartFunc ctx cgen
 
 genTypesStruct ctx defs = do
     types <- genData ctx defs
@@ -489,7 +456,7 @@ defineConstructor ctx typeName name tid tag args  = do
     len = length args
     arrayType = T.ArrayType (fromIntegral len) ptrType
     tpe = T.StructureType False [T.i32, arrayType] -- DataValue: {tag, values: []}
-    fargs = externArgsToSig args
+    fargs = staticArgsToSig args
     fieldsArray = C.Array ptrType fields
     fields = map (\(S.Arg n _) -> globalStringRefAsPtr n) args
 
