@@ -84,14 +84,9 @@ codegenTop ctx (S.Function meta name tpe args body) =
 
 codegenTop ctx (S.Data _ name constructors) = return ()
 
-codegenTop ctx exp = do
-    modState <- get
-    define T.void "main" [] (bls modState)
-  where
-    bls modState = createBlocks $ execCodegen [] modState $ do
-        entry <- addBlock entryBlockName
-        setBlock entry
-        cgen ctx exp >>= ret
+codegenTop ctx expr =
+    error $ printf "Expression of this kind should not get to codegenTop. It's a bug. %s at %s"
+        (show expr) (show $ S.exprPosition expr)
 
 -------------------------------------------------------------------------------
 -- Operations
