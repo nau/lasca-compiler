@@ -7,6 +7,7 @@ module Infer (
   ftv,
   typeCheck,
   inferExpr,
+  printTypeError,
   defaultTyenv
 ) where
 
@@ -43,18 +44,25 @@ type Infer = ExceptT TypeError (State InferState)
 type Subst = Map.Map TVar Type
 
 data TypeError
-    = UnificationFail Type Type
-    | InfiniteType TVar Type
-    | UnboundVariable String
-    | UnificationMismatch [Type] [Type]
-    deriving (Eq, Ord)
+    = UnificationFail Expr Type Type
+    | InfiniteType Expr TVar Type
+    | UnboundVariable Expr String
+    | UnificationMismatch Expr [Type] [Type]
+    deriving (Eq, Ord, Show)
 
-instance Show TypeError where
-    show (UnificationFail t1 t2) = "Unification Fail " ++ show t1 ++ " " ++ show t2
-    show (InfiniteType t1 t2) = "InfiniteType " ++ show t1 ++ " " ++ show t2
-    show (UnboundVariable s) = "UnboundVariable " ++ s
-    show (UnificationMismatch t1 t2) = "UnificationMismatch " ++ show t1 ++ " " ++ show t2
-
+printTypeError typeError = case typeError of
+    UnificationFail expr expected infered ->
+        printf "%s: Type error: expected type %s but got %s in expression %s"
+          (show $ exprPosition expr) (show expected) (show infered) (show expr)
+    InfiniteType expr tvar tpe ->
+        printf "%s: Type error: infinite type %s %s in expression %s"
+          (show $ exprPosition expr) (show tvar) (show tpe) (show expr)
+    UnboundVariable expr symbol ->
+        printf "%s: Type error: unknown symbol %s in expression %s"
+          (show $ exprPosition expr) (show symbol) (show expr)
+    UnificationMismatch expr expected infered ->
+        printf "%s: Type error: expected type %s but got %s in expression %s"
+          (show $ exprPosition expr) (show expected) (show infered) (show expr)
 
 class Substitutable a where
     substitute :: Subst -> a -> a
@@ -106,7 +114,10 @@ unify t (TVar a) = bind a t
 unify (TVar a) t = bind a t
 unify (TypeIdent a) (TypeIdent b) | a == b = return nullSubst
 unify (TypeApply (TypeIdent lhs) largs) (TypeApply (TypeIdent rhs) rargs) | lhs == rhs = unifyList largs rargs
-unify t1 t2 = throwError $ UnificationFail t1 t2
+unify t1 t2 = do
+    expr <- gets _current
+    let pos = exprPosition expr
+    throwError $ UnificationFail expr t1 t2
 
 unifyList :: [Type] -> [Type] -> Infer Subst
 -- unifyList x y | traceArgs ["unifyList", show x, show y] = undefined
@@ -116,12 +127,16 @@ unifyList (t1 : ts1) (t2 : ts2) = do
     su1 <- unify t1 t2
     su2 <- unifyList (substitute su1 ts1) (substitute su1 ts2)
     return (su2 `compose` su1)
-unifyList t1 t2 = throwError $ UnificationMismatch t1 t2
+unifyList t1 t2 = do
+    expr <- gets _current
+    throwError $ UnificationMismatch expr t1 t2
 
 bind ::  TVar -> Type -> Infer Subst
 bind a t
   | t == TVar a     = return nullSubst
-  | occursCheck a t = throwError $ InfiniteType a t
+  | occursCheck a t = do
+      expr <- gets _current
+      throwError $ InfiniteType expr a t
   | otherwise       = return $ Map.singleton a t
 
 occursCheck ::  Substitutable a => TVar -> a -> Bool
@@ -256,7 +271,9 @@ ops = Map.fromList [
 lookupEnv :: TypeEnv -> String -> Infer (Subst, Type)
 lookupEnv (TypeEnv env) x =
     case Map.lookup x env of
-        Nothing -> throwError $ UnboundVariable x
+        Nothing -> do
+            expr <- gets _current
+            throwError $ UnboundVariable expr x
         Just s  -> do t <- instantiate s
                       return (nullSubst, t)
 

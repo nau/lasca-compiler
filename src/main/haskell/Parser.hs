@@ -37,7 +37,9 @@ integerLiteral = do
 integerLit = IntLit . fromIntegral <$> signedInteger
 
 floatingLiteral :: Parser Expr
-floatingLiteral = Literal emptyMeta <$> floatLit
+floatingLiteral = do
+    meta <- getMeta
+    Literal meta <$> floatLit
 
 floatLit = FloatLit <$> signedFloat
 
@@ -46,7 +48,9 @@ strToBool "true" = True
 strToBool _      = False
 
 boolLiteral :: Parser Expr
-boolLiteral = Literal emptyMeta <$> boolLit
+boolLiteral = do
+    meta <- getMeta
+    Literal meta <$> boolLit
 
 boolLit :: Parser Lit
 boolLit = BoolLit . strToBool <$> (true <|> false)
@@ -64,14 +68,15 @@ stringLit = StringLit <$> stringLiteral
 interpolatedString :: Parser Expr
 interpolatedString = do
     list <- pTemplate
-    return $ go list
-  where go [] = Literal emptyMeta (StringLit "")
-        go list = case foldr go' [] list of
+    meta <- getMeta
+    return $ go meta list
+  where go meta [] = Literal meta (StringLit "")
+        go meta list = case foldr (go' meta) [] list of
                     [s] -> s
-                    strings -> Apply emptyMeta (Ident emptyMeta "concat") [Array emptyMeta strings]
+                    strings -> Apply meta (Ident meta "concat") [Array meta strings]
 
-        go' (Left s) acc  = Literal emptyMeta (StringLit s) : acc
-        go' (Right e) acc = Apply emptyMeta (Ident emptyMeta "toString") [e] : acc
+        go' meta (Left s) acc  = Literal meta (StringLit s) : acc
+        go' meta (Right e) acc = Apply meta (Ident meta "toString") [e] : acc
 
 
 pTemplate :: Parser [Either String Expr] -- Left = text, Right = variable

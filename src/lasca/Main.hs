@@ -105,7 +105,7 @@ genModule opts modo source = do
               when (printTypes opts) $ print env
 --              traceM $ show typedExprs
               return $ codegenStaticModule opts modo typedExprs
-            Left e -> die $ show e
+            Left e -> die $ printTypeError e
           else return $ codegenModule opts modo ex
 
 readMod :: LascaOpts -> String -> IO AST.Module
