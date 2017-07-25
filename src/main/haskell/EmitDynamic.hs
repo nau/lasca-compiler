@@ -107,10 +107,10 @@ codegenStartFunc ctx = do
     bls modState = createBlocks $ execCodegen [] modState $ do
         entry <- addBlock entryBlockName
         setBlock entry
-        callFn initLascaRuntimeFuncType "initLascaRuntime" [constRefOperand "Runtime"]
-        callFn (funcType T.void [intType, ptrType]) "initEnvironment" [localPtr "argc", localPtr "argv"]
+        callFn "initLascaRuntime" [constRefOperand "Runtime"]
+        callFn "initEnvironment" [localPtr "argc", localPtr "argv"]
         initGlobals
-        callFn mainFuncType "main" []
+        callFn "main" []
         terminator $ I.Do $ I.Ret Nothing []
         return ()
 
@@ -165,7 +165,7 @@ cgen ctx (S.Select meta tree expr) = do
     tree <- cgen ctx tree
     e <- cgen ctx expr
     let pos = createPosition $ S.pos meta
-    callFn runtimeSelectFuncType "runtimeSelect" [tree, e, constOp pos]
+    callFn "runtimeSelect" [tree, e, constOp pos]
 cgen ctx (S.Apply meta (S.Ident _ "or") [lhs, rhs]) = cgen ctx (S.If meta lhs (S.Literal S.emptyMeta (S.BoolLit True)) rhs)
 cgen ctx (S.Apply meta (S.Ident _ "and") [lhs, rhs]) = cgen ctx (S.If meta lhs rhs (S.Literal S.emptyMeta (S.BoolLit False)))
 cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
@@ -173,7 +173,7 @@ cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
     lrhs <- cgen ctx rhs
     let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
     let codeOp = constIntOp code
-    callFn runtimeBinOpFuncType "runtimeBinOp" [codeOp, llhs, lrhs]
+    callFn "runtimeBinOp" [codeOp, llhs, lrhs]
 cgen ctx (S.Apply meta expr args) = do
     syms <- gets symtab
     let symMap = Map.fromList syms
@@ -191,24 +191,24 @@ cgen ctx (S.Apply meta expr args) = do
             largs <- forM (zip args argTypes) $ \(arg, tpe) -> do
                 a <- cgen ctx arg
                 case tpe of
-                    TypeIdent "Int" -> callFn boxFuncType "unboxInt" [a]
-                    TypeIdent "Float" -> callFnType ptrType T.double "unboxFloat64" [a]
+                    TypeIdent "Int" -> callFn "unboxInt" [a]
+                    TypeIdent "Float" -> callFn "unboxFloat64" [a]
                     _ -> return a
             case returnType of
                 TypeIdent "Int" -> do
-                    res <- callFnType ptrType T.i32 (fromString fn) largs
+                    res <- callFn (fromString fn) largs
 --                    Debug.traceM ("res = " ++ show res)
-                    callFn boxFuncType "boxInt"  [res]
+                    callFn "boxInt"  [res]
                 TypeIdent "Float" -> do
-                    res <- callFnType T.double T.double (fromString fn) largs
+                    res <- callFn (fromString fn) largs
 --                    Debug.traceM ("res = " ++ show res ++ show largs ++ fn)
-                    callFn boxFuncType "boxFloat64"  [res]
-                _ -> callFn ptrType (fromString fn) largs
+                    callFn "boxFloat64"  [res]
+                _ -> callFn (fromString fn) largs
 
         S.Ident _ fn | isGlobal fn -> do
 --            Debug.traceM $ printf "Calling %s" fn
             largs <- forM args $ \arg -> cgen ctx arg
-            callFn ptrType (fromString fn) largs
+            callFn (fromString fn) largs
 
         expr -> do
             modState <- gets moduleState
@@ -225,7 +225,7 @@ cgen ctx (S.Apply meta expr args) = do
             -- cdecl calling convension, arguments passed right to left
             sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0 .. len] largs]
             let pos = createPosition $ S.pos meta
-            callFn runtimeApplyFuncType "runtimeApply" [e, argc, sargs, constOp pos]
+            callFn "runtimeApply" [e, argc, sargs, constOp pos]
 cgen ctx (S.BoxFunc _ funcName enclosedVars) = do
     modState <- gets moduleState
     let mapping = functions modState
@@ -241,10 +241,10 @@ cgen ctx (S.If meta cond tr fl) = do
     ------------------
     cond <- cgen ctx cond
     -- unbox Bool
-    voidPtrCond <- callFn unboxFuncType "unbox" [constIntOp 1, cond]
+    voidPtrCond <- callFn "unbox" [constIntOp 1, cond]
     bool <- ptrtoint voidPtrCond T.i1
 
-    test <- instr T.i1 (I.ICmp IP.EQ bool constTrue [])
+    test <- instr (I.ICmp IP.EQ bool constTrue [])
     cbr test ifthen ifelse -- Branch based on the condition
 
     -- if.then
@@ -359,5 +359,5 @@ defineConstructor ctx typeName name tid tag args  = do
         forM_ argsWithId $ \(S.Arg n t, i) -> do
             p <- getelementptr structPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, 2nd field, ith element] {tag, [arg1, arg2 ...]}
             store p (localPtr $ fromString n)
-        boxed <- callFn ptrType "box" [constIntOp tid, ptr]
+        boxed <- callFn "box" [constIntOp tid, ptr]
         ret boxed

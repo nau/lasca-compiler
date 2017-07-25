@@ -219,14 +219,14 @@ current = do
         Just x -> return x
         Nothing -> error $ "No such block: " ++ show c
 
-instr :: Type -> Instruction -> Codegen Operand
-instr tpe ins = do
+instr :: Instruction -> Codegen Operand
+instr ins = do
     n <- fresh
     let ref = UnName n
     blk <- current
     let i = stack blk
     modifyBlock (blk { stack = i ++ [ref := ins] } )
-    return $ LocalReference tpe ref
+    return $ LocalReference ptrType ref
 
 terminator :: Named Terminator -> Codegen (Named Terminator)
 terminator trm = do
@@ -329,48 +329,46 @@ toArgs :: [Operand] -> [(Operand, [A.ParameterAttribute])]
 toArgs = map (\x -> (x, []))
 
 
-bitcast op toTpe= instr toTpe (BitCast op toTpe [])
+bitcast op toTpe= instr (BitCast op toTpe [])
 
-ptrtoint op toTpe= instr toTpe (PtrToInt op toTpe [])
+ptrtoint op toTpe= instr (PtrToInt op toTpe [])
 
-inttoptr op = instr ptrType (IntToPtr op ptrType [])
+inttoptr op = instr (IntToPtr op ptrType [])
 
 -- Effects
-add tpe lhs rhs = instr tpe $ Add False False lhs rhs []
-sub tpe lhs rhs = instr tpe $ Sub False False lhs rhs []
-mul tpe lhs rhs = instr tpe $ Mul False False lhs rhs []
-div tpe lhs rhs = instr tpe $ SDiv True lhs rhs []
+add lhs rhs = instr $ Add False False lhs rhs []
+sub lhs rhs = instr $ Sub False False lhs rhs []
+mul lhs rhs = instr $ Mul False False lhs rhs []
+div lhs rhs = instr $ SDiv True lhs rhs []
 intEq lhs rhs = do
-    bool <- instr T.i32 $ ICmp IPred.EQ lhs rhs []
-    instr T.i32 $ ZExt bool T.i32 []
+    bool <- instr $ ICmp IPred.EQ lhs rhs []
+    instr $ ZExt bool T.i32 []
 intLt lhs rhs = do
-    bool <- instr T.i32 $ ICmp IPred.SLT lhs rhs []
-    instr T.i32 $ ZExt bool T.i32 []
+    bool <- instr $ ICmp IPred.SLT lhs rhs []
+    instr $ ZExt bool T.i32 []
 intGt lhs rhs = do
-    bool <- instr T.i32 $ ICmp IPred.SGT lhs rhs []
-    instr T.i32 $ ZExt bool T.i32 []
-fadd lhs rhs = instr T.double $ FAdd NoFastMathFlags lhs rhs []
-fsub lhs rhs = instr T.double $ FSub NoFastMathFlags lhs rhs []
-fmul lhs rhs = instr T.double $ FMul NoFastMathFlags lhs rhs []
-fdiv lhs rhs = instr T.double $ FDiv NoFastMathFlags lhs rhs []
+    bool <- instr $ ICmp IPred.SGT lhs rhs []
+    instr $ ZExt bool T.i32 []
+fadd lhs rhs = instr $ FAdd NoFastMathFlags lhs rhs []
+fsub lhs rhs = instr $ FSub NoFastMathFlags lhs rhs []
+fmul lhs rhs = instr $ FMul NoFastMathFlags lhs rhs []
+fdiv lhs rhs = instr $ FDiv NoFastMathFlags lhs rhs []
 
 call :: Operand -> [Operand] -> Codegen Operand
-call fn args = instr ptrType $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
+call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 
-callFn tpe name args = call (global tpe (fromString name)) args
-
-callFnType fnType retType name args = instr retType $ Call Nothing CC.C [] (Right (global fnType name)) (toArgs args) [] []
+callFn name args = call (global ptrType (fromString name)) args
 
 alloca :: Type -> Codegen Operand
-alloca ty = instr ty $ Alloca ty Nothing 0 []
+alloca ty = instr $ Alloca ty Nothing 0 []
 
-allocaSize ty size = instr ty $ Alloca ty (Just size) 0 []
+allocaSize ty size = instr $ Alloca ty (Just size) 0 []
 
 store :: Operand -> Operand -> Codegen Operand
-store ptr val = instr ptrType $ Store False ptr val Nothing 0 []
+store ptr val = instr $ Store False ptr val Nothing 0 []
 
 load :: Operand -> Codegen Operand
-load ptr = instr ptrType $ Load False ptr Nothing 0 []
+load ptr = instr $ Load False ptr Nothing 0 []
 
 -- Control Flow
 br :: Name -> Codegen (Named Terminator)
@@ -380,12 +378,12 @@ cbr :: Operand -> Name -> Name -> Codegen (Named Terminator)
 cbr cond tr fl = terminator $ Do $ CondBr cond tr fl []
 
 phi :: Type -> [(Operand, Name)] -> Codegen Operand
-phi ty incoming = instr ty $ Phi ty incoming []
+phi ty incoming = instr $ Phi ty incoming []
 
 ret :: Operand -> Codegen (Named Terminator)
 ret val = terminator $ Do $ Ret (Just val) []
 
-getelementptr addr indices = instr ptrType $ GetElementPtr False addr indices []
+getelementptr addr indices = instr $ GetElementPtr False addr indices []
 
 globalStringRef :: String -> C.Constant
 globalStringRef name = C.GlobalReference (stringStructType (length name)) (AST.Name (getStringLitName name))

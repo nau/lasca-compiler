@@ -125,10 +125,10 @@ codegenStartFunc ctx = do
     bls modState = createBlocks $ execCodegen [] modState $ do
         entry <- addBlock entryBlockName
         setBlock entry
-        callFn initLascaRuntimeFuncType "initLascaRuntime" [constRefOperand "Runtime"]
-        callFn (funcType T.void [intType, ptrType]) "initEnvironment" [localPtr "argc", localPtr "argv"]
+        callFn "initLascaRuntime" [constRefOperand "Runtime"]
+        callFn "initEnvironment" [localPtr "argc", localPtr "argv"]
         initGlobals
-        callFn mainFuncType "main" []
+        callFn "main" []
         terminator $ I.Do $ I.Ret Nothing []
         return ()
 
@@ -261,26 +261,26 @@ cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
     let lhsType = S.typeOf lhs
     let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
     case (code, lhsType) of
-        (10, TypeIdent "Int") -> add T.i32 llhs lrhs
-        (11, TypeIdent "Int") -> sub T.i32 llhs lrhs
-        (12, TypeIdent "Int") -> mul T.i32 llhs lrhs
-        (13, TypeIdent "Int") -> Codegen.div T.i32 llhs lrhs
+        (10, TypeIdent "Int") -> add llhs lrhs
+        (11, TypeIdent "Int") -> sub llhs lrhs
+        (12, TypeIdent "Int") -> mul llhs lrhs
+        (13, TypeIdent "Int") -> Codegen.div llhs lrhs
         (42, TypeIdent "Int") -> do
           bool <- intEq llhs lrhs
-          callFn boxFuncType "boxBool" [bool]
+          callFn "boxBool" [bool]
         (44, TypeIdent "Int") -> do
           bool <- intLt llhs lrhs
-          callFn boxFuncType "boxBool" [bool]
+          callFn "boxBool" [bool]
         (47, TypeIdent "Int") -> do
           bool <- intGt llhs lrhs
-          callFn boxFuncType "boxBool" [bool]
+          callFn "boxBool" [bool]
         (10, TypeIdent "Float") -> fadd llhs lrhs
         (11, TypeIdent "Float") -> fsub llhs lrhs
         (12, TypeIdent "Float") -> fmul llhs lrhs
         (13, TypeIdent "Float") -> fdiv llhs lrhs
         _  -> do
                 let codeOp = constIntOp code
-                callFn runtimeBinOpFuncType "runtimeBinOp" [codeOp, llhs, lrhs]
+                callFn "runtimeBinOp" [codeOp, llhs, lrhs]
 cgen ctx (S.Apply meta expr args) = do
     syms <- gets symtab
     let symMap = Map.fromList syms
@@ -310,23 +310,23 @@ cgen ctx (S.Apply meta expr args) = do
                     (TypeIdent l, TypeIdent r) | l == r -> return a
                     (TVar _, TypeIdent "Int") -> do
 --                        Debug.traceM ("boxing " ++ show a)
-                        callFn boxFuncType "boxInt" [a]
+                        callFn "boxInt" [a]
                     (TVar _, TypeIdent "Float") -> do
 --                        Debug.traceM ("boxing " ++ show a)
-                        callFn boxFuncType "boxFloat64" [a]
+                        callFn "boxFloat64" [a]
                     _ -> return a
             case returnType of
                 TypeIdent "Int" -> do
-                    res <- callFnType ptrType T.i32 (fromString fn) largs
+                    res <- callFn (fromString fn) largs
 --                    Debug.traceM ("res = " ++ show res)
                     return res
-          --          callFn boxFuncType "boxInt"  [res]
+          --          callFn "boxInt"  [res]
                 TypeIdent "Float" -> do
-                    res <- callFnType ptrType T.double (fromString fn) largs
+                    res <- callFn (fromString fn) largs
 --                    Debug.traceM ("res = " ++ show res)
                     return res
-          --          callFn boxFuncType "boxFloat64"  [res]
-                _ -> callFn ptrType fn largs
+          --          callFn "boxFloat64"  [res]
+                _ -> callFn fn largs
         this | isArray this && length args == 1 && isIntType (head args) -> do
             -- this must be arrayApply
             idx <- cgen ctx (head args) -- must be T.i32. TODO should be platform-dependent
@@ -366,7 +366,7 @@ cgen ctx (S.Apply meta expr args) = do
             -- cdecl calling convension, arguments passed right to left
             sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0 .. len] largs]
             let pos = createPosition $ S.pos meta
-            callFn runtimeApplyFuncType "runtimeApply" [e, argc, sargs, constOp pos]
+            callFn "runtimeApply" [e, argc, sargs, constOp pos]
 cgen ctx (S.BoxFunc _ funcName enclosedVars) = do
     modState <- gets moduleState
     let mapping = functions modState
@@ -383,10 +383,10 @@ cgen ctx (S.If meta cond tr fl) = do
     ------------------
     cond <- cgen ctx cond
     -- unbox Bool
-    voidPtrCond <- callFn unboxFuncType "unbox" [constIntOp 1, cond]
+    voidPtrCond <- callFn "unbox" [constIntOp 1, cond]
     bool <- ptrtoint voidPtrCond T.i1
 
-    test <- instr T.i1 (I.ICmp IP.EQ bool constTrue [])
+    test <- instr (I.ICmp IP.EQ bool constTrue [])
     cbr test ifthen ifelse -- Branch based on the condition
 
     -- if.then
@@ -508,6 +508,6 @@ defineConstructor ctx typeName name tid tag args  = do
                   _                 -> return $ localPtr $ fromString n
             store p (ref)
         -- remove boxing after removing runtimeIsConstr from genPattern, do a proper tag check instead
-        boxed <- callFn ptrType "box" [constIntOp tid, ptr]
+        boxed <- callFn "box" [constIntOp tid, ptr]
         ret boxed
 --        ret ptr

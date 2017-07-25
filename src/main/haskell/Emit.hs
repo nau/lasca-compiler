@@ -169,21 +169,12 @@ binops = Map.fromList [("+", 10), ("-", 11), ("*", 12), ("/", 13),
 -------------------------------------------------------------------------------
 funcType retTy args = T.FunctionType retTy args False
 
-initLascaRuntimeFuncType = funcType T.void [ptrType]
-mainFuncType = funcType ptrType []
-boxFuncType = funcType ptrType [T.i32]
-boxArrayFuncType = T.FunctionType ptrType [T.i32] True
-runtimeBinOpFuncType = funcType ptrType [T.i32, ptrType, ptrType]
-runtimeApplyFuncType = funcType ptrType [ptrType, T.i32, ptrType, positionStructType]
-runtimeSelectFuncType = funcType ptrType [ptrType, ptrType, positionStructType]
-unboxFuncType = funcType ptrType [ptrType, T.i32]
-
 sizeOfType tpe = do
     nullptr <- getelementptr (constOp (constNull tpe)) [constIntOp 1]
     sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
     return sizeof
 
-gcMalloc size = callFn (funcType ptrType [T.i32]) "gcMalloc" [size]
+gcMalloc size = callFn "gcMalloc" [size]
 
 gcMallocType tpe = do
     size <- sizeOfType tpe
@@ -192,25 +183,25 @@ gcMallocType tpe = do
     return (ptr, casted)
 
 
-box (S.BoolLit b) meta = callFn boxFuncType "boxBool" [constIntOp (boolToInt b)]
-box (S.IntLit  n) meta = callFn boxFuncType "boxInt" [constIntOp n]
-box (S.FloatLit  n) meta = callFn boxFuncType "boxFloat64" [constFloatOp n]
-box S.UnitLit meta = callFn boxFuncType "box" [constIntOp 0,  constOp constNullPtr]
+box (S.BoolLit b) meta = callFn "boxBool" [constIntOp (boolToInt b)]
+box (S.IntLit  n) meta = callFn "boxInt" [constIntOp n]
+box (S.FloatLit  n) meta = callFn "boxFloat64" [constFloatOp n]
+box S.UnitLit meta = callFn "box" [constIntOp 0,  constOp constNullPtr]
 box (S.StringLit s) meta = do
     let name = getStringLitName s
     let len = ByteString.length . UTF8.fromString $ s
     let ref = global (stringStructType len) name
     ref' <- bitcast ref ptrType
-    callFn boxFuncType "box" [constIntOp 4, ref']
+    callFn "box" [constIntOp 4, ref']
 
 createPosition S.NoPosition = createStruct [constInt 0, constInt 0] -- Postion (0, 0) means No Position. Why not.
 createPosition S.Position{S.sourceLine, S.sourceColumn} = createStruct [C.Int 32 (toInteger sourceLine), C.Int 32 (toInteger sourceColumn)]
 
-boxArray values = callFn boxFuncType "boxArray" (constIntOp (length values) : values)
+boxArray values = callFn "boxArray" (constIntOp (length values) : values)
 
 boxFunc name mapping = do
     let idx = fromMaybe (error ("No such function " ++ name)) (Map.lookup name mapping)
-    callFn (funcType ptrType [T.i32]) "boxFunc" [constIntOp idx]
+    callFn "boxFunc" [constIntOp idx]
 
 boxError name = do
     modify (\s -> s { generatedStrings = name : generatedStrings s })
@@ -218,7 +209,7 @@ boxError name = do
     let len = length name
     let ref = global (stringStructType len) strLitName
     ref <- bitcast ref ptrType
-    callFn (funcType ptrType [T.i32]) "boxError" [ref]
+    callFn "boxError" [ref]
 
 boxClosure :: String -> Map.Map String Int -> [S.Arg] -> Codegen AST.Operand
 boxClosure name mapping enclosedVars = do
@@ -237,7 +228,7 @@ boxClosure name mapping enclosedVars = do
 
     let sargs = sargsPtr
     sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0 .. argc] args]
-    callFn (funcType ptrType [T.i32, T.i32, ptrType]) "boxClosure" [constIntOp idx, constIntOp argc, sargsPtr]
+    callFn "boxClosure" [constIntOp idx, constIntOp argc, sargsPtr]
 
 boolToInt True = 1
 boolToInt False = 0
