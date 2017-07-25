@@ -56,10 +56,6 @@ import qualified Syntax as S
 import Syntax (Ctx, createGlobalContext)
 
 
-uncurryLambda expr = go expr ([], expr) where
-    go (S.Lam _ name e) result = let (args, body) = go e result in (name : args, body)
-    go e (args, _) = (args, e)
-
 -- codegenTop :: S.Expr -> LLVM ()
 codegenTop ctx (S.Val _ name expr) = do
     modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
@@ -254,75 +250,11 @@ codegenModule opts modo exprs = modul
         codegenStartFunc ctx cgen
 
 genTypesStruct ctx defs = do
-    types <- genData ctx defs
+    types <- genData ctx defs toSig argToPtr
     let array = C.Array ptrType types
     defineConst "Types" structType (struct array)
   where len = length defs
         struct a = createStruct [constInt len, a]
         structType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) ptrType]
 
-genData :: Ctx -> [S.DataDef] -> LLVM ([C.Constant])
-genData ctx defs = sequence [genDataStruct d | d <- defs]
-  where genDataStruct dd@(S.DataDef tid name constrs) = do
-            defineStringLit name
-            let literalName = fromString $ "Data." ++ name
-            let numConstructors = length constrs
-            constructors <- genConstructors ctx dd
-            let arrayOfConstructors = C.Array ptrType constructors
-            let struct = createStruct [constInt tid, globalStringRefAsPtr name, constInt numConstructors, arrayOfConstructors] -- struct Data
-            defineConst literalName (T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral numConstructors) ptrType]) struct
-            return (constRef literalName)
-
-genConstructors ctx (S.DataDef tid name constrs) = do
-    forM (zip constrs [0..]) $ \ ((S.DataConst n args), tag) ->
-        defineConstructor ctx (fromString name) n tid tag args
-
-defineConstructor ctx typeName name tid tag args  = do
-  -- TODO optimize for zero args
-    modState <- get
-    let codeGenResult = codeGen modState
-    let blocks = createBlocks codeGenResult
-
-    if null args
-    then do
-        let singletonName = name ++ ".Singleton"
-        let dataValue = createStruct [constInt tag, C.Array ptrType []]
-        defineConst (fromString singletonName) tpe dataValue
-
-        let boxed = createStruct [constInt tid, constRef (fromString singletonName)]
-        defineConst (fromString $ singletonName ++ ".Boxed") boxStructType boxed
-
-        let boxedRef = C.GlobalReference boxStructType (AST.Name (fromString $ singletonName ++ ".Boxed"))
-        let ptrRef = C.BitCast boxedRef ptrType
-        defineConst (fromString name) ptrType ptrRef
-    else do
-        define ptrType (fromString name) fargs blocks -- define constructor function
-        forM_ args $ \ (S.Arg name _) -> defineStringLit name -- define fields names as strings
-
-    let structType = T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral len) ptrType]
-    let struct =  createStruct [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, constInt len, fieldsArray]
-    let literalName = fromString $ typeName ++ "." ++ name
-    defineConst literalName structType struct
-
-    return $ constRef literalName
-
-  where
-    len = length args
-    arrayType = T.ArrayType (fromIntegral len) ptrType
-    tpe = T.StructureType False [T.i32, arrayType] -- DataValue: {tag, values: []}
-    fargs = toSig args
-    fieldsArray = C.Array ptrType fields
-    fields = map (\(S.Arg n _) -> globalStringRefAsPtr n) args
-
-    codeGen modState = execCodegen [] modState $ do
-        entry <- addBlock entryBlockName
-        setBlock entry
-        (ptr, structPtr) <- gcMallocType tpe
-        tagAddr <- getelementptr structPtr [constIntOp 0, constIntOp 0] -- [dereference, 1st field] {tag, [arg1, arg2 ...]}
-        store tagAddr (constIntOp tag)
-        let argsWithId = zip args [0..]
-        forM_ argsWithId $ \(S.Arg n t, i) -> do
-            p <- getelementptr structPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, 2nd field, ith element] {tag, [arg1, arg2 ...]}
-            store p (localPtr $ fromString n)
-        boxed <- callFn "box" [constIntOp tid, ptr]
-        ret boxed
+argToPtr (S.Arg n t) = return $ localPtr $ fromString n

@@ -68,10 +68,6 @@ defaultValueForType tpe =
         T.FloatingPointType T.DoubleFP -> constFloat 0.0
         _ -> constNull T.i8
 
-uncurryLambda expr = go expr ([], expr) where
-    go (S.Lam _ name e) result = let (args, body) = go e result in (name : args, body)
-    go e (args, _) = (args, e)
-
 data Trans = Trans {
     _modNames :: Names,
     _locals :: Map.Map String Type.Type,
@@ -367,6 +363,75 @@ desugarExprs ctx exprs = let
     (desugared, st) = runState (transform (desugarExpr ctx) exprs) emptyTrans
     syn = _syntacticAst st
   in desugared ++ syn
+
+--genData :: Ctx -> [S.DataDef] -> ([S.Arg] -> [(SBS.ShortByteString, AST.Type)]) -> LLVM ([C.Constant])
+genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
+  where genDataStruct dd@(S.DataDef tid name constrs) = do
+            defineStringLit name
+            let literalName = fromString $ "Data." ++ name
+            let numConstructors = length constrs
+            constructors <- genConstructors ctx dd
+            let arrayOfConstructors = C.Array ptrType constructors
+            let struct = createStruct [constInt tid, globalStringRefAsPtr name, constInt numConstructors, arrayOfConstructors] -- struct Data
+            defineConst literalName (T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral numConstructors) ptrType]) struct
+            return (constRef literalName)
+
+        genConstructors ctx (S.DataDef tid name constrs) = do
+            forM (zip constrs [0..]) $ \ ((S.DataConst n args), tag) ->
+                defineConstructor ctx (fromString name) n tid tag args
+
+        defineConstructor ctx typeName name tid tag args  = do
+          -- TODO optimize for zero args
+            modState <- get
+            let codeGenResult = codeGen modState
+            let blocks = createBlocks codeGenResult
+
+            if null args
+            then do
+                let singletonName = name ++ ".Singleton"
+                let dataValue = createStruct [constInt tag, C.Array ptrType []]
+                defineConst (fromString singletonName) tpe dataValue
+
+                let boxed = createStruct [constInt tid, constRef (fromString singletonName)]
+                defineConst (fromString $ singletonName ++ ".Boxed") boxStructType boxed
+
+                let boxedRef = C.GlobalReference boxStructType (AST.Name (fromString $ singletonName ++ ".Boxed"))
+                let ptrRef = C.BitCast boxedRef ptrType
+                defineConst (fromString name) ptrType ptrRef
+            else do
+                define ptrType (fromString name) fargs blocks -- define constructor function
+                forM_ args $ \ (S.Arg name _) -> defineStringLit name -- define fields names as strings
+
+            let structType = T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral len) ptrType]
+            let struct =  createStruct [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, constInt len, fieldsArray]
+            let literalName = fromString $ typeName ++ "." ++ name
+            defineConst literalName structType struct
+
+            return $ constRef literalName
+
+          where
+            len = length args
+            arrayType = T.ArrayType (fromIntegral len) ptrType
+            tpe = T.StructureType False [T.i32, arrayType] -- DataValue: {tag, values: []}
+            fargs = argsToSig args
+            fieldsArray = C.Array ptrType fields
+            fields = map (\(S.Arg n _) -> globalStringRefAsPtr n) args
+
+            codeGen modState = execCodegen [] modState $ do
+                entry <- addBlock entryBlockName
+                setBlock entry
+                (ptr, structPtr) <- gcMallocType tpe
+                tagAddr <- getelementptr structPtr [constIntOp 0, constIntOp 0] -- [dereference, 1st field] {tag, [arg1, arg2 ...]}
+                store tagAddr (constIntOp tag)
+                let argsWithId = zip args [0..]
+                forM_ argsWithId $ \(arg, i) -> do
+                    p <- getelementptr structPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, 2nd field, ith element] {tag, [arg1, arg2 ...]}
+                    ref <- argToPtr arg
+                    store p ref
+                -- remove boxing after removing runtimeIsConstr from genPattern, do a proper tag check instead
+                boxed <- callFn "box" [constIntOp tid, ptr]
+                ret boxed
+        --        ret ptr
 
 codegenStartFunc ctx cgen = do
     modState <- get
