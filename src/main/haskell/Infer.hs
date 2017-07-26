@@ -3,8 +3,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Infer (
-  Substitutable,
-  ftv,
+  normalizeType,
   typeCheck,
   inferExpr,
   printTypeError,
@@ -36,6 +35,10 @@ instance Show TypeEnv where
       where elems = List.foldl' (\s (name, scheme) -> s ++ name ++ " : " ++ show scheme ++ "\n") "" (Map.toList subst)
 
 data InferState = InferState {_count :: Int, _current :: Expr}
+
+normalizeType tpe = case Set.toList $ ftv tpe of
+                  [] -> tpe
+                  tvars -> Forall tvars tpe
 
 count :: Lens.Lens' InferState Int
 count = Lens.lens _count (\c e -> c { _count = e } )
@@ -199,23 +202,23 @@ updateMeta f e =
 
 normalize schema@(Forall ts body) =
     let res = (Forall (fmap snd ord) (normtype body), ord)
-    in {-Debug.trace (show res) -}res
+    in Debug.trace (show res) res
   where
-    ord = let a = zip (List.nub $ fv body) (fmap TV letters)
-          in {-Debug.trace ("mapping = " ++ show a)-} a   -- from [b, c, c, d, f, e, g] -> [a, b, c, d, e, f]
+    ord = let a = zip (Set.toList $ ftv body) (fmap TV letters)
+          in Debug.trace ("mapping = " ++ show a) a   -- from [b, c, c, d, f, e, g] -> [a, b, c, d, e, f]
 
     fv (TVar a)   = [a]
     fv (TypeFunc a b) = fv a ++ fv b
     fv (TypeIdent _)   = []
     fv (TypeApply t [])       = error "Should not be TypeApply without arguments!" -- TODO use NonEmpty List?
-    fv (TypeApply t args)   = fv t  -- FIXME args?
+    fv (TypeApply t args)   = fv t ++ (args >>= fv)  -- FIXME args?
 
     normtype (TypeFunc a b)  = TypeFunc  (normtype a) (normtype b)
-    normtype (TypeApply a b) = TypeApply (normtype a) b
+    normtype (TypeApply a b) = TypeApply (normtype a) (map normtype b)
     normtype (TypeIdent a)   = TypeIdent a
     normtype (TVar a)        =
         case lookup a ord of
-            Just x -> TVar x
+            Just x -> Debug.trace (printf "lookup for %s, found %s" (show a) (show x)) (TVar x)
             Nothing -> error $ printf "Type variable %s not in signature %s" (show a) (show schema)
 normalize t = (t, [])
 
@@ -389,7 +392,7 @@ infer ctx env ex = case ex of
             let argToType (Arg _ t) = t
             let f z t = z `TypeFunc` t
             let ts = map argToType args
-            let t = foldr f tpe ts
+            let t = normalizeType $ foldr f tpe ts
             return (nullSubst, t)
         else do
             -- functions are recursive, so do Fixpoint for inference
@@ -539,8 +542,8 @@ typeCheck ctx exprs = do
 
         genTypes :: DataConst -> [(String, Type)]
         genTypes (DataConst name args) =
-            let tpe = foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args
-                accessors = map (\(Arg n tpe) -> (n, TypeFunc dataTypeIdent tpe)) args
+            let tpe = normalizeType $ foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args
+                accessors = map (\(Arg n tpe) -> (n, normalizeType $ TypeFunc dataTypeIdent tpe)) args
             in (name, tpe) : accessors
     genTypesForData e = error ("What the hell" ++ show e)
 

@@ -21,6 +21,7 @@ import System.Process
 import System.Console.Haskeline
 import Options.Applicative
 import Data.Semigroup ((<>))
+import Data.List
 import Debug.Trace as Debug
 import qualified Text.Megaparsec as Megaparsec
 
@@ -103,7 +104,7 @@ genModule opts modo source = do
             Right (env, typedExprs) -> do
               when (verboseMode opts) $ putStrLn "typechecked OK"
               when (printTypes opts) $ print env
---              traceM $ show typedExprs
+              traceM $ intercalate "\n" (map printExprWithType typedExprs)
               return $ codegenStaticModule opts modo typedExprs
             Left e -> die $ printTypeError e
           else return $ codegenModule opts modo ex

@@ -136,6 +136,32 @@ instance Show Expr where
   show EmptyExpr = ""
 -}
 
+class Show a => DebugPrint a where
+    printExprWithType :: a -> String
+    printExprWithType a = show a
+
+instance DebugPrint Arg where
+    printExprWithType (Arg a t) = printf "%s: %s" a (show t)
+
+instance DebugPrint Expr where
+    printExprWithType expr = case expr of
+        Literal _ l -> show l
+        Ident meta n -> printf "%s: %s" n (show meta)
+        Val meta n e -> printf "val %s: %s = %s\n" n (show meta) (printExprWithType e)
+        Apply meta f e -> printf "%s(%s): %s" (printExprWithType f) (intercalate "," $ map printExprWithType e) (show meta)
+        Lam _ a e -> printf "{ %s -> %s }\n" (printExprWithType a) (printExprWithType e)
+        Select _ e f -> printf "%s.%s" (printExprWithType e) (printExprWithType f)
+        Match _ e cs -> printf "match %s {\n%s}\n" (printExprWithType e) (show cs)
+        BoxFunc meta f args -> printf "BoxFunc %s($args)" (show f) (intercalate "," $ map show args)
+        Function meta f t args b -> if _isExternal meta
+            then printf "extern def %s(%s): %s\n" f (intercalate "," $ map printExprWithType args) (show t)
+            else printf "--  %s : %s\ndef %s(%s): %s = %s\n" f (show meta) f (intercalate "," $ map printExprWithType args) (show t) (printExprWithType b)
+        If meta c t f -> printf "if %s then {\n%s \n} else {\n%s\n}: %s" (printExprWithType c) (printExprWithType t) (printExprWithType f) (show meta)
+        Let meta n e b -> printf "%s = %s;\n%s: %s" n (printExprWithType e) (printExprWithType b) (show meta)
+        Array _ es -> printf "[%s]" (intercalate "," $ map printExprWithType es)
+        Data _ n tvars cs -> printf "data %s %s = %s\n" n (show tvars) (intercalate "\n| " $ map show cs)
+        EmptyExpr -> ""
+
 
 data Case = Case Pattern Expr deriving (Eq, Ord, Show)
 data Pattern

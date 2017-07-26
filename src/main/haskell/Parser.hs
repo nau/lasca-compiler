@@ -160,7 +160,7 @@ matchExpr = do
 bracedCases = braces $ some acase
 
 acase = do
-    reservedOp "|"
+--    reservedOp "|"
     p <- ptrn
     reservedOp "->"
     e <- expr
@@ -248,9 +248,7 @@ extern = do
     args <- parens $ commaSep arg
     tpe <- typeAscription
     let funcType = foldr (\(Arg n at) ft -> TypeFunc at ft) tpe (List.reverse args)
-    let scheme = case Set.toList $ ftv funcType of
-                  [] -> funcType
-                  tvars -> Forall tvars funcType
+    let scheme = normalizeType funcType
     let meta' = meta { _isExternal = True, _exprType = scheme }
     return (Function meta' name tpe args EmptyExpr)
 

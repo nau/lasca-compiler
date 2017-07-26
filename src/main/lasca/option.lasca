@@ -1,0 +1,5 @@
+data Option a = None | Some(v: a)
+
+def main() = {
+    println("Even ${None} is ${Some(true)}")
+}
