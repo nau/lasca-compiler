@@ -40,3 +40,7 @@ typeArrayInt = typeArray typeInt
 
 isAny (TypeIdent "Any") = True
 isAny _ = False
+
+typeToList tpe = reverse $ go tpe []
+  where go (TypeFunc a b) acc = go b (a : acc)
+        go a acc              = a : acc

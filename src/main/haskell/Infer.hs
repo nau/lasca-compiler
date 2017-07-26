@@ -204,7 +204,7 @@ normalize schema@(Forall ts body) =
     let res = (Forall (fmap snd ord) (normtype body), ord)
     in Debug.trace (show res) res
   where
-    ord = let a = zip (Set.toList $ ftv body) (fmap TV letters)
+    ord = let a = zip (List.nub $ fv body) (fmap TV letters)
           in Debug.trace ("mapping = " ++ show a) a   -- from [b, c, c, d, f, e, g] -> [a, b, c, d, e, f]
 
     fv (TVar a)   = [a]
@@ -378,11 +378,10 @@ infer ctx env ex = case ex of
                 return (s1, resultType)
             _ -> do
                 let generalizedArgType = generalize env argType
-                let env' = env `extend` (x, generalizedArgType)
+                let env' = env `extend` (x, argType)
                 (s1, t1) <- infer ctx env' e
                 e' <- gets _current
-                intstantiatedArgType <- instantiate generalizedArgType
-                let resultType = substitute s1 intstantiatedArgType `TypeFunc` t1
+                let resultType = substitute s1 argType `TypeFunc` t1
                 setType $ Lam (meta `withType` resultType) arg e'
                 return (s1, resultType)
 
@@ -403,13 +402,13 @@ infer ctx env ex = case ex of
             -- fixpoint
             (s1, ttt) <- infer ctx env curried
             let composedType = substitute s1 (TypeFunc ttt tv1)
-        --    traceM $ "composedType " ++ show composedType
+            traceM $ "composedType " ++ show composedType
             s2 <- unify composedType ((tv `TypeFunc` tv) `TypeFunc` tv)
             let (s, t) = (s2 `compose` s1, substitute s2 tv1)
             e' <- gets _current
             let uncurried = foldr (\_ (Lam _ _ e) -> e) e' (nameArg : args)
             setType $ Function (meta `withType` t) name tpe args uncurried
-        --    traceM $ printf "def %s(%s): %s, subs: %s" name (List.intercalate "," $ map show args) (show t) (show s)
+            traceM $ printf "def %s(%s): %s, subs: %s" name (List.intercalate "," $ map show args) (show t) (show s)
             return (s, t)
 
 

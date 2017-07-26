@@ -115,8 +115,8 @@ typeMapping t = case t of
                   _                -> ptrType
 
 llvmTypeOf = typeMapping . S.typeOf
-mappedReturnType args t = typeMapping $ returnType args t
-returnType args t = foldr f t args
+mappedReturnType args t = typeMapping $ declaredReturnType args t
+declaredReturnType args t = foldr f t args
   where f arg (TypeFunc a b) = b
         f arg t = t
 -------------------------------------------------------------------------------
@@ -281,13 +281,12 @@ cgen ctx (S.Apply meta expr args) = do
         this@(S.Ident meta fn) | isGlobal fn -> do
             let funDecl = (ctx ^. S.globalFunctions) Map.! fn
             let fnType = S.typeOf funDecl
-            let fff t acc = case t of
-                              TypeFunc a b -> fff b (a : acc)
-                              a -> a : acc
-            let types = reverse $ fff fnType []
-            let paramTypes = init types
-            let returnType = last types
---            Debug.traceM $ printf "Calling %s: %s from %s, return type %s" fn (show types) (show fnType) (show returnType)
+            let declaredTypes = typeToList fnType
+            let paramTypes = init declaredTypes
+            let declaredReturnType = last declaredTypes
+            let expectedTypes = typeToList $ S.typeOf this
+            let expectedReturnType = last expectedTypes
+            Debug.traceM $ printf "Calling %s: %s, expected %s" fn (show declaredReturnType) (show expectedReturnType)
             largs <- forM (zip args paramTypes) $ \(arg, paramType) -> do
                 a <- cgen ctx arg
                 let argType = S.typeOf arg
@@ -300,17 +299,14 @@ cgen ctx (S.Apply meta expr args) = do
 --                        Debug.traceM ("boxing " ++ show a)
                         callFn "boxFloat64" [a]
                     _ -> return a
-            case returnType of
-                TypeIdent "Int" -> do
-                    res <- callFn (fromString fn) largs
---                    Debug.traceM ("res = " ++ show res)
-                    return res
-          --          callFn "boxInt"  [res]
-                TypeIdent "Float" -> do
-                    res <- callFn (fromString fn) largs
---                    Debug.traceM ("res = " ++ show res)
-                    return res
-          --          callFn "boxFloat64"  [res]
+            case (expectedReturnType, declaredReturnType) of
+                _ | expectedReturnType == declaredReturnType -> callFn fn largs
+                (TypeIdent "Int", TVar _) -> do
+                    result <- callFn fn largs
+                    callFn "unboxInt" [result]
+                (TypeIdent "Float", TVar _) -> do
+                    result <- callFn fn largs
+                    callFn "unboxFloat64" [result]
                 _ -> callFn fn largs
         expr -> do
             modState <- gets moduleState

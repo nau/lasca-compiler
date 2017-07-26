@@ -5,11 +5,18 @@ def empty(l) = match l {
     Cons(_, _) -> false
 }
 
-{-def foldl(l, z: b, f: a -> b -> b): b = match l {
+def foldl(self: List a, z: b, f: a -> b -> b): b = match self {
     Nil -> z
-    Cons(h, t) -> { println("Hello"); f(h, foldl(t, z, f)) }
-}-}
+    Cons(hd, tl) -> {
+        a = f(hd);
+        b = foldl(tl, z, f);
+        a(b)
+    }
+}
 
---def length(l) = foldl(l, 0, { e, acc -> acc + 1 })
+def length(l) = foldl(l, 0, { e -> { acc -> acc + 1 }})
 
-def main() = {}
+def main() = {
+    l = Cons("One", Nil);
+    println("Hello world! ${l.head}. Is empty: ${empty(l)}, ");
+}
