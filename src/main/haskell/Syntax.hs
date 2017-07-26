@@ -63,7 +63,7 @@ data Expr
     | If Meta Expr Expr Expr
     | Let Meta Name Expr Expr
     | Array Meta [Expr]
-    | Data Meta Name [DataConst]
+    | Data Meta Name [TVar] [DataConst]
     deriving (Ord, Show)
 
 metaLens :: Lens.Lens' Expr Meta
@@ -80,7 +80,7 @@ metaLens = Lens.lens (fst . getset) (snd . getset)
               If meta cond tr fl -> (meta, \ m -> If m cond tr fl)
               Let meta name expr body -> (meta, \ m -> Let m name expr body)
               Array meta exprs -> (meta, \ m -> Array m exprs)
-              Data meta name constrs -> (meta, \ m -> Data m name constrs)
+              Data meta name tvars constrs -> (meta, \ m -> Data m name tvars constrs)
               BoxFunc meta name args -> (meta, \m -> BoxFunc m name args)
               _ -> error $ "Should not happen :) " ++ show expr
 
@@ -113,7 +113,7 @@ instance Eq Expr where
     (If _ nl al l) == (If _ nr ar r) = nl == nr && al == ar && l == r
     (Let _ nl al l) == (Let _ nr ar r) = nl == nr && al == ar && l == r
     (Array _ l) == (Array _ r) = l == r
-    (Data _ nl l) == (Data _ nr r) = nl == nr && l == r
+    (Data _ nl ltvars l) == (Data _ nr rtvars r) = nl == nr && ltvars == rtvars && l == r
 
 {-
 instance Show Expr where
@@ -198,7 +198,7 @@ createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
     names :: Expr -> State Ctx ()
     names (Val _ name _) = globalVals %= Set.insert name
     names fun@(Function meta name tpe args _) = globalFunctions %= Map.insert name fun
-    names (Data _ name consts) = do
+    names (Data _ name tvars consts) = do
         id <- gets typeId
         let dataDef = DataDef id name consts
         let (funcs, vals) = foldl (\(funcs, vals) (DataConst n args) ->

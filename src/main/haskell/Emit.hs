@@ -317,7 +317,7 @@ genFunctionMap fns = do
 
 
     funcsWithArities = foldl go [] fns where
-        go s (S.Data _ name consts) =
+        go s (S.Data _ name tvars consts) =
             -- Add data constructors as global functions
             let m = foldl (\acc (S.DataConst n args) -> (n, length args) : acc) [] consts
             in m ++ s

@@ -410,7 +410,7 @@ infer ctx env ex = case ex of
             return (s, t)
 
 
-    Data meta name constructors -> error $ "Shouldn't happen! " ++ show meta
+    Data meta name tvars constructors -> error $ "Shouldn't happen! " ++ show meta
     Select meta tree expr -> do
         (s, t) <- infer ctx env (Apply meta expr [tree])
         (Apply _ e' [tree']) <- gets _current
@@ -520,7 +520,7 @@ inferTop ctx env ((name, ex):xs) = case inferExpr ctx env ex of
 typeCheck :: Ctx -> [Expr] -> Either TypeError (TypeEnv, [Expr])
 typeCheck ctx exprs = do
     let (dat, other) = List.partition pred exprs
-    let dataConstructorsEnv = dat >>= ddd
+    let dataConstructorsEnv = dat >>= genTypesForData
     let a = map f other
     let (TypeEnv te) = defaultTyenv
     let typeEnv = TypeEnv (Map.union te (Map.fromList dataConstructorsEnv))
@@ -530,16 +530,19 @@ typeCheck ctx exprs = do
     pred Data{} = True
     pred _      = False
 
-    ddd :: Expr -> [(String, Type)]
-    ddd (Data _ typeName constrs) = constrs >>= genType
+    genTypesForData :: Expr -> [(String, Type)]
+    genTypesForData (Data _ typeName tvars constrs) = constrs >>= genTypes
       where
-        genType :: DataConst -> [(String, Type)]
-        genType (DataConst name args) =
-            let dataTypeIdent = TypeIdent typeName
-                tpe = foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args
+        dataTypeIdent = case tvars of
+            [] -> TypeIdent typeName
+            tvars -> TypeApply (TypeIdent typeName) (map TVar tvars)
+
+        genTypes :: DataConst -> [(String, Type)]
+        genTypes (DataConst name args) =
+            let tpe = foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args
                 accessors = map (\(Arg n tpe) -> (n, TypeFunc dataTypeIdent tpe)) args
             in (name, tpe) : accessors
-    ddd e = error ("What the hell" ++ show e)
+    genTypesForData e = error ("What the hell" ++ show e)
 
 
     f e@(Val _ name _) = (name, e)

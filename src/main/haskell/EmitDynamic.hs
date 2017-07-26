@@ -82,7 +82,7 @@ codegenTop ctx (S.Function meta name tpe args body) =
             assign n var
         cgen ctx body >>= ret
 
-codegenTop ctx (S.Data _ name constructors) = return ()
+codegenTop ctx (S.Data _ name tvars constructors) = return ()
 
 codegenTop ctx expr =
     error $ printf "Expression of this kind should not get to codegenTop. It's a bug. %s at %s"
