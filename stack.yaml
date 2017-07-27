@@ -1,4 +1,4 @@
-resolver:  nightly-2017-06-18 #lts-6.9
+resolver:  lts-9.0
 packages:
 - location: '.'
 #- location:
