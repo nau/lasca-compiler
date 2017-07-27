@@ -181,6 +181,7 @@ cgen ctx this@(S.Select meta tree expr) = do
                                    treeType@(TypeApply (TypeIdent tpeName) _) -> (treeType, tpeName)
                                    treeType -> error $ printf "Unsupported type for selection %s" (show treeType)
     let identType = S.typeOf expr
+    let expectedReturnType = S.typeOf this
 --    Debug.traceM $ printf "Selecting %s: %s" (show treeType) (show identType)
     case expr of
         (S.Ident _ fieldName) | dataTypeHasField ctx tpeName fieldName -> do
@@ -189,7 +190,7 @@ cgen ctx this@(S.Select meta tree expr) = do
             let (S.Ident _ fieldName) = expr
             let fieldsWithIndex = (S.dataDefsFields ctx) Map.! tpeName
 --            Debug.traceM $ printf "fieldsWithIndex %s" (show fieldsWithIndex)
-            let (S.Arg n t, idx) = fromMaybe (error $ printf "No such field %s in %s" fieldName tpeName) (Map.lookup fieldName fieldsWithIndex)
+            let (S.Arg n declaredFieldType, idx) = fromMaybe (error $ printf "No such field %s in %s" fieldName tpeName) (Map.lookup fieldName fieldsWithIndex)
             let len = length fieldsWithIndex
             let arrayType = T.ArrayType (fromIntegral len) ptrType
             let tpe = T.StructureType False [T.i32, arrayType] -- DataValue: {tag, values: []}
@@ -204,13 +205,14 @@ cgen ctx this@(S.Select meta tree expr) = do
             valueAddr <- getelementptr array [constIntOp 0, constIntOp idx]
             value <- load valueAddr
 --            traceM $ printf "AAAA %s: %s" (show array) (show value)
-            resultValue <- case t of
+            resultValue <- case declaredFieldType of
                 TypeIdent "Float" -> ptrtofp value
                 TypeIdent "Int"   -> ptrtoint value T.i32
                 _                 -> return value
 --            Debug.traceM $ printf "Selecting %s: %s" (show tree) (show resultValue)
 --            return $ constFloatOp 1234.5
-            return resultValue
+            resolveBoxing resultValue declaredFieldType expectedReturnType
+--            return resultValue
         (S.Ident _ name) | isFuncType identType -> do
     --      traceM $ printf "Method call %s: %s" name (show identType)
             cgen ctx (S.Apply meta expr [tree])
@@ -223,13 +225,13 @@ cgen ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) | fn `Map.member` bino
     lrhs' <- cgen ctx rhs
     let lhsType = S.typeOf lhs
     let rhsType = S.typeOf rhs
-    Debug.traceM $ printf "Doing binop %s with type %s" (show this) (show $ S.typeOf op)
+--    Debug.traceM $ printf "Doing binop %s with type %s" (show this) (show $ S.typeOf op)
     let (TypeFunc realLhsType (TypeFunc realRhsType _)) = S.typeOf op
 --    let realLhsType = TypeIdent "Int"
 --    let realRhsType = TypeIdent "Int"
     llhs <- resolveBoxing llhs' lhsType realLhsType
     lrhs <- resolveBoxing lrhs' rhsType realRhsType
-    Debug.traceM $ printf "%s: %s <==> %s: %s" (show lhsType) (show realLhsType) (show rhsType) (show realRhsType)
+--    Debug.traceM $ printf "%s: %s <==> %s: %s" (show lhsType) (show realLhsType) (show rhsType) (show realRhsType)
     let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
     case (code, realLhsType) of
         (10, TypeIdent "Int") -> add llhs lrhs
@@ -246,9 +248,7 @@ cgen ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) | fn `Map.member` bino
         (11, TypeIdent "Float") -> fsub llhs lrhs
         (12, TypeIdent "Float") -> fmul llhs lrhs
         (13, TypeIdent "Float") -> fdiv llhs lrhs
-        _  -> do
-                let codeOp = constIntOp code
-                callFn "runtimeBinOp" [codeOp, llhs, lrhs]
+        _  -> error $ printf "%s: Unsupported binary operation %s" (show $ S.exprPosition this) (S.printExprWithType this)
 cgen ctx (S.Apply meta expr args) = cgenApply ctx meta expr args
 cgen ctx (S.BoxFunc _ funcName enclosedVars) = do
     modState <- gets moduleState
@@ -330,7 +330,7 @@ cgenApply ctx meta expr args = do
             let declaredReturnType = last declaredTypes
             let expectedTypes = typeToList $ S.typeOf this
             let expectedReturnType = last expectedTypes
-            Debug.traceM $ printf "Calling %s: %s, expected %s" fn (show declaredReturnType) (show expectedReturnType)
+--            Debug.traceM $ printf "Calling %s: %s, expected %s" fn (show declaredReturnType) (show expectedReturnType)
             largs <- forM (zip args paramTypes) $ \(arg, paramType) -> do
                 a <- cgen ctx arg
                 let argType = S.typeOf arg
@@ -379,7 +379,7 @@ resolveBoxing expr declaredType instantiatedType = do
         (TVar _, TypeIdent "Float") -> callFn "unboxFloat64" [expr]
         (TVar _, TVar _) -> return expr
         (l, r) -> do
-            Debug.traceM $ printf "resolveBoxing crap %s %s" (show l) (show r)
+--            Debug.traceM $ printf "resolveBoxing crap %s %s" (show l) (show r)
             return expr
 
 codegenStaticModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> AST.Module

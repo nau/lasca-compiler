@@ -202,10 +202,10 @@ updateMeta f e =
 
 normalize schema@(Forall ts body) =
     let res = (Forall (fmap snd ord) (normtype body), ord)
-    in Debug.trace (show res) res
+    in {-Debug.trace (show res)-} res
   where
     ord = let a = zip (List.nub $ fv body) (fmap TV letters)
-          in Debug.trace ("mapping = " ++ show a) a   -- from [b, c, c, d, f, e, g] -> [a, b, c, d, e, f]
+          in {-Debug.trace ("mapping = " ++ show a)-} a   -- from [b, c, c, d, f, e, g] -> [a, b, c, d, e, f]
 
     fv (TVar a)   = [a]
     fv (TypeFunc a b) = fv a ++ fv b
@@ -218,7 +218,7 @@ normalize schema@(Forall ts body) =
     normtype (TypeIdent a)   = TypeIdent a
     normtype (TVar a)        =
         case lookup a ord of
-            Just x -> Debug.trace (printf "lookup for %s, found %s" (show a) (show x)) (TVar x)
+            Just x -> {-Debug.trace (printf "lookup for %s, found %s" (show a) (show x))-} (TVar x)
             Nothing -> error $ printf "Type variable %s not in signature %s" (show a) (show schema)
 normalize t = (t, [])
 
@@ -402,13 +402,13 @@ infer ctx env ex = case ex of
             -- fixpoint
             (s1, ttt) <- infer ctx env curried
             let composedType = substitute s1 (TypeFunc ttt tv1)
-            traceM $ "composedType " ++ show composedType
+--            traceM $ "composedType " ++ show composedType
             s2 <- unify composedType ((tv `TypeFunc` tv) `TypeFunc` tv)
             let (s, t) = (s2 `compose` s1, substitute s2 tv1)
             e' <- gets _current
             let uncurried = foldr (\_ (Lam _ _ e) -> e) e' (nameArg : args)
             setType $ Function (meta `withType` t) name tpe args uncurried
-            traceM $ printf "def %s(%s): %s, subs: %s" name (List.intercalate "," $ map show args) (show t) (show s)
+--            traceM $ printf "def %s(%s): %s, subs: %s" name (List.intercalate "," $ map show args) (show t) (show s)
             return (s, t)
 
 

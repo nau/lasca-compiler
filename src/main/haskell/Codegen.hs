@@ -343,7 +343,7 @@ sub lhs rhs = instr $ Sub False False lhs rhs []
 mul lhs rhs = instr $ Mul False False lhs rhs []
 div lhs rhs = instr $ SDiv True lhs rhs []
 intCmp op lhs rhs = do
-    bool <- instr $ ICmp IPred.EQ lhs rhs []
+    bool <- instr $ ICmp op lhs rhs []
     instr $ ZExt bool T.i32 []
 intCmpBoxed op lhs rhs = do
     res <- intCmp op lhs rhs
