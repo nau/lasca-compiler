@@ -130,13 +130,13 @@ ptrSize = 8 -- 64 bit architecture, TODO this is hardcode
 -- Names
 -------------------------------------------------------------------------------
 
-type Names = Map.Map SBS.ShortByteString Int
+type Names = Map.Map BS.ByteString Int
 
-uniqueName :: SBS.ShortByteString -> Names -> (SBS.ShortByteString, Names)
+uniqueName :: BS.ByteString -> Names -> (BS.ByteString, Names)
 uniqueName nm ns =
     case Map.lookup nm ns of
         Nothing -> (nm,  Map.insert nm 1 ns)
-        Just ix -> (fromString $ show nm ++ show ix, Map.insert nm (ix+1) ns)
+        Just ix -> (nm `mappend` (fromString $ show ix), Map.insert nm (ix+1) ns)
 
 -------------------------------------------------------------------------------
 -- Codegen State
@@ -182,6 +182,7 @@ makeBlock (l, BlockState _ s t) = BasicBlock l s (maketerm t)
     maketerm (Just x) = x
     maketerm Nothing = error $ "Block has no terminator: " ++ show l
 
+entryBlockName :: BS.ByteString
 entryBlockName = "entry"
 
 emptyBlock :: Int -> BlockState
@@ -189,7 +190,7 @@ emptyBlock i = BlockState i [] Nothing
 
 emptyCodegen :: ModuleState -> CodegenState
 emptyCodegen ms = CodegenState {
-    currentBlock = Name entryBlockName,
+    currentBlock = Name (SBS.toShort entryBlockName),
     blocks = Map.empty,
     symtab = [],
     blockCount = 1,
@@ -241,13 +242,14 @@ terminator trm = do
 entry :: Codegen Name
 entry = gets currentBlock
 
-addBlock :: SBS.ShortByteString -> Codegen Name
+addBlock :: BS.ByteString -> Codegen Name
 addBlock bname = do
     bls <- gets blocks
     ix <- gets blockCount
     nms <- gets names
     let new = emptyBlock ix
-        (qname, supply) = uniqueName bname nms
+        (qname', supply) = uniqueName bname nms
+        qname = SBS.toShort qname'
     modify $ \s -> s { blocks = Map.insert (Name qname) new bls
                      , blockCount = ix + 1
                      , names = supply

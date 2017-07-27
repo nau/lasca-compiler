@@ -17,6 +17,7 @@ def foldl(self: List a, z: b, f: a -> b -> b): b = match self {
 def length(l) = foldl(l, 0, { e -> { acc -> acc + 1 }})
 
 def main() = {
-    l = Cons("One", Nil);
-    println("Hello world! ${l.head}. Is empty: ${empty(l)}, ");
+    list = Cons("Two", Cons("One", Nil));
+    len = list.length;
+    println("Hello world! ${list.head}. Is empty: ${list.empty}, ");
 }
