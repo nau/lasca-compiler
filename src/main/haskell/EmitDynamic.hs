@@ -170,16 +170,14 @@ cgen ctx (S.Apply meta expr args) = do
             modState <- gets moduleState
             e <- cgen ctx expr
             largs <- mapM (cgen ctx) args
-            let funcs = functions modState
             let argc = constIntOp (length largs)
-            let len = Map.size funcs
             sargsPtr <- allocaSize ptrType argc
             let asdf (idx, arg) = do
                   p <- getelementptr sargsPtr [idx]
                   store p arg
             sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
             -- cdecl calling convension, arguments passed right to left
-            sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0 .. len] largs]
+            sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0..] largs]
             let pos = createPosition $ S.pos meta
             callFn "runtimeApply" [e, argc, sargs, constOp pos]
 cgen ctx (S.BoxFunc _ funcName enclosedVars) = do

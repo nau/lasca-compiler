@@ -243,16 +243,54 @@ cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
         _  -> do
                 let codeOp = constIntOp code
                 callFn "runtimeBinOp" [codeOp, llhs, lrhs]
-cgen ctx (S.Apply meta expr args) = do
+cgen ctx (S.Apply meta expr args) = cgenApply ctx meta expr args
+cgen ctx (S.BoxFunc _ funcName enclosedVars) = do
+    modState <- gets moduleState
+    let mapping = functions modState
+    if null enclosedVars then boxFunc funcName mapping
+    else boxClosure funcName mapping enclosedVars
+cgen ctx m@S.Match{} =
+    error $ printf "Match expressions should be already desugared! %s at: %s" (show m) (show $ S.exprPosition m)
+cgen ctx (S.If meta cond tr fl) = do
+    let resultType = llvmTypeOf tr
+    ifthen <- addBlock "if.then"
+    ifelse <- addBlock "if.else"
+    ifexit <- addBlock "if.exit"
+    -- %entry
+    ------------------
+    cond <- cgen ctx cond
+    -- unbox Bool
+    voidPtrCond <- callFn "unbox" [constIntOp 1, cond]
+    bool <- ptrtoint voidPtrCond T.i1
+
+    test <- instr (I.ICmp IP.EQ bool constTrue [])
+    cbr test ifthen ifelse -- Branch based on the condition
+
+    -- if.then
+    ------------------
+    setBlock ifthen
+    trval <- cgen ctx tr       -- Generate code for the true branch
+    br ifexit              -- Branch to the merge block
+    ifthen <- getBlock
+
+    -- if.else
+    ------------------
+    setBlock ifelse
+    flval <- cgen ctx fl       -- Generate code for the false branch
+    br ifexit              -- Branch to the merge block
+    ifelse <- getBlock
+
+    -- if.exit
+    ------------------
+    setBlock ifexit
+    phi resultType [(trval, ifthen), (flval, ifelse)]
+
+cgen ctx e = error ("cgen shit " ++ show e)
+
+cgenApply ctx meta expr args = do
     syms <- gets symtab
     let symMap = Map.fromList syms
     let isGlobal fn = (fn `Map.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
-    let isArray expr = case S.typeOf expr of
-                         TypeApply (TypeIdent "Array") _ -> True
-                         _ -> False
-    let isIntType expr = case S.typeOf expr of
-                            TypeIdent "Int" -> True
-                            _ -> False
     case expr of
          -- FIXME Here are BUGZZZZ!!!! :)
         this@(S.Ident meta "arrayApply") -> do
@@ -312,62 +350,16 @@ cgen ctx (S.Apply meta expr args) = do
             modState <- gets moduleState
             e <- cgen ctx expr
             largs <- mapM (cgen ctx) args
-            let funcs = functions modState
             let argc = constIntOp (length largs)
-            let len = Map.size funcs
             sargsPtr <- allocaSize ptrType argc
             let asdf (idx, arg) = do
                   p <- getelementptr sargsPtr [idx]
                   store p arg
             sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
             -- cdecl calling convension, arguments passed right to left
-            sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0 .. len] largs]
+            sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0..] largs]
             let pos = createPosition $ S.pos meta
             callFn "runtimeApply" [e, argc, sargs, constOp pos]
-cgen ctx (S.BoxFunc _ funcName enclosedVars) = do
-    modState <- gets moduleState
-    let mapping = functions modState
-    if null enclosedVars then boxFunc funcName mapping
-    else boxClosure funcName mapping enclosedVars
-cgen ctx m@S.Match{} =
-    error $ printf "Match expressions should be already desugared! %s at: %s" (show m) (show $ S.exprPosition m)
-cgen ctx (S.If meta cond tr fl) = do
-    let resultType = llvmTypeOf tr
-    ifthen <- addBlock "if.then"
-    ifelse <- addBlock "if.else"
-    ifexit <- addBlock "if.exit"
-    -- %entry
-    ------------------
-    cond <- cgen ctx cond
-    -- unbox Bool
-    voidPtrCond <- callFn "unbox" [constIntOp 1, cond]
-    bool <- ptrtoint voidPtrCond T.i1
-
-    test <- instr (I.ICmp IP.EQ bool constTrue [])
-    cbr test ifthen ifelse -- Branch based on the condition
-
-    -- if.then
-    ------------------
-    setBlock ifthen
-    trval <- cgen ctx tr       -- Generate code for the true branch
-    br ifexit              -- Branch to the merge block
-    ifthen <- getBlock
-
-    -- if.else
-    ------------------
-    setBlock ifelse
-    flval <- cgen ctx fl       -- Generate code for the false branch
-    br ifexit              -- Branch to the merge block
-    ifelse <- getBlock
-
-    -- if.exit
-    ------------------
-    setBlock ifexit
-    phi resultType [(trval, ifthen), (flval, ifelse)]
-
-cgen ctx e = error ("cgen shit " ++ show e)
-
-
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------

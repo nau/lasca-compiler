@@ -1,4 +1,5 @@
 data List a = Nil | Cons(head: a, tail: List a)
+data Box a = Box(i: a)
 
 def empty(l) = match l {
     Nil -> true
@@ -7,17 +8,15 @@ def empty(l) = match l {
 
 def foldl(self: List a, z: b, f: a -> b -> b): b = match self {
     Nil -> z
-    Cons(hd, tl) -> {
-        a = f(hd);
-        b = foldl(tl, z, f);
-        a(b)
-    }
+    Cons(hd, tl) -> f(hd, foldl(tl, z, f))
 }
 
-def length(l) = foldl(l, 0, { e -> { acc -> acc + 1 }})
+def lengthInner(e, acc) = Box(acc.i + 1)
+
+def length(l) = foldl(l, Box(0), lengthInner).i
 
 def main() = {
     list = Cons("Two", Cons("One", Nil));
     len = list.length;
-    println("Hello world! ${list.head}. Is empty: ${list.empty}, ");
+    println("Hello world! ${list.head}. Is empty: ${list.empty}, length = ${len.toString}");
 }
