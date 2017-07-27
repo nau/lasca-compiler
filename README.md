@@ -33,11 +33,9 @@ Inspired by:
 - D (unified method syntax, macros) 
 - Pony (ref caps, behaviours)
 - Julia
+- Koka (https://github.com/koka-lang/koka)
 - Whiley (http://whiley.org/about/overview/)
-- Sage
-- Unison
-- Cloud Haskell
-- Oczor
+- Sage, Unison, Cloud Haskell
 
 Motivation
 ---

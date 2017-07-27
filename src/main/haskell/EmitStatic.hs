@@ -18,6 +18,7 @@ import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.IntegerPredicate as IP
 import qualified LLVM.AST.FloatingPointPredicate as FP
 import qualified LLVM.AST.FunctionAttribute as FA
+import qualified LLVM.AST.IntegerPredicate as IPred
 
 -- import qualified Data.Text as Text
 import qualified Data.ByteString as ByteString
@@ -217,25 +218,30 @@ cgen ctx this@(S.Select meta tree expr) = do
 
 cgen ctx (S.Apply meta (S.Ident _ "or") [lhs, rhs]) = cgen ctx (S.If meta lhs (S.Literal S.emptyMeta (S.BoolLit True)) rhs)
 cgen ctx (S.Apply meta (S.Ident _ "and") [lhs, rhs]) = cgen ctx (S.If meta lhs rhs (S.Literal S.emptyMeta (S.BoolLit False)))
-cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
-    llhs <- cgen ctx lhs
-    lrhs <- cgen ctx rhs
+cgen ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
+    llhs' <- cgen ctx lhs
+    lrhs' <- cgen ctx rhs
     let lhsType = S.typeOf lhs
+    let rhsType = S.typeOf rhs
+    Debug.traceM $ printf "Doing binop %s with type %s" (show this) (show $ S.typeOf op)
+    let (TypeFunc realLhsType (TypeFunc realRhsType _)) = S.typeOf op
+--    let realLhsType = TypeIdent "Int"
+--    let realRhsType = TypeIdent "Int"
+    llhs <- resolveBoxing llhs' lhsType realLhsType
+    lrhs <- resolveBoxing lrhs' rhsType realRhsType
+    Debug.traceM $ printf "%s: %s <==> %s: %s" (show lhsType) (show realLhsType) (show rhsType) (show realRhsType)
     let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
-    case (code, lhsType) of
+    case (code, realLhsType) of
         (10, TypeIdent "Int") -> add llhs lrhs
         (11, TypeIdent "Int") -> sub llhs lrhs
         (12, TypeIdent "Int") -> mul llhs lrhs
         (13, TypeIdent "Int") -> Codegen.div llhs lrhs
-        (42, TypeIdent "Int") -> do
-          bool <- intEq llhs lrhs
-          callFn "boxBool" [bool]
-        (44, TypeIdent "Int") -> do
-          bool <- intLt llhs lrhs
-          callFn "boxBool" [bool]
-        (47, TypeIdent "Int") -> do
-          bool <- intGt llhs lrhs
-          callFn "boxBool" [bool]
+        (42, TypeIdent "Int") -> intCmpBoxed IPred.EQ llhs lrhs
+        (43, TypeIdent "Int") -> intCmpBoxed IPred.NE llhs lrhs
+        (44, TypeIdent "Int") -> intCmpBoxed IPred.SLT llhs lrhs
+        (45, TypeIdent "Int") -> intCmpBoxed IPred.SLE llhs lrhs
+        (46, TypeIdent "Int") -> intCmpBoxed IPred.SGE llhs lrhs
+        (47, TypeIdent "Int") -> intCmpBoxed IPred.SGT llhs lrhs
         (10, TypeIdent "Float") -> fadd llhs lrhs
         (11, TypeIdent "Float") -> fsub llhs lrhs
         (12, TypeIdent "Float") -> fmul llhs lrhs
@@ -363,6 +369,18 @@ cgenApply ctx meta expr args = do
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------
+
+resolveBoxing expr declaredType instantiatedType = do
+    case (declaredType, instantiatedType) of
+        _ | declaredType == instantiatedType -> return expr
+        (TypeIdent "Int", TVar _) -> callFn "boxInt" [expr]
+        (TypeIdent "Float", TVar _) -> callFn "boxInt" [expr]
+        (TVar _, TypeIdent "Int") -> callFn "unboxInt" [expr]
+        (TVar _, TypeIdent "Float") -> callFn "unboxFloat64" [expr]
+        (TVar _, TVar _) -> return expr
+        (l, r) -> do
+            Debug.traceM $ printf "resolveBoxing crap %s %s" (show l) (show r)
+            return expr
 
 codegenStaticModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> AST.Module
 codegenStaticModule opts modo exprs = modul

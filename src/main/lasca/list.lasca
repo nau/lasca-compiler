@@ -1,5 +1,5 @@
 data List a = Nil | Cons(head: a, tail: List a)
-data Box a = Box(i: a)
+data Box a = Box(i: Int)
 
 def empty(l) = match l {
     Nil -> true

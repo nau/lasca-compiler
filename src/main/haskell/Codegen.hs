@@ -342,15 +342,12 @@ add lhs rhs = instr $ Add False False lhs rhs []
 sub lhs rhs = instr $ Sub False False lhs rhs []
 mul lhs rhs = instr $ Mul False False lhs rhs []
 div lhs rhs = instr $ SDiv True lhs rhs []
-intEq lhs rhs = do
+intCmp op lhs rhs = do
     bool <- instr $ ICmp IPred.EQ lhs rhs []
     instr $ ZExt bool T.i32 []
-intLt lhs rhs = do
-    bool <- instr $ ICmp IPred.SLT lhs rhs []
-    instr $ ZExt bool T.i32 []
-intGt lhs rhs = do
-    bool <- instr $ ICmp IPred.SGT lhs rhs []
-    instr $ ZExt bool T.i32 []
+intCmpBoxed op lhs rhs = do
+    res <- intCmp op lhs rhs
+    callFn "boxBool" [res]
 fadd lhs rhs = instr $ FAdd NoFastMathFlags lhs rhs []
 fsub lhs rhs = instr $ FSub NoFastMathFlags lhs rhs []
 fmul lhs rhs = instr $ FMul NoFastMathFlags lhs rhs []
