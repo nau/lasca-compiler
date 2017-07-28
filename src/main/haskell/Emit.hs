@@ -68,7 +68,7 @@ defaultValueForType tpe =
         T.FloatingPointType T.DoubleFP -> constFloat 0.0
         _ -> constNull T.i8
 
-data Trans = Trans {
+data DesugarPhaseState = DesugarPhaseState {
     _modNames :: Names,
     _currentFunctionName :: String,
     _locals :: Map.Map String Type.Type,
@@ -77,10 +77,10 @@ data Trans = Trans {
     _syntacticAst :: [S.Expr]
 } deriving (Show)
 
-modStateLocals :: Lens.Lens' Trans (Map.Map String Type.Type)
+modStateLocals :: Lens.Lens' DesugarPhaseState (Map.Map String Type.Type)
 modStateLocals = Lens.lens _locals (\ms l -> ms { _locals = l } )
 
-emptyTrans = Trans {
+emptyDesugarPhaseState = DesugarPhaseState {
     _modNames = Map.empty,
     _currentFunctionName = "",
     _locals = Map.empty,
@@ -270,12 +270,13 @@ declareStdFuncs = do
 --extractLambda :: S.Expr -> LLVM S.Expr
 extractLambda (S.Lam meta arg expr) = do
     state <- get
+    curFuncName <- gets _currentFunctionName
     let nms = _modNames state
     let syntactic = _syntacticAst state
     let outerVars = Map.keysSet $ _outers state
     let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
     let enclosedArgs = map (\n -> (S.Arg n typeAny, _outers state Map.! n)) usedOuterVars
-    let (funcName', nms') = uniqueName "lambda" nms
+    let (funcName', nms') = uniqueName (fromString $ curFuncName ++ "_lambda") nms
     let funcName = _currentFunctionName state ++ "_" ++ Char8.unpack funcName'
     let asdf t = foldr (\(_, t) resultType -> TypeFunc t resultType) t enclosedArgs
     let meta' = (S.exprType %~ asdf) meta
@@ -362,7 +363,7 @@ desugarExpr ctx expr = do
     return expr''
 
 desugarExprs ctx exprs = let
-    (desugared, st) = runState (transform (desugarExpr ctx) exprs) emptyTrans
+    (desugared, st) = runState (transform (desugarExpr ctx) exprs) emptyDesugarPhaseState
     syn = _syntacticAst st
   in desugared ++ syn
 

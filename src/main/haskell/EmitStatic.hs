@@ -366,28 +366,6 @@ cgenApply ctx meta expr args = do
             let pos = createPosition $ S.pos meta
             callFn "runtimeApply" [e, argc, sargs, constOp pos]
 
-declareBoxedFuncWrapper funcName args funcType = do
-    let types = typeToList funcType
-    let (shouldGenerateBoxedFunction, argTransformations) = foldr collect (False, []) types
-    if shouldGenerateBoxedFunction
-    then define ptrType (fromString $ funcName ++ ".Boxed") (toSig args) (genFunc argTransformations)
-    else return ()
-  where
-    collect tpe (bool, transformations) = let
-            shouldGenerateBoxedFunction = bool || tpe `Set.member` lascaUnboxedTypes
-            transformator = resolveBoxing tpe (TVar "a")
-        in (shouldGenerateBoxedFunction, transformator : transformations)
-
-    genFunc transformators = createBlocks $ execCodegen [] modState $ do
-                     entry <- addBlock entryBlockName
-                     setBlock entry
-                     let (retTransform : argTransforms) = transformators
-                     callFn funcName
-                     callFn "initEnvironment" [localPtr "argc", localPtr "argv"]
-                     initGlobals
-                     callFn "main" []
-                     terminator $ I.Do $ I.Ret Nothing []
-                     return ()
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------
