@@ -205,10 +205,7 @@ cgen ctx this@(S.Select meta tree expr) = do
             valueAddr <- getelementptr array [constIntOp 0, constIntOp idx]
             value <- load valueAddr
 --            traceM $ printf "AAAA %s: %s" (show array) (show value)
-            resultValue <- case declaredFieldType of
-                TypeIdent "Float" -> ptrtofp value
-                TypeIdent "Int"   -> ptrtoint value T.i32
-                _                 -> return value
+            resultValue <- castBoxedValue declaredFieldType value
 --            Debug.traceM $ printf "Selecting %s: %s" (show tree) (show resultValue)
 --            return $ constFloatOp 1234.5
             resolveBoxing resultValue declaredFieldType expectedReturnType
@@ -347,10 +344,10 @@ cgenApply ctx meta expr args = do
                 _ | expectedReturnType == declaredReturnType -> callFn fn largs
                 (TypeIdent "Int", TVar _) -> do
                     result <- callFn fn largs
-                    callFn "unboxInt" [result]
+                    unboxInt result
                 (TypeIdent "Float", TVar _) -> do
                     result <- callFn fn largs
-                    callFn "unboxFloat64" [result]
+                    unboxFloat64 result
                 _ -> callFn fn largs
         expr -> do
             modState <- gets moduleState
@@ -369,14 +366,30 @@ cgenApply ctx meta expr args = do
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------
+castBoxedValue declaredType value = case declaredType of
+    TypeIdent "Float" -> ptrtofp value
+    TypeIdent "Int"   -> ptrtoint value T.i32
+    _                 -> return value
+
+unboxInt expr = do
+    boxed <- bitcast expr (T.ptr boxStructType)
+    unboxedAddr <- getelementptr boxed [constIntOp 0, constIntOp 1]
+    unboxed <- load unboxedAddr
+    castBoxedValue (TypeIdent "Int") unboxed
+
+unboxFloat64 expr = do
+    boxed <- bitcast expr (T.ptr boxStructType)
+    unboxedAddr <- getelementptr boxed [constIntOp 0, constIntOp 1]
+    unboxed <- load unboxedAddr
+    castBoxedValue (TypeIdent "Float") unboxed
 
 resolveBoxing expr declaredType instantiatedType = do
     case (declaredType, instantiatedType) of
         _ | declaredType == instantiatedType -> return expr
         (TypeIdent "Int", TVar _) -> callFn "boxInt" [expr]
         (TypeIdent "Float", TVar _) -> callFn "boxInt" [expr]
-        (TVar _, TypeIdent "Int") -> callFn "unboxInt" [expr]
-        (TVar _, TypeIdent "Float") -> callFn "unboxFloat64" [expr]
+        (TVar _, TypeIdent "Int") -> unboxInt expr
+        (TVar _, TypeIdent "Float") -> unboxFloat64 expr
         (TVar _, TVar _) -> return expr
         (l, r) -> do
 --            Debug.traceM $ printf "resolveBoxing crap %s %s" (show l) (show r)
