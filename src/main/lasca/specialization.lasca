@@ -1,0 +1,14 @@
+data List a = Nil | Cons(head: a, tail: List a)
+
+def inner(a: Int) = a + 1
+
+def map(list, f) = match list {
+    Nil -> Nil
+    Cons(h, tl) -> Cons(f(h), map(tl, f))
+}
+
+def main() = {
+  list = Cons(1, Cons(2, Nil));
+  res = map(list, inner);
+  println(res.toString);
+}

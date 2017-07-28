@@ -135,6 +135,7 @@ isFuncType (TypeFunc _ _) = True
 isFuncType _ = False
 
 lascaPrimitiveTypes = Set.fromList [TypeIdent "Int", TypeIdent "Float", TypeIdent "Bool", TypeIdent "String", TypeIdent "Any", TypeIdent "Unit"]
+lascaUnboxedTypes =  Set.fromList [TypeIdent "Int", TypeIdent "Float"]
 
 cgen :: Ctx -> S.Expr -> Codegen AST.Operand
 cgen ctx (S.Let meta a b c) = do
@@ -208,7 +209,7 @@ cgen ctx this@(S.Select meta tree expr) = do
             resultValue <- castBoxedValue declaredFieldType value
 --            Debug.traceM $ printf "Selecting %s: %s" (show tree) (show resultValue)
 --            return $ constFloatOp 1234.5
-            resolveBoxing resultValue declaredFieldType expectedReturnType
+            resolveBoxing declaredFieldType expectedReturnType resultValue
 --            return resultValue
         (S.Ident _ name) | isFuncType identType -> do
     --      traceM $ printf "Method call %s: %s" name (show identType)
@@ -226,8 +227,8 @@ cgen ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) | fn `Map.member` bino
     let (TypeFunc realLhsType (TypeFunc realRhsType _)) = S.typeOf op
 --    let realLhsType = TypeIdent "Int"
 --    let realRhsType = TypeIdent "Int"
-    llhs <- resolveBoxing llhs' lhsType realLhsType
-    lrhs <- resolveBoxing lrhs' rhsType realRhsType
+    llhs <- resolveBoxing lhsType realLhsType llhs'
+    lrhs <- resolveBoxing rhsType realRhsType lrhs'
 --    Debug.traceM $ printf "%s: %s <==> %s: %s" (show lhsType) (show realLhsType) (show rhsType) (show realRhsType)
     let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
     case (code, realLhsType) of
@@ -350,6 +351,7 @@ cgenApply ctx meta expr args = do
                     unboxFloat64 result
                 _ -> callFn fn largs
         expr -> do
+            -- closures
             modState <- gets moduleState
             e <- cgen ctx expr
             largs <- mapM (cgen ctx) args
@@ -363,6 +365,29 @@ cgenApply ctx meta expr args = do
             sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0..] largs]
             let pos = createPosition $ S.pos meta
             callFn "runtimeApply" [e, argc, sargs, constOp pos]
+
+declareBoxedFuncWrapper funcName args funcType = do
+    let types = typeToList funcType
+    let (shouldGenerateBoxedFunction, argTransformations) = foldr collect (False, []) types
+    if shouldGenerateBoxedFunction
+    then define ptrType (fromString $ funcName ++ ".Boxed") (toSig args) (genFunc argTransformations)
+    else return ()
+  where
+    collect tpe (bool, transformations) = let
+            shouldGenerateBoxedFunction = bool || tpe `Set.member` lascaUnboxedTypes
+            transformator = resolveBoxing tpe (TVar "a")
+        in (shouldGenerateBoxedFunction, transformator : transformations)
+
+    genFunc transformators = createBlocks $ execCodegen [] modState $ do
+                     entry <- addBlock entryBlockName
+                     setBlock entry
+                     let (retTransform : argTransforms) = transformators
+                     callFn funcName
+                     callFn "initEnvironment" [localPtr "argc", localPtr "argv"]
+                     initGlobals
+                     callFn "main" []
+                     terminator $ I.Do $ I.Ret Nothing []
+                     return ()
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------
@@ -383,7 +408,7 @@ unboxFloat64 expr = do
     unboxed <- load unboxedAddr
     castBoxedValue (TypeIdent "Float") unboxed
 
-resolveBoxing expr declaredType instantiatedType = do
+resolveBoxing declaredType instantiatedType expr = do
     case (declaredType, instantiatedType) of
         _ | declaredType == instantiatedType -> return expr
         (TypeIdent "Int", TVar _) -> callFn "boxInt" [expr]
