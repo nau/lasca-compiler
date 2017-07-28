@@ -61,8 +61,8 @@ staticArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
 staticArgsToSig = map (\(S.Arg name tpe) -> (fromString name, typeMapping tpe))
 
 argToPtr (S.Arg n t) = case t of
-    TypeIdent "Float" -> fptoptr $ local T.double (fromString n)
-    TypeIdent "Int"   -> inttoptr $ local T.i32 (fromString n)
+--    TypeIdent "Float" -> fptoptr $ local T.double (fromString n)
+--    TypeIdent "Int"   -> inttoptr $ local T.i32 (fromString n)
     _                 -> return $ localPtr $ fromString n
 
 -- codegenTop :: S.Expr -> LLVM ()
@@ -73,7 +73,7 @@ codegenTop ctx this@(S.Val meta name expr) = do
 
 codegenTop ctx f@(S.Function meta name tpe args body) =
     if meta ^. S.isExternal then
-        external (typeMapping tpe) (fromString name ) (externArgsToSig args) False []
+        external (externalTypeMapping tpe) (fromString name ) (externArgsToSig args) False []
     else do
         modState <- get
         let codeGenResult = codeGen modState
@@ -110,8 +110,8 @@ codegenTop ctx expr =
 
 typeMapping :: Type -> AST.Type
 typeMapping t = case t of
-                  TypeIdent "Int" -> T.i32
-                  TypeIdent "Float" -> T.double
+--                  TypeIdent "Int" -> T.i32
+--                  TypeIdent "Float" -> T.double
 --                  TypeIdent "Unit" -> T.void
                   _                -> ptrType
 
@@ -136,6 +136,7 @@ isFuncType _ = False
 
 lascaPrimitiveTypes = Set.fromList [TypeIdent "Int", TypeIdent "Float", TypeIdent "Bool", TypeIdent "String", TypeIdent "Any", TypeIdent "Unit"]
 lascaUnboxedTypes =  Set.fromList [TypeIdent "Int", TypeIdent "Float"]
+anyTypeVar = TVar $ TV "a"
 
 cgen :: Ctx -> S.Expr -> Codegen AST.Operand
 cgen ctx (S.Let meta a b c) = do
@@ -157,24 +158,10 @@ cgen ctx (S.Ident meta name) = do
                 | otherwise -> boxError name
 cgen ctx (S.Literal meta l) = do
 --  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)
-    case l of
-        S.IntLit i -> return $ constIntOp i
-        S.FloatLit i -> return $ constFloatOp i
-        _        -> box l meta
+    box l meta
 cgen ctx this@(S.Array meta exprs) = do
     vs <- sequence [cgen ctx e | e <- exprs]
-    case S.typeOf this of
-       TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
-           let len = length vs
-           let arrayType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.double]
-           (ptr, arrayPtr) <- gcMallocType arrayType
-           sizePtr <- getelementptr arrayPtr [constIntOp 0, constIntOp 0]
-           store sizePtr (constIntOp len)
-           forM_ (zip vs [0..]) $ \(v, i) -> do
-               p <- getelementptr arrayPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, ith element]
-               store p v
-           return ptr
-       _ -> boxArray vs
+    boxArray vs
 cgen ctx this@(S.Select meta tree expr) = do
 --    Debug.traceM $ printf "Selecting! %s" (show this)
     let (treeType, tpeName) = case S.typeOf tree of
@@ -206,11 +193,12 @@ cgen ctx this@(S.Select meta tree expr) = do
             valueAddr <- getelementptr array [constIntOp 0, constIntOp idx]
             value <- load valueAddr
 --            traceM $ printf "AAAA %s: %s" (show array) (show value)
-            resultValue <- castBoxedValue declaredFieldType value
+--            resultValue <- castBoxedValue declaredFieldType value
 --            Debug.traceM $ printf "Selecting %s: %s" (show tree) (show resultValue)
 --            return $ constFloatOp 1234.5
-            resolveBoxing declaredFieldType expectedReturnType resultValue
+--            resolveBoxing declaredFieldType expectedReturnType resultValue
 --            return resultValue
+            return value
         (S.Ident _ name) | isFuncType identType -> do
     --      traceM $ printf "Method call %s: %s" name (show identType)
             cgen ctx (S.Apply meta expr [tree])
@@ -223,30 +211,32 @@ cgen ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) | fn `Map.member` bino
     lrhs' <- cgen ctx rhs
     let lhsType = S.typeOf lhs
     let rhsType = S.typeOf rhs
+    let returnType = S.typeOf this
 --    Debug.traceM $ printf "Doing binop %s with type %s" (show this) (show $ S.typeOf op)
     let (TypeFunc realLhsType (TypeFunc realRhsType _)) = S.typeOf op
 --    let realLhsType = TypeIdent "Int"
 --    let realRhsType = TypeIdent "Int"
-    llhs <- resolveBoxing lhsType realLhsType llhs'
-    lrhs <- resolveBoxing rhsType realRhsType lrhs'
+    llhs <- resolveBoxing anyTypeVar realLhsType llhs'
+    lrhs <- resolveBoxing anyTypeVar realRhsType lrhs'
 --    Debug.traceM $ printf "%s: %s <==> %s: %s" (show lhsType) (show realLhsType) (show rhsType) (show realRhsType)
     let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
-    case (code, realLhsType) of
-        (10, TypeIdent "Int") -> add llhs lrhs
-        (11, TypeIdent "Int") -> sub llhs lrhs
-        (12, TypeIdent "Int") -> mul llhs lrhs
-        (13, TypeIdent "Int") -> Codegen.div llhs lrhs
+    res <- case (code, realLhsType) of
+        (10, TypeIdent "Int") -> add llhs lrhs >>= resolveBoxing returnType anyTypeVar
+        (11, TypeIdent "Int") -> sub llhs lrhs >>= resolveBoxing returnType anyTypeVar
+        (12, TypeIdent "Int") -> mul llhs lrhs >>= resolveBoxing returnType anyTypeVar
+        (13, TypeIdent "Int") -> Codegen.div llhs lrhs >>= resolveBoxing returnType anyTypeVar
         (42, TypeIdent "Int") -> intCmpBoxed IPred.EQ llhs lrhs
         (43, TypeIdent "Int") -> intCmpBoxed IPred.NE llhs lrhs
         (44, TypeIdent "Int") -> intCmpBoxed IPred.SLT llhs lrhs
         (45, TypeIdent "Int") -> intCmpBoxed IPred.SLE llhs lrhs
         (46, TypeIdent "Int") -> intCmpBoxed IPred.SGE llhs lrhs
         (47, TypeIdent "Int") -> intCmpBoxed IPred.SGT llhs lrhs
-        (10, TypeIdent "Float") -> fadd llhs lrhs
-        (11, TypeIdent "Float") -> fsub llhs lrhs
-        (12, TypeIdent "Float") -> fmul llhs lrhs
-        (13, TypeIdent "Float") -> fdiv llhs lrhs
+        (10, TypeIdent "Float") -> fadd llhs lrhs >>= resolveBoxing returnType anyTypeVar
+        (11, TypeIdent "Float") -> fsub llhs lrhs >>= resolveBoxing returnType anyTypeVar
+        (12, TypeIdent "Float") -> fmul llhs lrhs >>= resolveBoxing returnType anyTypeVar
+        (13, TypeIdent "Float") -> fdiv llhs lrhs >>= resolveBoxing returnType anyTypeVar
         _  -> error $ printf "%s: Unsupported binary operation %s" (show $ S.exprPosition this) (S.printExprWithType this)
+    return res
 cgen ctx (S.Apply meta expr args) = cgenApply ctx meta expr args
 cgen ctx (S.BoxFunc _ funcName enclosedVars) = do
     modState <- gets moduleState
@@ -295,61 +285,41 @@ cgenApply ctx meta expr args = do
     syms <- gets symtab
     let symMap = Map.fromList syms
     let isGlobal fn = (fn `Map.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
+    let funDecl fn = (ctx ^. S.globalFunctions) Map.! fn
+    let isExtern fn = isGlobal fn && (funDecl fn ^. S.metaLens.S.isExternal)
     case expr of
          -- FIXME Here are BUGZZZZ!!!! :)
         this@(S.Ident meta "arrayApply") -> do
             let [arrayExpr, indexExpr] = args
             array <- cgen ctx arrayExpr -- should be a pointer to either boxed or unboxed array
-            idx <- cgen ctx indexExpr -- must be T.i32. TODO should be platform-dependent
-            case S.typeOf arrayExpr of
-                TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
-                    arrayStructPtr <- bitcast array (T.ptr (arrayStructType T.double))
-                    arrayPtr <- getelementptr arrayStructPtr [constIntOp 0, constIntOp 1]
-                    arrayPtr1 <- bitcast arrayPtr (T.ptr T.double)
-                    ptr <- getelementptr arrayPtr1 [idx]
-                    load ptr
-                _ -> do
-                    boxedArrayPtr <- bitcast array (T.ptr $ boxStructOfType (T.ptr $ arrayStructType ptrType)) -- Box(type, &Array(len, &data[])
-                    arrayStructAddr <- getelementptr boxedArrayPtr [constInt64Op 0, constIntOp 1]
-                    arrayStructPtr <- load arrayStructAddr
-                    arraysize <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 0]
-                    size <- load arraysize
-                    -- TODO check idx is in bounds, eliminatable
-                    arrayDataAddr <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 1]
-                    arraDataPtr <- load arrayDataAddr
-                    arrayDataArray <- bitcast arraDataPtr (T.ptr (T.ArrayType 0 ptrType))
-                    ptr' <- getelementptr arrayDataArray [constInt64Op 0, idx]
-                    load ptr'
-        this@(S.Ident meta fn) | isGlobal fn -> do
-            let funDecl = (ctx ^. S.globalFunctions) Map.! fn
-            let fnType = S.typeOf funDecl
-            let declaredTypes = typeToList fnType
-            let paramTypes = init declaredTypes
-            let declaredReturnType = last declaredTypes
-            let expectedTypes = typeToList $ S.typeOf this
-            let expectedReturnType = last expectedTypes
---            Debug.traceM $ printf "Calling %s: %s, expected %s" fn (show declaredReturnType) (show expectedReturnType)
-            largs <- forM (zip args paramTypes) $ \(arg, paramType) -> do
+            boxedIdx <- cgen ctx indexExpr -- must be T.i32. TODO should be platform-dependent
+            idx <- unboxInt boxedIdx
+            boxedArrayPtr <- bitcast array (T.ptr $ boxStructOfType (T.ptr $ arrayStructType ptrType)) -- Box(type, &Array(len, &data[])
+            arrayStructAddr <- getelementptr boxedArrayPtr [constInt64Op 0, constIntOp 1]
+            arrayStructPtr <- load arrayStructAddr
+            arraysize <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 0]
+            size <- load arraysize
+            -- TODO check idx is in bounds, eliminatable
+            arrayDataAddr <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 1]
+            arraDataPtr <- load arrayDataAddr
+            arrayDataArray <- bitcast arraDataPtr (T.ptr (T.ArrayType 0 ptrType))
+            ptr' <- getelementptr arrayDataArray [constInt64Op 0, idx]
+            load ptr'
+                    
+        S.Ident _ fn | isExtern fn -> do
+            let (S.Function _ _ returnType externArgs _) = S._globalFunctions ctx Map.! fn
+            let argTypes = map (\(S.Arg n t) -> t) externArgs
+--            Debug.traceM $ printf "Calling external %s(%s): %s" fn (show argTypes) (show returnType)
+            largs <- forM (zip args argTypes) $ \(arg, tpe) -> do
                 a <- cgen ctx arg
-                let argType = S.typeOf arg
-                case (paramType, argType) of
-                    (TypeIdent l, TypeIdent r) | l == r -> return a
-                    (TVar _, TypeIdent "Int") -> do
---                        Debug.traceM ("boxing " ++ show a)
-                        callFn "boxInt" [a]
-                    (TVar _, TypeIdent "Float") -> do
---                        Debug.traceM ("boxing " ++ show a)
-                        callFn "boxFloat64" [a]
-                    _ -> return a
-            case (expectedReturnType, declaredReturnType) of
-                _ | expectedReturnType == declaredReturnType -> callFn fn largs
-                (TypeIdent "Int", TVar _) -> do
-                    result <- callFn fn largs
-                    unboxInt result
-                (TypeIdent "Float", TVar _) -> do
-                    result <- callFn fn largs
-                    unboxFloat64 result
-                _ -> callFn fn largs
+                resolveBoxing anyTypeVar tpe a
+            res <- callFn (fromString fn) largs
+            resolveBoxing returnType anyTypeVar res
+
+        S.Ident _ fn | isGlobal fn -> do
+--            Debug.traceM $ printf "Calling %s" fn
+            largs <- forM args $ \arg -> cgen ctx arg
+            callFn (fromString fn) largs
         expr -> do
             -- closures
             modState <- gets moduleState
@@ -390,7 +360,7 @@ resolveBoxing declaredType instantiatedType expr = do
     case (declaredType, instantiatedType) of
         _ | declaredType == instantiatedType -> return expr
         (TypeIdent "Int", TVar _) -> callFn "boxInt" [expr]
-        (TypeIdent "Float", TVar _) -> callFn "boxInt" [expr]
+        (TypeIdent "Float", TVar _) -> callFn "boxFloat64" [expr]
         (TVar _, TypeIdent "Int") -> unboxInt expr
         (TVar _, TypeIdent "Float") -> unboxFloat64 expr
         (TVar _, TVar _) -> return expr
@@ -416,7 +386,7 @@ codegenStaticModule opts modo exprs = modul
         codegenStartFunc ctx cgen
 
 genTypesStruct ctx defs = do
-    types <- genData ctx defs staticArgsToSig argToPtr
+    types <- genData ctx defs toSig argToPtr
     let array = C.Array ptrType types
     defineConst "Types" structType (struct array)
   where len = length defs
