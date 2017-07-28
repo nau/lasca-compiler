@@ -18,5 +18,6 @@ def length(l) = foldl(l, Box(0), lengthInner).i -- remove this when lambda boxin
 def main() = {
     list = Cons("Two", Cons("One", Nil));
     len = list.length;
+    tes = {t -> println("Test")};
     println("Hello world! ${list.head}. Is empty: ${list.empty}, length = ${len.toString}");
 }

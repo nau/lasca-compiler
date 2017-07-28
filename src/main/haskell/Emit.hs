@@ -70,6 +70,7 @@ defaultValueForType tpe =
 
 data Trans = Trans {
     _modNames :: Names,
+    _currentFunctionName :: String,
     _locals :: Map.Map String Type.Type,
     _outers :: Map.Map String Type.Type,
     _usedVars :: Set.Set String,
@@ -81,6 +82,7 @@ modStateLocals = Lens.lens _locals (\ms l -> ms { _locals = l } )
 
 emptyTrans = Trans {
     _modNames = Map.empty,
+    _currentFunctionName = "",
     _locals = Map.empty,
     _outers = Map.empty,
     _usedVars = Set.empty,
@@ -124,7 +126,7 @@ transformExpr transformer expr = case expr of
         let argNames = Map.fromList argsWithTypes
 
 
-        modify (\s -> s { _locals = argNames, _outers = Map.empty, _usedVars = Set.empty } )
+        modify (\s -> s { _currentFunctionName = name, _locals = argNames, _outers = Map.empty, _usedVars = Set.empty } )
         e' <- go e1
         transformer (S.Function meta name tpe args e')
     e -> transformer e -- FIXME add Val/Match support!
@@ -274,7 +276,7 @@ extractLambda (S.Lam meta arg expr) = do
     let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
     let enclosedArgs = map (\n -> (S.Arg n typeAny, _outers state Map.! n)) usedOuterVars
     let (funcName', nms') = uniqueName "lambda" nms
-    let funcName = Char8.unpack funcName'
+    let funcName = _currentFunctionName state ++ "_" ++ Char8.unpack funcName'
     let asdf t = foldr (\(_, t) resultType -> TypeFunc t resultType) t enclosedArgs
     let meta' = (S.exprType %~ asdf) meta
     let func = S.Function meta' funcName typeAny (map fst enclosedArgs ++ [arg]) expr
