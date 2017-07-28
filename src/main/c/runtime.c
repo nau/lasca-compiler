@@ -538,7 +538,7 @@ Box* prepend(Box* arrayValue, Box* value) {
 
 Box* __attribute__ ((pure)) makeString(char * str) {
     int len = strlen(str);
-    String* val = gcMallocAtomic(sizeof(String) + len); // no +1, we don't 0 terminate strings
+    String* val = gcMalloc(sizeof(String) + len); // no +1, we don't 0 terminate strings
     val->length = len;
     memcpy(val->bytes, str, len); // memcpy instead of strncpy because we don't 0 terminate strings
     return box(STRING, val);
@@ -630,7 +630,7 @@ Box* concat(Box* arrayString) {
             String* s = unbox(STRING, array->data[i]);
             len += s->length;
         }
-        String* val = gcMallocAtomic(sizeof(String) + len); // no +1, we don't 0 terminate strings, it's zero initialized!
+        String* val = gcMalloc(sizeof(String) + len); // no +1, we don't 0 terminate strings, it's zero initialized!
         // val->length is 0, because gcMalloc allocates zero-initialized memory
         for (int i = 0; i < array->length; i++) {
             String* s = unbox(STRING, array->data[i]);

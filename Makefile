@@ -44,7 +44,7 @@ examples:
 	lasca -O2 -e --mode static  src/main/lasca/nbody.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e --mode dynamic src/main/lasca/nbody.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e --mode static  src/main/lasca/nbody2.lasca $(TEST_RTS) -- 50000
-	lasca -O2 -e --mode static  src/main/lasca/nbody2.lasca $(TEST_RTS) -- 50000
+	lasca -O2 -e --mode dynamic  src/main/lasca/nbody2.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e --mode static  src/main/lasca/option.lasca $(TEST_RTS)
 	lasca -O2 -e --mode dynamic src/main/lasca/option.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  src/main/lasca/ski.lasca $(TEST_RTS)
