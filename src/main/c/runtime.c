@@ -685,6 +685,7 @@ int toInt(Box* s) {
 
 void initLascaRuntime(Runtime* runtime) {
     GC_init();
+    GC_expand_hp(4*1024*1024);
     RUNTIME = runtime;
     UNIT_STRING = makeString("()");
     for (int i = 0; i < 100; i++) {
