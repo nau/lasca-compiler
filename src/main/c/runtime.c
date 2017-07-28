@@ -146,6 +146,15 @@ void *gcMalloc(size_t s) {
     return GC_malloc(s);
 }
 
+void *gcMallocImmutable(size_t s) {
+    return GC_malloc_stubborn(s);
+}
+
+void *gcMallocImmutableEnd(void* ptr) {
+    GC_end_stubborn_change(ptr);
+    return ptr;
+}
+
 void *gcMallocAtomic(size_t s) {
     return GC_malloc_atomic(s);
 }
@@ -173,9 +182,10 @@ const char * __attribute__ ((const)) typeIdToName(int typeId) {
 /* =============== Boxing ================== */
 
 Box *box(int type_id, void *value) {
-    Box* ti = gcMalloc(sizeof(Box));
+    Box* ti = gcMallocImmutable(sizeof(Box));
     ti->type = type_id;
     ti->value.ptr = value;
+    gcMallocImmutableEnd(ti);
     return ti;
 }
 
@@ -538,7 +548,7 @@ Box* prepend(Box* arrayValue, Box* value) {
 
 Box* __attribute__ ((pure)) makeString(char * str) {
     int len = strlen(str);
-    String* val = gcMalloc(sizeof(String) + len); // no +1, we don't 0 terminate strings
+    String* val = gcMallocAtomic(sizeof(String) + len); // no +1, we don't 0 terminate strings
     val->length = len;
     memcpy(val->bytes, str, len); // memcpy instead of strncpy because we don't 0 terminate strings
     return box(STRING, val);
@@ -547,7 +557,7 @@ Box* __attribute__ ((pure)) makeString(char * str) {
 Box* joinValues(int size, Box* values[], char* start, char* end) {
     int seps = size * 2;
     size_t resultSize = size * 32; // assume 32 bytes per array element. No reason, just guess
-    char * result = gcMalloc(resultSize); // zero-initialized, safe to use
+    char * result = gcMallocAtomic(resultSize); // zero-initialized, safe to use
     strcat(result, start);
     size_t curSize = strlen(start) + strlen(end);
     for (int i = 0; i < size; i++) {
@@ -630,7 +640,7 @@ Box* concat(Box* arrayString) {
             String* s = unbox(STRING, array->data[i]);
             len += s->length;
         }
-        String* val = gcMalloc(sizeof(String) + len); // no +1, we don't 0 terminate strings, it's zero initialized!
+        String* val = gcMallocAtomic(sizeof(String) + len); // no +1, we don't 0 terminate strings, it's zero initialized!
         // val->length is 0, because gcMalloc allocates zero-initialized memory
         for (int i = 0; i < array->length; i++) {
             String* s = unbox(STRING, array->data[i]);

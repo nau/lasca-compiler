@@ -166,13 +166,12 @@ cgen ctx this@(S.Array meta exprs) = do
        TypeApply (TypeIdent "Array") [TypeIdent "Float"] -> do
            let len = length vs
            let arrayType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.double]
-           (ptr, arrayPtr) <- gcMallocType arrayType
-           sizePtr <- getelementptr arrayPtr [constIntOp 0, constIntOp 0]
-           store sizePtr (constIntOp len)
-           forM_ (zip vs [0..]) $ \(v, i) -> do
-               p <- getelementptr arrayPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, ith element]
-               store p v
-           return ptr
+           gcMallocImmutableType arrayType $ \arrayPtr -> do
+               sizePtr <- getelementptr arrayPtr [constIntOp 0, constIntOp 0]
+               store sizePtr (constIntOp len)
+               forM_ (zip vs [0..]) $ \(v, i) -> do
+                   p <- getelementptr arrayPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, ith element]
+                   store p v
        _ -> boxArray vs
 cgen ctx this@(S.Select meta tree expr) = do
 --    Debug.traceM $ printf "Selecting! %s" (show this)
