@@ -195,12 +195,6 @@ gcMallocType tpe = do
     casted <- bitcast ptr (T.ptr tpe)
     return (ptr, casted)
 
-gcMallocImmutableType tpe init = do
-    size <- sizeOfType tpe
-    ptr <- callFn "gcMallocImmutable" [size]
-    casted <- bitcast ptr (T.ptr tpe)
-    init casted
-    callFn "gcMallocImmutableEnd" [ptr]
 
 box (S.BoolLit b) meta = callFn "boxBool" [constIntOp (boolToInt b)]
 box (S.IntLit  n) meta = callFn "boxInt" [constIntOp n]
@@ -255,8 +249,6 @@ boolToInt False = 0
 declareStdFuncs = do
     external T.void  "initLascaRuntime" [("runtime", ptrType)] False []
     external ptrType "gcMalloc" [("size", intType)] False []
-    external ptrType "gcMallocImmutable" [("size", intType)] False []
-    external ptrType "gcMallocImmutableEnd" [("ptr", ptrType)] False []
     external ptrType "box" [("t", intType), ("ptr", ptrType)] False [FA.GroupID 0]
     external ptrType "unbox" [("t", intType), ("ptr", ptrType)] False [FA.GroupID 0]
     external T.i32   "unboxInt" [("ptr", ptrType)] False [FA.GroupID 0]
@@ -430,14 +422,14 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
             codeGen modState = execCodegen [] modState $ do
                 entry <- addBlock entryBlockName
                 setBlock entry
-                ptr <- gcMallocImmutableType tpe $ \structPtr -> do
-                    tagAddr <- getelementptr structPtr [constIntOp 0, constIntOp 0] -- [dereference, 1st field] {tag, [arg1, arg2 ...]}
-                    store tagAddr (constIntOp tag)
-                    let argsWithId = zip args [0..]
-                    forM_ argsWithId $ \(arg, i) -> do
-                        p <- getelementptr structPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, 2nd field, ith element] {tag, [arg1, arg2 ...]}
-                        ref <- argToPtr arg
-                        store p ref
+                (ptr, structPtr) <- gcMallocType tpe
+                tagAddr <- getelementptr structPtr [constIntOp 0, constIntOp 0] -- [dereference, 1st field] {tag, [arg1, arg2 ...]}
+                store tagAddr (constIntOp tag)
+                let argsWithId = zip args [0..]
+                forM_ argsWithId $ \(arg, i) -> do
+                    p <- getelementptr structPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, 2nd field, ith element] {tag, [arg1, arg2 ...]}
+                    ref <- argToPtr arg
+                    store p ref
                 -- remove boxing after removing runtimeIsConstr from genPattern, do a proper tag check instead
                 boxed <- callFn "box" [constIntOp tid, ptr]
                 ret boxed
