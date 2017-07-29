@@ -13,6 +13,7 @@ import Syntax
 
 import Control.Monad
 import Control.Monad.Trans
+import Data.Maybe
 
 import System.IO
 import System.Environment
@@ -88,7 +89,9 @@ codegen opts modo fns = do
 
 genModule :: LascaOpts -> AST.Module -> String -> IO AST.Module
 genModule opts modo source = do
-  p <- readFile "src/main/lasca/Prelude.lasca"
+  maybeHome <- lookupEnv "LASCA_HOME"
+  let path = fromMaybe "src/main/lasca" (fmap (++ "/src") maybeHome) ++ "/Prelude.lasca"
+  p <- readFile path
   case parseToplevel p of
     Left err -> die $ Megaparsec.parseErrorPretty err
     Right preludeExprs -> case parseToplevel source of

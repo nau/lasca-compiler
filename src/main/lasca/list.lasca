@@ -16,9 +16,9 @@ def foldr(self: List a, z: b, f: a -> b -> b): b = match self {
     Cons(hd, tl) -> f(hd, foldr(tl, z, f))
 }
 
-def lengthInner(e, acc) = Box(acc.i + 1) -- remove this when lambda boxing issue is fixed
+def lengthInner(e, acc) = acc + 1
 
-def length(l) = foldl(l, Box(0), lengthInner).i -- remove this when lambda boxing issue is fixed
+def length(l) = foldl(l, 0, lengthInner)
 
 def main() = {
     list = Cons("Two", Cons("One", Nil));
