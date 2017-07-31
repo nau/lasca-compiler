@@ -313,6 +313,22 @@ Another for, say, O-complexity tracking.
 	def println(s: String): Unit
 ``` 
 
+Install on Mac OS using Homebrew
+================================
+
+    brew install nau/lasca/lasca-compiler
+    
+Setup LASCA_HOME environment variable. Add this to your .bash_profile    
+    
+    export LASCA_HOME=$(brew --prefix lasca-compiler)
+    
+Try it!
+
+    cat "def main() = println("Hello Lasca!")" > hello.lasca
+    lasca -e hello.lasca
+    Hello Lasca!
+        
+    
 Build on Mac OS
 ===============
 You need LLVM 4.0 installed, and latest Haskell Stack.

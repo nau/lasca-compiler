@@ -23,7 +23,7 @@ rtsDebug:
 rusts:
 	cd src/main/rust && cargo build && cp target/debug/liblascarts.dylib ../../../
     
-lasca:
+lasca: rts
 	stack install
 
 test:
@@ -51,6 +51,20 @@ examples:
 #	lasca -O2 -e src/main/lasca/typed.lasca $(TEST_RTS)
 
 install_and_examples: lasca examples
+
+release: install_and_examples
+	rm -rf dist
+	mkdir -p dist/{src,bash_completion}
+	cp .stack-work/dist/x86_64-osx/Cabal-1.24.2.0/build/lasca/lasca dist
+	cp liblascart.so dist
+#	find src/main/lasca -name *.lasca -exec cp \{} dist/src \;
+	cp src/main/lasca/Prelude.lasca dist/src
+#	lasca --bash-completion-script lasca > dist/$(brew --prefix)/etc/bash_completion.d/lasca
+	lasca --bash-completion-script lasca > dist/bash_completion/lasca
+	(cd dist; tar -czf ../lasca-0.0.1.tar.gz .)
+	SUM="$(shell shasum -a 256 lasca-0.0.1.tar.gz | awk '{ print $$1 }')"
+#	echo $(SUM)
+#	sed -E -e 's/sha256 "[a-zA-Z0-9]+"/sha256 $(SUM)/' ../homebrew-lasca/lasca-compiler.rb
 
 
 designpdf:
