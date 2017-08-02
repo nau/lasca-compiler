@@ -34,6 +34,7 @@ import qualified LLVM.AST.FloatingPointPredicate as FP
 import qualified LLVM.AST.Float as F
 import qualified LLVM.AST.FunctionAttribute as FA
 import qualified LLVM.AST.IntegerPredicate as IPred
+import qualified LLVM.AST.Linkage as Linkage
 
 import Data.Digest.Murmur32
 
@@ -96,20 +97,21 @@ defineGlobal name tpe body = defineGlobalVar name tpe body False
 
 defineConst name tpe body = defineGlobalVar name tpe (Just body) True
 
-defineFunction retty label argtys blocks vararg funcAttrs = addDefn $
+defineFunction retty label link argtys blocks vararg funcAttrs = addDefn $
     GlobalDefinition $ functionDefaults {
       name        = Name label
+    , linkage     = link
     , LLVM.AST.Global.functionAttributes = map Left funcAttrs
     , parameters  = ([Parameter ty (Name nm) [] | (nm, ty) <- argtys], vararg)
     , returnType  = retty
     , basicBlocks = blocks
     }
 
-define ::  Type -> SBS.ShortByteString -> [(SBS.ShortByteString, Type)] -> [BasicBlock] -> LLVM ()
-define retty label argtys body = defineFunction retty label argtys body False []
+--define ::  Type -> SBS.ShortByteString -> [(SBS.ShortByteString, Type)] -> [BasicBlock] -> LLVM ()
+define retty label argtys body = defineFunction retty label Linkage.External argtys body False []
 
-external ::  Type -> SBS.ShortByteString -> [(SBS.ShortByteString, Type)] -> Bool -> [A.GroupID] -> LLVM ()
-external retty label argtys vararg funcAttrs = defineFunction retty label argtys [] vararg funcAttrs
+--external ::  Type -> SBS.ShortByteString -> [(SBS.ShortByteString, Type)] -> Bool -> [A.GroupID] -> LLVM ()
+external retty label argtys vararg funcAttrs = defineFunction retty label Linkage.External argtys [] vararg funcAttrs
 
 ---------------------------------------------------------------------------------
 -- Types
