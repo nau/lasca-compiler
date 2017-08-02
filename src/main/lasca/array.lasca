@@ -1,21 +1,20 @@
+def for(start: Int, end: Int, f: Int -> Int) = {
+    if start < end then {
+        f(start);
+        for(start + 1, end, f);
+    } else 0;
+}
+
 def returnArray(s) = {
---  a = [2.0, 3.0];
---  args = ["12", "13"];
-  first = getArgs();
-  ff = first[0];
-  println(ff);
---  b = [a, [4.0, 5.5, s]];
---  c = b(1);
---  putchard(c(2));
---  putchard(DaysPerYear);
---  println(b.toString);
---  b = a(1);
---  putchard(a(0));
---  println(b(0).toString);
---  array = [a];
---  array1 = array(0);
---  array1(1);
-  s + 1.5
+    e = 1;
+    for(0, 5, { i ->
+        println(e.toString);
+        for(i + 1, 5, { j ->
+            s;
+            println("${i} + ${j} + ${e}");
+            0
+        });
+    });
 }
 
 

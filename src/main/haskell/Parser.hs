@@ -297,18 +297,29 @@ closure = braces cls
 data LetVal = Named Name Expr | Stmt Expr
 
 valdef f = do
-    id <- identifier
+    ident <- identifier
     option typeAny typeAscription
     reservedOp "="
     e <- expr
-    return (f id e)
+    return (f ident e)
+
+vardef f = do
+    reserved "var"
+    meta <- getMeta
+    ident <- identifier
+    option typeAny typeAscription
+    reservedOp "="
+    e <- expr
+    let refExpr = Apply meta (Ident meta "Ref") [e]
+    return (f ident refExpr)
+
 
 unnamedStmt = do
     e <- expr
     return (Stmt e)
 
 blockStmts = do
-    exprs <- (try (valdef Named) <|> unnamedStmt) `sepEndBy` semi
+    exprs <- (try (vardef Named) <|> try (valdef Named) <|> unnamedStmt) `sepEndBy` semi
     let letin = foldStmtsIntoOneLetExpr (List.reverse exprs)
     return letin
   where

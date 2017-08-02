@@ -57,23 +57,21 @@ def for(start: Int, end: Int, f: Int -> Int) = {
 }
 
 def offsetMomentum(bodies: [Body]) = {
-    px = Ref(0.0);
-    py = Ref(0.0);
-    pz = Ref(0.0);
+    var px = 0.0;
+    var py = 0.0;
+    var pz = 0.0;
     for(0, 5, { i ->
-        mass = bodies[i].mass;
-        px := px.getRef + bodies[i].vx.getRef * mass;
-        py := py.getRef + bodies[i].vy.getRef * mass;
-        pz := pz.getRef + bodies[i].vz.getRef * mass;
+        ibody = bodies[i];
+        mass = ibody.mass;
+        px := px.getRef + ibody.vx.getRef * mass;
+        py := py.getRef + ibody.vy.getRef * mass;
+        pz := pz.getRef + ibody.vz.getRef * mass;
         0
     });
-    vx1 = (0.0 - px.getRef) / SolarMass;
-    vy1 = (0.0 - py.getRef) / SolarMass;
-    vz1 = (0.0 - pz.getRef) / SolarMass;
     object = bodies[0];
-    object.vx := vx1;
-    object.vy := vy1;
-    object.vz := vz1;
+    object.vx := (0.0 - px.getRef) / SolarMass;
+    object.vy := (0.0 - py.getRef) / SolarMass;
+    object.vz := (0.0 - pz.getRef) / SolarMass;
 }
 
 def squared(x: Float, y: Float, z: Float) = x * x + y * y + z * z
@@ -116,7 +114,7 @@ def advance(bodies: [Body], dt) = {
 }
 
 def energy(bodies: [Body]) = {
-    e = Ref(0.0);
+    var e = 0.0;
     for(0, 5, { i ->
         body = bodies[i];
         e := e.getRef + 0.5 * body.mass * squared(body.vx.getRef, body.vy.getRef, body.vz.getRef);
