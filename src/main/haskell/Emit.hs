@@ -94,6 +94,16 @@ transform transformer exprs = sequence [transformExpr transformer expr | expr <-
 
 --transformExpr :: (S.Expr -> LLVM S.Expr) -> S.Expr -> LLVM S.Expr
 transformExpr transformer expr = case expr of
+    expr@(S.Ident _ n) -> do
+        modify (\s -> s { _usedVars = Set.insert n (_usedVars s)})
+        return expr
+    S.Array meta exprs -> do
+        exprs' <- mapM go exprs
+        return $ S.Array meta exprs'
+    S.Select meta tree expr -> do
+        tree' <- go tree
+        expr' <- go expr
+        return $ S.Select meta tree' expr'
     (S.If meta cond true false) -> do
         cond' <- go cond
         true' <- go true
@@ -107,16 +117,21 @@ transformExpr transformer expr = case expr of
         body' <- go body
         transformer (S.Let meta n e' body')
     l@(S.Lam m a@(S.Arg n t) e) -> do
-        modify (\s -> s { _outers = _locals s } )
+        oldOuters <- gets _outers
+        oldUsedVars <- gets _usedVars
+        modify (\s -> s { _outers = Map.union (_outers s) (_locals s) } )
         let r = case S.typeOf l of
                     TypeFunc a b -> Map.singleton n a
                     _ -> Map.singleton n typeAny
         modStateLocals .= r
         e' <- go e
-        transformer (S.Lam m a e')
+        res <- transformer (S.Lam m a e')
+        modify (\s  -> s {_outers = oldOuters, _locals = r})
+        return res
     (S.Apply meta e args) -> do
         e' <- go e
-        args' <- sequence [go arg | arg <- args]
+        args' <- mapM go args
+--        args' <- sequence [go arg | arg <- args]
         transformer (S.Apply meta e' args')
     f@(S.Function meta name tpe args e1) -> do
         let funcTypeToLlvm (S.Arg name _) (TypeFunc a b, acc) = (b, (name, a) : acc)
@@ -124,12 +139,14 @@ transformExpr transformer expr = case expr of
         let funcType = S.typeOf f
         let argsWithTypes = reverse $ snd $ foldr funcTypeToLlvm (funcType, []) (reverse args)
         let argNames = Map.fromList argsWithTypes
-
-
         modify (\s -> s { _currentFunctionName = name, _locals = argNames, _outers = Map.empty, _usedVars = Set.empty } )
         e' <- go e1
         transformer (S.Function meta name tpe args e')
-    e -> transformer e -- FIXME add Val/Match support!
+    S.Val meta name expr -> do
+        expr' <- go expr
+        return $ S.Val meta name expr'
+    e -> transformer e
+
   where go e = transformExpr transformer e
 
 
@@ -224,12 +241,15 @@ boxError name = do
     ref <- bitcast ref ptrType
     callFn "boxError" [ref]
 
+showSyms = show . map fst
+
+
 boxClosure :: String -> Map.Map String Int -> [S.Arg] -> Codegen AST.Operand
 boxClosure name mapping enclosedVars = do
     syms <- gets symtab
     let idx = fromMaybe (error ("Couldn't find " ++ name ++ " in mapping:\n" ++ show mapping)) (Map.lookup name mapping)
     let argc = length enclosedVars
-    let findArg n = fromMaybe (error ("Couldn't find " ++ n ++ " variable in symbols " ++ show syms)) (lookup n syms)
+    let findArg n = fromMaybe (error ("Couldn't find " ++ n ++ " variable in symbols " ++ showSyms syms)) (lookup n syms)
     let args = map (\(S.Arg n _) -> findArg n) enclosedVars
     sargsPtr <- gcMalloc (constIntOp $ ptrSize * argc)
     sargsPtr1 <- bitcast sargsPtr (T.ptr ptrType)
@@ -277,16 +297,14 @@ extractLambda (S.Lam meta arg expr) = do
     let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
     let enclosedArgs = map (\n -> (S.Arg n typeAny, _outers state Map.! n)) usedOuterVars
     let (funcName', nms') = uniqueName (fromString $ curFuncName ++ "_lambda") nms
-    let funcName = _currentFunctionName state ++ "_" ++ Char8.unpack funcName'
+    let funcName = Char8.unpack funcName'
     let asdf t = foldr (\(_, t) resultType -> TypeFunc t resultType) t enclosedArgs
     let meta' = (S.exprType %~ asdf) meta
     let func = S.Function meta' funcName typeAny (map fst enclosedArgs ++ [arg]) expr
     modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
-  --   Debug.traceM ("Generated lambda " ++ show func ++ ", outerVars = " ++ show outerVars ++ ", usedOuterVars" ++ show usedOuterVars)
+    s <- get
+    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" funcName (show outerVars) (show usedOuterVars) (show s)
     return (S.BoxFunc meta' funcName (map fst enclosedArgs))
-extractLambda expr@(S.Ident _ n) = do
-    modify (\s -> s { _usedVars = Set.insert n (_usedVars s)})
-    return expr
 extractLambda expr = return expr
 
 genFunctionMap :: [S.Expr] -> LLVM ()
@@ -357,13 +375,19 @@ genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
                                 foldr (\(a, S.Arg n _) acc -> genPattern ctx (S.Select S.emptyMeta lhs (S.Ident S.emptyMeta n)) a acc fail) rhs argParam
                             Just constrArgs -> error (printf "Constructor %s has %d parameters, but %d given" nm (length constrArgs) (length args)) -- TODO box this error
 
-desugarExpr ctx expr = do
-    expr' <- extractLambda expr
-    expr'' <- genMatch ctx expr'
-    return expr''
+desugarAssignment expr = case expr of
+    S.Apply meta (S.Ident imeta ":=") [ref, value] -> S.Apply meta (S.Ident imeta "updateRef") [ref, value]
+    _ -> expr
 
-desugarExprs ctx exprs = let
-    (desugared, st) = runState (transform (desugarExpr ctx) exprs) emptyDesugarPhaseState
+desugarExpr ctx expr = do
+    let expr1 = desugarAssignment expr
+    expr2 <- genMatch ctx expr1
+    return expr2
+
+delambdafy ctx exprs = desugarExprs ctx (\c e -> extractLambda e) exprs
+
+desugarExprs ctx func exprs = let
+    (desugared, st) = runState (transform (func ctx) exprs) emptyDesugarPhaseState
     syn = _syntacticAst st
   in desugared ++ syn
 

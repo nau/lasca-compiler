@@ -3,6 +3,7 @@ module Main where
 
 import Parser
 import Codegen
+import Emit
 import EmitDynamic
 import EmitStatic
 import JIT
@@ -103,13 +104,7 @@ genModule opts modo source = do
           when (printAst opts) $ print ex
           when (verboseMode opts) $ putStrLn("Compiler mode is " ++ mode opts)
           if mode opts == "static"
-          then case typeCheck (createGlobalContext opts ex) ex of
-            Right (env, typedExprs) -> do
-              when (verboseMode opts) $ putStrLn "typechecked OK"
-              when (printTypes opts) $ print env
-              when (printAst opts) $ putStrLn $ intercalate "\n" (map printExprWithType typedExprs)
-              return $ codegenStaticModule opts modo typedExprs
-            Left e -> die $ printTypeError e
+          then codegenStaticModule opts modo ex
           else return $ codegenModule opts modo ex
 
 readMod :: LascaOpts -> String -> IO AST.Module

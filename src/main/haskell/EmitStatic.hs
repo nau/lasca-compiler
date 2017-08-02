@@ -49,10 +49,12 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
 import qualified Debug.Trace as Debug
+import System.Exit
 
 import Codegen
 import Type
 import Emit
+import Infer
 import qualified Syntax as S
 import Syntax (Ctx, createGlobalContext)
 
@@ -368,19 +370,27 @@ resolveBoxing declaredType instantiatedType expr = do
 --            Debug.traceM $ printf "resolveBoxing crap %s %s" (show l) (show r)
             return expr
 
-codegenStaticModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> AST.Module
-codegenStaticModule opts modo exprs = modul
+codegenStaticModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> IO AST.Module
+codegenStaticModule opts modo exprs = do
+    let desugared = desugarExprs ctx desugarExpr exprs
+    case typeCheck ctx desugared of
+        Right (env, typedExprs) -> do
+            when (S.verboseMode opts) $ putStrLn "typechecked OK"
+            when (S.printTypes opts) $ print env
+            let desugared = delambdafy ctx typedExprs
+            when (S.printAst opts) $ putStrLn $ List.intercalate "\n" (map S.printExprWithType desugared)
+            return $ modul desugared
+        Left e -> die $ printTypeError e
   where
     ctx = createGlobalContext opts exprs
-    desugared = desugarExprs ctx exprs
-    modul = runLLVM modo genModule
-    genModule = do
+    modul exprs = runLLVM modo $ genModule exprs
+    genModule exprs = do
         declareStdFuncs
-        genFunctionMap desugared
+        genFunctionMap exprs
         let defs = reverse (S.dataDefs ctx)
         genTypesStruct ctx defs
         genRuntime opts
-        forM_ desugared $ \expr -> do
+        forM_ exprs $ \expr -> do
             defineStringConstants expr
             codegenTop ctx expr
         codegenStartFunc ctx cgen
