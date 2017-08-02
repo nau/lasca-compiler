@@ -13,3 +13,7 @@ extern def toInt(s: String): Int
 extern def concat(strings: Array String): String
 extern def die(msg: String): a
 extern def runtimeIsConstr(constr: a, name: String): Bool
+
+data Ref a = Ref(getRef: a)
+
+extern def updateRef(ref: Ref a, value: a): Ref a

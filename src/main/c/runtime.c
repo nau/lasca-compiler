@@ -262,6 +262,13 @@ double __attribute__ ((pure)) unboxFloat64(Box* ti) {
 
 /* ==================== Runtime Ops ============== */
 
+Box* updateRef(Box* ref, Box* value) {
+    DataValue* dataValue = unbox(1000, ref);
+    Box* oldValue = dataValue->values[0];
+    dataValue->values[0] = value;
+    return oldValue;
+}
+
 void* die(Box* msg) {
     println(msg);
     exit(1);
@@ -601,6 +608,10 @@ Box* __attribute__ ((pure)) toString(Box* value) {
             String *name = (String *) value->value.ptr;
             printf("AAAA!!! Undefined identifier %.*s\n", name->length, name->bytes);
             exit(1);
+        }
+        case 1000: {
+            DataValue* dataValue = value->value.ptr;
+            return toString(dataValue->values[0]);
         }
         default:
             if (isUserType(value)) {
