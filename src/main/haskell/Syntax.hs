@@ -152,7 +152,7 @@ instance DebugPrint Expr where
         Lam _ a e -> printf "{ %s -> %s }\n" (printExprWithType a) (printExprWithType e)
         Select _ e f -> printf "%s.%s" (printExprWithType e) (printExprWithType f)
         Match _ e cs -> printf "match %s {\n%s}\n" (printExprWithType e) (show cs)
-        BoxFunc meta f args -> printf "BoxFunc %s($args)" (show f) (intercalate "," $ map show args)
+        BoxFunc meta f args -> printf "BoxFunc %s(%s)" (show f) (intercalate "," $ map show args)
         Function meta f t args b -> if _isExternal meta
             then printf "extern def %s(%s): %s\n" f (intercalate "," $ map printExprWithType args) (show t)
             else printf "--  %s : %s\ndef %s(%s): %s = %s\n" f (show meta) f (intercalate "," $ map printExprWithType args) (show t) (printExprWithType b)
