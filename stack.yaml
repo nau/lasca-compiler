@@ -1,4 +1,4 @@
-resolver:  lts-9.0
+resolver:  nightly-2017-07-31
 packages:
 - location: '.'
 #- location:
@@ -12,6 +12,7 @@ ghc-options:
     -O0
     -rtsopts
     -Wincomplete-patterns
+    -funbox-strict-fields
 #    -fprof-auto
   lasca-test:
     -O0

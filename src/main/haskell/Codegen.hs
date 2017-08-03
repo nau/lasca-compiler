@@ -230,6 +230,7 @@ instr ins = do
     let i = stack blk
     modifyBlock (blk { stack = i ++ [ref := ins] } )
     return $ LocalReference ptrType ref
+{-# INLINE instr #-}
 
 terminator :: Named Terminator -> Codegen (Named Terminator)
 terminator trm = do
@@ -334,10 +335,13 @@ toArgs = map (\x -> (x, []))
 
 
 bitcast op toTpe= instr (BitCast op toTpe [])
+{-# INLINE bitcast #-}
 
 ptrtoint op toTpe= instr (PtrToInt op toTpe [])
+{-# INLINE ptrtoint #-}
 
 inttoptr op = instr (IntToPtr op ptrType [])
+{-# INLINE inttoptr #-}
 
 -- Effects
 add lhs rhs = instr $ Add False False lhs rhs []
@@ -357,19 +361,24 @@ fdiv lhs rhs = instr $ FDiv NoFastMathFlags lhs rhs []
 
 call :: Operand -> [Operand] -> Codegen Operand
 call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
+{-# INLINE call #-}
 
 callFn name args = call (global ptrType (fromString name)) args
+{-# INLINE callFn #-}
 
 alloca :: Type -> Codegen Operand
 alloca ty = instr $ Alloca ty Nothing 0 []
+{-# INLINE alloca #-}
 
 allocaSize ty size = instr $ Alloca ty (Just size) 0 []
 
 store :: Operand -> Operand -> Codegen Operand
 store ptr val = instr $ Store False ptr val Nothing 0 []
+{-# INLINE store #-}
 
 load :: Operand -> Codegen Operand
 load ptr = instr $ Load False ptr Nothing 0 []
+{-# INLINE load #-}
 
 -- Control Flow
 br :: Name -> Codegen (Named Terminator)
@@ -385,6 +394,7 @@ ret :: Operand -> Codegen (Named Terminator)
 ret val = terminator $ Do $ Ret (Just val) []
 
 getelementptr addr indices = instr $ GetElementPtr False addr indices []
+{-# INLINE getelementptr #-}
 
 globalStringRef :: String -> C.Constant
 globalStringRef name = C.GlobalReference (stringStructType (length name)) (AST.Name (getStringLitName name))

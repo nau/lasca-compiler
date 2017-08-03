@@ -345,12 +345,14 @@ castBoxedValue declaredType value = case declaredType of
     TypeIdent "Float" -> ptrtofp value
     TypeIdent "Int"   -> ptrtoint value T.i32
     _                 -> return value
+{-# INLINE castBoxedValue #-}
 
 unboxInt expr = do
     boxed <- bitcast expr (T.ptr boxStructType)
     unboxedAddr <- getelementptr boxed [constIntOp 0, constIntOp 1]
     unboxed <- load unboxedAddr
     castBoxedValue (TypeIdent "Int") unboxed
+{-# INLINE unboxInt #-}
 
 unboxFloat64 expr = do
     boxed <- bitcast expr (T.ptr boxStructType)
@@ -369,6 +371,7 @@ resolveBoxing declaredType instantiatedType expr = do
         (l, r) -> do
 --            Debug.traceM $ printf "resolveBoxing crap %s %s" (show l) (show r)
             return expr
+{-# INLINE resolveBoxing #-}
 
 codegenStaticModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> IO AST.Module
 codegenStaticModule opts modo exprs = do
