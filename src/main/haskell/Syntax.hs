@@ -174,16 +174,6 @@ data DataConst = DataConst Name [Arg] deriving (Eq, Ord, Show)
 data DataDef = DataDef Int String [DataConst]
     deriving (Show, Eq)
 
-data Ctx = Context {
-    _lascaOpts :: LascaOpts,
-    _globalFunctions :: Map.Map String Expr,
-    _globalVals :: Set.Set String,
-    dataDefs :: [DataDef],
-    dataDefsNames :: Set.Set String,
-    dataDefsFields :: Map.Map String (Map.Map String (Arg, Int)),
-    typeId :: Int -- TODO remove this. Needed for type id generation. Move to ModuleState?
-} deriving (Show, Eq)
-
 emptyCtx opts = Context {
     _lascaOpts = opts,
     _globalFunctions = Map.empty,
@@ -210,6 +200,17 @@ instance Show Lit where
 
 
 data Arg = Arg Name Type deriving (Eq, Ord, Show)
+
+data Ctx = Context {
+    _lascaOpts :: LascaOpts,
+    _globalFunctions :: Map.Map String Expr,
+    _globalVals :: Set.Set String,
+    dataDefs :: [DataDef],
+    dataDefsNames :: Set.Set String,
+    dataDefsFields :: Map.Map String (Map.Map String (Arg, Int)),
+    typeId :: Int -- TODO remove this. Needed for type id generation. Move to ModuleState?
+} deriving (Show, Eq)
+makeLenses ''Ctx
 
 createGlobalContext :: LascaOpts -> [Expr] -> Ctx
 createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
@@ -262,12 +263,3 @@ emptyLascaOpts = LascaOpts {
     printTypes = False,
     optimization = 0
 }
-
-lascaOpts :: Lens.Lens' Ctx LascaOpts
-lascaOpts = Lens.lens _lascaOpts (\c o -> c { _lascaOpts = o } )
-
-globalFunctions :: Lens.Lens' Ctx (Map.Map String Expr)
-globalFunctions = Lens.lens _globalFunctions (\c e -> c { _globalFunctions = e } )
-
-globalVals :: Lens.Lens' Ctx (Set.Set String)
-globalVals = Lens.lens _globalVals (\c e -> c { _globalVals = e } )

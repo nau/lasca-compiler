@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
@@ -18,6 +19,7 @@ import Syntax
 import Control.Monad.State
 import Control.Monad.Except
 import qualified Control.Lens as Lens
+import Control.Lens.TH
 import Control.Lens.Operators
 
 import Data.Monoid
@@ -35,13 +37,11 @@ instance Show TypeEnv where
       where elems = List.foldl' (\s (name, scheme) -> s ++ name ++ " : " ++ show scheme ++ "\n") "" (Map.toList subst)
 
 data InferState = InferState {_count :: Int, _current :: Expr}
+makeLenses ''InferState
 
 normalizeType tpe = case Set.toList $ ftv tpe of
                   [] -> tpe
                   tvars -> Forall tvars tpe
-
-count :: Lens.Lens' InferState Int
-count = Lens.lens _count (\c e -> c { _count = e } )
 
 type Infer = ExceptT TypeError (State InferState)
 type Subst = Map.Map TVar Type

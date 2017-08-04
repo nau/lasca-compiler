@@ -1,4 +1,5 @@
 {-# LANGUAGE Strict #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Emit where
 
@@ -42,6 +43,7 @@ import Control.Monad.Except
 import Control.Applicative
 import qualified Control.Lens as Lens
 import Control.Lens.Operators
+import Control.Lens.TH
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
@@ -76,9 +78,7 @@ data DesugarPhaseState = DesugarPhaseState {
     _usedVars :: Set.Set String,
     _syntacticAst :: [S.Expr]
 } deriving (Show)
-
-modStateLocals :: Lens.Lens' DesugarPhaseState (Map.Map String Type.Type)
-modStateLocals = Lens.lens _locals (\ms l -> ms { _locals = l } )
+makeLenses ''DesugarPhaseState
 
 emptyDesugarPhaseState = DesugarPhaseState {
     _modNames = Map.empty,
@@ -111,8 +111,8 @@ transformExpr transformer expr = case expr of
         transformer (S.If meta cond' true' false')
     (S.Let meta n e body) -> do
         case S.typeOf e of
-          TypeFunc a b -> modStateLocals %= Map.insert n a
-          _ -> modStateLocals %= Map.insert n typeAny
+          TypeFunc a b -> locals %= Map.insert n a
+          _ -> locals %= Map.insert n typeAny
         e' <- go e
         body' <- go body
         transformer (S.Let meta n e' body')
@@ -123,7 +123,7 @@ transformExpr transformer expr = case expr of
         let r = case S.typeOf l of
                     TypeFunc a b -> Map.singleton n a
                     _ -> Map.singleton n typeAny
-        modStateLocals .= r
+        locals .= r
         e' <- go e
         res <- transformer (S.Lam m a e')
         modify (\s  -> s {_outers = oldOuters, _locals = r})
