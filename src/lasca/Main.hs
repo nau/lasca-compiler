@@ -123,7 +123,7 @@ processModule opts mod fname = if exec opts then
      m <- runJIT opts mod
      return ()
   else
-  do Just asm <- getLLAsString mod
+  do asm <- getLLAsString mod
      writeFile (fname ++ ".ll") asm
      let name = takeWhile (/= '.') fname
      let optLevel = optimization opts

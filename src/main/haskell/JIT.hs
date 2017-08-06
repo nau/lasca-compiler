@@ -89,11 +89,11 @@ runJIT opts mod = do
                     -- Return the optimized module
                     return optmod
 
-getLLAsString :: AST.Module -> IO (Maybe String)
+getLLAsString :: AST.Module -> IO String
 getLLAsString mod = do
     s <- withContext $ \context ->
         withModuleFromAST context mod $ \m -> do
             putStrLn "Getting LLVM assembly..."
             moduleLLVMAssembly m
-    return $ Just (Char8.unpack s)
+    return $ Char8.unpack s
 

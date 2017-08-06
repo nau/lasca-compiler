@@ -23,8 +23,3 @@ ghc-options:
 #    -Wall
 #    -fforce-recomp
 #    -fdefer-type-errors
-#extra-deps:
-# - llvm-hs-4.1.0.0
-extra-lib-dirs:
- - /usr/local/Cellar/libffi/3.0.13/lib
- - /Users/nau/projects/lasca/lasca-compiler

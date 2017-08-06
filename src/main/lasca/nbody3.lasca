@@ -4,8 +4,7 @@ DaysPerYear = 365.24
 
 data Body = Body(x: Ref Float, y: Ref Float, z: Ref Float, vx: Ref Float, vy: Ref Float, vz: Ref Float, mass: Float)
 
-def body(x: Float, y: Float, z: Float, vx: Float, vy: Float, vz: Float, mass: Float) =
-    Body(Ref(x), Ref(y), Ref(z), Ref(vx), Ref(vy), Ref(vz), mass)
+def body(x, y, z, vx, vy, vz, mass) = Body(Ref(x), Ref(y), Ref(z), Ref(vx), Ref(vy), Ref(vz), mass)
 
 Jupiter = body(
      4.84143144246472090e+00,                  -- x

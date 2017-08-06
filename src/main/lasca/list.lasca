@@ -20,9 +20,16 @@ def lengthInner(e, acc) = acc + 1
 
 def length(l) = foldl(l, 0, lengthInner)
 
+def map(self, f) = match self {
+    Nil -> Nil
+    Cons(hd, tl) -> Cons(f(hd), map(tl, f))
+}
+
+
 def main() = {
-    list = Cons("Two", Cons("One", Nil));
+    list = Cons("1", Cons("2", Nil));
     len = list.length;
-    tes = {t -> println("Test")};
-    println("Hello world! ${list.head}. Is empty: ${list.empty}, length = ${len.toString}");
+    ints = map(list, toInt);
+--    ints2 = map(ints, { i -> i + 10});
+    println("Hello world! ${list}. Is empty: ${list.empty}, length = ${len.toString}");
 }
