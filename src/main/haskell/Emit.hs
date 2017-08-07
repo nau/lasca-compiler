@@ -166,7 +166,9 @@ defineStringConstants expr = case expr of
         defineStringConstants rhs
         return ()
     S.Array _ exprs -> mapM_ defineStringConstants exprs
-    S.Apply meta _ exprs -> mapM_ defineStringConstants exprs
+    S.Apply meta tree exprs -> do
+        defineStringConstants tree
+        mapM_ defineStringConstants exprs
     S.Let _ _ e body -> do
         defineStringConstants e
         defineStringConstants body
@@ -389,7 +391,7 @@ delambdafy ctx exprs = desugarExprs ctx (\c e -> extractLambda e) exprs
 desugarExprs ctx func exprs = let
     (desugared, st) = runState (transform (func ctx) exprs) emptyDesugarPhaseState
     syn = _syntacticAst st
-  in desugared ++ syn
+  in syn ++ desugared
 
 --genData :: Ctx -> [S.DataDef] -> ([S.Arg] -> [(SBS.ShortByteString, AST.Type)]) -> LLVM ([C.Constant])
 genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
