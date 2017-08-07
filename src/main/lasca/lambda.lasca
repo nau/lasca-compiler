@@ -2,6 +2,6 @@
 def main() = {
     b = println;
     c = "Hello";
-    a = { s -> b(c) };
-    a("test")
+    a = { s, d -> b(c) };
+    a("test", 1)
 }

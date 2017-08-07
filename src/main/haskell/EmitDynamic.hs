@@ -229,7 +229,8 @@ codegenModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> AST.Module
 codegenModule opts modo exprs = modul
   where
     ctx = createGlobalContext opts exprs
-    desugared = desugarExprs ctx (\c e -> desugarExpr c e >>= extractLambda) exprs
+    desugared' = desugarExprs ctx desugarExpr exprs
+    desugared = delambdafy ctx desugared'
     modul = runLLVM modo genModule
     genModule = do
         declareStdFuncs

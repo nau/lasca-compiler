@@ -89,6 +89,10 @@ emptyDesugarPhaseState = DesugarPhaseState {
     _syntacticAst = []
 }
 
+uncurryLambda expr = go expr ([], expr) where
+  go (S.Lam _ name e) result = let (args, body) = go e result in (name : args, body)
+  go e (args, _) = (args, e)
+
 --transform :: (S.Expr -> LLVM S.Expr) -> [S.Expr] -> LLVM [S.Expr]
 transform transformer exprs = sequence [transformExpr transformer expr | expr <- exprs]
 
@@ -149,7 +153,103 @@ transformExpr transformer expr = case expr of
 
   where go e = transformExpr transformer e
 
+--extractLambda :: S.Expr -> LLVM S.Expr
+extractLambda (S.Lam meta arg expr) = do
+    state <- get
+    curFuncName <- gets _currentFunctionName
+    let nms = _modNames state
+    let syntactic = _syntacticAst state
+    let outerVars = Map.keysSet $ _outers state
+    let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
+    let enclosedArgs = map (\n -> (S.Arg n typeAny, _outers state Map.! n)) usedOuterVars
+    let (funcName', nms') = uniqueName (fromString $ curFuncName ++ "_lambda") nms
+    let funcName = Char8.unpack funcName'
+    let asdf t = foldr (\(_, t) resultType -> TypeFunc t resultType) t enclosedArgs
+    let meta' = (S.exprType %~ asdf) meta
+    let func = S.Function meta' funcName typeAny (map fst enclosedArgs ++ [arg]) expr
+    modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
+    s <- get
+    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" funcName (show outerVars) (show usedOuterVars) (show s)
+    return (S.BoxFunc meta' funcName (map fst enclosedArgs))
+extractLambda expr = return expr
 
+extractLambda2 meta args expr = do
+    state <- get
+    curFuncName <- gets _currentFunctionName
+    let nms = _modNames state
+    let syntactic = _syntacticAst state
+    let outerVars = Map.keysSet $ _outers state
+    let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
+    let enclosedArgs = map (\n -> (S.Arg n typeAny, _outers state Map.! n)) usedOuterVars
+    let (funcName', nms') = uniqueName (fromString $ curFuncName ++ "_lambda") nms
+    let funcName = Char8.unpack funcName'
+    let asdf t = foldr (\(_, t) resultType -> TypeFunc t resultType) t enclosedArgs
+    let meta' = (S.exprType %~ asdf) meta
+    let func = S.Function meta' funcName typeAny (map fst enclosedArgs ++ args) expr
+    modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
+    s <- get
+    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" funcName (show outerVars) (show usedOuterVars) (show s)
+    return (S.BoxFunc meta' funcName (map fst enclosedArgs))
+
+
+delambdafy ctx exprs = let
+        (desugared, st) = runState (mapM delambdafyExpr exprs) emptyDesugarPhaseState
+        syn = _syntacticAst st
+    in syn ++ desugared
+
+    where delambdafyExpr expr = case expr of
+            expr@(S.Ident _ n) -> do
+                modify (\s -> s { _usedVars = Set.insert n (_usedVars s)})
+                return expr
+            S.Array meta exprs -> do
+                exprs' <- mapM go exprs
+                return $ S.Array meta exprs'
+            S.Select meta tree expr -> do
+                tree' <- go tree
+                expr' <- go expr
+                return $ S.Select meta tree' expr'
+            (S.If meta cond true false) -> do
+                cond' <- go cond
+                true' <- go true
+                false' <- go false
+                return (S.If meta cond' true' false')
+            (S.Let meta n e body) -> do
+                case S.typeOf e of
+                  TypeFunc a b -> locals %= Map.insert n a
+                  _ -> locals %= Map.insert n typeAny
+                e' <- go e
+                body' <- go body
+                return (S.Let meta n e' body')
+            l@(S.Lam m a@(S.Arg n t) e) -> do
+                oldOuters <- gets _outers
+                oldUsedVars <- gets _usedVars
+                modify (\s -> s { _outers = Map.union (_outers s) (_locals s) } )
+                let (args, e) = uncurryLambda l
+                let r = foldr (\(S.Arg n t) -> Map.insert n typeAny) Map.empty args
+                locals .= r
+                e' <- go e
+                res <- extractLambda2 m args e'
+                modify (\s  -> s {_outers = oldOuters, _locals = r})
+                return res
+            (S.Apply meta e args) -> do
+                e' <- go e
+                args' <- mapM go args
+        --        args' <- sequence [go arg | arg <- args]
+                return (S.Apply meta e' args')
+            f@(S.Function meta name tpe args e1) -> do
+                let funcTypeToLlvm (S.Arg name _) (TypeFunc a b, acc) = (b, (name, a) : acc)
+                    funcTypeToLlvm arg t = error $ "AAA2" ++ show arg ++ show t
+                let funcType = S.typeOf f
+                let argsWithTypes = reverse $ snd $ foldr funcTypeToLlvm (funcType, []) (reverse args)
+                let argNames = Map.fromList argsWithTypes
+                modify (\s -> s { _currentFunctionName = name, _locals = argNames, _outers = Map.empty, _usedVars = Set.empty } )
+                e' <- go e1
+                return (S.Function meta name tpe args e')
+            S.Val meta name expr -> do
+                expr' <- go expr
+                return $ S.Val meta name expr'
+            e -> return e
+            where go e = delambdafyExpr e
 
 defineStringConstants :: S.Expr -> LLVM ()
 defineStringConstants expr = case expr of
@@ -289,26 +389,6 @@ declareStdFuncs = do
   --  external ptrType "runtimeIsConstr" [("value", ptrType), ("name", ptrType)] False [FA.GroupID 0]
     addDefn $ AST.FunctionAttributes (FA.GroupID 0) [FA.ReadOnly]
 
---extractLambda :: S.Expr -> LLVM S.Expr
-extractLambda (S.Lam meta arg expr) = do
-    state <- get
-    curFuncName <- gets _currentFunctionName
-    let nms = _modNames state
-    let syntactic = _syntacticAst state
-    let outerVars = Map.keysSet $ _outers state
-    let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
-    let enclosedArgs = map (\n -> (S.Arg n typeAny, _outers state Map.! n)) usedOuterVars
-    let (funcName', nms') = uniqueName (fromString $ curFuncName ++ "_lambda") nms
-    let funcName = Char8.unpack funcName'
-    let asdf t = foldr (\(_, t) resultType -> TypeFunc t resultType) t enclosedArgs
-    let meta' = (S.exprType %~ asdf) meta
-    let func = S.Function meta' funcName typeAny (map fst enclosedArgs ++ [arg]) expr
-    modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
-    s <- get
-    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" funcName (show outerVars) (show usedOuterVars) (show s)
-    return (S.BoxFunc meta' funcName (map fst enclosedArgs))
-extractLambda expr = return expr
-
 genFunctionMap :: [S.Expr] -> LLVM ()
 genFunctionMap fns = do
     defineNames
@@ -385,8 +465,6 @@ desugarExpr ctx expr = do
     let expr1 = desugarAssignment expr
     expr2 <- genMatch ctx expr1
     return expr2
-
-delambdafy ctx exprs = desugarExprs ctx (\c e -> extractLambda e) exprs
 
 desugarExprs ctx func exprs = let
     (desugared, st) = runState (transform (func ctx) exprs) emptyDesugarPhaseState

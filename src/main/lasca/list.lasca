@@ -16,9 +16,7 @@ def foldr(self: List a, z: b, f: a -> b -> b): b = match self {
     Cons(hd, tl) -> f(hd, foldr(tl, z, f))
 }
 
-def lengthInner(e, acc) = acc + 1
-
-def length(l) = foldl(l, 0, lengthInner)
+def length(l) = foldl(l, 0, { e, acc -> acc + 1})
 
 def map(self, f) = match self {
     Nil -> Nil
