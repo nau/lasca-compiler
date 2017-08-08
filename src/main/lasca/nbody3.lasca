@@ -75,16 +75,6 @@ def offsetMomentum(bodies: [Body]) = {
 
 def squared(x: Float, y: Float, z: Float) = x * x + y * y + z * z
 
-def updateCoords(bodies, dt) = {
-    for(0, 5, { i ->
-        body = bodies[i];
-        body.x := body.x.getRef + dt * body.vx.getRef;
-        body.y := body.y.getRef + dt * body.vy.getRef;
-        body.z := body.z.getRef + dt * body.vz.getRef;
-        0
-    });
-}
-
 def advance(bodies: [Body], dt) = {
     for(0, 5 - 1, { i ->
         ibody = bodies[i];
@@ -108,7 +98,13 @@ def advance(bodies: [Body], dt) = {
             0
         });
     });
-    updateCoords(bodies, dt);
+    for(0, 5, { i ->
+        body = bodies[i];
+        body.x := body.x.getRef + dt * body.vx.getRef;
+        body.y := body.y.getRef + dt * body.vy.getRef;
+        body.z := body.z.getRef + dt * body.vz.getRef;
+        0
+    });
     bodies
 }
 

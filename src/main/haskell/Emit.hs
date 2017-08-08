@@ -203,13 +203,14 @@ delambdafy ctx exprs = let
             l@(S.Lam m a@(S.Arg n t) e) -> do
                 oldOuters <- gets _outers
                 oldUsedVars <- gets _usedVars
+                oldLocals <- gets _locals
                 modify (\s -> s { _outers = Map.union (_outers s) (_locals s) } )
                 let (args, e) = uncurryLambda l
                 let r = foldr (\(S.Arg n t) -> Map.insert n typeAny) Map.empty args
                 locals .= r
                 e' <- go e
                 res <- extractLambda2 m args e'
-                modify (\s  -> s {_outers = oldOuters, _locals = r})
+                modify (\s  -> s {_outers = oldOuters, _locals = oldLocals})
                 return res
             (S.Apply meta e args) -> do
                 e' <- go e
