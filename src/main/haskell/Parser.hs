@@ -121,6 +121,12 @@ unop = Ex.Prefix parser
             meta <- getMeta
             (\op expr -> Apply meta (Ident meta ("unary" ++ op)) [expr]) <$> anyOperatorParser
 
+unary s = Ex.Prefix parser
+  where parser = do
+            meta <- getMeta
+            reservedOp s
+            return (\expr -> Apply meta (Ident meta ("unary" ++ s)) [expr])
+
 binary s = Ex.InfixL parser
   where parser = do
             meta <- getMeta
@@ -184,6 +190,7 @@ litPattern = LitPattern <$> (boolLit <|> stringLit <|> try floatLit <|> integerL
 
 binops = [
           [postfixIndex, Ex.InfixL select, postfixApply],
+          [unary "-"],
           [binary "*", binary "/" ],
           [binary "+", binary "-" ],
           [binary "<=", binary ">=", binary "<", binary ">", binary "==" , binary "!="],

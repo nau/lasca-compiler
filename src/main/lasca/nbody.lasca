@@ -56,9 +56,9 @@ def go(bodies: [[Float]], i: Int, pxyz: [Float]) = {
 }
 
 def offsetMomentum(object: [Float], px, py, pz) = {
-    vx = (0.0 - px) / SolarMass;
-    vy = (0.0 - py) / SolarMass;
-    vz = (0.0 - pz) / SolarMass;
+    vx = -px / SolarMass;
+    vy = -py / SolarMass;
+    vz = -pz / SolarMass;
     [ object[0], object[1], object[2],
       vx, vy, vz,
       object[6]

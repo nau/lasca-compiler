@@ -326,6 +326,26 @@ Box* __attribute__ ((pure)) runtimeBinOp(int code, Box* lhs, Box* rhs) {
     return result;
 }
 
+Box* __attribute__ ((pure)) runtimeUnaryOp(int code, Box* expr) {
+    Box* result = NULL;
+    switch (code) {
+        case 1:
+            if (expr->type == INT) {
+                result = boxInt(-expr->value.num);
+            } else if (expr->type == DOUBLE) {
+                result = boxFloat64(-expr->value.dbl);
+            } else {
+                printf("AAAA!!! Type mismatch! Expected Int or Double for op but got %s\n", typeIdToName(expr->type));
+                exit(1);
+            }
+            break;
+        default:
+            printf("AAAA!!! Unsupported unary operation %i", code);
+            exit(1);
+    }
+    return result;
+}
+
 Box* arrayApply(Box* arrayValue, int index) {
     Array* array = unbox(ARRAY, arrayValue);
     assert(array->length > index);

@@ -208,6 +208,16 @@ cgen ctx this@(S.Select meta tree expr) = do
 
 cgen ctx (S.Apply meta (S.Ident _ "or") [lhs, rhs]) = cgen ctx (S.If meta lhs (S.Literal S.emptyMeta (S.BoolLit True)) rhs)
 cgen ctx (S.Apply meta (S.Ident _ "and") [lhs, rhs]) = cgen ctx (S.If meta lhs rhs (S.Literal S.emptyMeta (S.BoolLit False)))
+cgen ctx this@(S.Apply meta op@(S.Ident _ "unary-") [expr]) = do
+    lexpr' <- cgen ctx expr
+    let (TypeFunc realExprType _) = S.typeOf op
+    lexpr <- resolveBoxing anyTypeVar realExprType lexpr'
+    let returnType = S.typeOf this
+    res <- case S.typeOf expr of
+        TypeIdent "Int"   -> sub (constIntOp 0) lexpr >>= resolveBoxing returnType anyTypeVar
+        TypeIdent "Float" -> fsub (constFloatOp 0.0) lexpr >>= resolveBoxing returnType anyTypeVar
+--    Debug.traceM $ printf "Doing unary- %s with type %s" (show this) (show $ S.typeOf op)
+    return res
 cgen ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
     llhs' <- cgen ctx lhs
     lrhs' <- cgen ctx rhs

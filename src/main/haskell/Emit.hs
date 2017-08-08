@@ -153,26 +153,6 @@ transformExpr transformer expr = case expr of
 
   where go e = transformExpr transformer e
 
---extractLambda :: S.Expr -> LLVM S.Expr
-extractLambda (S.Lam meta arg expr) = do
-    state <- get
-    curFuncName <- gets _currentFunctionName
-    let nms = _modNames state
-    let syntactic = _syntacticAst state
-    let outerVars = Map.keysSet $ _outers state
-    let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
-    let enclosedArgs = map (\n -> (S.Arg n typeAny, _outers state Map.! n)) usedOuterVars
-    let (funcName', nms') = uniqueName (fromString $ curFuncName ++ "_lambda") nms
-    let funcName = Char8.unpack funcName'
-    let asdf t = foldr (\(_, t) resultType -> TypeFunc t resultType) t enclosedArgs
-    let meta' = (S.exprType %~ asdf) meta
-    let func = S.Function meta' funcName typeAny (map fst enclosedArgs ++ [arg]) expr
-    modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
-    s <- get
-    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" funcName (show outerVars) (show usedOuterVars) (show s)
-    return (S.BoxFunc meta' funcName (map fst enclosedArgs))
-extractLambda expr = return expr
-
 extractLambda2 meta args expr = do
     state <- get
     curFuncName <- gets _currentFunctionName
@@ -383,6 +363,7 @@ declareStdFuncs = do
     external ptrType "boxFloat64" [("d", T.double)] False [FA.GroupID 0]
     external ptrType "boxArray" [("size", intType)] True [FA.GroupID 0]
     external ptrType "runtimeBinOp"  [("code",  intType), ("lhs",  ptrType), ("rhs", ptrType)] False [FA.GroupID 0]
+    external ptrType "runtimeUnaryOp"  [("code",  intType), ("expr",  ptrType)] False [FA.GroupID 0]
     external ptrType "runtimeApply"  [("func", ptrType), ("argc", intType), ("argv", ptrType), ("pos", positionStructType)] False []
     external ptrType "runtimeSelect" [("tree", ptrType), ("expr", ptrType), ("pos", positionStructType)] False [FA.GroupID 0]
     external T.void  "initEnvironment" [("argc", intType), ("argv", ptrType)] False []
@@ -461,8 +442,14 @@ desugarAssignment expr = case expr of
     S.Apply meta (S.Ident imeta ":=") [ref, value] -> S.Apply meta (S.Ident imeta "updateRef") [ref, value]
     _ -> expr
 
+desugarUnaryMinus expr = case expr of
+    S.Apply _ (S.Ident _ ("unary-")) [S.Literal meta (S.IntLit v)] -> S.Literal meta (S.IntLit (-v))
+    S.Apply _ (S.Ident _ ("unary-")) [S.Literal meta (S.FloatLit v)] -> S.Literal meta (S.FloatLit (-v))
+    e -> e
+
 desugarExpr ctx expr = do
-    let expr1 = desugarAssignment expr
+    let expr2 = desugarUnaryMinus expr
+    let expr1 = desugarAssignment expr2
     expr2 <- genMatch ctx expr1
     return expr2
 

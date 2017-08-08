@@ -124,6 +124,9 @@ cgen ctx (S.Select meta tree expr) = do
     callFn "runtimeSelect" [tree, e, constOp pos]
 cgen ctx (S.Apply meta (S.Ident _ "or") [lhs, rhs]) = cgen ctx (S.If meta lhs (S.Literal S.emptyMeta (S.BoolLit True)) rhs)
 cgen ctx (S.Apply meta (S.Ident _ "and") [lhs, rhs]) = cgen ctx (S.If meta lhs rhs (S.Literal S.emptyMeta (S.BoolLit False)))
+cgen ctx this@(S.Apply meta op@(S.Ident _ "unary-") [expr]) = do
+    lexpr <- cgen ctx expr
+    callFn "runtimeUnaryOp" [constIntOp 1, lexpr]
 cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
     llhs <- cgen ctx lhs
     lrhs <- cgen ctx rhs

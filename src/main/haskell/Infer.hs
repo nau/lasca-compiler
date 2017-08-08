@@ -240,6 +240,7 @@ emptyTyenv = TypeEnv Map.empty
 
 defaultTyenv :: TypeEnv
 defaultTyenv = TypeEnv (Map.fromList [
+      ("unary-", Forall [a] (ta `TypeFunc` ta)),
       ("+",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
       ("-",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
       ("*",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),

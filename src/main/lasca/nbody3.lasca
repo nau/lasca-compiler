@@ -68,9 +68,9 @@ def offsetMomentum(bodies: [Body]) = {
         0
     });
     object = bodies[0];
-    object.vx := (0.0 - px.getRef) / SolarMass;
-    object.vy := (0.0 - py.getRef) / SolarMass;
-    object.vz := (0.0 - pz.getRef) / SolarMass;
+    object.vx := -px.getRef / SolarMass;
+    object.vy := -py.getRef / SolarMass;
+    object.vz := -pz.getRef / SolarMass;
 }
 
 def squared(x: Float, y: Float, z: Float) = x * x + y * y + z * z
