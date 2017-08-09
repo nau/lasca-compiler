@@ -31,10 +31,10 @@ parserTests = testGroup "Parser tests"
                Apply emptyMeta (Ident emptyMeta "toString") [Apply (withMetaPos 1 25) (Ident emptyMeta "+") [Ident emptyMeta "test123", Literal (withMetaPos 1 27) (IntLit 1)]]]
       ])
   , testCase "Pattern matching" $
-      parseExpr "match true { | true -> 1 }" @?= Right (Match emptyMeta (Literal emptyMeta (BoolLit True)) [
+      parseExpr "match true { true -> 1 }" @?= Right (Match emptyMeta (Literal emptyMeta (BoolLit True)) [
         Case (LitPattern (BoolLit True)) (Literal (withMetaPos 1 24) (IntLit 1))])
   , testCase "Pattern matching" $
-        parseExpr "match foo { | Person(0, name, \"God\", None, _) -> 1 | _ -> match false { | true -> 4 } }" @?= Right (
+        parseExpr "match foo { Person(0, name, \"God\", None, _) -> 1 _ -> match false { true -> 4 } }" @?= Right (
           Match emptyMeta (Ident emptyMeta "foo") [
             Case (ConstrPattern "Person" [LitPattern (IntLit 0),VarPattern "name",LitPattern (StringLit "God"),
                   ConstrPattern "None" [],WildcardPattern]) (Literal (withMetaPos 1 50) (IntLit 1)),
@@ -47,7 +47,7 @@ parserTests = testGroup "Parser tests"
 typerTests = testGroup "Typer tests"
   [
     testCase "Pattern matching" $
-      parseAndInferExpr "match true { | true -> 1 | false -> 2 }" @?= (TypeIdent "Int")
+      parseAndInferExpr "match true { true -> 1 false -> 2 }" @?= (TypeIdent "Int")
   ]
 
 benchTests = testGroup "Bench" [testCase "gen10k" $ parseAndInferFile "src/main/lasca/gen5k.lasca"]

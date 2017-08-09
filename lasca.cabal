@@ -72,6 +72,7 @@ test-suite lasca-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      src/test
   main-is:             Main.hs
+  default-extensions:  OverloadedStrings
   build-depends:       base >=4.6,
                        text,
                        utf8-string,
