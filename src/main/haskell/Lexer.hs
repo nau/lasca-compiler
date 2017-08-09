@@ -6,7 +6,7 @@ import Control.Monad (void)
 import qualified Text.Megaparsec.Lexer as L
 
 ops = ["+","*","-","/",";", "==", ":=", "=",",",".","<",">","|",":"]
-keywords = ["data", "def", "extern", "if", "then", "else", "in", "let", "true", "false", "match", "do", "lazy", "var"]
+keywords = ["package", "import", "data", "def", "extern", "if", "then", "else", "in", "let", "true", "false", "match", "do", "lazy", "var"]
 
 sc :: Parser () -- ‘sc’ stands for “space consumer”
 sc = L.space (void spaceChar) lineComment blockComment

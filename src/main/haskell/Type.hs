@@ -2,6 +2,32 @@
 module Type where
 
 import Data.List
+import Data.String
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as SBS
+
+data Name = Name String | NS Name Name deriving (Eq, Ord)
+
+instance IsString Name where
+    fromString = Name
+
+instance Show Name where
+    show n = case n of
+        Name s -> s
+        NS prefix n -> show prefix ++ "." ++ show n
+
+qnameToString n = show n
+
+qname = Name
+
+nameToSBS :: Name -> SBS.ShortByteString
+nameToSBS = fromString . show
+
+nameToBS :: Name -> BS.ByteString
+nameToBS = fromString . show
+
+defaultPackageName = "default"
+defaultPackageQName = Name defaultPackageName
 
 newtype TVar = TV String
   deriving (Eq, Ord)
@@ -10,8 +36,8 @@ instance Show TVar where
   show (TV s) = s
 
 data Type
-  = TVar !TVar
-  | TypeIdent !String
+  = TVar TVar
+  | TypeIdent Name
   | TypeFunc Type Type
   | TypeApply Type [Type]
   | Forall [TVar] Type
@@ -19,7 +45,7 @@ data Type
 
 instance Show Type where
   show (TVar (TV n)) = n
-  show (TypeIdent s) = s
+  show (TypeIdent s) = show s
   show (TypeFunc l r) = "(" ++ show l ++ " -> " ++ show r ++ ")"
   show (TypeApply t args) = "(" ++ show t ++ foldl (\acc a -> acc ++ " " ++ show a) "" args ++ ")"
   show (Forall targs t) = "∀(" ++ intercalate "," (map show targs) ++ ") => " ++ show t

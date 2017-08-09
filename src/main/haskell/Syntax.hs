@@ -16,7 +16,7 @@ import Control.Lens.Operators
 import Control.Lens.TH
 import           Type
 
-type Name = String
+--type Name = String
 
 data LascaOpts = LascaOpts
     { lascaFiles   :: [String]
@@ -67,6 +67,8 @@ data Expr
     | Let Meta Name Expr Expr
     | Array Meta [Expr]
     | Data Meta Name [TVar] [DataConst]
+    | Package Meta Name
+    | Import Meta Name
     deriving (Ord, Show)
 
 metaLens :: Lens.Lens' Expr Meta
@@ -139,39 +141,39 @@ class Show a => DebugPrint a where
     printExprWithType a = show a
 
 instance DebugPrint Arg where
-    printExprWithType (Arg a t) = printf "%s: %s" a (show t)
+    printExprWithType (Arg a t) = printf "%s: %s" (show a) (show t)
 
 instance DebugPrint Expr where
     printExprWithType expr = case expr of
         Literal _ l -> show l
-        Ident meta n -> printf "%s: %s" n (show meta)
-        Val meta n e -> printf "val %s: %s = %s\n" n (show meta) (printExprWithType e)
+        Ident meta n -> printf "%s: %s" (show n) (show meta)
+        Val meta n e -> printf "val %s: %s = %s\n" (show n) (show meta) (printExprWithType e)
         Apply meta f e -> printf "%s(%s): %s" (printExprWithType f) (intercalate "," $ map printExprWithType e) (show meta)
         Lam _ a e -> printf "{ %s -> %s }\n" (printExprWithType a) (printExprWithType e)
         Select _ e f -> printf "%s.%s" (printExprWithType e) (printExprWithType f)
         Match _ e cs -> printf "match %s {\n%s}\n" (printExprWithType e) (show cs)
         BoxFunc meta f args -> printf "BoxFunc %s(%s)" (show f) (intercalate "," $ map show args)
         Function meta f t args b -> if _isExternal meta
-            then printf "extern def %s(%s): %s\n" f (intercalate "," $ map printExprWithType args) (show t)
-            else printf "--  %s : %s\ndef %s(%s): %s = %s\n" f (show meta) f (intercalate "," $ map printExprWithType args) (show t) (printExprWithType b)
+            then printf "extern def %s(%s): %s\n" (show f) (intercalate "," $ map printExprWithType args) (show t)
+            else printf "--  %s : %s\ndef %s(%s): %s = %s\n" (show f) (show meta) (show f) (intercalate "," $ map printExprWithType args) (show t) (printExprWithType b)
         If meta c t f -> printf "if %s then {\n%s \n} else {\n%s\n}: %s" (printExprWithType c) (printExprWithType t) (printExprWithType f) (show meta)
-        Let meta n e b -> printf "%s = %s;\n%s: %s" n (printExprWithType e) (printExprWithType b) (show meta)
+        Let meta n e b -> printf "%s = %s;\n%s: %s" (show n) (printExprWithType e) (printExprWithType b) (show meta)
         Array _ es -> printf "[%s]" (intercalate "," $ map printExprWithType es)
-        Data _ n tvars cs -> printf "data %s %s = %s\n" n (show tvars) (intercalate "\n| " $ map show cs)
+        Data _ n tvars cs -> printf "data %s %s = %s\n" (show n) (show tvars) (intercalate "\n| " $ map show cs)
         EmptyExpr -> ""
 
 
 data Case = Case Pattern Expr deriving (Eq, Ord, Show)
 data Pattern
     = LitPattern Lit
-    | ConstrPattern String [Pattern]
+    | ConstrPattern Name [Pattern]
     | VarPattern String
     | WildcardPattern
     deriving (Eq, Ord, Show)
 
 data DataConst = DataConst Name [Arg] deriving (Eq, Ord, Show)
 
-data DataDef = DataDef Int String [DataConst]
+data DataDef = DataDef Int Name [DataConst]
     deriving (Show, Eq)
 
 emptyCtx opts = Context {
@@ -203,11 +205,11 @@ data Arg = Arg Name Type deriving (Eq, Ord, Show)
 
 data Ctx = Context {
     _lascaOpts :: LascaOpts,
-    _globalFunctions :: Map.Map String Expr,
-    _globalVals :: Set.Set String,
+    _globalFunctions :: Map.Map Name Expr,
+    _globalVals :: Set.Set Name,
     dataDefs :: [DataDef],
-    dataDefsNames :: Set.Set String,
-    dataDefsFields :: Map.Map String (Map.Map String (Arg, Int)),
+    dataDefsNames :: Set.Set Name,
+    dataDefsFields :: Map.Map Name (Map.Map Name (Arg, Int)),
     typeId :: Int -- TODO remove this. Needed for type id generation. Move to ModuleState?
 } deriving (Show, Eq)
 makeLenses ''Ctx
@@ -238,7 +240,7 @@ createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
         let argsWithIds = foldl' (\acc (DataConst _ args) ->
                                           fst $ foldl' (\(acc, idx) arg@(Arg n t)  ->
                                               if n `Map.member` acc
-                                              then error $ printf "Field %s already defined in data %s" n name
+                                              then error $ printf "Field %s already defined in data %s" (show n) (show name)
                                               else (Map.insert n (arg, idx) acc, idx + 1) -- field name -> (S.Arg, field index in constructor) mapping
                                           ) (acc, 0) args
                                       ) Map.empty consts

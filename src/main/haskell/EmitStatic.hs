@@ -60,32 +60,32 @@ import Syntax (Ctx, createGlobalContext)
 
 
 staticArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
-staticArgsToSig = map (\(S.Arg name tpe) -> (fromString name, typeMapping tpe))
+staticArgsToSig = map (\(S.Arg name tpe) -> (nameToSBS name, typeMapping tpe))
 
 argToPtr (S.Arg n t) = case t of
---    TypeIdent "Float" -> fptoptr $ local T.double (fromString n)
---    TypeIdent "Int"   -> inttoptr $ local T.i32 (fromString n)
-    _                 -> return $ localPtr $ fromString n
+--    TypeIdent "Float" -> fptoptr $ local T.double (nameToSBS n)
+--    TypeIdent "Int"   -> inttoptr $ local T.i32 (nameToSBS n)
+    _                 -> return $ localPtr $ nameToSBS n
 
 -- codegenTop :: S.Expr -> LLVM ()
 codegenTop ctx this@(S.Val meta name expr) = do
     modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
     let valType = llvmTypeOf this
-    defineGlobal (fromString name) valType (Just $ defaultValueForType valType)
+    defineGlobal (nameToSBS name) valType (Just $ defaultValueForType valType)
 
 codegenTop ctx f@(S.Function meta name tpe args body) =
     if meta ^. S.isExternal then
-        external (externalTypeMapping tpe) (fromString name ) (externArgsToSig args) False []
+        external (externalTypeMapping tpe) (nameToSBS name ) (externArgsToSig args) False []
     else do
         modState <- get
         let codeGenResult = codeGen modState
         let blocks = createBlocks codeGenResult
         mapM_ defineStringLit (generatedStrings codeGenResult)
         let retType = mappedReturnType args funcType
-        define retType (fromString name) largs blocks
+        define retType (nameToSBS name) largs blocks
   where
     funcType = S.typeOf f
-    largs = map (\(n, t) -> (fromString n, t)) argsWithTypes
+    largs = map (\(n, t) -> (nameToSBS n, t)) argsWithTypes
 
     funcTypeToLlvm (S.Arg name _) (TypeFunc a b, acc) = (b, (name, typeMapping a) : acc)
     funcTypeToLlvm arg t = error $ "AAA3" ++ show arg ++ show t
@@ -99,7 +99,7 @@ codegenTop ctx f@(S.Function meta name tpe args body) =
         setBlock entry
         forM_ argsWithTypes $ \(n, t) -> do
             var <- alloca t
-            store var (local t (fromString n))
+            store var (local t (nameToSBS n))
     --        Debug.traceM $ printf "assign %s: %s = %s" n (show t) (show var)
             assign n var
         cgen ctx body >>= ret
@@ -156,8 +156,8 @@ cgen ctx (S.Ident meta name) = do
     --       Debug.trace ("Local " ++ show name)
             load x
         Nothing | name `Map.member` S._globalFunctions ctx -> boxFunc name mapping
-                | name `Set.member` S._globalVals ctx -> load (global ptrType (fromString name))
-                | otherwise -> boxError name
+                | name `Set.member` S._globalVals ctx -> load (global ptrType (nameToSBS name))
+                | otherwise -> boxError (show name)
 cgen ctx (S.Literal meta l) = do
 --  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)
     box l meta
@@ -180,7 +180,7 @@ cgen ctx this@(S.Select meta tree expr) = do
             let (S.Ident _ fieldName) = expr
             let fieldsWithIndex = (S.dataDefsFields ctx) Map.! tpeName
 --            Debug.traceM $ printf "fieldsWithIndex %s" (show fieldsWithIndex)
-            let (S.Arg n declaredFieldType, idx) = fromMaybe (error $ printf "No such field %s in %s" fieldName tpeName) (Map.lookup fieldName fieldsWithIndex)
+            let (S.Arg n declaredFieldType, idx) = fromMaybe (error $ printf "No such field %s in %s" (show fieldName) (show tpeName)) (Map.lookup fieldName fieldsWithIndex)
             let len = length fieldsWithIndex
             let arrayType = T.ArrayType (fromIntegral len) ptrType
             let tpe = T.StructureType False [T.i32, arrayType] -- DataValue: {tag, values: []}
@@ -231,7 +231,7 @@ cgen ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) | fn `Map.member` bino
     llhs <- resolveBoxing anyTypeVar realLhsType llhs'
     lrhs <- resolveBoxing anyTypeVar realRhsType lrhs'
 --    Debug.traceM $ printf "%s: %s <==> %s: %s" (show lhsType) (show realLhsType) (show rhsType) (show realRhsType)
-    let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
+    let code = fromMaybe (error ("Couldn't find binop " ++ show fn)) (Map.lookup fn binops)
     res <- case (code, realLhsType) of
         (10, TypeIdent "Int") -> add llhs lrhs >>= resolveBoxing returnType anyTypeVar
         (11, TypeIdent "Int") -> sub llhs lrhs >>= resolveBoxing returnType anyTypeVar
@@ -325,13 +325,13 @@ cgenApply ctx meta expr args = do
             largs <- forM (zip args argTypes) $ \(arg, tpe) -> do
                 a <- cgen ctx arg
                 resolveBoxing anyTypeVar tpe a
-            res <- callFn (fromString fn) largs
+            res <- callFn (show fn) largs
             resolveBoxing returnType anyTypeVar res
 
         S.Ident _ fn | isGlobal fn -> do
 --            Debug.traceM $ printf "Calling %s" fn
             largs <- forM args $ \arg -> cgen ctx arg
-            callFn (fromString fn) largs
+            callFn (show fn) largs
         expr -> do
             -- closures
             modState <- gets moduleState

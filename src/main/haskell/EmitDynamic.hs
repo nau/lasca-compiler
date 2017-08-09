@@ -59,17 +59,17 @@ import Syntax (Ctx, createGlobalContext)
 -- codegenTop :: S.Expr -> LLVM ()
 codegenTop ctx (S.Val _ name expr) = do
     modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
-    defineGlobal (fromString name) ptrType (Just (C.Null ptrType))
+    defineGlobal (nameToSBS name) ptrType (Just (C.Null ptrType))
 
 codegenTop ctx (S.Function meta name tpe args body) =
     if meta ^. S.isExternal then
-        external (externalTypeMapping tpe) (fromString name ) (externArgsToSig args) False []
+        external (externalTypeMapping tpe) (nameToSBS name ) (externArgsToSig args) False []
     else do
         modState <- get
         let codeGenResult = codeGen modState
         let blocks = createBlocks codeGenResult
         mapM_ defineStringLit (generatedStrings codeGenResult)
-        define ptrType (fromString name) largs blocks
+        define ptrType (nameToSBS name) largs blocks
   where
     largs = toSig args
     codeGen modState = execCodegen [] modState $ do
@@ -78,7 +78,7 @@ codegenTop ctx (S.Function meta name tpe args body) =
   --       Debug.traceM ("Generating function2 " ++ name)
         forM_ args $ \(S.Arg n t) -> do
             var <- alloca ptrType
-            store var (localPtr $ fromString n)
+            store var (localPtr $ nameToSBS n)
             assign n var
         cgen ctx body >>= ret
 
@@ -108,8 +108,8 @@ cgen ctx (S.Ident meta name) = do
   --       Debug.trace ("Local " ++ show name)
           load x
       Nothing | name `Map.member` S._globalFunctions ctx -> boxFunc name mapping
-              | name `Set.member` S._globalVals ctx -> load (global ptrType (fromString name))
-              | otherwise -> boxError name
+              | name `Set.member` S._globalVals ctx -> load (global ptrType (nameToSBS name))
+              | otherwise -> boxError (show name)
 cgen ctx (S.Literal l meta) = do
 --  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)
     box meta l
@@ -130,7 +130,7 @@ cgen ctx this@(S.Apply meta op@(S.Ident _ "unary-") [expr]) = do
 cgen ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
     llhs <- cgen ctx lhs
     lrhs <- cgen ctx rhs
-    let code = fromMaybe (error ("Couldn't find binop " ++ fn)) (Map.lookup fn binops)
+    let code = fromMaybe (error ("Couldn't find binop " ++ show fn)) (Map.lookup fn binops)
     let codeOp = constIntOp code
     callFn "runtimeBinOp" [codeOp, llhs, lrhs]
 cgen ctx (S.Apply meta expr args) = do
@@ -155,19 +155,19 @@ cgen ctx (S.Apply meta expr args) = do
                     _ -> return a
             case returnType of
                 TypeIdent "Int" -> do
-                    res <- callFn (fromString fn) largs
+                    res <- callFn (show fn) largs
 --                    Debug.traceM ("res = " ++ show res)
                     callFn "boxInt"  [res]
                 TypeIdent "Float" -> do
-                    res <- callFn (fromString fn) largs
+                    res <- callFn (show fn) largs
 --                    Debug.traceM ("res = " ++ show res ++ show largs ++ fn)
                     callFn "boxFloat64"  [res]
-                _ -> callFn (fromString fn) largs
+                _ -> callFn (show fn) largs
 
         S.Ident _ fn | isGlobal fn -> do
 --            Debug.traceM $ printf "Calling %s" fn
             largs <- forM args $ \arg -> cgen ctx arg
-            callFn (fromString fn) largs
+            callFn (show fn) largs
 
         expr -> do
             modState <- gets moduleState
@@ -254,4 +254,4 @@ genTypesStruct ctx defs = do
         struct a = createStruct [constInt len, a]
         structType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) ptrType]
 
-argToPtr (S.Arg n t) = return $ localPtr $ fromString n
+argToPtr (S.Arg n t) = return $ localPtr $ nameToSBS n

@@ -41,7 +41,7 @@ import Data.Digest.Murmur32
 import qualified Debug.Trace as Debug
 
 import qualified Syntax as S
-import qualified Type
+import qualified Type as LT
 
 
 -------------------------------------------------------------------------------
@@ -53,8 +53,8 @@ newtype LLVM a = LLVM { unLLVM :: State ModuleState a }
 
 data ModuleState = ModuleState {
     _llvmModule :: AST.Module,
-    _globalValsInit :: [(S.Name, S.Expr)],
-    functions :: Map.Map String Int,
+    _globalValsInit :: [(LT.Name, S.Expr)],
+    functions :: Map.Map LT.Name Int,
     structs :: Map.Map Int Int
 } deriving (Show)
 
@@ -144,7 +144,7 @@ uniqueName nm ns =
 -- Codegen State
 -------------------------------------------------------------------------------
 
-type SymbolTable = [(String, Operand)]
+type SymbolTable = [(LT.Name, Operand)]
 
 data CodegenState
     = CodegenState {
@@ -202,7 +202,7 @@ emptyCodegen ms = CodegenState {
     generatedStrings = []
 }
 
-execCodegen :: [(String, Operand)] -> ModuleState -> Codegen a -> CodegenState
+execCodegen :: [(LT.Name, Operand)] -> ModuleState -> Codegen a -> CodegenState
 execCodegen vars modState m = execState transformations initialState
   where
     transformations = runCodegen m
@@ -276,12 +276,12 @@ modifyBlock new = do
 -- Symbol Table
 -------------------------------------------------------------------------------
 
-assign :: String -> Operand -> Codegen ()
+assign :: LT.Name -> Operand -> Codegen ()
 assign var x = do
     lcls <- gets symtab
     modify $ \s -> s { symtab = (var, x) : lcls }
 
-getvar :: String -> Codegen Operand
+getvar :: LT.Name -> Codegen Operand
 getvar var = do
     syms <- gets symtab
     case lookup var syms of
@@ -407,7 +407,7 @@ false = zero
 true = one
 
 toSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
-toSig = map (\(S.Arg name tpe) -> (fromString name, ptrType))
+toSig = map (\(S.Arg name tpe) -> (fromString (show name), ptrType))
 
 getStringLitName :: String -> SBS.ShortByteString
 getStringLitName s = name

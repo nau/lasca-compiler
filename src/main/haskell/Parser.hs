@@ -119,18 +119,18 @@ binop = Ex.InfixL parser
 unop = Ex.Prefix parser
   where parser = do
             meta <- getMeta
-            (\op expr -> Apply meta (Ident meta ("unary" ++ op)) [expr]) <$> anyOperatorParser
+            (\op expr -> Apply meta (Ident meta (Name $ "unary" ++ op)) [expr]) <$> anyOperatorParser
 
 unary s = Ex.Prefix parser
   where parser = do
             meta <- getMeta
             reservedOp s
-            return (\expr -> Apply meta (Ident meta ("unary" ++ s)) [expr])
+            return (\expr -> Apply meta (Ident meta (Name $ "unary" ++ s)) [expr])
 
 binary s = Ex.InfixL parser
   where parser = do
             meta <- getMeta
-            reservedOp s >> return (\lhs rhs -> Apply meta (Ident meta s) [lhs, rhs])
+            reservedOp s >> return (\lhs rhs -> Apply meta (Ident meta (Name s)) [lhs, rhs])
 
 anyOperatorParser = do
     traverse_ (notFollowedBy . reservedOp) ops
@@ -180,7 +180,7 @@ ptrn = litPattern
 constrPattern = do
     id <- upperIdentifier
     patterns <- option [] $ parens (ptrn `sepBy` comma)
-    return $ ConstrPattern id patterns
+    return $ ConstrPattern (Name id) patterns
 
 wildcardPattern = do
     reservedOp "_"
@@ -207,9 +207,9 @@ expr =  Ex.makeExprParser factor operatorTable
 variable :: Parser Expr
 variable = do
     meta <- getMeta
-    Ident meta <$> identifier
+    Ident meta . Name <$> identifier
 
-makeType name = if Char.isLower $ List.head name then TVar $ TV name else TypeIdent name
+makeType name = if Char.isLower $ List.head name then TVar $ TV name else TypeIdent (Name name)
 
 typeTerm = ((\t -> TypeApply (TypeIdent "Array") [t]) <$> brackets typeExpr)
        <|> parens typeExpr
@@ -244,7 +244,7 @@ function = do
     reservedOp "="
     body <- expr
     let meta' = meta { _exprType = foldr (TypeFunc . const typeAny) tpe args } -- TODO not sure why we need this. maybe in dynamic mode for... check and remove
-    return (Function meta' name tpe args body)
+    return (Function meta' (Name name) tpe args body)
 
 extern :: Parser Expr
 extern = do
@@ -257,13 +257,13 @@ extern = do
     let funcType = foldr (\(Arg n at) ft -> TypeFunc at ft) tpe (List.reverse args)
     let scheme = normalizeType funcType
     let meta' = meta { _isExternal = True, _exprType = scheme }
-    return (Function meta' name tpe args EmptyExpr)
+    return (Function meta' (Name name) tpe args EmptyExpr)
 
 arg :: Parser Arg
 arg = do
     name <- identifier
     tpe <- option typeAny typeAscription
-    return (Arg name tpe)
+    return (Arg (Name name) tpe)
 
 argsApply = parens (commaSep expr)
 
@@ -287,7 +287,7 @@ letins = do
         option typeAny typeAscription
         reservedOp "="
         val <- expr
-        return (var, val)
+        return (Name var, val)
     reserved "in"
     body <- expr
     return $ foldr (uncurry $ Let meta) body defs
@@ -308,7 +308,7 @@ valdef f = do
     option typeAny typeAscription
     reservedOp "="
     e <- expr
-    return (f ident e)
+    return (f (Name ident) e)
 
 vardef f = do
     reserved "var"
@@ -318,7 +318,7 @@ vardef f = do
     reservedOp "="
     e <- expr
     let refExpr = Apply meta (Ident meta "Ref") [e]
-    return (f ident refExpr)
+    return (f (Name ident) refExpr)
 
 
 unnamedStmt = do
@@ -338,7 +338,7 @@ blockStmts = do
         let namedExprs = go init' 1
         foldl' (\acc (name, e) -> Let emptyMeta name e acc) last' namedExprs
 
-    go (Stmt e : exprs) idx = ('_' : show idx, e) : go exprs (idx + 1)
+    go (Stmt e : exprs) idx = (Name $ '_' : show idx, e) : go exprs (idx + 1)
     go (Named id e : exprs) idx = (id, e) : go exprs idx
     go [] _ = []
 
@@ -355,12 +355,12 @@ dataDef = do
     reservedOp "="
     optional $ reservedOp "|"
     constructors <-  dataConstructor `sepBy` reservedOp "|"
-    return (Data meta typeName (List.map TV tvars) constructors)
+    return (Data meta (Name typeName) (List.map TV tvars) constructors)
 
 dataConstructor = do
     name <- identifier
     args <- option [] $ parens (arg `sepEndBy` comma)
-    return (DataConst name args)
+    return (DataConst (Name name) args)
 
 factor :: Parser Expr -- TODO remove unneeded try's, reorder
 factor =  try floatingLiteral
@@ -380,8 +380,22 @@ globalValDef = do
     meta <- getMeta
     valdef $ Val meta
 
+packageDef = do
+    reserved "package"
+    meta <- getMeta
+    name <- identifier
+    return $ Package meta (Name name)
+
+importDef = do
+    reserved "import"
+    meta <- getMeta
+    name <- identifier
+    return $ Import meta (Name name)
+
 defn :: Parser Expr
-defn = try extern
+defn =  try packageDef
+    <|> try importDef
+    <|> try extern
     <|> try function
     <|> try dataDef
     <|> globalValDef

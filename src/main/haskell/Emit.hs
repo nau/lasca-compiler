@@ -3,10 +3,10 @@
 
 module Emit where
 
-import LLVM.Module
-import LLVM.Context
-import LLVM.Analysis
-import LLVM.PassManager
+import qualified LLVM.Module
+import qualified LLVM.Context
+import qualified LLVM.Analysis
+import qualified LLVM.PassManager
 
 import qualified LLVM.AST as AST
 import qualified LLVM.AST.Global
@@ -63,7 +63,7 @@ externalTypeMapping (TypeIdent "Float") = T.double
 externalTypeMapping _ = ptrType-- Dynamic mode
 
 externArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
-externArgsToSig = map (\(S.Arg name tpe) -> (fromString name, externalTypeMapping tpe))
+externArgsToSig = map (\(S.Arg name tpe) -> (fromString (show name), externalTypeMapping tpe))
 
 defaultValueForType tpe =
     case tpe of
@@ -72,10 +72,10 @@ defaultValueForType tpe =
 
 data DesugarPhaseState = DesugarPhaseState {
     _modNames :: Names,
-    _currentFunctionName :: String,
-    _locals :: Map.Map String Type.Type,
-    _outers :: Map.Map String Type.Type,
-    _usedVars :: Set.Set String,
+    _currentFunctionName :: Name,
+    _locals :: Map.Map Name Type.Type,
+    _outers :: Map.Map Name Type.Type,
+    _usedVars :: Set.Set Name,
     _syntacticAst :: [S.Expr]
 } deriving (Show)
 makeLenses ''DesugarPhaseState
@@ -161,14 +161,14 @@ extractLambda2 meta args expr = do
     let outerVars = Map.keysSet $ _outers state
     let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
     let enclosedArgs = map (\n -> (S.Arg n typeAny, _outers state Map.! n)) usedOuterVars
-    let (funcName', nms') = uniqueName (fromString $ curFuncName ++ "_lambda") nms
-    let funcName = Char8.unpack funcName'
+    let (funcName', nms') = uniqueName (fromString $ (show curFuncName) ++ "_lambda") nms
+    let funcName = Name $ Char8.unpack funcName'
     let asdf t = foldr (\(_, t) resultType -> TypeFunc t resultType) t enclosedArgs
     let meta' = (S.exprType %~ asdf) meta
     let func = S.Function meta' funcName typeAny (map fst enclosedArgs ++ args) expr
     modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
     s <- get
-    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" funcName (show outerVars) (show usedOuterVars) (show s)
+--    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" funcName (show outerVars) (show usedOuterVars) (show s)
     return (S.BoxFunc meta' funcName (map fst enclosedArgs))
 
 
@@ -273,7 +273,7 @@ defineStringConstants expr = case expr of
 -- Operations
 -------------------------------------------------------------------------------
 
-binops :: Map.Map String Int
+binops :: Map.Map Name Int
 binops = Map.fromList [("+", 10), ("-", 11), ("*", 12), ("/", 13),
     ("==", 42), ("!=", 43), ("<", 44), ("<=", 45), (">=", 46), (">", 47)]
 
@@ -313,7 +313,7 @@ createPosition S.Position{S.sourceLine, S.sourceColumn} = createStruct [C.Int 32
 boxArray values = callFn "boxArray" (constIntOp (length values) : values)
 
 boxFunc name mapping = do
-    let idx = fromMaybe (error ("No such function " ++ name)) (Map.lookup name mapping)
+    let idx = fromMaybe (error ("No such function " ++ show name)) (Map.lookup name mapping)
     callFn "boxFunc" [constIntOp idx]
 
 boxError name = do
@@ -327,12 +327,12 @@ boxError name = do
 showSyms = show . map fst
 
 
-boxClosure :: String -> Map.Map String Int -> [S.Arg] -> Codegen AST.Operand
+boxClosure :: Name -> Map.Map Name Int -> [S.Arg] -> Codegen AST.Operand
 boxClosure name mapping enclosedVars = do
     syms <- gets symtab
-    let idx = fromMaybe (error ("Couldn't find " ++ name ++ " in mapping:\n" ++ show mapping)) (Map.lookup name mapping)
+    let idx = fromMaybe (error ("Couldn't find " ++ show name ++ " in mapping:\n" ++ show mapping)) (Map.lookup name mapping)
     let argc = length enclosedVars
-    let findArg n = fromMaybe (error ("Couldn't find " ++ n ++ " variable in symbols " ++ showSyms syms)) (lookup n syms)
+    let findArg n = fromMaybe (error ("Couldn't find " ++ show n ++ " variable in symbols " ++ showSyms syms)) (lookup n syms)
     let args = map (\(S.Arg n _) -> findArg n) enclosedVars
     sargsPtr <- gcMalloc (constIntOp $ ptrSize * argc)
     sargsPtr1 <- bitcast sargsPtr (T.ptr ptrType)
@@ -380,13 +380,13 @@ genFunctionMap fns = do
     modify (\s -> s { functions = mapping })
   where
 
-    defineNames = mapM (\(name, _) -> defineStringLit name) funcsWithArities
+    defineNames = mapM (\(name, _) -> defineStringLit (show name)) funcsWithArities
 
     len = fromIntegral (length funcsWithArities)
 
     array = C.Array functionStructType (fmap snd entries)
 
-    mapping :: Map.Map String Int
+    mapping :: Map.Map Name Int
     mapping = go 0 Map.empty entries where
         go i m ((name, _) : es) = go (i + 1) (Map.insert name i m) es
         go i m [] = m
@@ -398,8 +398,8 @@ genFunctionMap fns = do
     struct1 = createStruct [C.Int 32 (toInteger len), array]
 
     struct name arity = createStruct
-                            [globalStringRefAsPtr name, constRef (fromString name), constInt arity]
-
+                            [globalStringRefAsPtr sname, constRef (fromString sname), constInt arity]
+                        where sname = show name
 
     funcsWithArities = foldl go [] fns where
         go s (S.Data _ name tvars consts) =
@@ -424,11 +424,11 @@ genMatch ctx expr = return expr
 genFail = S.Apply S.emptyMeta (S.Ident S.emptyMeta "die") [S.Literal S.emptyMeta $ S.StringLit "Match error!"]
 
 genPattern ctx lhs S.WildcardPattern rhs = const rhs
-genPattern ctx lhs (S.VarPattern name) rhs = const (S.Let S.emptyMeta name lhs rhs)
+genPattern ctx lhs (S.VarPattern name) rhs = const (S.Let S.emptyMeta (Name name) lhs rhs)
 genPattern ctx lhs (S.LitPattern literal) rhs = S.If S.emptyMeta (S.Apply S.emptyMeta (S.Ident S.emptyMeta "==") [lhs, S.Literal S.emptyMeta literal]) rhs
 genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
   where cond fail = S.If S.emptyMeta constrCheck (checkArgs name fail) fail
-        constrCheck = S.Apply S.emptyMeta (S.Ident S.emptyMeta "runtimeIsConstr") [lhs, S.Literal S.emptyMeta $ S.StringLit name]
+        constrCheck = S.Apply S.emptyMeta (S.Ident S.emptyMeta "runtimeIsConstr") [lhs, S.Literal S.emptyMeta $ S.StringLit (show name)]
         constrMap = let cs = foldr (\ (S.DataDef _ _ constrs) acc -> constrs ++ acc) [] (S.dataDefs ctx)
                         tuples = fmap (\c@(S.DataConst n args) -> (n, args)) cs
                     in  Map.fromList tuples
@@ -437,7 +437,7 @@ genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
                             Just constrArgs | length args == length constrArgs -> do
                                 let argParam = zip args constrArgs
                                 foldr (\(a, S.Arg n _) acc -> genPattern ctx (S.Select S.emptyMeta lhs (S.Ident S.emptyMeta n)) a acc fail) rhs argParam
-                            Just constrArgs -> error (printf "Constructor %s has %d parameters, but %d given" nm (length constrArgs) (length args)) -- TODO box this error
+                            Just constrArgs -> error (printf "Constructor %s has %d parameters, but %d given" (show nm) (length constrArgs) (length args)) -- TODO box this error
 
 desugarAssignment expr = case expr of
     S.Apply meta (S.Ident imeta ":=") [ref, value] -> S.Apply meta (S.Ident imeta "updateRef") [ref, value]
@@ -462,18 +462,18 @@ desugarExprs ctx func exprs = let
 --genData :: Ctx -> [S.DataDef] -> ([S.Arg] -> [(SBS.ShortByteString, AST.Type)]) -> LLVM ([C.Constant])
 genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
   where genDataStruct dd@(S.DataDef tid name constrs) = do
-            defineStringLit name
-            let literalName = fromString $ "Data." ++ name
+            defineStringLit (show name)
+            let literalName = fromString $ "Data." ++ (show name)
             let numConstructors = length constrs
             constructors <- genConstructors ctx dd
             let arrayOfConstructors = C.Array ptrType constructors
-            let struct = createStruct [constInt tid, globalStringRefAsPtr name, constInt numConstructors, arrayOfConstructors] -- struct Data
+            let struct = createStruct [constInt tid, globalStringRefAsPtr (show name), constInt numConstructors, arrayOfConstructors] -- struct Data
             defineConst literalName (T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral numConstructors) ptrType]) struct
             return (constRef literalName)
 
         genConstructors ctx (S.DataDef tid name constrs) = do
             forM (zip constrs [0..]) $ \ ((S.DataConst n args), tag) ->
-                defineConstructor ctx (fromString name) n tid tag args
+                defineConstructor ctx name n tid tag args
 
         defineConstructor ctx typeName name tid tag args  = do
           -- TODO optimize for zero args
@@ -483,7 +483,7 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
 
             if null args
             then do
-                let singletonName = name ++ ".Singleton"
+                let singletonName = show name ++ ".Singleton"
                 let dataValue = createStruct [constInt tag, C.Array ptrType []]
                 defineConst (fromString singletonName) tpe dataValue
 
@@ -492,14 +492,14 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
 
                 let boxedRef = C.GlobalReference boxStructType (AST.Name (fromString $ singletonName ++ ".Boxed"))
                 let ptrRef = C.BitCast boxedRef ptrType
-                defineConst (fromString name) ptrType ptrRef
+                defineConst (fromString $ show name) ptrType ptrRef
             else do
-                define ptrType (fromString name) fargs blocks -- define constructor function
-                forM_ args $ \ (S.Arg name _) -> defineStringLit name -- define fields names as strings
+                define ptrType (fromString $ show name) fargs blocks -- define constructor function
+                forM_ args $ \ (S.Arg name _) -> defineStringLit (show name) -- define fields names as strings
 
             let structType = T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral len) ptrType]
-            let struct =  createStruct [C.Int 32 (fromIntegral tid), globalStringRefAsPtr name, constInt len, fieldsArray]
-            let literalName = fromString $ typeName ++ "." ++ name
+            let struct =  createStruct [C.Int 32 (fromIntegral tid), globalStringRefAsPtr (show name), constInt len, fieldsArray]
+            let literalName = fromString $ (show typeName) ++ "." ++ show name
             defineConst literalName structType struct
 
             return $ constRef literalName
@@ -510,7 +510,7 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
             tpe = T.StructureType False [T.i32, arrayType] -- DataValue: {tag, values: []}
             fargs = argsToSig args
             fieldsArray = C.Array ptrType fields
-            fields = map (\(S.Arg n _) -> globalStringRefAsPtr n) args
+            fields = map (\(S.Arg n _) -> globalStringRefAsPtr (show n)) args
 
             codeGen modState = execCodegen [] modState $ do
                 entry <- addBlock entryBlockName
@@ -549,5 +549,5 @@ codegenStartFunc ctx cgen = do
 
     gen (name, expr) = do
         v <- cgen ctx expr
-        store (global ptrType (fromString name)) v
+        store (global ptrType (fromString (show name))) v
         return v

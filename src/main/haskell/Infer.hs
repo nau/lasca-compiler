@@ -30,11 +30,11 @@ import qualified Data.Set as Set
 import Debug.Trace as Debug
 import Text.Printf
 
-newtype TypeEnv = TypeEnv (Map.Map String Type) deriving (Monoid)
+newtype TypeEnv = TypeEnv (Map.Map Name Type) deriving (Monoid)
 
 instance Show TypeEnv where
     show (TypeEnv subst) = "Γ = {\n" ++ elems ++ "}"
-      where elems = List.foldl' (\s (name, scheme) -> s ++ name ++ " : " ++ show scheme ++ "\n") "" (Map.toList subst)
+      where elems = List.foldl' (\s (name, scheme) -> s ++ show name ++ " : " ++ show scheme ++ "\n") "" (Map.toList subst)
 
 data InferState = InferState {_count :: Int, _current :: Expr}
 makeLenses ''InferState
@@ -49,7 +49,7 @@ type Subst = Map.Map TVar Type
 data TypeError
     = UnificationFail Expr Type Type
     | InfiniteType Expr TVar Type
-    | UnboundVariable Expr String
+    | UnboundVariable Expr Name
     | UnificationMismatch Expr [Type] [Type]
     deriving (Eq, Ord, Show)
 
@@ -233,7 +233,7 @@ substype schema t@(TVar a)        ord =
 initState :: Expr -> InferState
 initState e = InferState { _count = 0, _current = e}
 
-extend :: TypeEnv -> (String, Type) -> TypeEnv
+extend :: TypeEnv -> (Name, Type) -> TypeEnv
 extend (TypeEnv env) (x, s) = TypeEnv $ Map.insert x s env
 
 emptyTyenv = TypeEnv Map.empty
@@ -272,7 +272,7 @@ ops = Map.fromList [
     ("or", typeBool `TypeFunc` typeBool `TypeFunc` typeBool)
     ]
 
-lookupEnv :: TypeEnv -> String -> Infer (Subst, Type)
+--lookupEnv :: TypeEnv -> String -> Infer (Subst, Type)
 lookupEnv (TypeEnv env) x =
     case Map.lookup x env of
         Nothing -> do
@@ -469,7 +469,7 @@ infer ctx env ex = case ex of
                 return (env, tv)       -- (0, a)
             (VarPattern n)    -> do                  -- (n -> a, a)
                 tv <- fresh
-                return (env `extend` (n, tv), tv)
+                return (env `extend` (Name n, tv), tv)
             (LitPattern lit) -> return (env, litType lit)   -- (0, litType)
             (ConstrPattern name args) -> do          -- (name -> a, a -> User)
                 (_, t) <- lookupEnv env name           -- t = String -> User
@@ -512,7 +512,7 @@ inferPrim ctx env l t = do
 inferExpr :: Ctx -> TypeEnv -> Expr -> Either TypeError (Type, Expr)
 inferExpr ctx env e = runInfer e $ infer ctx env e
 
-inferTop :: Ctx -> TypeEnv -> [(String, Expr)] -> Either TypeError (TypeEnv, [Expr])
+inferTop :: Ctx -> TypeEnv -> [(Name, Expr)] -> Either TypeError (TypeEnv, [Expr])
 inferTop ctx env [] = Right (env, [])
 inferTop ctx env ((name, ex):xs) = case inferExpr ctx env ex of
     Left err -> Left err
@@ -533,14 +533,14 @@ typeCheck ctx exprs = do
     pred Data{} = True
     pred _      = False
 
-    genTypesForData :: Expr -> [(String, Type)]
+    genTypesForData :: Expr -> [(Name, Type)]
     genTypesForData (Data _ typeName tvars constrs) = constrs >>= genTypes
       where
         dataTypeIdent = case tvars of
             [] -> TypeIdent typeName
             tvars -> TypeApply (TypeIdent typeName) (map TVar tvars)
 
-        genTypes :: DataConst -> [(String, Type)]
+        genTypes :: DataConst -> [(Name, Type)]
         genTypes (DataConst name args) =
             let tpe = normalizeType $ foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args
                 accessors = map (\(Arg n tpe) -> (n, normalizeType $ TypeFunc dataTypeIdent tpe)) args
