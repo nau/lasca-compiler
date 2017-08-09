@@ -26,6 +26,7 @@ import           Foreign.C.String
 import           Foreign.C.Types
 import Foreign.Marshal.Array
 import           Syntax
+import Options
 
 import           Control.Monad.Except
 

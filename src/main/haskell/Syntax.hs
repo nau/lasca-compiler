@@ -15,19 +15,7 @@ import qualified Control.Lens as Lens
 import Control.Lens.Operators
 import Control.Lens.TH
 import           Type
-
---type Name = String
-
-data LascaOpts = LascaOpts
-    { lascaFiles   :: [String]
-    , mode         :: String
-    , exec         :: Bool
-    , verboseMode  :: Bool
-    , printLLVMAsm :: Bool
-    , printAst     :: Bool
-    , printTypes   :: Bool
-    , optimization :: Int
-    } deriving (Show, Eq)
+import Options
 
 data Position = NoPosition | Position {sourceLine :: Word, sourceColumn :: Word} deriving (Eq, Ord)
 

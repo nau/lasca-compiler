@@ -14,7 +14,7 @@ instance IsString Name where
 instance Show Name where
     show n = case n of
         Name s -> s
-        NS prefix n -> show prefix ++ "." ++ show n
+        NS prefix n -> show prefix ++ "_" ++ show n
 
 qnameToString n = show n
 

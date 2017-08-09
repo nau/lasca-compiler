@@ -57,6 +57,7 @@ import Emit
 import Infer
 import qualified Syntax as S
 import Syntax (Ctx, createGlobalContext)
+import qualified Options as Opts
 
 
 staticArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
@@ -383,15 +384,15 @@ resolveBoxing declaredType instantiatedType expr = do
             return expr
 {-# INLINE resolveBoxing #-}
 
-codegenStaticModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> IO AST.Module
+codegenStaticModule :: Opts.LascaOpts -> AST.Module -> [S.Expr] -> IO AST.Module
 codegenStaticModule opts modo exprs = do
     let desugared = desugarExprs ctx desugarExpr exprs
     case typeCheck ctx desugared of
         Right (env, typedExprs) -> do
-            when (S.verboseMode opts) $ putStrLn "typechecked OK"
-            when (S.printTypes opts) $ print env
+            when (Opts.verboseMode opts) $ putStrLn "typechecked OK"
+            when (Opts.printTypes opts) $ print env
             let desugared = delambdafy ctx typedExprs
-            when (S.printAst opts) $ putStrLn $ List.intercalate "\n" (map S.printExprWithType desugared)
+            when (Opts.printAst opts) $ putStrLn $ List.intercalate "\n" (map S.printExprWithType desugared)
             return $ modul desugared
         Left e -> die $ printTypeError e
   where

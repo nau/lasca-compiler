@@ -54,6 +54,7 @@ import Type
 import Emit
 import qualified Syntax as S
 import Syntax (Ctx, createGlobalContext)
+import qualified Options as Opts
 
 
 -- codegenTop :: S.Expr -> LLVM ()
@@ -228,7 +229,7 @@ cgen ctx e = error ("cgen shit " ++ show e)
 -- Compilation
 -------------------------------------------------------------------------------
 
-codegenModule :: S.LascaOpts -> AST.Module -> [S.Expr] -> AST.Module
+codegenModule :: Opts.LascaOpts -> AST.Module -> [S.Expr] -> AST.Module
 codegenModule opts modo exprs = modul
   where
     ctx = createGlobalContext opts exprs

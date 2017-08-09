@@ -53,6 +53,7 @@ import Codegen
 import Type
 import qualified Syntax as S
 import Syntax (Ctx, createGlobalContext)
+import qualified Options as Opts
 
 
 externalTypeMapping :: Type -> AST.Type
@@ -411,7 +412,7 @@ genFunctionMap fns = do
 
 genRuntime opts = defineConst "Runtime" runtimeStructType runtime
   where
-    runtime = createStruct [constRef "Functions", constRef "Types", constBool $ S.verboseMode opts]
+    runtime = createStruct [constRef "Functions", constRef "Types", constBool $ Opts.verboseMode opts]
 
 
 --genMatch :: Ctx -> S.Expr -> S.Expr
