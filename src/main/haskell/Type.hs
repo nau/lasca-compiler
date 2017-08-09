@@ -16,6 +16,8 @@ instance Show Name where
         Name s -> s
         NS prefix n -> show prefix ++ "_" ++ show n
 
+qualify pkg name = if pkg == defaultPackageQName then name else NS pkg name
+
 qnameToString n = show n
 
 qname = Name
@@ -26,7 +28,7 @@ nameToSBS = fromString . show
 nameToBS :: Name -> BS.ByteString
 nameToBS = fromString . show
 
-defaultPackageName = "default"
+defaultPackageName = "Main"
 defaultPackageQName = Name defaultPackageName
 
 newtype TVar = TV String

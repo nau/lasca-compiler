@@ -520,21 +520,28 @@ inferTop ctx env ((name, ex):xs) = case inferExpr ctx env ex of
                             Left err -> Left err
                             Right (ty, exs) -> Right (ty, ex' : exs)
 
-typeCheck :: Ctx -> [Expr] -> Either TypeError (TypeEnv, [Expr])
-typeCheck ctx exprs = do
-    let (dat, other) = List.partition pred exprs
-    let dataConstructorsEnv = dat >>= genTypesForData
-    let a = map f other
-    let (TypeEnv te) = defaultTyenv
-    let typeEnv = TypeEnv (Map.union te (Map.fromList dataConstructorsEnv))
-    let res = inferTop ctx typeEnv a
-    fmap (\(typeEnv, exprs) -> (typeEnv, dat ++ exprs)) res
-  where
-    pred Data{} = True
-    pred _      = False
+data InferStuff = InferStuff {
+    _names :: [(Name, Expr)],
+    _types :: [(Name, Type)],
+    _datas :: [Expr]
+}
+makeLenses ''InferStuff
 
-    genTypesForData :: Expr -> [(Name, Type)]
-    genTypesForData (Data _ typeName tvars constrs) = constrs >>= genTypes
+collectNames exprs = forM_ exprs collectName
+
+collectName :: Expr -> State InferStuff ()
+collectName expr = case expr of
+    Val _ name _ -> do
+        names %= (++ [(name, expr)])
+        return ()
+    Function _ name _ _ _ -> do
+        names %= (++ [(name, expr)])
+        return ()
+    dat@(Data _ typeName tvars constrs) -> do
+        let constructorsTypes = constrs >>= genTypes
+        types %= (++ constructorsTypes)
+        datas %= (++ [dat])
+        return ()
       where
         dataTypeIdent = case tvars of
             [] -> TypeIdent typeName
@@ -545,10 +552,16 @@ typeCheck ctx exprs = do
             let tpe = normalizeType $ foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args
                 accessors = map (\(Arg n tpe) -> (n, normalizeType $ TypeFunc dataTypeIdent tpe)) args
             in (name, tpe) : accessors
-    genTypesForData e = error ("What the hell" ++ show e)
+    Package{} -> return ()
+    Import{} -> return ()
+    _ -> error ("What the fuck " ++ show expr)
 
-
-    f e@(Val _ name _) = (name, e)
-    f e@(Function _ name _ _ _) = (name, e)
-    f e = error ("What the fuck " ++ show e)
-
+typeCheck :: Ctx -> [Expr] -> Either TypeError (TypeEnv, [Expr])
+typeCheck ctx exprs = do
+    let stuff = execState (collectNames exprs) (InferStuff {_names = [], _types = [], _datas = []})
+    let namedExprs = stuff ^. names
+    let dataConstructorsEnv = Map.fromList $ stuff ^. types
+    let (TypeEnv te) = defaultTyenv
+    let typeEnv = TypeEnv (Map.union te dataConstructorsEnv)
+    let res = inferTop ctx typeEnv namedExprs
+    fmap (\(typeEnv, exprs) -> (typeEnv, stuff ^. datas ++ exprs)) res

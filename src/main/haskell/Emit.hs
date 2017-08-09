@@ -266,6 +266,8 @@ defineStringConstants expr = case expr of
     S.Function meta name retType args expr -> do
         defineStringConstants expr
         return ()
+    S.Package{} -> return ()
+    S.Import{} -> return ()
     S.EmptyExpr -> return ()
     S.BoxFunc{} -> return ()
     S.Data{} -> return ()

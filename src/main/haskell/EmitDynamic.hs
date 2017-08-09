@@ -84,6 +84,8 @@ codegenTop ctx (S.Function meta name tpe args body) =
         cgen ctx body >>= ret
 
 codegenTop ctx (S.Data _ name tvars constructors) = return ()
+codegenTop ctx S.Package{} = return ()
+codegenTop ctx S.Import{} = return ()
 
 codegenTop ctx expr =
     error $ printf "Expression of this kind should not get to codegenTop. It's a bug. %s at %s"

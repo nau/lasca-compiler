@@ -1,3 +1,5 @@
+package List
+
 data List a = Nil | Cons(head: a, tail: List a)
 data Box a = Box(i: a) -- remove this when lambda boxing issue is fixed
 

@@ -1,1 +1,8 @@
-def main() = println("Hello world!")
+package Hello
+
+import List
+
+def main() = {
+    list = Cons(1, Nil);
+    println("Hello world! ${list}")
+}

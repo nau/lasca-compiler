@@ -16,6 +16,7 @@ import Options
 import Control.Monad
 import Control.Monad.Trans
 import Data.Maybe
+import Text.Printf
 
 import System.IO
 import System.Environment
@@ -23,8 +24,10 @@ import System.Exit
 import System.Process
 import System.Console.Haskeline
 import Data.List
+import qualified Data.Set as Set
 import Debug.Trace as Debug
 import qualified Text.Megaparsec as Megaparsec
+import Control.Lens.TH
 
 import qualified LLVM.AST as AST
 
@@ -55,17 +58,14 @@ codegen opts modo fns = do
 
 genModule :: LascaOpts -> AST.Module -> String -> IO AST.Module
 genModule opts modo source = do
-  maybeHome <- lookupEnv "LASCA_HOME"
-  let path = fromMaybe "src/main/lasca" (fmap (++ "/src") maybeHome) ++ "/Prelude.lasca"
-  p <- readFile path
-  case parseToplevel p of
-    Left err -> die $ Megaparsec.parseErrorPretty err
-    Right preludeExprs -> case parseToplevel source of
+    let importPreludeAst = Import emptyMeta "Prelude"
+    case parseToplevel source of
       Left err -> die $ Megaparsec.parseErrorPretty err
       Right exprs -> do
-          let ex = preludeExprs ++ exprs
+          let exprs' = (importPreludeAst : exprs)
+          (imported, ex) <- loadImports Set.empty [] exprs'
 --          print exprs
-          when (verboseMode opts) $ putStrLn "Parsed OK"
+          when (verboseMode opts) $ putStrLn ("Parsed OK, imported " ++ show imported)
           when (printAst opts) $ print ex
           when (verboseMode opts) $ putStrLn("Compiler mode is " ++ mode opts)
           if mode opts == "static"
@@ -114,8 +114,34 @@ repl opts = runInputT defaultSettings (loop (initModule "Lasca JIT"))
           Just modn -> loop modn
           Nothing -> loop mod
 
---compile opts homeDir file = do
+loadImport :: Set.Set Name -> [Name] -> Name -> IO (Set.Set Name, [Expr])
+loadImport imported importPath name = do
+    when (name `elem` importPath) $ die (printf "Circular dependency in %s -> %s" (show importPath) (show name))
+    if name `Set.member` imported
+    then return (imported, [])
+    else do
+        let path = "src/main/lasca/" ++ show name ++ ".lasca"
+        p <- readFile path
+        case parseToplevel p of
+            Left err -> die $ Megaparsec.parseErrorPretty err
+            Right moduleExprs -> do
+                (newImported, importedExprs) <- loadImports imported (name : importPath) moduleExprs
+                return $ (newImported, importedExprs ++ moduleExprs)
 
+
+getImports exprs =
+    foldl' (\imports expr -> case expr of
+                          Import _ name -> name : imports
+                          _ -> imports
+                          ) [] exprs
+
+loadImports :: Set.Set Name -> [Name] -> [Expr] -> IO (Set.Set Name, [Expr])
+loadImports imported importPath exprs = do
+    let imports = getImports exprs
+    foldM (\acc@(imported, exprs) name -> do
+        (newImported, newExprs) <- loadImport imported importPath name
+        return $ (Set.union imported newImported, newExprs ++ exprs)
+        ) (imported, exprs) imports
 
 main :: IO ()
 main = parseOptions >>= greet
