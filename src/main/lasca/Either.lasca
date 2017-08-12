@@ -1,0 +1,20 @@
+package Either
+
+data Either a b = Left(left: a) | Right(right: b)
+
+def isLeft(self: Either a b) = match self {
+    Left(l) -> true
+    _ -> false
+}
+
+def isRight(self: Either a b) = match self {
+    Left(l) -> false
+    _ -> true
+}
+
+
+def main() = {
+    l = Left("Test");
+    r = Right(123);
+    println("Left is ${isLeft(l)}, right is left ${r.isLeft}, right is right ${r.isRight}");
+}
