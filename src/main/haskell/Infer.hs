@@ -76,7 +76,7 @@ instance Substitutable Type where
     substitute _ (TypeIdent a)       = TypeIdent a
     substitute s t@(TVar a)     = Map.findWithDefault t a s
     substitute s (t1 `TypeFunc` t2) = substitute s t1 `TypeFunc` substitute s t2
-    substitute s (TypeApply t [args]) = TypeApply (substitute s t) [substitute s args]
+    substitute s (TypeApply t args) = TypeApply (substitute s t) (substitute s args)
     substitute s (Forall tvars t) = Forall tvars $ substitute s' t
                                where s' = foldr Map.delete s tvars
     substitute s t = error $ "Wat? " ++ show s ++ ", " ++ show t
@@ -84,8 +84,7 @@ instance Substitutable Type where
     ftv TypeIdent{}         = Set.empty
     ftv (TVar a)       = Set.singleton a
     ftv (t1 `TypeFunc` t2) = ftv t1 `Set.union` ftv t2
-    ftv (TypeApply _ [])         = error "Should not be TypeApply without arguments!" -- TODO use NonEmpty List?
-    ftv (TypeApply t args)       = Set.unions (ftv t : List.map ftv args)
+    ftv (TypeApply t args)       = ftv args
     ftv (Forall as t) = ftv t `Set.difference` Set.fromList as
 
 instance Substitutable a => Substitutable [a] where
