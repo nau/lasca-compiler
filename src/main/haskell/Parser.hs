@@ -13,9 +13,10 @@ import qualified Data.Map.Strict as Map
 import           Data.List.NonEmpty
 import qualified Data.Set as Set
 import           Data.Foldable
+import qualified Data.Scientific as Sci
 import           Text.Megaparsec as Megaparsec
 import qualified Text.Megaparsec.Expr   as Ex
-import           Text.Megaparsec.String
+import Text.Megaparsec.Char
 import Text.Megaparsec.Pos
 
 
@@ -407,7 +408,7 @@ toplevel = many $ defn
 
 parseExpr s = parse (contents expr) "<stdin>" s
 
-parseInterpol :: String -> Either (ParseError Char Dec) [Either String Expr]
+--parseInterpol :: String -> Either (ParseError Char Dec) [Either String Expr]
 parseInterpol s = parse (contents pTemplate) "<stdin>" s
 
 parseToplevel s = parse (contents toplevel) "<stdin>" s

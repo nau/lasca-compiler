@@ -1,10 +1,12 @@
-resolver:  nightly-2017-07-31
+resolver:  nightly-2017-09-07
 packages:
 - location: '.'
 #- location:
 #    git: https://github.com/llvm-hs/llvm-hs-pretty.git
 #    commit: bb56f12e348aa1e19ec6111cecd200d4e0ffced9
 flags:
+extra-lib-dirs:
+  - '.'
 ghc-options:
   lasca:
     -O0

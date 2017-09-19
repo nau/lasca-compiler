@@ -12,7 +12,7 @@ OPTS = -no-user-package-db -package-db .cabal-sandbox/*-packages.conf.d
 TEST_RTS =
 
 bench:
-	time lasca -O2 -e src/main/lasca/gen.lasca +RTS -sstderr
+	time lasca -O2 -e src/main/lasca/gen.lasca
 
 rts:
 	$(CC) -shared -fPIC -g -O3 -I/usr/local/include -L/usr/local/lib -lgc -lstdc++ src/main/c/*.c* -o liblascart.so

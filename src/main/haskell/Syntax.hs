@@ -18,7 +18,7 @@ import Control.Lens.TH
 import           Type
 import Options
 
-data Position = NoPosition | Position {sourceLine :: Word, sourceColumn :: Word} deriving (Eq, Ord)
+data Position = NoPosition | Position {sourceLine :: Int, sourceColumn :: Int} deriving (Eq, Ord)
 
 data Meta = Meta {
     pos :: Position,
