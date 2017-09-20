@@ -71,13 +71,13 @@ Ideas
   https://github.com/pleiad/Refinements
   http://leon.epfl.ch
   https://github.com/ucsd-progsys/liquidhaskell
-  Z3 (commercial license?), CVC4 as proof assistant.  
+  Z3 (commercial license?), CVC4 as proof assistant.
+- Algebraic Subtyping? (https://www.cl.cam.ac.uk/~sd601/thesis.pdf)   
 - light, non-symbol-polluted syntax
 - Uniqueness type (inplace write, no gc)
   See Rust, Pony, Idris Unique type
   http://lampwww.epfl.ch/~phaller/doc/capabilities-uniqueness2.pdf  
 - indentation-based? 
-	no, curly braces: merge conflicts!, reformat, easier to copy-paste from SO 
 - readability first
 - fast development cycle
 - presentation compiler (JSON compiler API?)
@@ -297,19 +297,18 @@ One is a standard HM/System F(w)
 
 Another for side effect tracking. Consider annotations or inside comments annotations
  
-Another for, say, O-complexity tracking.
- 
 ```scala
-	--@ O(1), pure, total 
+	@ pure, total 
 	def toString(a): String = "a"
-	--@ O(1), pure
+	@  pure
 	def head(l: List a): a = {
 	  require(l.size > 0) -- compile time proof
 	  match l {
-	  | Cons(v) -> v
+	    Cons(v) -> v
+	    Nil -> panic("Empty list")
 	  }
 	}
-	-- @ String -> IO ()
+  @ String -> IO ()
 	def println(s: String): Unit
 ``` 
 

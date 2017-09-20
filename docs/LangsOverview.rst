@@ -113,7 +113,7 @@ Basically, Gabriel summarize it to several rules:
 2. Don't use lenses for the same reason.
 3. Don't use point-free style.
 4. Use do notation generously
-  Meaning, write your code imperatively, don't do huge one-liners
+   Meaning, write your code imperatively, don't do huge one-liners
 
 Can't agree more.
 
@@ -407,9 +407,6 @@ Cons
 
 Any dynamic language
 --------------------
-
-{temperature : 383}
-<temperature>393</temperature>
 
 Writing code is the easiest part of software development. The most
 interesting part comes after the code is written. Its maintenance,
