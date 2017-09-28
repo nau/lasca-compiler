@@ -1,7 +1,6 @@
 {-# LANGUAGE Strict            #-}
 module Parser (
   parseExpr,
-  parseInterpol,
   parseToplevel
 ) where
 
@@ -9,6 +8,7 @@ import           Control.Applicative    ((<$>))
 import Control.Monad.State
 import qualified Data.Char as Char
 import           Data.List as List
+import           Data.Maybe
 import qualified Data.Map.Strict as Map
 import           Data.List.NonEmpty
 import qualified Data.Set as Set
@@ -237,6 +237,7 @@ typeAscription = do
 
 function :: Parser Expr
 function = do
+    annots <- optional annotations
     reserved "def"
     meta <- getMeta
     name <- identifier
@@ -244,7 +245,10 @@ function = do
     tpe <- option typeAny typeAscription
     reservedOp "="
     body <- expr
-    let meta' = meta { _exprType = foldr (TypeFunc . const typeAny) tpe args } -- TODO not sure why we need this. maybe in dynamic mode for... check and remove
+    let meta' = meta {
+        _exprType = foldr (TypeFunc . const typeAny) tpe args, -- TODO not sure why we need this. maybe in dynamic mode for... check and remove
+        _annots = fromMaybe [] annots
+    }
     return (Function meta' (Name name) tpe args body)
 
 extern :: Parser Expr
@@ -393,6 +397,10 @@ importDef = do
     name <- identifier
     return $ Import meta (Name name)
 
+annotations = do
+  reservedOp "@"
+  commaSep identifier
+
 defn :: Parser Expr
 defn =  try packageDef
     <|> try importDef
@@ -407,8 +415,5 @@ toplevel :: Parser [Expr]
 toplevel = many $ defn
 
 parseExpr s = parse (contents expr) "<stdin>" s
-
---parseInterpol :: String -> Either (ParseError Char Dec) [Either String Expr]
-parseInterpol s = parse (contents pTemplate) "<stdin>" s
 
 parseToplevel s = parse (contents toplevel) "<stdin>" s

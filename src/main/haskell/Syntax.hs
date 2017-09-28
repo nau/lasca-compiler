@@ -23,19 +23,20 @@ data Position = NoPosition | Position {sourceLine :: Int, sourceColumn :: Int} d
 data Meta = Meta {
     pos :: Position,
     _exprType :: Type,
-    _isExternal :: Bool
+    _isExternal :: Bool,
+    _annots :: [String]
 } deriving (Eq, Ord)
 makeLenses ''Meta
 
 instance Show Meta where
 --  show (Meta pos tpe) = "Meta{pos=" ++ show pos ++ ", tpe=" ++ show tpe ++ "}"
-    show meta = show (_exprType meta)
+    show meta = show (_annots meta) ++ " " ++ show (_exprType meta)
 
 instance Show Position where
     show NoPosition = "<unknown>"
     show Position{sourceLine = sl, sourceColumn = sc} = show sl ++ ":" ++ show sc
 
-emptyMeta = Meta { pos = NoPosition, _exprType = typeAny, _isExternal = False }
+emptyMeta = Meta { pos = NoPosition, _exprType = typeAny, _isExternal = False, _annots = [] }
 
 withMetaPos line col = emptyMeta { pos = Position {sourceLine = line, sourceColumn = col} }
 
