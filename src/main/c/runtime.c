@@ -52,8 +52,7 @@ typedef struct {
 
 typedef struct {
     int funcIdx;
-    int argc;
-    Box** argv;
+    Box* args;  // boxed Array of boxed enclosed arguments
 } Closure;
 
 typedef struct {
@@ -156,6 +155,7 @@ void *gcRealloc(void* old, size_t s) {
 
 Box* toString(Box* value);
 Box* println(Box* val);
+Box* boxArray(size_t size, ...);
 
 const char * __attribute__ ((const)) typeIdToName(int typeId) {
     switch (typeId) {
@@ -208,22 +208,21 @@ Box * __attribute__ ((pure)) boxFloat64(double i) {
     return ti;
 }
 
-Box * boxClosure(int idx, int argc, Box** args) {
+Box * boxClosure(int idx, Box* args) {
     Closure* cl = gcMalloc(sizeof(Closure));
-  //  printf("boxClosure(%d, %d, %p)\n", idx, argc, args);
-  //  fflush(stdout);
+//    printf("boxClosure(%d, %p)\n", idx, args);
+//    fflush(stdout);
     cl->funcIdx = idx;
-    cl->argc = argc;
-    cl->argv = args;
-  //  printf("Enclose %d, argc = %d, args[0].type = %d, args[1].type = %d\n", idx, argc, args[0]->type, args[1]->type);
-  //  fflush(stdout);
+    cl->args = args;
+//    printf("Enclose %d, argc = %d, args[0].type = %d, args[1].type = %d\n", idx, argc, args[0]->type, args[1]->type);
+//    fflush(stdout);
     return box(CLOSURE, cl);
 }
 
 Box * __attribute__ ((pure)) boxFunc(int idx) {
-  //  printf("boxFunc(%d)\n", idx);
-  //  fflush(stdout);
-    return boxClosure(idx, 0, NULL);
+//    printf("boxFunc(%d)\n", idx);
+//    fflush(stdout);
+    return boxClosure(idx, NULL);
 }
 
 void * __attribute__ ((pure)) unbox(int expected, Box* ti) {
@@ -370,9 +369,9 @@ Box* runtimeApply(Box* val, int argc, Box* argv[], Position pos) {
         exit(1);
     }
     Function f = fs->functions[closure->funcIdx];
-    if (f.arity != argc + closure->argc) {
+    if (f.arity != argc + (closure->args == NULL ? 0 : 1)) {
         printf("AAAA!!! Function %.*s takes %d params, but passed %d enclosed params and %d params instead at line: %d\n",
-            f.name->length, f.name->bytes, f.arity, closure->argc, argc, pos.line);
+            f.name->length, f.name->bytes, f.arity, (closure->args == NULL ? 0 : 1), argc, pos.line);
         exit(1);
     }
     // TODO: use platform ABI, like it should be.
@@ -384,56 +383,48 @@ Box* runtimeApply(Box* val, int argc, Box* argv[], Position pos) {
         }
         case 1: {
             void* (*funcptr)(Box*) = f.funcPtr;
-            return (argc == 1) ? funcptr(argv[0]) : funcptr(closure->argv[0]);
+            return (argc == 1) ? funcptr(argv[0]) : funcptr(closure->args);
         }
         case 2: {
             void* (*funcptr)(Box*, Box*) = f.funcPtr;
             switch (argc) {
-                case 0: return funcptr(closure->argv[0], closure->argv[1]);
-                case 1: return funcptr(closure->argv[0], argv[0]);
+                case 1: return funcptr(closure->args, argv[0]);
                 case 2: return funcptr(argv[0], argv[1]);
             }
         }
         case 3: {
             void* (*funcptr)(Box*, Box*, Box*) = f.funcPtr;
                 switch (argc) {
-                    case 0: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2]);
-                    case 1: return funcptr(closure->argv[0], closure->argv[1], argv[0]);
-                    case 2: return funcptr(closure->argv[0], argv[0], argv[1]);
+                    case 2: return funcptr(closure->args, argv[0], argv[1]);
                     case 3: return funcptr(argv[0], argv[1], argv[2]);
                 }
         }
         case 4: {
             void* (*funcptr)(Box*, Box*, Box*, Box*) = f.funcPtr;
             switch (argc) {
-                case 0: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], closure->argv[3]);
-                case 1: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], argv[0]);
-                case 2: return funcptr(closure->argv[0], closure->argv[1], argv[0], argv[1]);
-                case 3: return funcptr(closure->argv[0], argv[0], argv[1], argv[2]);
+                case 3: return funcptr(closure->args, argv[0], argv[1], argv[2]);
                 case 4: return funcptr(argv[0], argv[1], argv[2], argv[3]);
             }
         }
         case 5: {
             void* (*funcptr)(Box*, Box*, Box*, Box*, Box*) = f.funcPtr;
             switch (argc) {
-                case 0: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], closure->argv[3], closure->argv[4]);
-                case 1: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], closure->argv[3], argv[0]);
-                case 2: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], argv[0], argv[1]);
-                case 3: return funcptr(closure->argv[0], closure->argv[1], argv[0], argv[1], argv[2]);
-                case 4: return funcptr(closure->argv[0], argv[0], argv[1], argv[2], argv[3]);
+                case 4: return funcptr(closure->args, argv[0], argv[1], argv[2], argv[3]);
                 case 5: return funcptr(argv[0], argv[1], argv[2], argv[3], argv[4]);
             }
         }
         case 6: {
             void* (*funcptr)(Box*, Box*, Box*, Box*, Box*, Box*) = f.funcPtr;
             switch (argc) {
-                case 0: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], closure->argv[3], closure->argv[4], closure->argv[5]);
-                case 1: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], closure->argv[3], closure->argv[4], argv[0]);
-                case 2: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], closure->argv[3], argv[0], argv[1]);
-                case 3: return funcptr(closure->argv[0], closure->argv[1], closure->argv[2], argv[0], argv[1], argv[2]);
-                case 4: return funcptr(closure->argv[0], closure->argv[1], argv[0], argv[1], argv[2], argv[3]);
-                case 5: return funcptr(closure->argv[1], argv[0], argv[1], argv[2], argv[3], argv[4]);
+                case 5: return funcptr(closure->args, argv[0], argv[1], argv[2], argv[3], argv[4]);
                 case 6: return funcptr(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
+            }
+        }
+        case 7: {
+            void* (*funcptr)(Box*, Box*, Box*, Box*, Box*, Box*, Box*) = f.funcPtr;
+            switch (argc) {
+                case 6: return funcptr(closure->args, argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
+                case 7: return funcptr(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5], argv[6]);
             }
         }
         default:

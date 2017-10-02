@@ -164,9 +164,17 @@ extractLambda2 meta args expr = do
     let enclosedArgs = map (\n -> (S.Arg n typeAny, _outers state Map.! n)) usedOuterVars
     let (funcName', nms') = uniqueName (fromString $ (show curFuncName) ++ "_lambda") nms
     let funcName = Name $ Char8.unpack funcName'
-    let asdf t = foldr (\(_, t) resultType -> TypeFunc t resultType) t enclosedArgs
-    let meta' = (S.exprType %~ asdf) meta
-    let func = S.Function meta' funcName typeAny (map fst enclosedArgs ++ args) expr
+    let enclosedArgType = TypeApply (TypeIdent "Array") [typeAny]
+    let addEnclosedArgsParameter t = TypeFunc enclosedArgType t -- HACK with Array type
+    let meta' = (S.exprType %~ addEnclosedArgsParameter) meta
+    let generateEnclosedLocals ((S.Arg name tpe, _), idx) e = do
+            let m = meta
+            let body = S.Apply m (S.Ident meta "arrayApply") [
+                  S.Ident (meta `S.withType` enclosedArgType) "$enclosed",
+                  S.Literal (meta `S.withType` TypeIdent "Int") $ S.IntLit idx]
+            S.Let m name body e
+    let expr1 = foldr generateEnclosedLocals expr (zip enclosedArgs [0..])
+    let func = S.Function meta' funcName typeAny (S.Arg "$enclosed" typeAny : args) expr1
     modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
     s <- get
 --    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" funcName (show outerVars) (show usedOuterVars) (show s)
@@ -336,18 +344,10 @@ boxClosure name mapping enclosedVars = do
     let idx = fromMaybe (error ("Couldn't find " ++ show name ++ " in mapping:\n" ++ show mapping)) (Map.lookup name mapping)
     let argc = length enclosedVars
     let findArg n = fromMaybe (error ("Couldn't find " ++ show n ++ " variable in symbols " ++ showSyms syms)) (lookup n syms)
-    let args = map (\(S.Arg n _) -> findArg n) enclosedVars
-    sargsPtr <- gcMalloc (constIntOp $ ptrSize * argc)
-    sargsPtr1 <- bitcast sargsPtr (T.ptr ptrType)
-    let asdf (idx, arg) = do
-            p <- getelementptr sargsPtr1 [idx]
-            bc1 <- bitcast p (T.ptr ptrType)
-            bc <- load arg
-            store bc1 bc
+    args <- forM enclosedVars $  \(S.Arg n _) -> load (findArg n)
 
-    let sargs = sargsPtr
-    sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0 .. argc] args]
-    callFn "boxClosure" [constIntOp idx, constIntOp argc, sargsPtr]
+    sargsPtr <- if null enclosedVars then return constNullPtrOp else boxArray args
+    callFn "boxClosure" [constIntOp idx, sargsPtr]
 
 boolToInt True = 1
 boolToInt False = 0
@@ -363,7 +363,7 @@ declareStdFuncs = do
     external ptrType "boxInt" [("d", intType)] False [FA.GroupID 0]
     external ptrType "boxBool" [("d", intType)] False [FA.GroupID 0]
     external ptrType "boxFunc" [("id", intType)] False [FA.GroupID 0]
-    external ptrType "boxClosure" [("id", intType), ("argc", intType), ("argv", ptrType)] False []
+    external ptrType "boxClosure" [("id", intType), ("argv", ptrType)] False []
     external ptrType "boxFloat64" [("d", T.double)] False [FA.GroupID 0]
     external ptrType "boxArray" [("size", intType)] True [FA.GroupID 0]
     external ptrType "runtimeBinOp"  [("code",  intType), ("lhs",  ptrType), ("rhs", ptrType)] False [FA.GroupID 0]

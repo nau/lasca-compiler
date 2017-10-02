@@ -40,7 +40,9 @@ emptyMeta = Meta { pos = NoPosition, _exprType = typeAny, _isExternal = False, _
 
 withMetaPos line col = emptyMeta { pos = Position {sourceLine = line, sourceColumn = col} }
 
-metaWithType s = emptyMeta { _exprType = s }
+emptyMetaWithType s = emptyMeta { _exprType = s }
+
+withType meta t = meta { _exprType = t }
 
 data Expr
     = EmptyExpr
@@ -241,7 +243,7 @@ createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
                                   then (funcs, n : vals)
                                   else let dataTypeIdent = TypeIdent name
                                            tpe = (foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args) -- FIXME forall
-                                           meta = metaWithType tpe
+                                           meta = emptyMetaWithType tpe
                                            funDef = Function meta n dataTypeIdent args EmptyExpr
                                        in ((n, funDef) : funcs, vals)) ([], []) consts
             -- FIXME Merge with above, create State?

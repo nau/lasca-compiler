@@ -280,8 +280,6 @@ lookupEnv (TypeEnv env) x =
         Just s  -> do t <- instantiate s
                       return (nullSubst, t)
 
-withType meta t = meta { _exprType = t }
-
 setType :: Expr -> Infer ()
 setType e = modify (\s -> s {_current = e })
 

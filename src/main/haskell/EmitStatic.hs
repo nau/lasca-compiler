@@ -294,6 +294,47 @@ cgen ctx (S.If meta cond tr fl) = do
 
 cgen ctx e = error ("cgen shit " ++ show e)
 
+
+cgenIf resultType test tr fl = do
+    ifthen <- addBlock "if.then"
+    ifelse <- addBlock "if.else"
+    ifexit <- addBlock "if.exit"
+    -- %entry
+    ------------------
+    cbr test ifthen ifelse -- Branch based on the condition
+
+    -- if.then
+    ------------------
+    setBlock ifthen
+    trval <- tr       -- Generate code for the true branch
+    br ifexit              -- Branch to the merge block
+    ifthen <- getBlock
+
+    -- if.else
+    ------------------
+    setBlock ifelse
+    flval <- fl       -- Generate code for the false branch
+    br ifexit              -- Branch to the merge block
+    ifelse <- getBlock
+
+    -- if.exit
+    ------------------
+    setBlock ifexit
+    phi resultType [(trval, ifthen), (flval, ifelse)]
+
+cgenArrayApply array idx = do
+    boxedArrayPtr <- bitcast array (T.ptr $ boxStructOfType (T.ptr $ arrayStructType ptrType)) -- Box(type, &Array(len, &data[])
+    arrayStructAddr <- getelementptr boxedArrayPtr [constInt64Op 0, constIntOp 1]
+    arrayStructPtr <- load arrayStructAddr
+    arraysize <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 0]
+    size <- load arraysize
+    -- TODO check idx is in bounds, eliminatable
+    arrayDataAddr <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 1]
+    arraDataPtr <- load arrayDataAddr
+    arrayDataArray <- bitcast arraDataPtr (T.ptr (T.ArrayType 0 ptrType))
+    ptr' <- getelementptr arrayDataArray [constInt64Op 0, idx]
+    load ptr'
+
 cgenApply ctx meta expr args = do
     syms <- gets symtab
     let symMap = Map.fromList syms
@@ -307,17 +348,8 @@ cgenApply ctx meta expr args = do
             array <- cgen ctx arrayExpr -- should be a pointer to either boxed or unboxed array
             boxedIdx <- cgen ctx indexExpr -- must be T.i32. TODO should be platform-dependent
             idx <- unboxInt boxedIdx
-            boxedArrayPtr <- bitcast array (T.ptr $ boxStructOfType (T.ptr $ arrayStructType ptrType)) -- Box(type, &Array(len, &data[])
-            arrayStructAddr <- getelementptr boxedArrayPtr [constInt64Op 0, constIntOp 1]
-            arrayStructPtr <- load arrayStructAddr
-            arraysize <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 0]
-            size <- load arraysize
-            -- TODO check idx is in bounds, eliminatable
-            arrayDataAddr <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 1]
-            arraDataPtr <- load arrayDataAddr
-            arrayDataArray <- bitcast arraDataPtr (T.ptr (T.ArrayType 0 ptrType))
-            ptr' <- getelementptr arrayDataArray [constInt64Op 0, idx]
-            load ptr'
+--            callFn "arrayApply" [array, idx]
+            cgenArrayApply array idx
                     
         S.Ident _ fn | isExtern fn -> do
             let (S.Function _ _ returnType externArgs _) = S._globalFunctions ctx Map.! fn
@@ -346,30 +378,65 @@ cgenApply ctx meta expr args = do
             sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
             -- cdecl calling convension, arguments passed right to left
             sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0..] largs]
-            let pos = createPosition $ S.pos meta
-            callFn "runtimeApply" [e, argc, sargs, constOp pos]
+            
+
+            closure <- unbox e
+            closureTyped <- bitcast closure (T.ptr closureStructType)
+            enclosedArgsAddr <- getelementptr closureTyped [constIntOp 0, constIntOp 1]
+            enclosedArgs <- load enclosedArgsAddr
+--            Functions* fs = RUNTIME->functions;
+--            Function f = fs->functions[closure->funcIdx];
+            funPtr <- funcPtrFromClosure closure
+            let argsTypes = map (const ptrType) args
+            funPtrTyped1 <- bitcast funPtr (T.ptr (funcType ptrType argsTypes))
+            funPtrTyped2 <- bitcast funPtr (T.ptr (funcType ptrType (ptrType : argsTypes)))
+
+            ptr <- ptrtoint enclosedArgs T.i64
+            test <- instr (I.ICmp IP.EQ ptr (constInt64Op 0) [])
+            cgenIf ptrType test (call funPtrTyped1 largs) (call funPtrTyped2 (enclosedArgs : largs))
 
 -------------------------------------------------------------------------------
 -- Compilation
 -------------------------------------------------------------------------------
+
+funcPtrFromClosure closure = do
+    modState <- gets moduleState
+    let mapping = functions modState
+    let len = Map.size mapping
+    closureTyped <- bitcast closure (T.ptr closureStructType)
+    idxPtr <- getelementptr closureTyped [constIntOp 0, constIntOp 0]
+    idx <- instrTyped T.i32 $ I.Load False idxPtr Nothing 0 []
+--    callFn "putInt" [idx]
+    let fst = functionsStructType (fromIntegral len)
+    let fnsAddr = (global (T.ptr fst) (nameToSBS "Functions"))
+    fns <- instrTyped (T.ptr fst) $ I.Load False fnsAddr Nothing 0 []
+    sizeAddr <- getelementptr fnsAddr [constIntOp 0, constIntOp 0]
+    size <- instrTyped T.i32 $ I.Load False sizeAddr Nothing 0 []
+--     Functions[idx].funcPtr
+    fnPtr <- getelementptr fnsAddr [constIntOp 0, constIntOp 1, idx, constIntOp 1]
+    load fnPtr
+
 castBoxedValue declaredType value = case declaredType of
     TypeIdent "Float" -> ptrtofp value
     TypeIdent "Int"   -> ptrtoint value T.i32
     _                 -> return value
 {-# INLINE castBoxedValue #-}
 
-unboxInt expr = do
+unbox expr = do
     boxed <- bitcast expr (T.ptr boxStructType)
     unboxedAddr <- getelementptr boxed [constIntOp 0, constIntOp 1]
-    unboxed <- load unboxedAddr
+    load unboxedAddr
+{-# INLINE unbox #-}
+
+unboxInt expr = do
+    unboxed <- unbox expr
     castBoxedValue (TypeIdent "Int") unboxed
 {-# INLINE unboxInt #-}
 
 unboxFloat64 expr = do
-    boxed <- bitcast expr (T.ptr boxStructType)
-    unboxedAddr <- getelementptr boxed [constIntOp 0, constIntOp 1]
-    unboxed <- load unboxedAddr
+    unboxed <- unbox expr
     castBoxedValue (TypeIdent "Float") unboxed
+{-# INLINE unboxFloat64 #-}
 
 resolveBoxing declaredType instantiatedType expr = do
     case (declaredType, instantiatedType) of

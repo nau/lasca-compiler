@@ -223,14 +223,17 @@ current = do
         Nothing -> error $ "No such block: " ++ show c
 
 instr :: Instruction -> Codegen Operand
-instr ins = do
+instr ins = instrTyped ptrType ins
+{-# INLINE instr #-}
+
+instrTyped tpe ins = do
     n <- fresh
     let ref = UnName n
     blk <- current
     let i = stack blk
     modifyBlock (blk { stack = i ++ [ref := ins] } )
-    return $ LocalReference ptrType ref
-{-# INLINE instr #-}
+    return $ LocalReference tpe ref
+{-# INLINE instrTyped #-}
 
 terminator :: Named Terminator -> Codegen (Named Terminator)
 terminator trm = do
@@ -303,6 +306,7 @@ constOp = ConstantOperand
 
 constNull tpe = C.IntToPtr (C.Int 32 0) (T.ptr tpe)
 constNullPtr = constNull T.i8
+constNullPtrOp = constOp constNullPtr
 
 constInt :: Int -> C.Constant
 constInt i = C.Int 32 (toInteger i)
@@ -439,6 +443,8 @@ boxStructType = boxStructOfType ptrType
 arrayStructType elemType = T.StructureType False [T.i32, T.ptr elemType]
 
 positionStructType = T.StructureType False [T.i32, T.i32]
+
+closureStructType = T.StructureType False [T.i32, ptrType]
 
 functionStructType = T.StructureType False [ptrType, ptrType, T.i32]
 
