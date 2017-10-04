@@ -20,7 +20,7 @@ import           Data.Word
 import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.IO as TIO
-import System.Environment (getArgs)
+import System.IO
 import           Foreign.Ptr          (FunPtr, Ptr, castFunPtr)
 import           Foreign.C.String
 import           Foreign.C.Types
@@ -63,14 +63,17 @@ runJIT :: LascaOpts -> AST.Module -> IO AST.Module
 runJIT opts mod = do
 --  let llvmAst = ppllvm mod
 --  TIO.putStrLn $ LT.toStrict llvmAst
-    withContext $ \context ->
+    withContext $ \context -> do
+--        runtimeLl <- readFile "runtime.ll"
+
         jit context $ \executionEngine ->
+--            withModuleFromLLVMAssembly context runtimeLl $ \stdModule ->
             withModuleFromAST context mod $ \m ->
                 withPassManager (passes (optimization opts)) $ \pm -> do
                     -- Optimization Pass
+--                    linkModules m stdModule
                     runPassManager pm m
                     optmod <- moduleAST m
-
                     when (printLLVMAsm opts) $ do
                         s <- moduleLLVMAssembly m
                         Char8.putStrLn s
