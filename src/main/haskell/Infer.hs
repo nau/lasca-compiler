@@ -51,6 +51,7 @@ data TypeError
     | InfiniteType Expr TVar Type
     | UnboundVariable Expr Name
     | UnificationMismatch Expr [Type] [Type]
+    | ArityMismatch Expr Type Int Int
     deriving (Eq, Ord, Show)
 
 printTypeError typeError = case typeError of
@@ -66,6 +67,9 @@ printTypeError typeError = case typeError of
     UnificationMismatch expr expected infered ->
         printf "%s: Type error: expected type %s but got %s in expression %s"
           (show $ exprPosition expr) (show expected) (show infered) (show expr)
+    ArityMismatch expr tpe expected actual ->
+        printf "%s: Call error: applying %s arguments to a function of type %s with arity %s in expression %s"
+          (show $ exprPosition expr) (show actual) (show tpe) (show expected) (show expr)
 
 class Substitutable a where
     substitute :: Subst -> a -> a
@@ -79,7 +83,7 @@ instance Substitutable Type where
     substitute s (TypeApply t args) = TypeApply (substitute s t) (substitute s args)
     substitute s (Forall tvars t) = Forall tvars $ substitute s' t
                                where s' = foldr Map.delete s tvars
-    substitute s t = error $ "Wat? " ++ show s ++ ", " ++ show t
+--    substitute s t = error $ "Wat? " ++ show s ++ ", " ++ show t
 
     ftv TypeIdent{}         = Set.empty
     ftv (TVar a)       = Set.singleton a
@@ -305,24 +309,35 @@ infer ctx env ex = case ex of
         s3 <- unify (TypeFunc t1 (TypeFunc t2 tv)) (ops Map.! op)
         return (s1 `compose` s2 `compose` s3, substitute s3 tv)
 
-    Apply meta e1 [arg] -> do
+    this@(Apply meta expr args) -> do
         tv <- fresh
-        (s1, t1) <- infer ctx env e1
-        e1' <- gets _current
-        (s2, t2) <- infer ctx (substitute s1 env) arg
-        e2' <- gets _current
-        s3       <- unify (substitute s2 t1) (TypeFunc t2 tv)
-        let tpe = substitute s3 tv
-        setType $ Apply (meta `withType` tpe) e1' [e2']
-        return (s3 `compose` s2 `compose` s1, tpe)
+        (s1, exprType) <- infer ctx env expr
+        expr1 <- gets _current
+        let exprArity = funcTypeArity exprType
+        let argLen = length args
+        {- Check we don't partially apply a function.
+           Currently we only support fully applied function calls.
 
-    Apply meta e1 args -> do
-       let curried = List.foldl' (\expr arg -> Apply meta expr [arg]) e1 args
-       (subst, t) <- infer ctx env curried
-       e' <- gets _current
-       let (uncurried, args') = foldr (\_ ((Apply _ e [a']), as) -> (e, a':as)) (e', []) args
-       setType $ Apply (meta `withType` t) uncurried args'
-       return (subst, t)
+           Note, argLen /= exprArity is a valid scenario
+           exptType can be a free type variable
+
+           def foo(f) = f(1, 2)
+
+           here exprType would be TV "1", and argLen = 2
+           We should infer f: Int -> Int -> a, and foo: (Int -> Int -> a) -> a
+           Same applies to recursive calls.
+        -}
+        if argLen < exprArity then do
+--            Debug.traceM $ printf "%s subst %s env %s" (show exprType) (show s1) (show env)
+            throwError $ ArityMismatch this exprType exprArity argLen
+        else do
+            (s2, applyType, args') <- inferPrim ctx env args exprType
+            let subst = s2 `compose` s1
+            let subApplyType = substitute subst applyType
+            let subExprType = substitute subst exprType
+--            Debug.traceM $ printf "%s === %s, subst %s" (show subExprType) (show subApplyType) (show subst)
+            setType $ Apply (meta `withType` subApplyType) expr1 args'
+            return (subst, subApplyType)
 
     Let meta x e1 e2 -> do
         (s1, t1) <- infer ctx env e1
@@ -499,12 +514,12 @@ inferPrim ctx env l t = do
     let composedType = substitute s1 (tf tv)
 --    Debug.traceM $ "composedType " ++ show composedType
     s2 <- unify composedType t
-    return (s2 `compose` s1, substitute s2 tv, exprs)
+    return (s2 `compose` s1, substitute s2 tv, reverse exprs)
   where
     inferStep (s, tf, exprs) exp = do
         (s', t) <- infer ctx (substitute s env) exp
         exp' <- gets _current
-        return (s' `compose` s, tf . TypeFunc t, exprs ++ [exp'])
+        return (s' `compose` s, tf . TypeFunc t, exp' : exprs)
 
 inferExpr :: Ctx -> TypeEnv -> Expr -> Either TypeError (Type, Expr)
 inferExpr ctx env e = runInfer e $ infer ctx env e

@@ -73,3 +73,6 @@ typeToList tpe = reverse $ go tpe []
   where go (TypeFunc a b) acc = go b (a : acc)
         go (Forall tvars tpe) acc = go tpe acc
         go a acc              = a : acc
+
+funcTypeArity this@(TypeFunc a b) = (length $ typeToList this) - 1
+funcTypeArity _ = 0
