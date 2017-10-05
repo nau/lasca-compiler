@@ -17,11 +17,16 @@ import Control.Monad
 import Control.Monad.Trans
 import Data.Maybe
 import Text.Printf
+import qualified Data.ByteString.Char8 as Char8
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as SBS
 
 import System.IO
 import System.Environment
 import System.Exit
 import System.Process
+import System.Directory
+import System.FilePath
 import System.Console.Haskeline
 import Data.List
 import qualified Data.Set as Set
@@ -59,8 +64,12 @@ codegen opts modo fns = do
 genModule :: LascaOpts -> AST.Module -> String -> IO AST.Module
 genModule opts modo source = do
     let importPreludeAst = Import emptyMeta "Prelude"
-    case parseToplevel source of
-      Left err -> die $ Megaparsec.parseErrorPretty err
+    let filePath = Char8.unpack (SBS.fromShort $ AST.moduleSourceFileName modo)
+    dir <- getCurrentDirectory
+    let absoluteFilePath = dir </> filePath
+    case parseToplevelFilename absoluteFilePath source of
+      Left err -> do
+          die $ Megaparsec.parseErrorPretty err
       Right exprs -> do
           let exprs' = (importPreludeAst : exprs)
           (imported, ex) <- loadImports Set.empty [] exprs'

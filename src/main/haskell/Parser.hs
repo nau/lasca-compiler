@@ -1,6 +1,7 @@
 {-# LANGUAGE Strict            #-}
 module Parser (
   parseExpr,
+  parseToplevelFilename,
   parseToplevel
 ) where
 
@@ -416,4 +417,6 @@ toplevel = many $ defn
 
 parseExpr s = parse (contents expr) "<stdin>" s
 
-parseToplevel s = parse (contents toplevel) "<stdin>" s
+parseToplevelFilename fileName s = parse (contents toplevel) fileName s
+
+parseToplevel s = parseToplevelFilename "<stdin>" s
