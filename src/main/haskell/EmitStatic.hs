@@ -50,6 +50,8 @@ import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
 import qualified Debug.Trace as Debug
 import System.Exit
+import System.Directory
+import System.FilePath
 
 import Codegen
 import Type
@@ -461,7 +463,11 @@ codegenStaticModule opts modo exprs = do
             let desugared = delambdafy ctx typedExprs
             when (Opts.printAst opts) $ putStrLn $ List.intercalate "\n" (map S.printExprWithType desugared)
             return $ modul desugared
-        Left e -> die $ printTypeError e
+        Left e -> do
+            let sourceSBS = AST.moduleSourceFileName modo
+            dir <- getCurrentDirectory
+            let source = dir </> Char8.unpack (SBS.fromShort sourceSBS)
+            die $ (source ++ ":" ++ showTypeError e)
   where
     ctx = createGlobalContext opts exprs
     modul exprs = runLLVM modo $ genModule exprs

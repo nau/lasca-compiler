@@ -7,7 +7,7 @@ module Infer (
   normalizeType,
   typeCheck,
   inferExpr,
-  printTypeError,
+  showTypeError,
   defaultTyenv
 ) where
 
@@ -54,7 +54,7 @@ data TypeError
     | ArityMismatch Expr Type Int Int
     deriving (Eq, Ord, Show)
 
-printTypeError typeError = case typeError of
+showTypeError typeError = case typeError of
     UnificationFail expr expected infered ->
         printf "%s: Type error: expected type %s but got %s in expression %s"
           (show $ exprPosition expr) (show expected) (show infered) (show expr)

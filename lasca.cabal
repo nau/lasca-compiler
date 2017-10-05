@@ -29,6 +29,8 @@ library
                         optparse-applicative,
                         bytestring,
                         murmur-hash,
+                        directory,
+                        filepath,
                         mtl
   Extra-libraries:      lascart
   default-language:     Haskell2010
