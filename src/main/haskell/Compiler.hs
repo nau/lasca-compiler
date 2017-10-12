@@ -76,7 +76,7 @@ genModule opts modo source = do
 --          Debug.traceM $ printf "AAA %s\n%s" (show  exprs') (show ex)
 --          print exprs
           when (verboseMode opts) $ putStrLn ("Parsed OK, imported " ++ show imported)
-          when (printAst opts) $ print ex
+          when (printAst opts) $ mapM_ print ex
           when (verboseMode opts) $ putStrLn("Compiler mode is " ++ mode opts)
           if mode opts == "static"
           then codegenStaticModule opts modo ex
@@ -103,7 +103,7 @@ processModule opts mod fname = if exec opts then
      let name = takeWhile (/= '.') fname
      let optLevel = optimization opts
      let optimizationOpts = ["-O" ++ show optLevel | optLevel > 0]
-     callProcess "clang-4.0"
+     callProcess "clang-5.0"
        (optimizationOpts ++
           ["-e", "_start", "-g", "-o", name, "-L.", "-llascart",
            fname ++ ".ll"])

@@ -235,6 +235,13 @@ instrTyped tpe ins = do
     return $ LocalReference tpe ref
 {-# INLINE instrTyped #-}
 
+instrDo ins = do
+    blk <- current
+    let i = stack blk
+    modifyBlock (blk { stack = i ++ [Do $ ins]} )
+    return ()
+{-# INLINE instrDo #-}
+
 terminator :: Named Terminator -> Codegen (Named Terminator)
 terminator trm = do
     blk <- current
@@ -299,7 +306,7 @@ local tpe name = LocalReference tpe (AST.Name name)
 localPtr name = local ptrType name
 
 global :: Type -> SBS.ShortByteString -> Operand
-global tpe name = constOp (C.GlobalReference tpe (AST.Name name))
+global tpe name = constOp (C.GlobalReference (T.ptr tpe) (AST.Name name))
 
 constOp :: C.Constant -> Operand
 constOp = ConstantOperand
@@ -322,8 +329,7 @@ constByte b = constOp (C.Int 8 b)
 constBool b = C.Int 1 (if b then 1 else 0)
 constTrue = constOp (constBool True)
 constFalse = constOp (constBool False)
-constRef name = let ptr = C.GlobalReference ptrType (AST.Name name) in C.BitCast ptr ptrType
-constRefOperand name = constOp (constRef name)
+constRef tpe name = let ptr = C.GlobalReference (T.ptr tpe) (AST.Name name) in C.BitCast ptr ptrType
 
 fptoptr fp = do
     int <- bitcast fp T.i64
@@ -357,7 +363,7 @@ intCmp op lhs rhs = do
     instr $ ZExt bool T.i32 []
 intCmpBoxed op lhs rhs = do
     res <- intCmp op lhs rhs
-    callFn "boxBool" [res]
+    callFn (funcType ptrType [intType]) "boxBool" [res]
 fadd lhs rhs = instr $ FAdd NoFastMathFlags lhs rhs []
 fsub lhs rhs = instr $ FSub NoFastMathFlags lhs rhs []
 fmul lhs rhs = instr $ FMul NoFastMathFlags lhs rhs []
@@ -367,7 +373,10 @@ call :: Operand -> [Operand] -> Codegen Operand
 call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 {-# INLINE call #-}
 
-callFn name args = call (global ptrType (fromString name)) args
+callIns fn args = Call Nothing CC.C [] (Right fn) (toArgs args) [] []
+callFnIns ftype name args = callIns (global ftype (fromString name)) args
+
+callFn ftype name args = call (global ftype (fromString name)) args
 {-# INLINE callFn #-}
 
 alloca :: Type -> Codegen Operand
@@ -376,8 +385,8 @@ alloca ty = instr $ Alloca ty Nothing 0 []
 
 allocaSize ty size = instr $ Alloca ty (Just size) 0 []
 
-store :: Operand -> Operand -> Codegen Operand
-store ptr val = instr $ Store False ptr val Nothing 0 []
+store :: Operand -> Operand -> Codegen ()
+store ptr val = instrDo $ Store False ptr val Nothing 0 []
 {-# INLINE store #-}
 
 load :: Operand -> Codegen Operand
@@ -401,7 +410,7 @@ getelementptr addr indices = instr $ GetElementPtr False addr indices []
 {-# INLINE getelementptr #-}
 
 globalStringRef :: String -> C.Constant
-globalStringRef name = C.GlobalReference (stringStructType (length name)) (AST.Name (getStringLitName name))
+globalStringRef name = C.GlobalReference (T.ptr $ stringStructType (length name)) (AST.Name (getStringLitName name))
 
 globalStringRefAsPtr name = C.BitCast (globalStringRef name) ptrType
 
@@ -433,6 +442,7 @@ defineStringLit s = defineConst (getStringLitName s) (stringStructType len) stri
   where (string, len) = createString s
 
 --            Lasca Runtime Data Representation Types
+funcType retTy args = T.FunctionType retTy args False
 
 stringStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
 

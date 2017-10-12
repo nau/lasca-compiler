@@ -74,6 +74,7 @@ argToPtr (S.Arg n t) = case t of
 codegenTop ctx this@(S.Val meta name expr) = do
     modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
     let valType = llvmTypeOf this
+--    Debug.traceM $ printf "Cons %s: %s" (show name) (show valType)
     defineGlobal (nameToSBS name) valType (Just $ defaultValueForType valType)
 
 codegenTop ctx f@(S.Function meta name tpe args body) =
@@ -163,7 +164,7 @@ cgen ctx (S.Ident meta name) = do
                 | otherwise -> boxError (show name)
 cgen ctx (S.Literal meta l) = do
 --  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)
-    box l meta
+    boxLit l meta
 cgen ctx this@(S.Array meta exprs) = do
     vs <- sequence [cgen ctx e | e <- exprs]
     boxArray vs
@@ -269,7 +270,7 @@ cgen ctx (S.If meta cond tr fl) = do
     ------------------
     cond <- cgen ctx cond
     -- unbox Bool
-    voidPtrCond <- callFn "unbox" [constIntOp 1, cond]
+    voidPtrCond <- unboxDirect cond
     bool <- ptrtoint voidPtrCond T.i1
 
     test <- instr (I.ICmp IP.EQ bool constTrue [])
@@ -354,19 +355,20 @@ cgenApply ctx meta expr args = do
             cgenArrayApply array idx
                     
         S.Ident _ fn | isExtern fn -> do
-            let (S.Function _ _ returnType externArgs _) = S._globalFunctions ctx Map.! fn
+            let f@(S.Function _ _ returnType externArgs _) = S._globalFunctions ctx Map.! fn
             let argTypes = map (\(S.Arg n t) -> t) externArgs
 --            Debug.traceM $ printf "Calling external %s(%s): %s" fn (show argTypes) (show returnType)
             largs <- forM (zip args argTypes) $ \(arg, tpe) -> do
                 a <- cgen ctx arg
                 resolveBoxing anyTypeVar tpe a
-            res <- callFn (show fn) largs
+            res <- callFn (externFuncLLvmType f) (show fn) largs
             resolveBoxing returnType anyTypeVar res
 
         S.Ident _ fn | isGlobal fn -> do
 --            Debug.traceM $ printf "Calling %s" fn
+            let f = S._globalFunctions ctx Map.! fn
             largs <- forM args $ \arg -> cgen ctx arg
-            callFn (show fn) largs
+            callFn (funcLLvmType f) (show fn) largs
         expr -> do
             -- closures
             modState <- gets moduleState
@@ -382,7 +384,7 @@ cgenApply ctx meta expr args = do
             sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0..] largs]
             
 
-            closure <- unbox e
+            closure <- unboxDirect e
             closureTyped <- bitcast closure (T.ptr closureStructType)
             enclosedArgsAddr <- getelementptr closureTyped [constIntOp 0, constIntOp 1]
             enclosedArgs <- load enclosedArgsAddr
@@ -410,7 +412,7 @@ funcPtrFromClosure closure = do
     idx <- instrTyped T.i32 $ I.Load False idxPtr Nothing 0 []
 --    callFn "putInt" [idx]
     let fst = functionsStructType (fromIntegral len)
-    let fnsAddr = (global (T.ptr fst) (nameToSBS "Functions"))
+    let fnsAddr = (global fst (nameToSBS "Functions"))
     fns <- instrTyped (T.ptr fst) $ I.Load False fnsAddr Nothing 0 []
     sizeAddr <- getelementptr fnsAddr [constIntOp 0, constIntOp 0]
     size <- instrTyped T.i32 $ I.Load False sizeAddr Nothing 0 []
@@ -424,27 +426,27 @@ castBoxedValue declaredType value = case declaredType of
     _                 -> return value
 {-# INLINE castBoxedValue #-}
 
-unbox expr = do
+unboxDirect expr = do
     boxed <- bitcast expr (T.ptr boxStructType)
     unboxedAddr <- getelementptr boxed [constIntOp 0, constIntOp 1]
     load unboxedAddr
-{-# INLINE unbox #-}
+{-# INLINE unboxDirect #-}
 
 unboxInt expr = do
-    unboxed <- unbox expr
+    unboxed <- unboxDirect expr
     castBoxedValue (TypeIdent "Int") unboxed
 {-# INLINE unboxInt #-}
 
 unboxFloat64 expr = do
-    unboxed <- unbox expr
+    unboxed <- unboxDirect expr
     castBoxedValue (TypeIdent "Float") unboxed
 {-# INLINE unboxFloat64 #-}
 
 resolveBoxing declaredType instantiatedType expr = do
     case (declaredType, instantiatedType) of
         _ | declaredType == instantiatedType -> return expr
-        (TypeIdent "Int", TVar _) -> callFn "boxInt" [expr]
-        (TypeIdent "Float", TVar _) -> callFn "boxFloat64" [expr]
+        (TypeIdent "Int", TVar _) -> boxInt expr
+        (TypeIdent "Float", TVar _) -> boxFloat64 expr
         (TVar _, TypeIdent "Int") -> unboxInt expr
         (TVar _, TypeIdent "Float") -> unboxFloat64 expr
         (TVar _, TVar _) -> return expr
@@ -473,19 +475,22 @@ codegenStaticModule opts modo exprs = do
     modul exprs = runLLVM modo $ genModule exprs
     genModule exprs = do
         declareStdFuncs
-        genFunctionMap exprs
+        fmt <- genFunctionMap exprs
         let defs = reverse (S.dataDefs ctx)
-        genTypesStruct ctx defs
-        genRuntime opts
+        tst <- genTypesStruct ctx defs
+        genRuntime opts fmt tst
         forM_ exprs $ \expr -> do
             defineStringConstants expr
             codegenTop ctx expr
+--        codegenTop ctx (S.Function (S.emptyMetaWithType (TypeFunc typeUnit typeUnit)) "main" typeAny [] (S.Literal S.emptyMeta (S.UnitLit)))
         codegenStartFunc ctx cgen
 
 genTypesStruct ctx defs = do
     types <- genData ctx defs toSig argToPtr
+--    Debug.traceM $ printf "genTypesStruct %s" (show types)
     let array = C.Array ptrType types
     defineConst "Types" structType (struct array)
+    return structType
   where len = length defs
         struct a = createStruct [constInt len, a]
         structType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) ptrType]

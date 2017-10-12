@@ -61,8 +61,8 @@ passes level = defaultCuratedPassSetSpec { optLevel = Just (fromIntegral level) 
 
 runJIT :: LascaOpts -> AST.Module -> IO AST.Module
 runJIT opts mod = do
---  let llvmAst = ppllvm mod
---  TIO.putStrLn $ LT.toStrict llvmAst
+--    let llvmAst = ppllvm mod
+--    TIO.putStrLn $ LT.toStrict llvmAst
     withContext $ \context -> do
 --        runtimeLl <- readFile "runtime.ll"
 
@@ -80,15 +80,15 @@ runJIT opts mod = do
                     let args = lascaFiles opts
                     let len = length args
                     EE.withModuleInEngine executionEngine m $ \ee -> do
-                        initLascaRuntime <- EE.getFunction ee (AST.Name "start")
+                        startFunPtr <- EE.getFunction ee (AST.Name "start")
                         -- mainfn <- EE.getFunction ee (AST.Name "main")
-                        case initLascaRuntime of
+                        case startFunPtr of
                             Just fn -> do
                                 cargs <- mapM newCString args
                                 array <- mallocArray len
                                 pokeArray array cargs
                                 startFun (castFunPtr fn :: FunPtr (Int -> Ptr CString -> IO ())) len array
-                            Nothing -> putStrLn "Couldn't find initLascaRuntime!"
+                            Nothing -> putStrLn "Couldn't find function start!"
 
                     -- Return the optimized module
                     return optmod

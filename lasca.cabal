@@ -13,18 +13,18 @@ library
                         RecordWildCards
                         NamedFieldPuns
                         FlexibleContexts
-  build-depends:        base >=4.6,
+  build-depends:        base >=4.9,
                         text,
                         utf8-string,
                         haskeline,
                         process,
                         containers,
                         pretty >=1.1,
-                        megaparsec >= 5.0.0,
+                        megaparsec >= 6.0.0,
                         scientific,
                         lens >= 4.15,
-                        llvm-hs >= 4.1.0.0,
-                        llvm-hs-pure >= 4.1.0.0,
+                        llvm-hs >= 5.0.0,
+                        llvm-hs-pure >= 5.0.0,
 --                        llvm-hs-pretty >= 0.1.0.0,
                         optparse-applicative,
                         bytestring,
@@ -50,22 +50,8 @@ library
                         Type
 executable lasca
   other-extensions:     GADTs
-  build-depends:        base >=4.6,
-                        lasca,
-                        text,
-                        utf8-string,
-                        haskeline,
-                        process,
-                        containers,
-                        pretty >=1.1,
-                        megaparsec >= 5.0.0,
-                        lens >= 4.15,
-                        llvm-hs >= 4.0.0.0,
-                        llvm-hs-pure >= 4.0.0.0,
-                        optparse-applicative,
-                        bytestring,
-                        murmur-hash,
-                        mtl
+  build-depends:        base >=4.9,
+                        lasca
   Extra-libraries:      lascart
   default-language:     Haskell2010
   hs-source-dirs:       src/lasca
@@ -76,28 +62,17 @@ test-suite lasca-test
   hs-source-dirs:      src/test
   main-is:             Main.hs
   default-extensions:  OverloadedStrings
-  build-depends:       base >=4.6,
+  build-depends:       base >=4.9,
+                       lasca,
                        text,
                        utf8-string,
-                       haskeline,
-                       process,
-                       containers,
---                        pretty >=1.1,
-                       megaparsec >= 5.0.0,
-                       lens >= 4.15,
---                        llvm-hs >= 4.0.0.0,
---                        llvm-hs-pure >= 4.0.0.0,
-                       optparse-applicative,
-                       bytestring,
-                       murmur-hash,
-                       mtl,
-                       tasty, tasty-hunit, tasty-smallcheck, tasty-quickcheck,
-                       lasca
-  ghc-options:         -threaded -rtsopts 
+                       megaparsec >= 6.0.0,
+                       tasty, tasty-hunit, tasty-smallcheck, tasty-quickcheck
+  ghc-options:         -threaded -rtsopts
   default-language:    Haskell2010
 --executable gencode
 --  other-extensions:    GADTs
---  build-depends:       base >=4.6
+--  build-depends:       base >=4.9
 --  default-language:    Haskell2010
 --  hs-source-dirs:      src/main/gencode
 --  main-is:             GenBench.hs

@@ -3,9 +3,9 @@ IFORMAT = markdown
 FLAGS = --standalone --toc --highlight-style pygments
 
 #CC = gcc
-CC = clang-4.0 -Wno-nullability-completeness -Wno-expansion-to-defined
+CC = clang-5.0 -Wno-nullability-completeness -Wno-expansion-to-defined
 CC_INCLUDE = -I/usr/local/include -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/
-LLC = llc-4.0
+LLC = llc-5.0
 
 OPTS = -no-user-package-db -package-db .cabal-sandbox/*-packages.conf.d
 
@@ -58,7 +58,7 @@ install_and_examples: lasca examples
 release: install_and_examples
 	rm -rf dist
 	mkdir -p dist/{src,bash_completion}
-	cp .stack-work/dist/x86_64-osx/Cabal-1.24.2.0/build/lasca/lasca dist
+	cp .stack-work/dist/x86_64-osx/Cabal-2.0.0.2/build/lasca/lasca dist
 	cp liblascart.so dist
 #	find src/main/lasca -name *.lasca -exec cp \{} dist/src \;
 	cp src/main/lasca/Prelude.lasca dist/src
