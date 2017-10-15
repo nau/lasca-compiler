@@ -73,6 +73,7 @@ genModule opts modo source = do
       Right exprs -> do
           let exprs' = (importPreludeAst : exprs)
           (imported, ex) <- loadImports Set.empty [] exprs'
+--          Debug.traceM $ printf "AAA %s\n%s" (show  exprs') (show ex)
 --          print exprs
           when (verboseMode opts) $ putStrLn ("Parsed OK, imported " ++ show imported)
           when (printAst opts) $ print ex
@@ -125,6 +126,7 @@ repl opts = runInputT defaultSettings (loop (initModule "Lasca JIT"))
 
 loadImport :: Set.Set Name -> [Name] -> Name -> IO (Set.Set Name, [Expr])
 loadImport imported importPath name = do
+--    Debug.traceM $ printf "loadImport %s %s %s" (show imported) (show importPath) (show name)
     when (name `elem` importPath) $ die (printf "Circular dependency in %s -> %s" (show importPath) (show name))
     if name `Set.member` imported
     then return (imported, [])
@@ -135,7 +137,7 @@ loadImport imported importPath name = do
             Left err -> die $ Megaparsec.parseErrorPretty err
             Right moduleExprs -> do
                 (newImported, importedExprs) <- loadImports imported (name : importPath) moduleExprs
-                return $ (newImported, importedExprs ++ moduleExprs)
+                return $ (newImported, importedExprs)
 
 
 getImports exprs =
