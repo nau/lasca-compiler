@@ -324,7 +324,7 @@ boxLit (S.FloatLit  n) meta = boxFloat64 (constFloatOp n)
 boxLit S.UnitLit meta = box (constIntOp 0)  (constOp constNullPtr)
 boxLit (S.StringLit s) meta = do
     let name = getStringLitName s
-    let len = ByteString.length . UTF8.fromString $ s
+    let len = 1 + (ByteString.length . UTF8.fromString $ s)
     let ref = global (stringStructType len) name
     ref' <- bitcast ref ptrType
     box (constIntOp 4) ref'
@@ -341,7 +341,7 @@ boxFunc name mapping = do
 boxError name = do
     modify (\s -> s { generatedStrings = name : generatedStrings s })
     let strLitName = getStringLitName name
-    let len = length name
+    let len = length name + 1
     let ref = global (stringStructType len) strLitName
     ref <- bitcast ref ptrType
     callFn (funcType ptrType [ptrType]) "boxError" [ref]

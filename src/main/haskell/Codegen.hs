@@ -410,7 +410,7 @@ getelementptr addr indices = instr $ GetElementPtr False addr indices []
 {-# INLINE getelementptr #-}
 
 globalStringRef :: String -> C.Constant
-globalStringRef name = C.GlobalReference (T.ptr $ stringStructType (length name)) (AST.Name (getStringLitName name))
+globalStringRef name = C.GlobalReference (T.ptr $ stringStructType (length name + 1)) (AST.Name (getStringLitName name))
 
 globalStringRefAsPtr name = C.BitCast (globalStringRef name) ptrType
 
@@ -430,12 +430,12 @@ getStringLitName s = name
 
 createStruct args = C.Struct Nothing False args
 
-createString s = (createStruct [constInt len, C.Array T.i8 bytes], len)
+createString s = (createStruct [constInt (len - 1), C.Array T.i8 bytes], len)
   where
     bytestring = UTF8.fromString s
     constByte b = C.Int 8 (toInteger b)
-    bytes = map constByte (ByteString.unpack bytestring)
-    len = ByteString.length bytestring
+    bytes = map constByte (ByteString.unpack bytestring ++ [fromInteger 0])
+    len = ByteString.length bytestring + 1
 
 defineStringLit :: String -> LLVM ()
 defineStringLit s = defineConst (getStringLitName s) (stringStructType len) string

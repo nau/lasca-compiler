@@ -125,7 +125,7 @@ Box UNIT_SINGLETON = {
 };
 String EMPTY_STRING = {
     .length = 0,
-    .bytes = ""
+    .bytes = "\00"
 };
 Box EMPTY_STRING_BOX = {
     .type = STRING,
@@ -231,7 +231,7 @@ void * __attribute__ ((pure)) unbox(int expected, Box* ti) {
         return ti->value.ptr;
     } else if (ti->type == -1) {
         String *name = (String *) ti->value.ptr;
-        printf("AAAA!!! Undefined identifier %.*s\n", name->length, name->bytes);
+        printf("AAAA!!! Undefined identifier %s\n", name->bytes);
         exit(1);
     } else {
         printf("AAAA!!! Expected %s but got %s\n", typeIdToName(expected), typeIdToName(ti->type));
@@ -370,8 +370,8 @@ Box* runtimeApply(Box* val, int argc, Box* argv[], Position pos) {
     }
     Function f = fs->functions[closure->funcIdx];
     if (f.arity != argc + (closure->args == NULL ? 0 : 1)) {
-        printf("AAAA!!! Function %.*s takes %d params, but passed %d enclosed params and %d params instead at line: %d\n",
-            f.name->length, f.name->bytes, f.arity, (closure->args == NULL ? 0 : 1), argc, pos.line);
+        printf("AAAA!!! Function %s takes %d params, but passed %d enclosed params and %d params instead at line: %d\n",
+            f.name->bytes, f.arity, (closure->args == NULL ? 0 : 1), argc, pos.line);
         exit(1);
     }
     // TODO: use platform ABI, like it should be.
@@ -446,14 +446,14 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
         // if rhs is not a local ident, nor a function, try to find this field in lhs data structure
         if (ident->type == -1) {
             String* name = ident->value.ptr; // should be identifier name
-      //      printf("Ident name %.*s\n", name->length, name->bytes);
+      //      printf("Ident name %s\n", name->bytes);
             Data* data = types->data[tree->type - 1000]; // find struct in global array of structs
-      //      printf("Found data type %.*s %d, tag %d\n", data->name->length, data->name->bytes, tree->type, dataValue->tag);
+      //      printf("Found data type %s %d, tag %d\n", data->name->bytes, tree->type, dataValue->tag);
             Struct* constr = data->constructors[dataValue->tag];
             int numFields = constr->numFields;
             for (int i = 0; i < numFields; i++) {
                 String* field = constr->fields[i];
-        //        printf("Check field %d %.*s\n", field->length, field->length, field->bytes);
+        //        printf("Check field %d %s\n", field->length, field->bytes);
                 if (field->length == name->length && strncmp(field->bytes, name->bytes, name->length) == 0) {
                     Box* value = dataValue->values[i];
           //          printf("Found value %d at index %d\n", value->type, i);
@@ -461,7 +461,7 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
                     return value;
                 }
             }
-            printf("Couldn't find field %.*s at line: %d\n", name->length, name->bytes, pos.line);
+            printf("Couldn't find field %s at line: %d\n", name->bytes, pos.line);
         } else if (ident->type == CLOSURE) {
               // FIXME fix for closure?  check arity?
               Closure* f = unbox(CLOSURE, ident);
@@ -511,7 +511,7 @@ void * runtimePutchar(Box* ch) {
 
 Box* println(Box* val) {
     String * str = unbox(STRING, val);
-    printf("%.*s\n", str->length, str->bytes);
+    printf("%s\n", str->bytes);
     return &UNIT_SINGLETON;
 }
 
@@ -556,9 +556,9 @@ Box* prepend(Box* arrayValue, Box* value) {
 
 Box* __attribute__ ((pure)) makeString(char * str) {
     int len = strlen(str);
-    String* val = gcMalloc(sizeof(String) + len); // no +1, we don't 0 terminate strings
+    String* val = gcMalloc(sizeof(String) + len + 1);  // null terminated
     val->length = len;
-    memcpy(val->bytes, str, len); // memcpy instead of strncpy because we don't 0 terminate strings
+    strncpy(val->bytes, str, len);
     return box(STRING, val);
 }
 
@@ -617,7 +617,7 @@ Box* __attribute__ ((pure)) toString(Box* value) {
         case ARRAY:   return arrayToString(value);
         case -1: {
             String *name = (String *) value->value.ptr;
-            printf("AAAA!!! Undefined identifier %.*s\n", name->length, name->bytes);
+            printf("AAAA!!! Undefined identifier %s\n", name->bytes);
             exit(1);
         }
         case 1000: {
@@ -631,7 +631,7 @@ Box* __attribute__ ((pure)) toString(Box* value) {
                 Struct* constr = metaData->constructors[dataValue->tag];
                 int startlen = constr->name->length + 2; // ending 0 and possibly "(" if constructor has parameters
                 char start[startlen];
-                snprintf(start, startlen, "%.*s", constr->name->length, constr->name->bytes);
+                snprintf(start, startlen, "%s", constr->name->bytes);
                 if (constr->numFields > 0) {
                     strcat(start, "(");
                     return joinValues(constr->numFields, dataValue->values, start, ")");
@@ -652,11 +652,12 @@ Box* concat(Box* arrayString) {
             String* s = unbox(STRING, array->data[i]);
             len += s->length;
         }
-        String* val = gcMalloc(sizeof(String) + len); // no +1, we don't 0 terminate strings, it's zero initialized!
+        String* val = gcMalloc(sizeof(String) + len + 1); // +1 for null-termination
         // val->length is 0, because gcMalloc allocates zero-initialized memory
+        // it's also zero terminated, because gcMalloc allocates zero-initialized memory
         for (int i = 0; i < array->length; i++) {
             String* s = unbox(STRING, array->data[i]);
-            memcpy(&val->bytes[val->length], s->bytes, s->length); // memcpy instead of strncpy because we don't 0 terminate strings
+            memcpy(&val->bytes[val->length], s->bytes, s->length);
             val->length += s->length;
         }
         result = box(STRING, val);
@@ -691,8 +692,8 @@ Box* getArgs() {
 int toInt(Box* s) {
     String* str = unbox(STRING, s);
   //  println(s);
-    char* cstr = malloc(str->length + 1);
-    memcpy(cstr, str->bytes, str->length);
+    char cstr[str->length + 1];
+    memcpy(cstr, str->bytes, str->length); // TODO use VLA?
     cstr[str->length] = 0;
   //  printf("cstr = %s\n", cstr);
     char *ep;
@@ -701,7 +702,6 @@ int toInt(Box* s) {
         printf("Couldn't convert %s to int", cstr);
         exit( EXIT_FAILURE );
     }
-    free(cstr);
     return (int) i;
 }
 
@@ -718,3 +718,11 @@ void initLascaRuntime(Runtime* runtime) {
         printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %d, # structs = %d\n",
           RUNTIME->functions->size, RUNTIME->types->size);
 }
+
+/*
+Box* lascaOpenFile(Box* filename, Box* mode) {
+    String* str = unbox(STRING, filename);
+    String* md = unbox(STRING, mode);
+    FILE* f = fopen(str->bytes, md->bytes);
+    return box
+}*/
