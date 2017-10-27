@@ -59,7 +59,7 @@ import qualified Options as Opts
 externalTypeMapping :: Type -> AST.Type
 -- FIXME currently we assume every function returns a result and can't be Unit/void
 --externalTypeMapping (TypeIdent "Unit") = T.void
-externalTypeMapping (TypeIdent "Int") = T.i32
+externalTypeMapping (TypeIdent "Int") = intType
 externalTypeMapping (TypeIdent "Float") = T.double
 externalTypeMapping _ = ptrType-- Dynamic mode
 
@@ -300,10 +300,10 @@ binops = Map.fromList [("+", 10), ("-", 11), ("*", 12), ("/", 13),
 -------------------------------------------------------------------------------
 sizeOfType tpe = do
     nullptr <- getelementptr (constOp (constNull tpe)) [constIntOp 1]
-    sizeof <- ptrtoint nullptr T.i32 -- FIXME change to T.i64?
+    sizeof <- ptrtoint nullptr intType
     return sizeof
 
-gcMalloc size = callFn (funcType ptrType [intType]) "gcMalloc" [size] -- TODO change to platform dependent size
+gcMalloc size = callFn (funcType ptrType [intType]) "gcMalloc" [size]
 
 gcMallocType tpe = do
     size <- sizeOfType tpe
@@ -311,11 +311,11 @@ gcMallocType tpe = do
     casted <- bitcast ptr (T.ptr tpe)
     return (ptr, casted)
 
-box t v = callFn (funcType ptrType [intType, ptrType]) "box" [t, v] -- todo change to i64?
+box t v = callFn (funcType ptrType [intType, ptrType]) "box" [t, v]
 boxBool v = callFn (funcType ptrType [intType]) "boxBool" [v] -- todo change to i1
-boxInt v = callFn (funcType ptrType [intType]) "boxInt" [v] -- todo change to i64
+boxInt v = callFn (funcType ptrType [intType]) "boxInt" [v]
 boxFloat64 v = callFn (funcType ptrType [T.double]) "boxFloat64" [v]
-unbox t v = callFn (funcType ptrType [intType, ptrType]) "unbox" [t, v] -- todo change to i64?
+unbox t v = callFn (funcType ptrType [intType, ptrType]) "unbox" [t, v]
 
 
 boxLit (S.BoolLit b) meta = boxBool (constIntOp (boolToInt b))
@@ -330,7 +330,7 @@ boxLit (S.StringLit s) meta = do
     box (constIntOp 4) ref'
 
 createPosition S.NoPosition = createStruct [constInt 0, constInt 0] -- Postion (0, 0) means No Position. Why not.
-createPosition S.Position{S.sourceLine, S.sourceColumn} = createStruct [C.Int 32 (toInteger sourceLine), C.Int 32 (toInteger sourceColumn)]
+createPosition S.Position{S.sourceLine, S.sourceColumn} = createStruct [constInt sourceLine, constInt sourceColumn]
 
 boxArray values = callFn (T.FunctionType ptrType [intType] True) "boxArray" (constIntOp (length values) : values)
 
@@ -368,7 +368,7 @@ declareStdFuncs = do
     external ptrType "gcMalloc" [("size", intType)] False []
     external ptrType "box" [("t", intType), ("ptr", ptrType)] False [FA.GroupID 0]
     external ptrType "unbox" [("t", intType), ("ptr", ptrType)] False [FA.GroupID 0]
-    external T.i32   "unboxInt" [("ptr", ptrType)] False [FA.GroupID 0]
+    external intType "unboxInt" [("ptr", ptrType)] False [FA.GroupID 0]
     external T.double "unboxFloat64" [("ptr", ptrType)] False [FA.GroupID 0]
     external ptrType "boxError" [("n", ptrType)] False [FA.GroupID 0]
     external ptrType "boxInt" [("d", intType)] False [FA.GroupID 0]
@@ -402,10 +402,11 @@ genFunctionMap fns = do
     modify (\s -> s { functions = mapping })
     return funcMapType
   where
-    funcMapType = functionsStructType len
+    funcMapType = functionsStructType (fromIntegral len)
     defineNames = mapM (\(name, _, _) -> defineStringLit (show name)) funcsWithArities
 
-    len = fromIntegral (length funcsWithArities)
+    len :: Int
+    len = length funcsWithArities
 
     array = C.Array functionStructType (fmap snd entries)
 
@@ -419,7 +420,7 @@ genFunctionMap fns = do
 
     entries = fmap (\(name, llvmType, arity) -> (name, struct name llvmType arity)) funcsWithArities
 
-    struct1 = createStruct [C.Int 32 (toInteger len), array]
+    struct1 = createStruct [constInt (len), array]
 
     struct name tpe arity = createStruct
                             [globalStringRefAsPtr sname, constRef tpe (fromString sname), constInt arity]
@@ -500,7 +501,7 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
                                        constInt numConstructors,
                                        arrayOfConstructors] -- struct Data
             let dataStructType numConstructors = T.StructureType False [
-                      T.i32, ptrType, T.i32, T.ArrayType (fromIntegral numConstructors) ptrType
+                      intType, ptrType, intType, T.ArrayType (fromIntegral numConstructors) ptrType
                     ]
             defineConst literalName (dataStructType numConstructors) struct
             return (constRef (dataStructType numConstructors) literalName)
@@ -532,8 +533,8 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
                 define ptrType (fromString $ show name) fargs blocks -- define constructor function
                 forM_ args $ \ (S.Arg name _) -> defineStringLit (show name) -- define fields names as strings
 
-            let structType = T.StructureType False [T.i32, ptrType, T.i32, T.ArrayType (fromIntegral len) ptrType]
-            let struct =  createStruct [C.Int 32 (fromIntegral tid), globalStringRefAsPtr (show name), constInt len, fieldsArray]
+            let structType = T.StructureType False [intType, ptrType, intType, T.ArrayType (fromIntegral len) ptrType]
+            let struct =  createStruct [constInt (fromIntegral tid), globalStringRefAsPtr (show name), constInt len, fieldsArray]
             let literalName = fromString $ (show typeName) ++ "." ++ show name
             defineConst literalName structType struct
 
@@ -542,7 +543,7 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
           where
             len = length args
             arrayType = T.ArrayType (fromIntegral len) ptrType
-            dataValueStructType = T.StructureType False [T.i32, arrayType] -- DataValue: {tag, values: []}
+            dataValueStructType = T.StructureType False [intType, arrayType] -- DataValue: {tag, values: []}
             fargs = argsToSig args
             fieldsArray = C.Array ptrType fields
             fields = map (\(S.Arg n _) -> globalStringRefAsPtr (show n)) args
@@ -551,11 +552,11 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
                 entry <- addBlock entryBlockName
                 setBlock entry
                 (ptr, structPtr) <- gcMallocType dataValueStructType
-                tagAddr <- getelementptr structPtr [constIntOp 0, constIntOp 0] -- [dereference, 1st field] {tag, [arg1, arg2 ...]}
+                tagAddr <- getelementptr structPtr [constIntOp 0, constInt32Op 0] -- [dereference, 1st field] {tag, [arg1, arg2 ...]}
                 store tagAddr (constIntOp tag)
                 let argsWithId = zip args [0..]
                 forM_ argsWithId $ \(arg, i) -> do
-                    p <- getelementptr structPtr [constIntOp 0, constIntOp 1, constIntOp i] -- [dereference, 2nd field, ith element] {tag, [arg1, arg2 ...]}
+                    p <- getelementptr structPtr [constIntOp 0, constInt32Op 1, constIntOp i] -- [dereference, 2nd field, ith element] {tag, [arg1, arg2 ...]}
                     ref <- argToPtr arg
                     store p ref
                 -- remove boxing after removing runtimeIsConstr from genPattern, do a proper tag check instead

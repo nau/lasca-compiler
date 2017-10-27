@@ -256,6 +256,6 @@ genTypesStruct ctx defs = do
     return structType
   where len = length defs
         struct a = createStruct [constInt len, a]
-        structType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) ptrType]
+        structType = T.StructureType False [intType, T.ArrayType (fromIntegral len) ptrType]
 
 argToPtr (S.Arg n t) = return $ localPtr $ nameToSBS n

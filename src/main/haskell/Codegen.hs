@@ -118,7 +118,7 @@ external retty label argtys vararg funcAttrs = defineFunction retty label Linkag
 -------------------------------------------------------------------------------
 
 intType :: Type
-intType = IntegerType 32
+intType = T.i64
 
 boolType :: Type
 boolType = IntegerType 1
@@ -311,15 +311,18 @@ global tpe name = constOp (C.GlobalReference (T.ptr tpe) (AST.Name name))
 constOp :: C.Constant -> Operand
 constOp = ConstantOperand
 
-constNull tpe = C.IntToPtr (C.Int 32 0) (T.ptr tpe)
+constNull tpe = C.IntToPtr (constInt 0) (T.ptr tpe)
 constNullPtr = constNull T.i8
 constNullPtrOp = constOp constNullPtr
 
 constInt :: Int -> C.Constant
-constInt i = C.Int 32 (toInteger i)
+constInt = constInt64
+constInt32 i = C.Int 32 (toInteger i)
+constInt64 i = C.Int 64 (toInteger i)
 
 constIntOp :: Int -> Operand
-constIntOp i = constOp (C.Int 32 (toInteger i))
+constIntOp = constInt64Op
+constInt32Op i = constOp (C.Int 32 (toInteger i))
 constInt64Op i = constOp (C.Int 64 (toInteger i))
 
 constFloat i = C.Float (F.Double i)
@@ -360,7 +363,7 @@ mul lhs rhs = instr $ Mul False False lhs rhs []
 div lhs rhs = instr $ SDiv True lhs rhs []
 intCmp op lhs rhs = do
     bool <- instr $ ICmp op lhs rhs []
-    instr $ ZExt bool T.i32 []
+    instr $ ZExt bool intType []
 intCmpBoxed op lhs rhs = do
     res <- intCmp op lhs rhs
     callFn (funcType ptrType [intType]) "boxBool" [res]
@@ -444,21 +447,21 @@ defineStringLit s = defineConst (getStringLitName s) (stringStructType len) stri
 --            Lasca Runtime Data Representation Types
 funcType retTy args = T.FunctionType retTy args False
 
-stringStructType len = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) T.i8]
+stringStructType len = T.StructureType False [intType, T.ArrayType (fromIntegral len) T.i8]
 
-boxStructOfType boxedType = T.StructureType False [T.i32, boxedType]
+boxStructOfType boxedType = T.StructureType False [intType, boxedType]
 
 boxStructType = boxStructOfType ptrType
 
-arrayStructType elemType = T.StructureType False [T.i32, T.ptr elemType]
+arrayStructType elemType = T.StructureType False [intType, T.ptr elemType]
 
-positionStructType = T.StructureType False [T.i32, T.i32]
+positionStructType = T.StructureType False [intType, intType]
 
-closureStructType = T.StructureType False [T.i32, ptrType]
+closureStructType = T.StructureType False [intType, ptrType]
 
-functionStructType = T.StructureType False [ptrType, ptrType, T.i32]
+functionStructType = T.StructureType False [ptrType, ptrType, intType]
 
-functionsStructType len = T.StructureType False [T.i32, arrayTpe len]
+functionsStructType len = T.StructureType False [intType, arrayTpe len]
   where arrayTpe len = T.ArrayType len functionStructType
 
 runtimeStructType = T.StructureType False [ptrType, ptrType, boolType]

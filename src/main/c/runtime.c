@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdarg.h>
 #include <unistd.h>
 #include <string.h>
@@ -8,108 +9,108 @@
 #include <gc.h>
 
 // Operators
-const int ADD = 10;
-const int SUB = 11;                           // x - y
-const int MUL = 12;
-const int DIV = 13;                           // x / y
-const int MOD = 14;                           // x % y
+const int64_t ADD = 10;
+const int64_t SUB = 11;                           // x - y
+const int64_t MUL = 12;
+const int64_t DIV = 13;                           // x / y
+const int64_t MOD = 14;                           // x % y
 
-const int EQ = 42;                            // x == y
-const int NE = 43;                            // x != y
-const int LT = 44;                            // x < y
-const int LE = 45;                            // x <= y
-const int GE = 46;                            // x >= y
-const int GT = 47;                            // x > y
+const int64_t EQ = 42;                            // x == y
+const int64_t NE = 43;                            // x != y
+const int64_t LT = 44;                            // x < y
+const int64_t LE = 45;                            // x <= y
+const int64_t GE = 46;                            // x >= y
+const int64_t GT = 47;                            // x > y
   // Boolean unary operations
-const int ZNOT = 50;                          // !x
+const int64_t ZNOT = 50;                          // !x
 
   // Boolean binary operations
-const int ZOR = 60;                           // x || y
-const int ZAND = 61;                          // x && y
+const int64_t ZOR = 60;                           // x || y
+const int64_t ZAND = 61;                          // x && y
 
 // Primitive Types
-const int UNIT     = 0;
-const int BOOL     = 1;
-const int INT      = 2;
-const int DOUBLE   = 3;
-const int STRING   = 4;
-const int CLOSURE  = 5;
-const int ARRAY    = 6;
+const int64_t UNIT     = 0;
+const int64_t BOOL     = 1;
+const int64_t INT      = 2;
+const int64_t DOUBLE   = 3;
+const int64_t STRING   = 4;
+const int64_t CLOSURE  = 5;
+const int64_t ARRAY    = 6;
 
 typedef struct {
-    int type;
+    int64_t type;
     union Value {
-        int num;
+        int64_t num;
         double dbl;
         void* ptr;
     } value;
 } Box;
 
 typedef struct {
-    int length;
+    int64_t length;
     char bytes[];
 } String;
 
 typedef struct {
-    int funcIdx;
+    int64_t funcIdx;
     Box* args;  // boxed Array of boxed enclosed arguments
 } Closure;
 
 typedef struct {
-    int length;
+    int64_t length;
     Box** data;
 } Array;
 
 typedef struct {
     String* name;
     void * funcPtr;
-    int arity;
+    int64_t arity;
 } Function;
 
 typedef struct {
-    int size;
+    int64_t size;
     Function functions[];
 } Functions;
 
 typedef struct {
-    int typeId;
-  //  int tag;   // it's not set now. Not sure we need this
+    int64_t typeId;
+  //  int64_t tag;   // it's not set now. Not sure we need this
     String* name;
-    int numFields;
+    int64_t numFields;
     String* fields[];
 } Struct;
 
 typedef struct {
-    int typeId;
+    int64_t typeId;
     String* name;
-    int numValues;
+    int64_t numValues;
     Struct* constructors[];
 } Data;
 
 typedef struct {
-    int size;
+    int64_t size;
     Data* data[];
 } Types;
 
 typedef struct {
-    int argc;
+    int64_t argc;
     Box* argv;
 } Environment;
 
 typedef struct {
     Functions* functions;
     Types* types;
-    int verbose;
+    int64_t verbose;
 } Runtime;
 
 typedef struct {
-    int tag;
+    int64_t tag;
     Box* values[];
 } DataValue;
 
 typedef struct {
-    int line;
-    int column;
+    int64_t line;
+    int64_t column;
 } Position;
 
 Box TRUE_SINGLETON = {
@@ -157,7 +158,7 @@ Box* toString(Box* value);
 Box* println(Box* val);
 Box* boxArray(size_t size, ...);
 
-const char * __attribute__ ((const)) typeIdToName(int typeId) {
+const char * __attribute__ ((const)) typeIdToName(int64_t typeId) {
     switch (typeId) {
         case 0: return "Unit";
         case 1: return "Bool";
@@ -172,14 +173,14 @@ const char * __attribute__ ((const)) typeIdToName(int typeId) {
 
 /* =============== Boxing ================== */
 
-Box *box(int type_id, void *value) {
+Box *box(int64_t type_id, void *value) {
     Box* ti = gcMalloc(sizeof(Box));
     ti->type = type_id;
     ti->value.ptr = value;
     return ti;
 }
 
-Box * __attribute__ ((pure)) boxBool(int i) {
+Box * __attribute__ ((pure)) boxBool(int64_t i) {
     switch (i) {
         case 0: return &FALSE_SINGLETON; break;
         default: return &TRUE_SINGLETON; break;
@@ -190,7 +191,7 @@ Box * __attribute__ ((pure)) boxError(String *name) {
     return box(-1, name);
 }
 
-Box * __attribute__ ((pure)) boxInt(int i) {
+Box * __attribute__ ((pure)) boxInt(int64_t i) {
     if (i >= 0 && i < 100) return &INT_ARRAY[i];
     else {
         Box* ti = gcMallocAtomic(sizeof(Box));
@@ -208,7 +209,7 @@ Box * __attribute__ ((pure)) boxFloat64(double i) {
     return ti;
 }
 
-Box * boxClosure(int idx, Box* args) {
+Box * boxClosure(int64_t idx, Box* args) {
     Closure* cl = gcMalloc(sizeof(Closure));
 //    printf("boxClosure(%d, %p)\n", idx, args);
 //    fflush(stdout);
@@ -219,14 +220,14 @@ Box * boxClosure(int idx, Box* args) {
     return box(CLOSURE, cl);
 }
 
-Box * __attribute__ ((pure)) boxFunc(int idx) {
+Box * __attribute__ ((pure)) boxFunc(int64_t idx) {
 //    printf("boxFunc(%d)\n", idx);
 //    fflush(stdout);
     return boxClosure(idx, NULL);
 }
 
-void * __attribute__ ((pure)) unbox(int expected, Box* ti) {
-  //  printf("unbox(%d, %d) ", ti->type, (int) ti->value);
+void * __attribute__ ((pure)) unbox(int64_t expected, Box* ti) {
+  //  printf("unbox(%d, %d) ", ti->type, (int64_t) ti->value);
     if (ti->type == expected) {
         return ti->value.ptr;
     } else if (ti->type == -1) {
@@ -239,8 +240,8 @@ void * __attribute__ ((pure)) unbox(int expected, Box* ti) {
     }
 }
 
-int __attribute__ ((pure)) unboxInt(Box* ti) {
-  //  printf("unbox(%d, %d) ", ti->type, (int) ti->value);
+int64_t __attribute__ ((pure)) unboxInt(Box* ti) {
+  //  printf("unbox(%d, %d) ", ti->type, (int64_t) ti->value);
     if (ti->type == INT) {
         return ti->value.num;
     } else {
@@ -250,7 +251,7 @@ int __attribute__ ((pure)) unboxInt(Box* ti) {
 }
 
 double __attribute__ ((pure)) unboxFloat64(Box* ti) {
-  //  printf("unbox(%d, %d) ", ti->type, (int) ti->value);
+  //  printf("unbox(%d, %d) ", ti->type, (int64_t) ti->value);
     if (ti->type == DOUBLE) {
         return ti->value.dbl;
     } else {
@@ -273,8 +274,8 @@ void* die(Box* msg) {
     exit(1);
 }
 
-static int isUserType(Box* v) {
-    int type = v->type;
+static int64_t isUserType(Box* v) {
+    int64_t type = v->type;
     return type >= 1000 && (type < 1000 + RUNTIME->types->size);
 }
 
@@ -287,7 +288,7 @@ static int isUserType(Box* v) {
                    case DOUBLE:  { result = boxBool (lhs->value.dbl op rhs->value.dbl); break; } \
                    default: {printf("AAAA!!! Type mismatch! Expected Bool, Int or Double but got %s\n", typeIdToName(lhs->type)); exit(1); }\
                    }
-Box* __attribute__ ((pure)) runtimeBinOp(int code, Box* lhs, Box* rhs) {
+Box* __attribute__ ((pure)) runtimeBinOp(int64_t code, Box* lhs, Box* rhs) {
     if (lhs->type != rhs->type) {
         printf("AAAA!!! Type mismatch! lhs = %s, rhs = %s\n", typeIdToName(lhs->type), typeIdToName(rhs->type));
         exit(1);
@@ -319,13 +320,13 @@ Box* __attribute__ ((pure)) runtimeBinOp(int code, Box* lhs, Box* rhs) {
             DO_CMP(>);
             break;
         default:
-            printf("AAAA!!! Unsupported binary operation %i", code);
+            printf("AAAA!!! Unsupported binary operation %lli", code);
             exit(1);
     }
     return result;
 }
 
-Box* __attribute__ ((pure)) runtimeUnaryOp(int code, Box* expr) {
+Box* __attribute__ ((pure)) runtimeUnaryOp(int64_t code, Box* expr) {
     Box* result = NULL;
     switch (code) {
         case 1:
@@ -339,19 +340,19 @@ Box* __attribute__ ((pure)) runtimeUnaryOp(int code, Box* expr) {
             }
             break;
         default:
-            printf("AAAA!!! Unsupported unary operation %i", code);
+            printf("AAAA!!! Unsupported unary operation %lli", code);
             exit(1);
     }
     return result;
 }
 
-Box* arrayApply(Box* arrayValue, int index) {
+Box* arrayApply(Box* arrayValue, int64_t index) {
     Array* array = unbox(ARRAY, arrayValue);
     assert(array->length > index);
     return array->data[index];
 }
 
-int arrayLength(Box* arrayValue) {
+int64_t arrayLength(Box* arrayValue) {
     Array* array = unbox(ARRAY, arrayValue);
     return array->length;
 }
@@ -361,16 +362,16 @@ String UNIMPLEMENTED_SELECT = {
     .bytes = "Unimplemented select"
 };
 
-Box* runtimeApply(Box* val, int argc, Box* argv[], Position pos) {
+Box* runtimeApply(Box* val, int64_t argc, Box* argv[], Position pos) {
     Functions* fs = RUNTIME->functions;
     Closure *closure = unbox(CLOSURE, val);
     if (closure->funcIdx >= fs->size) {
-        printf("AAAA!!! No such function with id %d, max id is %d at line: %d\n", (int) closure->funcIdx, fs->size, pos.line);
+        printf("AAAA!!! No such function with id %lld, max id is %lld at line: %lld\n", (int64_t) closure->funcIdx, fs->size, pos.line);
         exit(1);
     }
     Function f = fs->functions[closure->funcIdx];
     if (f.arity != argc + (closure->args == NULL ? 0 : 1)) {
-        printf("AAAA!!! Function %s takes %d params, but passed %d enclosed params and %d params instead at line: %d\n",
+        printf("AAAA!!! Function %s takes %lld params, but passed %d enclosed params and %lld params instead at line: %lld\n",
             f.name->bytes, f.arity, (closure->args == NULL ? 0 : 1), argc, pos.line);
         exit(1);
     }
@@ -428,7 +429,7 @@ Box* runtimeApply(Box* val, int argc, Box* argv[], Position pos) {
             }
         }
         default:
-            printf("AAAA! Unsupported arity %d at line: %d\n", f.arity, pos.line);
+            printf("AAAA! Unsupported arity %lld at line: %lld\n", f.arity, pos.line);
             exit(1);
             break;
     };
@@ -450,8 +451,8 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
             Data* data = types->data[tree->type - 1000]; // find struct in global array of structs
       //      printf("Found data type %s %d, tag %d\n", data->name->bytes, tree->type, dataValue->tag);
             Struct* constr = data->constructors[dataValue->tag];
-            int numFields = constr->numFields;
-            for (int i = 0; i < numFields; i++) {
+            int64_t numFields = constr->numFields;
+            for (int64_t i = 0; i < numFields; i++) {
                 String* field = constr->fields[i];
         //        printf("Check field %d %s\n", field->length, field->bytes);
                 if (field->length == name->length && strncmp(field->bytes, name->bytes, name->length) == 0) {
@@ -461,7 +462,7 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
                     return value;
                 }
             }
-            printf("Couldn't find field %s at line: %d\n", name->bytes, pos.line);
+            printf("Couldn't find field %s at line: %lld\n", name->bytes, pos.line);
         } else if (ident->type == CLOSURE) {
               // FIXME fix for closure?  check arity?
               Closure* f = unbox(CLOSURE, ident);
@@ -490,8 +491,8 @@ Box* runtimeIsConstr(Box* value, Box* constrName) {
 }
 /* ================== IO ================== */
 
-void* putInt(int c) {
-    printf("%d\n", c);
+void* putInt(int64_t c) {
+    printf("%lld\n", c);
     fflush(stdout);
     return 0;
 }
@@ -530,7 +531,7 @@ Box* boxArray(size_t size, ...) {
     va_list argp;
     Array * array = createArray(size);
     va_start (argp, size);
-    for (int i = 0; i < size; i++) {
+    for (int64_t i = 0; i < size; i++) {
         Box* arg = va_arg(argp, Box*);
         array->data[i] = arg;
     }
@@ -555,7 +556,7 @@ Box* prepend(Box* arrayValue, Box* value) {
 }
 
 Box* __attribute__ ((pure)) makeString(char * str) {
-    int len = strlen(str);
+    size_t len = strlen(str);
     String* val = gcMalloc(sizeof(String) + len + 1);  // null terminated
     val->length = len;
     strncpy(val->bytes, str, len);
@@ -602,12 +603,12 @@ Box* __attribute__ ((pure)) arrayToString(Box* arrayValue)  {
 Box* __attribute__ ((pure)) toString(Box* value) {
     char buf[100]; // 100 chars is enough for all (c)
 
-    int type = value->type;
+    int64_t type = value->type;
     switch (type) {
         case UNIT: return UNIT_STRING;
         case BOOL: return makeString(value->value.num == 0 ? "false" : "true");
         case INT:
-            snprintf(buf, 100, "%d", value->value.num);
+            snprintf(buf, 100, "%lld", value->value.num);
             return makeString(buf);
         case DOUBLE:
             snprintf(buf, 100, "%12.9lf", value->value.dbl);
@@ -629,7 +630,7 @@ Box* __attribute__ ((pure)) toString(Box* value) {
                 DataValue* dataValue = value->value.ptr;
                 Data* metaData = RUNTIME->types->data[type - 1000];
                 Struct* constr = metaData->constructors[dataValue->tag];
-                int startlen = constr->name->length + 2; // ending 0 and possibly "(" if constructor has parameters
+                int64_t startlen = constr->name->length + 2; // ending 0 and possibly "(" if constructor has parameters
                 char start[startlen];
                 snprintf(start, startlen, "%s", constr->name->bytes);
                 if (constr->numFields > 0) {
@@ -637,7 +638,7 @@ Box* __attribute__ ((pure)) toString(Box* value) {
                     return joinValues(constr->numFields, dataValue->values, start, ")");
                 } else return makeString(start);
             } else {
-                printf("Unsupported type %d", value->type);
+                printf("Unsupported type %lld", value->type);
                 exit(1);
             }
     }
@@ -647,15 +648,15 @@ Box* concat(Box* arrayString) {
     Array* array = unbox(ARRAY, arrayString);
     Box* result = &EMPTY_STRING_BOX;
     if (array->length > 0) {
-        int len = 0;
-        for (int i = 0; i < array->length; i++) {
+        int64_t len = 0;
+        for (int64_t i = 0; i < array->length; i++) {
             String* s = unbox(STRING, array->data[i]);
             len += s->length;
         }
         String* val = gcMalloc(sizeof(String) + len + 1); // +1 for null-termination
         // val->length is 0, because gcMalloc allocates zero-initialized memory
         // it's also zero terminated, because gcMalloc allocates zero-initialized memory
-        for (int i = 0; i < array->length; i++) {
+        for (int64_t i = 0; i < array->length; i++) {
             String* s = unbox(STRING, array->data[i]);
             memcpy(&val->bytes[val->length], s->bytes, s->length);
             val->length += s->length;
@@ -667,18 +668,18 @@ Box* concat(Box* arrayString) {
 
 /* ============ System ================ */
 
-void initEnvironment(int argc, char* argv[]) {
-  //  int len = 0;
-  //  for (int i = 0; i< argc; i++) len += strlen(argv[i]);
+void initEnvironment(int64_t argc, char* argv[]) {
+  //  int64_t len = 0;
+  //  for (int64_t i = 0; i< argc; i++) len += strlen(argv[i]);
   //  char buf[len + argc*2 + 10];
-  //  for (int i = 0; i < argc; i++) {
+  //  for (int64_t i = 0; i < argc; i++) {
   //    strcat(buf, argv[i]);
   //    strcat(buf, " ");
   //  }
   //  printf("Called with %d \n", argc);
     ENV.argc = argc;
     Array* array = createArray(argc);
-    for (int i = 0; i < argc; i++) {
+    for (int64_t i = 0; i < argc; i++) {
         Box* s = makeString(argv[i]);
         array->data[i] = s;
     }
@@ -689,7 +690,7 @@ Box* getArgs() {
     return ENV.argv;
 }
 
-int toInt(Box* s) {
+int64_t toInt(Box* s) {
     String* str = unbox(STRING, s);
   //  println(s);
     char cstr[str->length + 1];
@@ -699,10 +700,10 @@ int toInt(Box* s) {
     char *ep;
     long i = strtol(cstr, &ep, 10);
     if (cstr == ep) {
-        printf("Couldn't convert %s to int", cstr);
+        printf("Couldn't convert %s to int64_t", cstr);
         exit( EXIT_FAILURE );
     }
-    return (int) i;
+    return (int64_t) i;
 }
 
 void initLascaRuntime(Runtime* runtime) {
@@ -715,7 +716,7 @@ void initLascaRuntime(Runtime* runtime) {
         INT_ARRAY[i].value.num = i;
     }
     if (runtime->verbose)
-        printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %d, # structs = %d\n",
+        printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %lld, # structs = %lld\n",
           RUNTIME->functions->size, RUNTIME->types->size);
 }
 

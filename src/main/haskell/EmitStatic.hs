@@ -187,15 +187,15 @@ cgen ctx this@(S.Select meta tree expr) = do
             let (S.Arg n declaredFieldType, idx) = fromMaybe (error $ printf "No such field %s in %s" (show fieldName) (show tpeName)) (Map.lookup fieldName fieldsWithIndex)
             let len = length fieldsWithIndex
             let arrayType = T.ArrayType (fromIntegral len) ptrType
-            let tpe = T.StructureType False [T.i32, arrayType] -- DataValue: {tag, values: []}
+            let tpe = T.StructureType False [intType, arrayType] -- DataValue: {tag, values: []}
 
             boxedTree <- bitcast tree (T.ptr boxStructType)
             
-            unboxedAddr <- getelementptr boxedTree [constIntOp 0, constIntOp 1]
+            unboxedAddr <- getelementptr boxedTree [constIntOp 0, constInt32Op 1]
             unboxed <- load unboxedAddr
 
             dataStruct <- bitcast unboxed (T.ptr tpe)
-            array <- getelementptr dataStruct [constIntOp 0, constIntOp 1]
+            array <- getelementptr dataStruct [constIntOp 0, constInt32Op 1]
             valueAddr <- getelementptr array [constIntOp 0, constIntOp idx]
             value <- load valueAddr
 --            traceM $ printf "AAAA %s: %s" (show array) (show value)
@@ -327,12 +327,12 @@ cgenIf resultType test tr fl = do
 
 cgenArrayApply array idx = do
     boxedArrayPtr <- bitcast array (T.ptr $ boxStructOfType (T.ptr $ arrayStructType ptrType)) -- Box(type, &Array(len, &data[])
-    arrayStructAddr <- getelementptr boxedArrayPtr [constInt64Op 0, constIntOp 1]
+    arrayStructAddr <- getelementptr boxedArrayPtr [constIntOp 0, constInt32Op 1]
     arrayStructPtr <- load arrayStructAddr
-    arraysize <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 0]
+    arraysize <- getelementptr arrayStructPtr [constIntOp 0, constInt32Op 0]
     size <- load arraysize
     -- TODO check idx is in bounds, eliminatable
-    arrayDataAddr <- getelementptr arrayStructPtr [constInt64Op 0, constIntOp 1]
+    arrayDataAddr <- getelementptr arrayStructPtr [constInt64Op 0, constInt32Op 1]
     arraDataPtr <- load arrayDataAddr
     arrayDataArray <- bitcast arraDataPtr (T.ptr (T.ArrayType 0 ptrType))
     ptr' <- getelementptr arrayDataArray [constInt64Op 0, idx]
@@ -349,7 +349,7 @@ cgenApply ctx meta expr args = do
         this@(S.Ident meta "arrayApply") -> do
             let [arrayExpr, indexExpr] = args
             array <- cgen ctx arrayExpr -- should be a pointer to either boxed or unboxed array
-            boxedIdx <- cgen ctx indexExpr -- must be T.i32. TODO should be platform-dependent
+            boxedIdx <- cgen ctx indexExpr
             idx <- unboxInt boxedIdx
 --            callFn "arrayApply" [array, idx]
             cgenArrayApply array idx
@@ -386,7 +386,7 @@ cgenApply ctx meta expr args = do
 
             closure <- unboxDirect e
             closureTyped <- bitcast closure (T.ptr closureStructType)
-            enclosedArgsAddr <- getelementptr closureTyped [constIntOp 0, constIntOp 1]
+            enclosedArgsAddr <- getelementptr closureTyped [constIntOp 0, constInt32Op 1]
             enclosedArgs <- load enclosedArgsAddr
 --            Functions* fs = RUNTIME->functions;
 --            Function f = fs->functions[closure->funcIdx];
@@ -395,7 +395,7 @@ cgenApply ctx meta expr args = do
             funPtrTyped1 <- bitcast funPtr (T.ptr (funcType ptrType argsTypes))
             funPtrTyped2 <- bitcast funPtr (T.ptr (funcType ptrType (ptrType : argsTypes)))
 
-            ptr <- ptrtoint enclosedArgs T.i64
+            ptr <- ptrtoint enclosedArgs intType
             test <- instr (I.ICmp IP.EQ ptr (constInt64Op 0) [])
             cgenIf ptrType test (call funPtrTyped1 largs) (call funPtrTyped2 (enclosedArgs : largs))
 
@@ -408,27 +408,27 @@ funcPtrFromClosure closure = do
     let mapping = functions modState
     let len = Map.size mapping
     closureTyped <- bitcast closure (T.ptr closureStructType)
-    idxPtr <- getelementptr closureTyped [constIntOp 0, constIntOp 0]
-    idx <- instrTyped T.i32 $ I.Load False idxPtr Nothing 0 []
+    idxPtr <- getelementptr closureTyped [constIntOp 0, constInt32Op 0]
+    idx <- instrTyped intType $ I.Load False idxPtr Nothing 0 []
 --    callFn "putInt" [idx]
     let fst = functionsStructType (fromIntegral len)
     let fnsAddr = (global fst (nameToSBS "Functions"))
     fns <- instrTyped (T.ptr fst) $ I.Load False fnsAddr Nothing 0 []
-    sizeAddr <- getelementptr fnsAddr [constIntOp 0, constIntOp 0]
-    size <- instrTyped T.i32 $ I.Load False sizeAddr Nothing 0 []
+--    sizeAddr <- getelementptr fnsAddr [constIntOp 0, constIntOp 0]
+--    size <- instrTyped intType $ I.Load False sizeAddr Nothing 0 []
 --     Functions[idx].funcPtr
-    fnPtr <- getelementptr fnsAddr [constIntOp 0, constIntOp 1, idx, constIntOp 1]
+    fnPtr <- getelementptr fnsAddr [constIntOp 0, constInt32Op 1, idx, constInt32Op 1]
     load fnPtr
 
 castBoxedValue declaredType value = case declaredType of
     TypeIdent "Float" -> ptrtofp value
-    TypeIdent "Int"   -> ptrtoint value T.i32
+    TypeIdent "Int"   -> ptrtoint value intType
     _                 -> return value
 {-# INLINE castBoxedValue #-}
 
 unboxDirect expr = do
     boxed <- bitcast expr (T.ptr boxStructType)
-    unboxedAddr <- getelementptr boxed [constIntOp 0, constIntOp 1]
+    unboxedAddr <- getelementptr boxed [constIntOp 0, constInt32Op 1]
     load unboxedAddr
 {-# INLINE unboxDirect #-}
 
@@ -493,4 +493,4 @@ genTypesStruct ctx defs = do
     return structType
   where len = length defs
         struct a = createStruct [constInt len, a]
-        structType = T.StructureType False [T.i32, T.ArrayType (fromIntegral len) ptrType]
+        structType = T.StructureType False [intType, T.ArrayType (fromIntegral len) ptrType]
