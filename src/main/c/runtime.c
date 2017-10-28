@@ -346,6 +346,30 @@ Box* __attribute__ ((pure)) runtimeUnaryOp(int64_t code, Box* expr) {
     return result;
 }
 
+String* unsafeString(Box* b) {
+    return b->value.ptr;
+}
+
+int64_t runtimeCompare(Box* lhs, Box* rhs) {
+    if (lhs->type != rhs->type) {
+        printf("AAAA!!! Type mismatch! lhs = %s, rhs = %s\n", typeIdToName(lhs->type), typeIdToName(rhs->type));
+        exit(1);
+    }
+    int64_t result = 0;
+    switch (lhs->type) {
+        case BOOL:
+        case INT:
+        case DOUBLE: { result = // FIXME it's wrong for double
+                lhs->value.num < rhs->value.num ? -1 :
+                lhs->value.num == rhs->value.num ? 0 : 1;
+            break;
+        }
+        case STRING: result = strcmp(unsafeString(lhs)->bytes, unsafeString(rhs)->bytes); // TODO do proper unicode stuff
+    }
+    result = result < 0 ? (int64_t) -1 : result == 0 ? 0 : 1;
+    return result;
+}
+
 Box* arrayApply(Box* arrayValue, int64_t index) {
     Array* array = unbox(ARRAY, arrayValue);
     assert(array->length > index);
@@ -564,29 +588,29 @@ Box* __attribute__ ((pure)) makeString(char * str) {
 }
 
 Box* joinValues(int size, Box* values[], char* start, char* end) {
-    int seps = size * 2;
-    size_t resultSize = size * 32; // assume 32 bytes per array element. No reason, just guess
-    char * result = gcMalloc(resultSize); // zero-initialized, safe to use
-    strcat(result, start);
-    size_t curSize = strlen(start) + strlen(end);
+    String* strings[size];
+    int startLen = strlen(start);
+    int endLen = strlen(end);
+    int resultSize = startLen + endLen + 1 + 2 * size;
+
     for (int i = 0; i < size; i++) {
         Box* elem = values[i];
         String* value = unbox(STRING, toString(elem));
-        // realloc if we don't fit it the result buffer
-        if (curSize + value->length >= resultSize + 10) { // reserve 10 bytes for trailing ']' etc
-            size_t newSize = resultSize * 1.5;
-            result = gcRealloc(result, newSize);
-            resultSize = newSize;
-        }
-        strncat(result, value->bytes, value->length);
-        curSize += value->length;
-        if (i + 1 < size) {
-            strcat(result, ", ");
-            curSize += 2;
-        }
+        resultSize += value->length;
+        strings[i] = value;
+    }
+
+    char * result = malloc(resultSize);
+    strcpy(result, start);
+    for (int i = 0; i < size; i++) {
+        String* value = strings[i];
+        strcat(result, value->bytes);
+        if (i + 1 < size) strcat(result, ", ");
     }
     strcat(result, end);
-    return makeString(result);
+    Box* string = makeString(result);
+    free(result);
+    return string;
 }
 
 Box* __attribute__ ((pure)) arrayToString(Box* arrayValue)  {

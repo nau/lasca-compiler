@@ -1,0 +1,161 @@
+package Map
+
+import Option
+
+data Map k a  = Bin(binSize: Int, binKey: k, binValue: a, ltree: Map k a, rtree: Map k a)
+              | Tip
+
+data View k a = View(viewKey: k, viewValue: a, viewMap: Map k a)
+
+def empty() = Tip
+
+def isEmpty(self: Map k a): Bool = match self {
+    Tip -> true
+    _   -> false
+}
+
+def size(self: Map k a): Int = match self {
+   Tip -> 0
+   Bin(s, _, _, _, _) -> s
+}
+
+def lookup(self: Map k a, key: k): a = match self {
+    Tip -> None
+    Bin(_, kx, x, l, r) -> match runtimeCompare(key, kx) {
+        -1 -> lookup(l, key)
+        1  -> lookup(r, key)
+        0  -> Some(x)
+    }
+}
+
+def member(self, key) = match lookup(self, key) {
+    None -> false
+    _    -> true
+}
+
+def single(key, value) = Bin(1, key, value, Tip, Tip)
+
+Delta = 3
+
+Ratio = 2
+
+def bin(k, x, l, r) = Bin(l.size + r.size + 1, k, x, l, r)
+
+def singleL(k1, x1, t1, t) = match t {
+    Bin(_, k2, x2, t2, t3) -> bin(k2, x2, bin(k1, x1, t1, t2), t3)
+}
+
+def singleR(k1, x1, t, t3) = match t {
+    Bin(_, k2, x2, t1, t2) -> bin(k2, x2, t1, bin(k1, x1, t2, t3))
+}
+
+def doubleL(k1, x1, t1, t) = match t {
+    Bin(_, k2, x2, Bin(_, k3, x3, t2, t3), t4) -> bin(k3, x3, bin(k1, x1, t1, t2), bin(k2, x2, t3, t4))
+}
+
+def doubleR(k1, x1, t, t4) = match t {
+    Bin(_, k2, x2, t1, Bin(_, k3, x3, t2, t3)) -> bin(k3, x3, bin(k2, x2, t1, t2), bin(k1, x1, t3, t4))
+}
+
+
+def rotateL(k, x, l, r) = match r {
+    Bin(_, _, _, ly, ry) -> if ly.size < Ratio * ry.size then singleL(k, x, l, r) else doubleL(k, x, l, r)
+}
+
+def rotateR(k, x, l, r) = match l {
+    Bin(_, _, _, ly, ry) -> if ry.size < Ratio * ly.size then singleR(k, x, l, r) else doubleR(k, x, l, r)
+}
+
+def balance(k, x, l, r) = {
+    if l.size + r.size <= 1 then Bin(l.size + r.size + 1, k, x, l, r)
+    else if r.size > Delta * l.size then rotateL(k, x, l, r)
+    else if l.size > Delta * r.size then rotateR(k, x, l, r)
+    else Bin(l.size + r.size + 1, k, x, l, r)
+}
+
+def insertGo(self, orig, kx, x) = match self {
+    Tip -> single(orig, x)
+    Bin(s, ky, y, l, r) -> match runtimeCompare(kx, ky) {
+        -1 -> let l1 = insertGo(l, orig, kx, x) in balance(ky, y, l1, r)
+        1  -> let r1 = insertGo(r, orig, kx, x) in balance(ky, y, l, r1)
+        0  -> Bin(s, orig, x, l, r)
+    }
+}
+
+def insert(self, k, x) = insertGo(self, k, k, x)
+
+def minViewSure(k, x, l, r) = match l {
+    Tip -> View(k, x, r)
+    Bin(_, kx, xl, ll, lr) -> let view = minViewSure(kx, xl, ll, lr)
+        in View(view.viewKey, view.viewValue, balance(k, x, view.viewMap, r))
+}
+
+def maxViewSure(k, x, l, r) = match r {
+    Tip -> View(k, x, l)
+    Bin(_, kr, xr, rl, rr) -> let view = maxViewSure(kr, xr, rl, rr)
+        in View(view.viewKey, view.viewValue, balance(k, x, l, view.viewMap))
+}
+
+{-
+  glues two trees together.
+  Assumes that [l] and [r] are already balanced with respect to each other.
+-}
+def glue(l, r) = match l {
+    Tip -> r
+    Bin(sl, kl, xl, ll, lr) -> match r {
+        Tip -> l
+        Bin(sr, kr, xr, rl, rr) ->
+            if sl > sr then match maxViewSure(kl, xl, ll, lr) {
+                View(km, m, l1) -> balance(km, m, l1, r)
+            } else match minViewSure(kr, xr, rl, rr) {
+                View(km, m, r1) -> balance(km, m, l, r1)
+            }
+    }
+}
+
+def delete(self, k) = match self {
+    Tip -> Tip
+    Bin(_, kx, x, l, r) -> match runtimeCompare(k, kx) {
+        -1 -> balance(kx, x, delete(l, k), r)
+        1  -> balance(kx, x, l, delete(r, k))
+        0  -> glue(l, r)
+    }
+}
+
+def test(i, m) = if i > 0 then test(i - 1, insert(m, i, i.toString)) else m
+
+def main() = {
+    emp = Tip;
+    one = single(1, "one");
+    two = insert(one, 2, "two");
+    three = insert(two, 3, "three");
+    four = insert(three, 4, "four");
+    println("runtimeCompare = ${runtimeCompare(1, 2)}");
+    println("Test isEmpty should be true: ${emp.isEmpty}");
+    println("Test size should be 0: ${emp.size}");
+    println("Test isEmpty should be false: ${one.isEmpty}");
+    println("Test isEmpty should be true: ${delete(one, 1).isEmpty}");
+
+    println("Test size should be 1: ${one.size}");
+    println("Lookup should be one: ${lookup(one, 1)}");
+    println("Lookup should be none: ${lookup(one, 2)}");
+
+    println("Test size should be 2: ${two.size}");
+    println("Lookup should be two: ${lookup(two, 2)}");
+    println("Lookup should be none: ${lookup(two, 3)}");
+
+    println("Test size should be 3: ${three.size}");
+    println("Lookup should be three: ${lookup(three, 3)}");
+    println("Lookup should be none: ${lookup(three, 4)}");
+
+    println("Test size should be 4: ${four.size}");
+    println("Lookup should be four: ${lookup(four, 4)}");
+    println("4 is member of four: ${member(four, 4)}");
+    println("Lookup should be none: ${lookup(four, 5)}");
+    println(toString(four));
+
+    thou = test(1000, empty());
+    println(toString(thou.size));
+    println(toString(delete(thou, 1000).size));
+
+}
