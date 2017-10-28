@@ -78,8 +78,9 @@ codegenTop ctx this@(S.Val meta name expr) = do
     defineGlobal (nameToSBS name) valType (Just $ defaultValueForType valType)
 
 codegenTop ctx f@(S.Function meta name tpe args body) =
-    if meta ^. S.isExternal then
-        external (externalTypeMapping tpe) (nameToSBS name ) (externArgsToSig args) False []
+    if meta ^. S.isExternal then do
+        let (S.Literal _ (S.StringLit externName)) = body
+        external (externalTypeMapping tpe) (fromString externName) (externArgsToSig args) False []
     else do
         modState <- get
         let codeGenResult = codeGen modState
@@ -355,13 +356,13 @@ cgenApply ctx meta expr args = do
             cgenArrayApply array idx
                     
         S.Ident _ fn | isExtern fn -> do
-            let f@(S.Function _ _ returnType externArgs _) = S._globalFunctions ctx Map.! fn
+            let f@(S.Function _ _ returnType externArgs (S.Literal _ (S.StringLit externName))) = S._globalFunctions ctx Map.! fn
             let argTypes = map (\(S.Arg n t) -> t) externArgs
 --            Debug.traceM $ printf "Calling external %s(%s): %s" fn (show argTypes) (show returnType)
             largs <- forM (zip args argTypes) $ \(arg, tpe) -> do
                 a <- cgen ctx arg
                 resolveBoxing anyTypeVar tpe a
-            res <- callFn (externFuncLLvmType f) (show fn) largs
+            res <- callFn (externFuncLLvmType f) externName largs
             resolveBoxing returnType anyTypeVar res
 
         S.Ident _ fn | isGlobal fn -> do

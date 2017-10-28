@@ -63,8 +63,9 @@ codegenTop ctx this@(S.Val meta name expr) = do
     defineGlobal (nameToSBS name) ptrType (Just (C.Null ptrType))
 
 codegenTop ctx (S.Function meta name tpe args body) =
-    if meta ^. S.isExternal then
-        external (externalTypeMapping tpe) (nameToSBS name ) (externArgsToSig args) False []
+    if meta ^. S.isExternal then do
+        let (S.Literal _ (S.StringLit externName)) = body
+        external (externalTypeMapping tpe) (fromString externName) (externArgsToSig args) False []
     else do
         modState <- get
         let codeGenResult = codeGen modState
@@ -147,7 +148,7 @@ cgen ctx (S.Apply meta expr args) = do
        -- TODO check arguments!
        -- this is done to speed-up calls if you `a global function
         S.Ident _ fn | isExtern fn -> do
-            let f@(S.Function _ _ returnType externArgs _) = S._globalFunctions ctx Map.! fn
+            let f@(S.Function _ _ returnType externArgs (S.Literal _ (S.StringLit externName))) = S._globalFunctions ctx Map.! fn
             let argTypes = map (\(S.Arg n t) -> t) externArgs
 --            Debug.traceM $ printf "Calling external %s(%s): %s" fn (show argTypes) (show returnType)
             largs <- forM (zip args argTypes) $ \(arg, tpe) -> do
@@ -156,7 +157,7 @@ cgen ctx (S.Apply meta expr args) = do
                     TypeIdent "Int" -> callFn (funcType intType [ptrType]) "unboxInt" [a]
                     TypeIdent "Float" -> callFn (funcType T.double [ptrType]) "unboxFloat64" [a]
                     _ -> return a
-            res <- callFn (externFuncLLvmType f) (show fn) largs
+            res <- callFn (externFuncLLvmType f) externName largs
             case returnType of
                 TypeIdent "Int" -> do
 --                    Debug.traceM ("res = " ++ show res)

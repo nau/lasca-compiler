@@ -260,10 +260,13 @@ extern = do
     name <- identifier
     args <- parens $ commaSep arg
     tpe <- typeAscription
+    reservedOp "="
+    externName <- lexeme stringLit
+    let body = Literal meta externName
     let funcType = foldr (\(Arg n at) ft -> TypeFunc at ft) tpe (List.reverse args)
     let scheme = normalizeType funcType
     let meta' = meta { _isExternal = True, _exprType = scheme }
-    return (Function meta' (Name name) tpe args EmptyExpr)
+    return (Function meta' (Name name) tpe args body)
 
 arg :: Parser Arg
 arg = do
