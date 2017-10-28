@@ -84,7 +84,8 @@ data DesugarPhaseState = DesugarPhaseState {
     _locals :: Map.Map Name Type.Type,
     _outers :: Map.Map Name Type.Type,
     _usedVars :: Set.Set Name,
-    _syntacticAst :: [S.Expr]
+    _syntacticAst :: [S.Expr],
+    _freshId :: Int
 } deriving (Show)
 makeLenses ''DesugarPhaseState
 
@@ -94,8 +95,14 @@ emptyDesugarPhaseState = DesugarPhaseState {
     _locals = Map.empty,
     _outers = Map.empty,
     _usedVars = Set.empty,
-    _syntacticAst = []
+    _syntacticAst = [],
+    _freshId = 1
 }
+
+freshName n = do
+    idx <- gets _freshId
+    freshId += 1
+    return $ fromString (n ++ show idx)
 
 uncurryLambda expr = go expr ([], expr) where
   go (S.Lam _ name e) result = let (args, body) = go e result in (name : args, body)
@@ -121,6 +128,11 @@ transformExpr transformer expr = case expr of
         true' <- go true
         false' <- go false
         transformer (S.If meta cond' true' false')
+    S.Match meta expr cases -> do
+        cases1 <- forM cases $ \(S.Case p expr) -> do
+            e <- go expr
+            return $ S.Case p e
+        transformer (S.Match meta expr cases1)
     (S.Let meta n e body) -> do
         case S.typeOf e of
           TypeFunc a b -> locals %= Map.insert n a
@@ -209,6 +221,11 @@ delambdafy ctx exprs = let
                 true' <- go true
                 false' <- go false
                 return (S.If meta cond' true' false')
+            S.Match meta expr cases -> do
+                cases1 <- forM cases $ \(S.Case p expr) -> do
+                    e <- go expr
+                    return $ S.Case p e
+                return (S.Match meta expr cases1)
             (S.Let meta n e body) -> do
                 case S.typeOf e of
                   TypeFunc a b -> locals %= Map.insert n a
@@ -446,8 +463,10 @@ genRuntime opts fmt tst = defineConst "Runtime" runtimeStructType runtime
 --genMatch :: Ctx -> S.Expr -> S.Expr
 genMatch ctx m@(S.Match meta expr []) = error $ "Should be at least on case in match expression: " ++ show m
 genMatch ctx (S.Match meta expr cases) = do
-    let body = foldr (\(S.Case p e) acc -> genPattern ctx (S.Ident (expr ^. S.metaLens) "$match") p e acc) genFail cases
-    return $ S.Let meta "$match" expr body  -- FIXME hack. Gen unique names
+    matchName <- freshName "$match"
+    let body = foldr (\(S.Case p e) acc -> genPattern ctx (S.Ident (expr ^. S.metaLens) matchName) p e acc
+                      ) genFail cases
+    return $ S.Let meta matchName expr body
 genMatch ctx expr = return expr
 
 genFail = S.Apply S.emptyMeta (S.Ident S.emptyMeta "die") [S.Literal S.emptyMeta $ S.StringLit "Match error!"]
