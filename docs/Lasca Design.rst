@@ -272,6 +272,32 @@ And it's cross-platform representations.
 Packages are transferred via bittorrent or alike P2P service.
 https://lasca.io would be kind of a torrent tracker site.
 
+Collections
+===========
+
+Immutable
+---------
+
+Efficient Immutable Collections
+https://michael.steindorfer.name/publications/phd-thesis-efficient-immutable-collections.pdf
+
+CHAMP for Map/Set
+Vector (AMT)
+
+Mutable
+-------
+
+Not sure how to call it better. I'd like to have kind of ndarray built in.
+Array it just a one dimensional tensor/ndarray.
+
+Tensor (Numpy ndarray)
+----------------------
+type Array a = Tensor a
+type Ti32 = Tensor Int32
+type Ti64 = Tensor Int64
+type Tf32 = Tensor Float32
+type Tf64 = Tensor Float64
+
 Memory Management
 =================
 
