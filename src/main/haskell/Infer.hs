@@ -248,12 +248,12 @@ defaultTyenv = TypeEnv (Map.fromList [
       ("-",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
       ("*",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
       ("/",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
-      ("==", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
-      ("!=", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
-      ("<",  Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
-      ("<=", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
-      (">",  Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool)),
-      (">=", Forall [a] (ta `TypeFunc` ta `TypeFunc` typeBool))
+      ("==", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
+      ("!=", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
+      ("<",  Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
+      ("<=", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
+      (">",  Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
+      (">=", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool))
     ])
   where a = TV "a"
         ta = TVar a
@@ -271,8 +271,8 @@ generalize env t  = case Set.toList $ ftv t `Set.difference` ftv env of
     vars -> Forall vars t
 
 ops = Map.fromList [
-    ("and", typeBool `TypeFunc` typeBool `TypeFunc` typeBool),
-    ("or", typeBool `TypeFunc` typeBool `TypeFunc` typeBool)
+    ("and", TypeBool `TypeFunc` TypeBool `TypeFunc` TypeBool),
+    ("or", TypeBool `TypeFunc` TypeBool `TypeFunc` TypeBool)
     ]
 
 --lookupEnv :: TypeEnv -> String -> Infer (Subst, Type)
@@ -355,7 +355,7 @@ infer ctx env ex = case ex of
 
         condTv <- fresh
         (s1, t1) <- infer ctx env cond
-        s2 <- unify (substitute s1 t1) typeBool
+        s2 <- unify (substitute s1 t1) TypeBool
         let substCond = s2 `compose` s1
         cond' <- gets _current
 
@@ -500,9 +500,9 @@ infer ctx env ex = case ex of
         return (nullSubst, tpe)
     e -> error ("Wat? " ++ show e)
 
-litType (IntLit _)    = typeInt
-litType (FloatLit _)  = typeFloat
-litType (BoolLit _)   = typeBool
+litType (IntLit _)    = TypeInt
+litType (FloatLit _)  = TypeFloat
+litType (BoolLit _)   = TypeBool
 litType (StringLit _) = typeString
 litType UnitLit       = typeUnit
 

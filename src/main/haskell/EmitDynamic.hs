@@ -154,15 +154,15 @@ cgen ctx (S.Apply meta expr args) = do
             largs <- forM (zip args argTypes) $ \(arg, tpe) -> do
                 a <- cgen ctx arg
                 case tpe of
-                    TypeIdent "Int" -> callFn (funcType intType [ptrType]) "unboxInt" [a]
-                    TypeIdent "Float" -> callFn (funcType T.double [ptrType]) "unboxFloat64" [a]
+                    TypeInt -> callFn (funcType intType [ptrType]) "unboxInt" [a]
+                    TypeFloat -> callFn (funcType T.double [ptrType]) "unboxFloat64" [a]
                     _ -> return a
             res <- callFn (externFuncLLvmType f) externName largs
             case returnType of
-                TypeIdent "Int" -> do
+                TypeInt -> do
 --                    Debug.traceM ("res = " ++ show res)
                     boxInt res
-                TypeIdent "Float" -> do
+                TypeFloat -> do
 --                    Debug.traceM ("res = " ++ show res ++ show largs ++ fn)
                     boxFloat64 res
                 _ -> return res

@@ -54,17 +54,15 @@ instance Show Type where
 
 infixr `TypeFunc`
 
-typeInt :: Type
-typeInt  = TypeIdent "Int"
-typeFloat = TypeIdent "Float"
-typeBool :: Type
-typeBool = TypeIdent "Bool"
+pattern TypeInt   = TypeIdent "Int"
+pattern TypeFloat = TypeIdent "Float"
+pattern TypeBool  = TypeIdent "Bool"
 
 typeAny = TypeIdent "Any"
 typeString = TypeIdent "String"
 typeUnit = TypeIdent "Unit"
 typeArray t = TypeApply (TypeIdent "Array") [t]
-typeArrayInt = typeArray typeInt
+typeArrayInt = typeArray TypeInt
 
 isAny (TypeIdent "Any") = True
 isAny _ = False

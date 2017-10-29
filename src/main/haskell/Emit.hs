@@ -59,8 +59,8 @@ import qualified Options as Opts
 externalTypeMapping :: Type -> AST.Type
 -- FIXME currently we assume every function returns a result and can't be Unit/void
 --externalTypeMapping (TypeIdent "Unit") = T.void
-externalTypeMapping (TypeIdent "Int") = intType
-externalTypeMapping (TypeIdent "Float") = T.double
+externalTypeMapping TypeInt = intType
+externalTypeMapping TypeFloat = T.double
 externalTypeMapping _ = ptrType-- Dynamic mode
 
 externArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
@@ -190,7 +190,7 @@ extractLambda2 meta args expr = do
             let m = meta
             let body = S.Apply m (S.Ident meta "arrayApply") [
                   S.Ident (meta `S.withType` enclosedArgType) "$enclosed",
-                  S.Literal (meta `S.withType` TypeIdent "Int") $ S.IntLit idx]
+                  S.Literal (meta `S.withType` TypeInt) $ S.IntLit idx]
             S.Let m name body e
     let expr1 = foldr generateEnclosedLocals expr (zip enclosedArgs [0..])
     let func = S.Function meta' funcName typeAny (S.Arg "$enclosed" typeAny : args) expr1

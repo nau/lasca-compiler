@@ -66,8 +66,8 @@ staticArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
 staticArgsToSig = map (\(S.Arg name tpe) -> (nameToSBS name, typeMapping tpe))
 
 argToPtr (S.Arg n t) = case t of
---    TypeIdent "Float" -> fptoptr $ local T.double (nameToSBS n)
---    TypeIdent "Int"   -> inttoptr $ local T.i32 (nameToSBS n)
+--    TypeFloat -> fptoptr $ local T.double (nameToSBS n)
+--    TypeInt   -> inttoptr $ local T.i32 (nameToSBS n)
     _                 -> return $ localPtr $ nameToSBS n
 
 -- codegenTop :: S.Expr -> LLVM ()
@@ -117,8 +117,8 @@ codegenTop ctx expr =
 
 typeMapping :: Type -> AST.Type
 typeMapping t = case t of
---                  TypeIdent "Int" -> T.i32
---                  TypeIdent "Float" -> T.double
+--                  TypeInt -> T.i32
+--                  TypeFloat -> T.double
 --                  TypeIdent "Unit" -> T.void
                   _                -> ptrType
 
@@ -141,8 +141,8 @@ isDataType ctx tpe = case tpe of
 isFuncType (TypeFunc _ _) = True
 isFuncType _ = False
 
-lascaPrimitiveTypes = Set.fromList [TypeIdent "Int", TypeIdent "Float", TypeIdent "Bool", TypeIdent "String", TypeIdent "Any", TypeIdent "Unit"]
-lascaUnboxedTypes =  Set.fromList [TypeIdent "Int", TypeIdent "Float"]
+lascaPrimitiveTypes = Set.fromList [TypeInt, TypeFloat, TypeBool, typeString, typeAny, typeUnit]
+lascaUnboxedTypes =  Set.fromList [TypeInt, TypeFloat]
 anyTypeVar = TVar $ TV "a"
 
 cgen :: Ctx -> S.Expr -> Codegen AST.Operand
@@ -219,8 +219,8 @@ cgen ctx this@(S.Apply meta op@(S.Ident _ "unary-") [expr]) = do
     lexpr <- resolveBoxing anyTypeVar realExprType lexpr'
     let returnType = S.typeOf this
     res <- case S.typeOf expr of
-        TypeIdent "Int"   -> sub (constIntOp 0) lexpr >>= resolveBoxing returnType anyTypeVar
-        TypeIdent "Float" -> fsub (constFloatOp 0.0) lexpr >>= resolveBoxing returnType anyTypeVar
+        TypeInt   -> sub (constIntOp 0) lexpr >>= resolveBoxing returnType anyTypeVar
+        TypeFloat -> fsub (constFloatOp 0.0) lexpr >>= resolveBoxing returnType anyTypeVar
 --    Debug.traceM $ printf "Doing unary- %s with type %s" (show this) (show $ S.typeOf op)
     return res
 cgen ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
@@ -231,27 +231,27 @@ cgen ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) | fn `Map.member` bino
     let returnType = S.typeOf this
 --    Debug.traceM $ printf "Doing binop %s with type %s" (show this) (show $ S.typeOf op)
     let (TypeFunc realLhsType (TypeFunc realRhsType _)) = S.typeOf op
---    let realLhsType = TypeIdent "Int"
---    let realRhsType = TypeIdent "Int"
+--    let realLhsType = TypeInt
+--    let realRhsType = TypeInt
     llhs <- resolveBoxing anyTypeVar realLhsType llhs'
     lrhs <- resolveBoxing anyTypeVar realRhsType lrhs'
 --    Debug.traceM $ printf "%s: %s <==> %s: %s" (show lhsType) (show realLhsType) (show rhsType) (show realRhsType)
     let code = fromMaybe (error ("Couldn't find binop " ++ show fn)) (Map.lookup fn binops)
     res <- case (code, realLhsType) of
-        (10, TypeIdent "Int") -> add llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (11, TypeIdent "Int") -> sub llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (12, TypeIdent "Int") -> mul llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (13, TypeIdent "Int") -> Codegen.div llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (42, TypeIdent "Int") -> intCmpBoxed IPred.EQ llhs lrhs
-        (43, TypeIdent "Int") -> intCmpBoxed IPred.NE llhs lrhs
-        (44, TypeIdent "Int") -> intCmpBoxed IPred.SLT llhs lrhs
-        (45, TypeIdent "Int") -> intCmpBoxed IPred.SLE llhs lrhs
-        (46, TypeIdent "Int") -> intCmpBoxed IPred.SGE llhs lrhs
-        (47, TypeIdent "Int") -> intCmpBoxed IPred.SGT llhs lrhs
-        (10, TypeIdent "Float") -> fadd llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (11, TypeIdent "Float") -> fsub llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (12, TypeIdent "Float") -> fmul llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (13, TypeIdent "Float") -> fdiv llhs lrhs >>= resolveBoxing returnType anyTypeVar
+        (10, TypeInt) -> add llhs lrhs >>= resolveBoxing returnType anyTypeVar
+        (11, TypeInt) -> sub llhs lrhs >>= resolveBoxing returnType anyTypeVar
+        (12, TypeInt) -> mul llhs lrhs >>= resolveBoxing returnType anyTypeVar
+        (13, TypeInt) -> Codegen.div llhs lrhs >>= resolveBoxing returnType anyTypeVar
+        (42, TypeInt) -> intCmpBoxed IPred.EQ llhs lrhs
+        (43, TypeInt) -> intCmpBoxed IPred.NE llhs lrhs
+        (44, TypeInt) -> intCmpBoxed IPred.SLT llhs lrhs
+        (45, TypeInt) -> intCmpBoxed IPred.SLE llhs lrhs
+        (46, TypeInt) -> intCmpBoxed IPred.SGE llhs lrhs
+        (47, TypeInt) -> intCmpBoxed IPred.SGT llhs lrhs
+        (10, TypeFloat) -> fadd llhs lrhs >>= resolveBoxing returnType anyTypeVar
+        (11, TypeFloat) -> fsub llhs lrhs >>= resolveBoxing returnType anyTypeVar
+        (12, TypeFloat) -> fmul llhs lrhs >>= resolveBoxing returnType anyTypeVar
+        (13, TypeFloat) -> fdiv llhs lrhs >>= resolveBoxing returnType anyTypeVar
         _  -> error $ printf "%s: Unsupported binary operation %s" (show $ S.exprPosition this) (S.printExprWithType this)
     return res
 cgen ctx (S.Apply meta expr args) = cgenApply ctx meta expr args
@@ -422,8 +422,8 @@ funcPtrFromClosure closure = do
     load fnPtr
 
 castBoxedValue declaredType value = case declaredType of
-    TypeIdent "Float" -> ptrtofp value
-    TypeIdent "Int"   -> ptrtoint value intType
+    TypeFloat -> ptrtofp value
+    TypeInt   -> ptrtoint value intType
     _                 -> return value
 {-# INLINE castBoxedValue #-}
 
@@ -435,21 +435,21 @@ unboxDirect expr = do
 
 unboxInt expr = do
     unboxed <- unboxDirect expr
-    castBoxedValue (TypeIdent "Int") unboxed
+    castBoxedValue TypeInt unboxed
 {-# INLINE unboxInt #-}
 
 unboxFloat64 expr = do
     unboxed <- unboxDirect expr
-    castBoxedValue (TypeIdent "Float") unboxed
+    castBoxedValue TypeFloat unboxed
 {-# INLINE unboxFloat64 #-}
 
 resolveBoxing declaredType instantiatedType expr = do
     case (declaredType, instantiatedType) of
         _ | declaredType == instantiatedType -> return expr
-        (TypeIdent "Int", TVar _) -> boxInt expr
-        (TypeIdent "Float", TVar _) -> boxFloat64 expr
-        (TVar _, TypeIdent "Int") -> unboxInt expr
-        (TVar _, TypeIdent "Float") -> unboxFloat64 expr
+        (TypeInt, TVar _) -> boxInt expr
+        (TypeFloat, TVar _) -> boxFloat64 expr
+        (TVar _, TypeInt) -> unboxInt expr
+        (TVar _, TypeFloat) -> unboxFloat64 expr
         (TVar _, TVar _) -> return expr
         (l, r) -> do
 --            Debug.traceM $ printf "resolveBoxing crap %s %s" (show l) (show r)

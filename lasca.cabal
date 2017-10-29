@@ -13,6 +13,7 @@ library
                         RecordWildCards
                         NamedFieldPuns
                         FlexibleContexts
+                        PatternSynonyms
   build-depends:        base >=4.9,
                         text,
                         utf8-string,
