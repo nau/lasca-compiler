@@ -247,7 +247,7 @@ function = do
     reservedOp "="
     body <- expr
     let meta' = meta {
-        _exprType = foldr (TypeFunc . const typeAny) tpe args, -- TODO not sure why we need this. maybe in dynamic mode for... check and remove
+        _exprType = foldr (TypeFunc . const typeAny) tpe args, -- We need this for dynamic mode code generation
         _annots = fromMaybe [] annots
     }
     return (Function meta' (Name name) tpe args body)
@@ -307,7 +307,9 @@ closure = braces cls
             reservedOp "->"
             letin <- blockStmts
             meta <- getMeta
-            let lambdas = foldr (Lam meta) letin args
+            let (lambdas, _) = foldr (\arg (body, tpe) ->
+                        let lambdaType = TypeFunc typeAny tpe in
+                        (Lam (meta `withType` lambdaType) arg body, lambdaType)) (letin, typeAny) args
             return lambdas
 
 data LetVal = Named Name Expr | Stmt Expr

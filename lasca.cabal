@@ -41,6 +41,7 @@ library
                         Options
                         Infer
                         Emit
+                        EmitCommon
                         EmitDynamic
                         EmitStatic
                         Codegen

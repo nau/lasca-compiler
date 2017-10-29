@@ -4,8 +4,6 @@ module Compiler where
 import Parser
 import Codegen
 import Emit
-import EmitDynamic
-import EmitStatic
 import JIT
 import Infer
 import Type
@@ -57,7 +55,7 @@ process opts modo source = do
 
 codegen :: LascaOpts -> AST.Module -> [Expr] -> IO AST.Module
 codegen opts modo fns = do
-  let ast = codegenModule opts modo fns
+  ast <- codegenModule opts modo fns
   runJIT opts ast
   return ast
 
@@ -78,9 +76,7 @@ genModule opts modo source = do
           when (verboseMode opts) $ putStrLn ("Parsed OK, imported " ++ show imported)
           when (printAst opts) $ mapM_ print ex
           when (verboseMode opts) $ putStrLn("Compiler mode is " ++ mode opts)
-          if mode opts == "static"
-          then codegenStaticModule opts modo ex
-          else return $ codegenModule opts modo ex
+          codegenModule opts modo ex
 
 readMod :: LascaOpts -> String -> IO AST.Module
 readMod opts fname = do

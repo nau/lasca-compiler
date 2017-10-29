@@ -1,8 +1,6 @@
 {-# LANGUAGE Strict #-}
 
-module EmitStatic (
-  codegenStaticModule
-) where
+module EmitStatic where
 
 import LLVM.Module
 import LLVM.Context
@@ -55,81 +53,11 @@ import System.FilePath
 
 import Codegen
 import Type
-import Emit
+import EmitCommon
 import Infer
 import qualified Syntax as S
 import Syntax (Ctx, createGlobalContext)
 import qualified Options as Opts
-
-
-staticArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
-staticArgsToSig = map (\(S.Arg name tpe) -> (nameToSBS name, typeMapping tpe))
-
-argToPtr (S.Arg n t) = case t of
---    TypeFloat -> fptoptr $ local T.double (nameToSBS n)
---    TypeInt   -> inttoptr $ local T.i32 (nameToSBS n)
-    _                 -> return $ localPtr $ nameToSBS n
-
--- codegenTop :: S.Expr -> LLVM ()
-codegenTop ctx this@(S.Val meta name expr) = do
-    modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
-    let valType = llvmTypeOf this
---    Debug.traceM $ printf "Cons %s: %s" (show name) (show valType)
-    defineGlobal (nameToSBS name) valType (Just $ defaultValueForType valType)
-
-codegenTop ctx f@(S.Function meta name tpe args body) =
-    if meta ^. S.isExternal then do
-        let (S.Literal _ (S.StringLit externName)) = body
-        external (externalTypeMapping tpe) (fromString externName) (externArgsToSig args) False []
-    else do
-        modState <- get
-        let codeGenResult = codeGen modState
-        let blocks = createBlocks codeGenResult
-        mapM_ defineStringLit (generatedStrings codeGenResult)
-        let retType = mappedReturnType args funcType
-        define retType (nameToSBS name) largs blocks
-  where
-    funcType = S.typeOf f
-    largs = map (\(n, t) -> (nameToSBS n, t)) argsWithTypes
-
-    funcTypeToLlvm (S.Arg name _) (TypeFunc a b, acc) = (b, (name, typeMapping a) : acc)
-    funcTypeToLlvm arg t = error $ "AAA3" ++ show arg ++ show t
-
-    argsWithTypes = do
---        Debug.traceM $ printf "codegenTop %s(%s): %s" (name) (show args) (show funcType)
-        reverse $ snd $ foldr funcTypeToLlvm (funcType, []) (reverse args)
-    codeGen modState = execCodegen [] modState $ do
-  --      Debug.traceM $ printf "argsWithTypes %s" (show argsWithTypes)
-        entry <- addBlock entryBlockName
-        setBlock entry
-        forM_ argsWithTypes $ \(n, t) -> do
-            var <- alloca t
-            store var (local t (nameToSBS n))
-    --        Debug.traceM $ printf "assign %s: %s = %s" n (show t) (show var)
-            assign n var
-        cgen ctx body >>= ret
-
-codegenTop ctx (S.Data _ name tvars constructors) = return ()
-
-codegenTop ctx expr =
-    error $ printf "Expression of this kind should not get to codegenTop. It's a bug. %s at %s"
-        (show expr) (show $ S.exprPosition expr)
-
-typeMapping :: Type -> AST.Type
-typeMapping t = case t of
---                  TypeInt -> T.i32
---                  TypeFloat -> T.double
---                  TypeIdent "Unit" -> T.void
-                  _                -> ptrType
-
-llvmTypeOf = typeMapping . S.typeOf
-mappedReturnType args t = typeMapping $ declaredReturnType args t
-declaredReturnType args t = foldr f t args
-  where f arg (TypeFunc a b) = b
-        f arg t = t
--------------------------------------------------------------------------------
--- Operations
--------------------------------------------------------------------------------
 
 dataTypeHasField ctx typeName fieldName =
     typeName `Set.member` (S.dataDefsNames ctx) && fieldName `Map.member` (S.dataDefsFields ctx Map.! typeName)
@@ -169,51 +97,78 @@ cgen ctx (S.Literal meta l) = do
 cgen ctx this@(S.Array meta exprs) = do
     vs <- sequence [cgen ctx e | e <- exprs]
     boxArray vs
-cgen ctx this@(S.Select meta tree expr) = do
---    Debug.traceM $ printf "Selecting! %s" (show this)
-    let (treeType, tpeName) = case S.typeOf tree of
-                                   treeType@(TypeIdent tpeName) -> (treeType, tpeName)
-                                   treeType@(TypeApply (TypeIdent tpeName) _) -> (treeType, tpeName)
-                                   treeType -> error $ printf "Unsupported type for selection %s" (show treeType)
-    let identType = S.typeOf expr
-    let expectedReturnType = S.typeOf this
---    Debug.traceM $ printf "Selecting %s: %s" (show treeType) (show identType)
-    case expr of
-        (S.Ident _ fieldName) | dataTypeHasField ctx tpeName fieldName -> do
-            let pos = createPosition $ S.pos meta
-            tree <- cgen ctx tree
-            let (S.Ident _ fieldName) = expr
-            let fieldsWithIndex = (S.dataDefsFields ctx) Map.! tpeName
---            Debug.traceM $ printf "fieldsWithIndex %s" (show fieldsWithIndex)
-            let (S.Arg n declaredFieldType, idx) = fromMaybe (error $ printf "No such field %s in %s" (show fieldName) (show tpeName)) (Map.lookup fieldName fieldsWithIndex)
-            let len = length fieldsWithIndex
-            let arrayType = T.ArrayType (fromIntegral len) ptrType
-            let tpe = T.StructureType False [intType, arrayType] -- DataValue: {tag, values: []}
-
-            boxedTree <- bitcast tree (T.ptr boxStructType)
-            
-            unboxedAddr <- getelementptr boxedTree [constIntOp 0, constInt32Op 1]
-            unboxed <- load unboxedAddr
-
-            dataStruct <- bitcast unboxed (T.ptr tpe)
-            array <- getelementptr dataStruct [constIntOp 0, constInt32Op 1]
-            valueAddr <- getelementptr array [constIntOp 0, constIntOp idx]
-            value <- load valueAddr
---            traceM $ printf "AAAA %s: %s" (show array) (show value)
---            resultValue <- castBoxedValue declaredFieldType value
---            Debug.traceM $ printf "Selecting %s: %s" (show tree) (show resultValue)
---            return $ constFloatOp 1234.5
---            resolveBoxing declaredFieldType expectedReturnType resultValue
---            return resultValue
-            return value
-        (S.Ident _ name) | isFuncType identType -> do
-    --      traceM $ printf "Method call %s: %s" name (show identType)
-            cgen ctx (S.Apply meta expr [tree])
-        _ -> error $ printf "Unsupported select: %s at %s" (show this) (show $ S.pos meta)
+cgen ctx this@(S.Select meta tree expr) = cgenSelect ctx this
 
 cgen ctx (S.Apply meta (S.Ident _ "or") [lhs, rhs]) = cgen ctx (S.If meta lhs (S.Literal S.emptyMeta (S.BoolLit True)) rhs)
 cgen ctx (S.Apply meta (S.Ident _ "and") [lhs, rhs]) = cgen ctx (S.If meta lhs rhs (S.Literal S.emptyMeta (S.BoolLit False)))
-cgen ctx this@(S.Apply meta op@(S.Ident _ "unary-") [expr]) = do
+cgen ctx this@(S.Apply meta (S.Ident _ "unary-") [expr]) = cgenApplyUnOp ctx this
+cgen ctx this@(S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = cgenApplyBinOp ctx this
+cgen ctx (S.Apply meta expr args) = cgenApply ctx meta expr args
+cgen ctx (S.BoxFunc _ funcName enclosedVars) = do
+    modState <- gets moduleState
+    let mapping = functions modState
+    if null enclosedVars then boxFunc funcName mapping
+    else boxClosure funcName mapping enclosedVars
+cgen ctx m@S.Match{} =
+    error $ printf "Match expressions should be already desugared! %s at: %s" (show m) (show $ S.exprPosition m)
+cgen ctx (S.If meta cond tr fl) = cgenIfStatic ctx meta cond tr fl
+
+cgen ctx e = error ("cgen shit " ++ show e)
+
+cgenIfStatic ctx meta cond tr fl = do
+    let resultType = llvmTypeOf tr
+    let test = do
+            cond <- cgen ctx cond
+            -- unbox Bool
+            voidPtrCond <- unboxDirect cond
+            bool <- ptrtoint voidPtrCond T.i1
+            instr (I.ICmp IP.EQ bool constTrue [])
+    cgenIf resultType test (cgen ctx tr) (cgen ctx fl)
+
+cgenSelect ctx this@(S.Select meta tree expr) = do
+    --    Debug.traceM $ printf "Selecting! %s" (show this)
+    let (treeType, tpeName) = case S.typeOf tree of
+                                  treeType@(TypeIdent tpeName) -> (treeType, tpeName)
+                                  treeType@(TypeApply (TypeIdent tpeName) _) -> (treeType, tpeName)
+                                  treeType -> error $ printf "Unsupported type for selection %s" (show treeType)
+    let identType = S.typeOf expr
+    let expectedReturnType = S.typeOf this
+    --    Debug.traceM $ printf "Selecting %s: %s" (show treeType) (show identType)
+    case expr of
+       (S.Ident _ fieldName) | dataTypeHasField ctx tpeName fieldName -> do
+           let pos = createPosition $ S.pos meta
+           tree <- cgen ctx tree
+           let (S.Ident _ fieldName) = expr
+           let fieldsWithIndex = (S.dataDefsFields ctx) Map.! tpeName
+    --            Debug.traceM $ printf "fieldsWithIndex %s" (show fieldsWithIndex)
+           let (S.Arg n declaredFieldType, idx) = fromMaybe (error $ printf "No such field %s in %s" (show fieldName) (show tpeName)) (Map.lookup fieldName fieldsWithIndex)
+           let len = length fieldsWithIndex
+           let arrayType = T.ArrayType (fromIntegral len) ptrType
+           let tpe = T.StructureType False [intType, arrayType] -- DataValue: {tag, values: []}
+
+           boxedTree <- bitcast tree (T.ptr boxStructType)
+
+           unboxedAddr <- getelementptr boxedTree [constIntOp 0, constInt32Op 1]
+           unboxed <- load unboxedAddr
+
+           dataStruct <- bitcast unboxed (T.ptr tpe)
+           array <- getelementptr dataStruct [constIntOp 0, constInt32Op 1]
+           valueAddr <- getelementptr array [constIntOp 0, constIntOp idx]
+           value <- load valueAddr
+    --            traceM $ printf "AAAA %s: %s" (show array) (show value)
+    --            resultValue <- castBoxedValue declaredFieldType value
+    --            Debug.traceM $ printf "Selecting %s: %s" (show tree) (show resultValue)
+    --            return $ constFloatOp 1234.5
+    --            resolveBoxing declaredFieldType expectedReturnType resultValue
+    --            return resultValue
+           return value
+       (S.Ident _ name) | isFuncType identType -> do
+    --      traceM $ printf "Method call %s: %s" name (show identType)
+           cgen ctx (S.Apply meta expr [tree])
+       _ -> error $ printf "Unsupported select: %s at %s" (show this) (show $ S.pos meta)
+
+
+cgenApplyUnOp ctx this@(S.Apply meta op@(S.Ident _ "unary-") [expr]) = do
     lexpr' <- cgen ctx expr
     let (TypeFunc realExprType _) = S.typeOf op
     lexpr <- resolveBoxing anyTypeVar realExprType lexpr'
@@ -223,7 +178,9 @@ cgen ctx this@(S.Apply meta op@(S.Ident _ "unary-") [expr]) = do
         TypeFloat -> fsub (constFloatOp 0.0) lexpr >>= resolveBoxing returnType anyTypeVar
 --    Debug.traceM $ printf "Doing unary- %s with type %s" (show this) (show $ S.typeOf op)
     return res
-cgen ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = do
+
+
+cgenApplyBinOp ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) = do
     llhs' <- cgen ctx lhs
     lrhs' <- cgen ctx rhs
     let lhsType = S.typeOf lhs
@@ -254,90 +211,6 @@ cgen ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) | fn `Map.member` bino
         (13, TypeFloat) -> fdiv llhs lrhs >>= resolveBoxing returnType anyTypeVar
         _  -> error $ printf "%s: Unsupported binary operation %s" (show $ S.exprPosition this) (S.printExprWithType this)
     return res
-cgen ctx (S.Apply meta expr args) = cgenApply ctx meta expr args
-cgen ctx (S.BoxFunc _ funcName enclosedVars) = do
-    modState <- gets moduleState
-    let mapping = functions modState
-    if null enclosedVars then boxFunc funcName mapping
-    else boxClosure funcName mapping enclosedVars
-cgen ctx m@S.Match{} =
-    error $ printf "Match expressions should be already desugared! %s at: %s" (show m) (show $ S.exprPosition m)
-cgen ctx (S.If meta cond tr fl) = do
-    let resultType = llvmTypeOf tr
-    ifthen <- addBlock "if.then"
-    ifelse <- addBlock "if.else"
-    ifexit <- addBlock "if.exit"
-    -- %entry
-    ------------------
-    cond <- cgen ctx cond
-    -- unbox Bool
-    voidPtrCond <- unboxDirect cond
-    bool <- ptrtoint voidPtrCond T.i1
-
-    test <- instr (I.ICmp IP.EQ bool constTrue [])
-    cbr test ifthen ifelse -- Branch based on the condition
-
-    -- if.then
-    ------------------
-    setBlock ifthen
-    trval <- cgen ctx tr       -- Generate code for the true branch
-    br ifexit              -- Branch to the merge block
-    ifthen <- getBlock
-
-    -- if.else
-    ------------------
-    setBlock ifelse
-    flval <- cgen ctx fl       -- Generate code for the false branch
-    br ifexit              -- Branch to the merge block
-    ifelse <- getBlock
-
-    -- if.exit
-    ------------------
-    setBlock ifexit
-    phi resultType [(trval, ifthen), (flval, ifelse)]
-
-cgen ctx e = error ("cgen shit " ++ show e)
-
-
-cgenIf resultType test tr fl = do
-    ifthen <- addBlock "if.then"
-    ifelse <- addBlock "if.else"
-    ifexit <- addBlock "if.exit"
-    -- %entry
-    ------------------
-    cbr test ifthen ifelse -- Branch based on the condition
-
-    -- if.then
-    ------------------
-    setBlock ifthen
-    trval <- tr       -- Generate code for the true branch
-    br ifexit              -- Branch to the merge block
-    ifthen <- getBlock
-
-    -- if.else
-    ------------------
-    setBlock ifelse
-    flval <- fl       -- Generate code for the false branch
-    br ifexit              -- Branch to the merge block
-    ifelse <- getBlock
-
-    -- if.exit
-    ------------------
-    setBlock ifexit
-    phi resultType [(trval, ifthen), (flval, ifelse)]
-
-cgenArrayApply array idx = do
-    boxedArrayPtr <- bitcast array (T.ptr $ boxStructOfType (T.ptr $ arrayStructType ptrType)) -- Box(type, &Array(len, &data[])
-    arrayStructAddr <- getelementptr boxedArrayPtr [constIntOp 0, constInt32Op 1]
-    arrayStructPtr <- load arrayStructAddr
-    arraysize <- getelementptr arrayStructPtr [constIntOp 0, constInt32Op 0]
-    size <- load arraysize
-    -- TODO check idx is in bounds, eliminatable
-    arrayDataAddr <- getelementptr arrayStructPtr [constInt64Op 0, constInt32Op 1]
-    arraDataPtr <- load arrayDataAddr
-    arrayDataArray <- bitcast arraDataPtr (T.ptr (T.ArrayType 0 ptrType))
-    ptr' <- getelementptr arrayDataArray [constInt64Op 0, idx]
-    load ptr'
 
 cgenApply ctx meta expr args = do
     syms <- gets symtab
@@ -397,8 +270,22 @@ cgenApply ctx meta expr args = do
             funPtrTyped2 <- bitcast funPtr (T.ptr (funcType ptrType (ptrType : argsTypes)))
 
             ptr <- ptrtoint enclosedArgs intType
-            test <- instr (I.ICmp IP.EQ ptr (constInt64Op 0) [])
+            let test = instr (I.ICmp IP.EQ ptr (constInt64Op 0) [])
             cgenIf ptrType test (call funPtrTyped1 largs) (call funPtrTyped2 (enclosedArgs : largs))
+
+cgenArrayApply array idx = do
+    boxedArrayPtr <- bitcast array (T.ptr $ boxStructOfType (T.ptr $ arrayStructType ptrType)) -- Box(type, &Array(len, &data[])
+    arrayStructAddr <- getelementptr boxedArrayPtr [constIntOp 0, constInt32Op 1]
+    arrayStructPtr <- load arrayStructAddr
+    arraysize <- getelementptr arrayStructPtr [constIntOp 0, constInt32Op 0]
+    size <- load arraysize
+    -- TODO check idx is in bounds, eliminatable
+    arrayDataAddr <- getelementptr arrayStructPtr [constInt64Op 0, constInt32Op 1]
+    arraDataPtr <- load arrayDataAddr
+    arrayDataArray <- bitcast arraDataPtr (T.ptr (T.ArrayType 0 ptrType))
+    ptr' <- getelementptr arrayDataArray [constInt64Op 0, idx]
+    load ptr'
+
 
 -------------------------------------------------------------------------------
 -- Compilation
@@ -456,42 +343,4 @@ resolveBoxing declaredType instantiatedType expr = do
             return expr
 {-# INLINE resolveBoxing #-}
 
-codegenStaticModule :: Opts.LascaOpts -> AST.Module -> [S.Expr] -> IO AST.Module
-codegenStaticModule opts modo exprs = do
-    let desugared = desugarExprs ctx desugarExpr exprs
-    case typeCheck ctx desugared of
-        Right (env, typedExprs) -> do
-            when (Opts.verboseMode opts) $ putStrLn "typechecked OK"
-            when (Opts.printTypes opts) $ print env
-            let desugared = delambdafy ctx typedExprs
-            when (Opts.printAst opts) $ putStrLn $ List.intercalate "\n" (map S.printExprWithType desugared)
-            return $ modul desugared
-        Left e -> do
-            let sourceSBS = AST.moduleSourceFileName modo
-            dir <- getCurrentDirectory
-            let source = dir </> Char8.unpack (SBS.fromShort sourceSBS)
-            die $ (source ++ ":" ++ showTypeError e)
-  where
-    ctx = createGlobalContext opts exprs
-    modul exprs = runLLVM modo $ genModule exprs
-    genModule exprs = do
-        declareStdFuncs
-        fmt <- genFunctionMap exprs
-        let defs = reverse (S.dataDefs ctx)
-        tst <- genTypesStruct ctx defs
-        genRuntime opts fmt tst
-        forM_ exprs $ \expr -> do
-            defineStringConstants expr
-            codegenTop ctx expr
---        codegenTop ctx (S.Function (S.emptyMetaWithType (TypeFunc typeUnit typeUnit)) "main" typeAny [] (S.Literal S.emptyMeta (S.UnitLit)))
-        codegenStartFunc ctx cgen
 
-genTypesStruct ctx defs = do
-    types <- genData ctx defs toSig argToPtr
---    Debug.traceM $ printf "genTypesStruct %s" (show types)
-    let array = C.Array ptrType types
-    defineConst "Types" structType (struct array)
-    return structType
-  where len = length defs
-        struct a = createStruct [constInt len, a]
-        structType = T.StructureType False [intType, T.ArrayType (fromIntegral len) ptrType]
