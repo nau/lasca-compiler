@@ -4,61 +4,38 @@ Lasca Language
 [![Join the chat at https://gitter.im/lasca-lang/compiler](https://badges.gitter.im/lasca-lang/Lobby.svg)](https://gitter.im/lasca-lang/compiler?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 Lasca is Scala shifted towards Haskell. 
+
 Lasca is a LLVM-based statically typed general purpose programming language.
+
 It has a 'dynamic' compilation mode, meaning instant code generation without compile time type checking/inference, 
 allowing instant compilation/execution cycle, like dynamic languages give.
-It's planned to have a full type inference, parametric polymorphism, and sort of type classes (a-la Idris or Rust, allowing multiple instances for an interface, unlike Haskell).
+It's planned to have a full type inference, parametric polymorphism, and sort of type classes.
  
 Imagine
-- Scala with type classes, fast compilation/startup time, without OOP, inheritance, variance, implicits, and other complexities
-- Go with ADTs, global type inference and parametric polymorphism 
-- Haskell that is strict and has more 'traditional' syntax and semantics, normal String, and string interpolation
-- OCaml with overloaded +-*/ for ints and floats, type classes 
-- Rust with garbage collector and without all those scopes and <>::!?
+- Scala with type classes, fast compilation/start time, and optional dynamic typing
+- Go with ADTs, global type inference, and parametric polymorphism 
+- Haskell with decent records syntax, runtime polymorphism, and string interpolation
+- OCaml with typeclasses, overloaded +-*/ for ints and floats, and do-notation
+- Rust with garbage collector without <::>!?
 - Erlang with types and fast execution
-- Python with multiline lambdas
-- IntelliJ Idea support :)
+- Python with multithreading, pattern matching, and multiline lambdas
 
 Inspired by:
 - Scala
-- Haskell, Liquid Haskell
-- OCaml/SML
-- Clojure (persisted data structures)
+- Haskell, Liquid Haskell, Linear Haskell
+- OCaml/SML/1ML
+- Clojure (persisted data structures, HAMT/CHAMP)
 - Idris/Agda (dependent types?)
 - Go (simplicity, speed, Any interface?, all-in-one compiler)
 - Rust (linear types, borrowing, method syntax)
 - Erlang (actors, immutability, simplicity, distributed)
-- Python (docstrings, doctests)
+- Python (docstrings, doctests, syntax)
 - Swift
-- D (unified method syntax, macros) 
 - Pony (ref caps, behaviours)
 - Julia
 - Koka (https://github.com/koka-lang/koka)
 - Whiley (http://whiley.org/about/overview/)
 - Sage, Unison, Cloud Haskell
-
-Motivation
----
-
-You write code once and read it hundred times. 
-Hence, readability and simplicity but expressivity and conciseness is the essence.
-One of goals is to speed-up and partition a usual development cycle:
-
- change -> get result
- 
- prototype -> get fast result -> improve code -> test -> produce optimized program
-
-Compilation time matters. A lot. 
- 
-To speed-up prototyping I suggest disable/simplify typechecking during prototyping.
-This can be done by compiler option with per source file, or even per definition granularity
-See Haskell Deffered type checking.
-
-    lasca --mode dynamic hello.lasca // compile in dynamic typing mode
-    
-Right balance between expressiveness and readability is the essence.
-
-IDE support is very important. Lasca will have IntelliJ Idea support from early stages.
  
 
 Ideas
@@ -66,22 +43,22 @@ Ideas
 - Concurrency Oriented Programming (Erlang). Objects are out. Concurrency is in.
 - Gradual Typing (http://homes.soic.indiana.edu/jsiek/what-is-gradual-typing/)
 - Deferred Type Errors (runtime compilation mode, Haskell)
-- Linear types (Rust)?
-- Liquid Type system (refinement types) 
+- Linear/affine types (Rust, Linear Haskell)?
+- Liquid Type system (refinement types, Leon, Liquid Haskell) 
   https://github.com/pleiad/Refinements
   http://leon.epfl.ch
   https://github.com/ucsd-progsys/liquidhaskell
-  Z3 (commercial license?), CVC4 as proof assistant.
-- Algebraic Subtyping? (https://www.cl.cam.ac.uk/~sd601/thesis.pdf)   
-- light, non-symbol-polluted syntax
+  Z3/CVC4 as proof assistant.
+- Algebraic Subtyping for module system? (https://www.cl.cam.ac.uk/~sd601/thesis.pdf)   
+- light, non-symbol-polluted syntax (Python)
 - Uniqueness type (inplace write, no gc)
-  See Rust, Pony, Idris Unique type
+  See Rust, Pony, Idris Unique type, Linear Haskell
   http://lampwww.epfl.ch/~phaller/doc/capabilities-uniqueness2.pdf  
-- indentation-based? 
+- indentation-based
 - readability first
 - fast development cycle
-- presentation compiler (JSON compiler API?)
-- IDE-friendly ('dot-autocomplete', auto-formatting, compiler API) 
+- presentation compiler for IDE integration
+- IDE-friendly (intellisence 'dot-autocomplete', auto-formatting, compiler API) 
 - type-safe
 - strict functional
 - expression-based
@@ -96,10 +73,8 @@ Ideas
 - no OOP and data subclassing/inheritance?
 - syntactic sugar is ok
 - no null
-- annotations (Java-style)
+- annotations (Java/Python-style)
 - annotation-based extensions, like visibility (@private, public by default)
-	- nope
-    - Consider private by default, bc adding public function to a package may require full source recompilation. If it is.
 - macros based metaprogramming (Scala Meta, Template Haskell)    
 - macro-based extensions?
 - implicits? (Scala/Haskell/Idris)
@@ -117,7 +92,6 @@ Ideas
 - CPS/Actors/π-calculus/STM?, non-blocking IO, reactive
 - import of a package must not introduce any side effects?! (hello Go)
 - JSON ready, included
-- grades for code by the compiler (A+, A, B, C, D, E, F). From untyped undocumented F-code, to proven, documented with examples A+ code
 - libuv for async I/O?
 - https://www.youtube.com/watch?v=buQNgW-voAg (future functional programming language)
 - blockchain based storage of proven software?
@@ -365,33 +339,20 @@ If you want to build everything with profiling support
 uncomment -rtsopts, -prof, -fprof-auto ghc options in stack.yaml, and run
     
     stack build --executable-profiling --library-profiling
-    
-IntelliJ IDEA Plugin
-====================
-lasca-intellij-plugin.zip in the project root folder is actually a IntelliJ Plugin for Lasca. 
-
-It supports
-- syntax highlighting
-- Go to definition
-- Find Usages for global functions
-- Rename refactoring for global functions
-
-To install the plugin:
-
-    Preferences -> Plugins -> Install Plugin From Disk -> lasca-intellij-plugin.zip
+   
     
 Current n-body run:
 --------------------
     $ time lasca -e -O2 src/main/lasca/nbody.lasca -- 50000000
     -0.169075164
     -0.169059907
-    
-    real	15m3.991s
-    user	18m4.411s
-    sys	4m25.523s
+
+    real      7m13.261s
+    user      7m39.476s
+    sys       0m38.716s
 
     find src -name *.hs  | xargs cat | wc -l
-    2201
+    3714
     
     find src -name *.c  | xargs cat | wc -l
-    682
+    681
