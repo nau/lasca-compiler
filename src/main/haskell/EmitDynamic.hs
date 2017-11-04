@@ -85,8 +85,6 @@ cgen ctx this@(S.Array meta exprs) = do
     boxArray vs
 cgen ctx this@(S.Select meta tree expr) = cgenSelect ctx this
 
-cgen ctx (S.Apply meta (S.Ident _ "or") [lhs, rhs]) = cgen ctx (S.If meta lhs (S.Literal S.emptyMeta (S.BoolLit True)) rhs)
-cgen ctx (S.Apply meta (S.Ident _ "and") [lhs, rhs]) = cgen ctx (S.If meta lhs rhs (S.Literal S.emptyMeta (S.BoolLit False)))
 cgen ctx this@(S.Apply meta (S.Ident _ "unary-") [expr]) = cgenApplyUnOp ctx this
 cgen ctx this@(S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = cgenApplyBinOp ctx this
 cgen ctx (S.Apply meta expr args) = cgenApply ctx meta expr args

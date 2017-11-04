@@ -63,23 +63,9 @@ import qualified Options as Opts
 codegenModule :: Opts.LascaOpts -> AST.Module -> [S.Expr] -> IO AST.Module
 codegenModule opts modo exprs = do
     let desugared = desugarExprs ctx desugarExpr exprs
-    (exprs, cgen) <- do
-        if Opts.mode opts == "static"
-        then case typeCheck ctx desugared of
-                 Right (env, typedExprs) -> do
-                     when (Opts.verboseMode opts) $ putStrLn "typechecked OK"
-                     when (Opts.printTypes opts) $ print env
-                     return (typedExprs, EmitStatic.cgen)
-                 Left e -> do
-                     let sourceSBS = AST.moduleSourceFileName modo
-                     dir <- getCurrentDirectory
-                     let source = dir </> Char8.unpack (SBS.fromShort sourceSBS)
-                     die $ (source ++ ":" ++ showTypeError e)
-        else return (desugared, EmitDynamic.cgen)
-
+    (exprs, cgen) <- typecheck ctx modo desugared -- TODO remove modo
     when (Opts.printAst opts) $ putStrLn $ List.intercalate "\n" (map S.printExprWithType exprs)
-
-    let desugared = delambdafy ctx exprs
+    let desugared = delambdafy ctx exprs -- must be after typechecking
     return $ modul cgen desugared
   where
     ctx = createGlobalContext opts exprs
@@ -95,6 +81,21 @@ codegenModule opts modo exprs = do
             codegenTop ctx cgen expr
         codegenStartFunc ctx cgen
 
+
+typecheck ctx modo exprs = do
+    let opts = ctx ^. S.lascaOpts
+    if Opts.mode opts == "static"
+    then case typeCheck ctx exprs of
+             Right (env, typedExprs) -> do
+                 when (Opts.verboseMode opts) $ putStrLn "typechecked OK"
+                 when (Opts.printTypes opts) $ print env
+                 return (typedExprs, EmitStatic.cgen)
+             Left e -> do
+                 let sourceSBS = AST.moduleSourceFileName modo
+                 dir <- getCurrentDirectory
+                 let source = dir </> Char8.unpack (SBS.fromShort sourceSBS)
+                 die $ (source ++ ":" ++ showTypeError e)
+    else return (exprs, EmitDynamic.cgen)
 
 codegenTop ctx cgen topExpr = case topExpr of
     this@(S.Val meta name expr) -> do

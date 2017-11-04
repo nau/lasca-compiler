@@ -517,9 +517,14 @@ desugarUnaryMinus expr = case expr of
     S.Apply _ (S.Ident _ ("unary-")) [S.Literal meta (S.FloatLit v)] -> S.Literal meta (S.FloatLit (-v))
     e -> e
 
+desugarAndOr expr = case expr of
+    S.Apply meta (S.Ident _ "or")  [lhs, rhs] -> S.If meta lhs (S.Literal S.emptyMeta (S.BoolLit True)) rhs
+    S.Apply meta (S.Ident _ "and") [lhs, rhs] -> S.If meta lhs rhs (S.Literal S.emptyMeta (S.BoolLit False))
+    e -> e
+
 desugarExpr ctx expr = do
-    let expr2 = desugarUnaryMinus expr
-    let expr1 = desugarAssignment expr2
+    let desugarFunc = desugarAndOr . desugarAssignment . desugarUnaryMinus
+    let expr1 = desugarFunc expr
     expr2 <- genMatch ctx expr1
     return expr2
 
