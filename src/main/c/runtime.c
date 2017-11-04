@@ -8,110 +8,7 @@
 #include <math.h>
 #include <gc.h>
 
-// Operators
-const int64_t ADD = 10;
-const int64_t SUB = 11;                           // x - y
-const int64_t MUL = 12;
-const int64_t DIV = 13;                           // x / y
-const int64_t MOD = 14;                           // x % y
-
-const int64_t EQ = 42;                            // x == y
-const int64_t NE = 43;                            // x != y
-const int64_t LT = 44;                            // x < y
-const int64_t LE = 45;                            // x <= y
-const int64_t GE = 46;                            // x >= y
-const int64_t GT = 47;                            // x > y
-  // Boolean unary operations
-const int64_t ZNOT = 50;                          // !x
-
-  // Boolean binary operations
-const int64_t ZOR = 60;                           // x || y
-const int64_t ZAND = 61;                          // x && y
-
-// Primitive Types
-const int64_t UNIT     = 0;
-const int64_t BOOL     = 1;
-const int64_t INT      = 2;
-const int64_t DOUBLE   = 3;
-const int64_t STRING   = 4;
-const int64_t CLOSURE  = 5;
-const int64_t ARRAY    = 6;
-
-typedef struct {
-    int64_t type;
-    union Value {
-        int64_t num;
-        double dbl;
-        void* ptr;
-    } value;
-} Box;
-
-typedef struct {
-    int64_t length;
-    char bytes[];
-} String;
-
-typedef struct {
-    int64_t funcIdx;
-    Box* args;  // boxed Array of boxed enclosed arguments
-} Closure;
-
-typedef struct {
-    int64_t length;
-    Box** data;
-} Array;
-
-typedef struct {
-    String* name;
-    void * funcPtr;
-    int64_t arity;
-} Function;
-
-typedef struct {
-    int64_t size;
-    Function functions[];
-} Functions;
-
-typedef struct {
-    int64_t typeId;
-  //  int64_t tag;   // it's not set now. Not sure we need this
-    String* name;
-    int64_t numFields;
-    String* fields[];
-} Struct;
-
-typedef struct {
-    int64_t typeId;
-    String* name;
-    int64_t numValues;
-    Struct* constructors[];
-} Data;
-
-typedef struct {
-    int64_t size;
-    Data* data[];
-} Types;
-
-typedef struct {
-    int64_t argc;
-    Box* argv;
-} Environment;
-
-typedef struct {
-    Functions* functions;
-    Types* types;
-    int64_t verbose;
-} Runtime;
-
-typedef struct {
-    int64_t tag;
-    Box* values[];
-} DataValue;
-
-typedef struct {
-    int64_t line;
-    int64_t column;
-} Position;
+#include "lasca.h"
 
 Box TRUE_SINGLETON = {
     .type = BOOL,
@@ -154,9 +51,6 @@ void *gcRealloc(void* old, size_t s) {
     return GC_realloc(old, s);
 }
 
-Box* toString(Box* value);
-Box* println(Box* val);
-Box* boxArray(size_t size, ...);
 
 const char * __attribute__ ((const)) typeIdToName(int64_t typeId) {
     switch (typeId) {
@@ -346,41 +240,6 @@ Box* __attribute__ ((pure)) runtimeUnaryOp(int64_t code, Box* expr) {
     return result;
 }
 
-String* unsafeString(Box* b) {
-    return b->value.ptr;
-}
-
-int64_t runtimeCompare(Box* lhs, Box* rhs) {
-    if (lhs->type != rhs->type) {
-        printf("AAAA!!! Type mismatch! lhs = %s, rhs = %s\n", typeIdToName(lhs->type), typeIdToName(rhs->type));
-        exit(1);
-    }
-    int64_t result = 0;
-    switch (lhs->type) {
-        case BOOL:
-        case INT:
-        case DOUBLE: { result = // FIXME it's wrong for double
-                lhs->value.num < rhs->value.num ? -1 :
-                lhs->value.num == rhs->value.num ? 0 : 1;
-            break;
-        }
-        case STRING: result = strcmp(unsafeString(lhs)->bytes, unsafeString(rhs)->bytes); // TODO do proper unicode stuff
-    }
-    result = result < 0 ? (int64_t) -1 : result == 0 ? 0 : 1;
-    return result;
-}
-
-Box* arrayApply(Box* arrayValue, int64_t index) {
-    Array* array = unbox(ARRAY, arrayValue);
-    assert(array->length > index);
-    return array->data[index];
-}
-
-int64_t arrayLength(Box* arrayValue) {
-    Array* array = unbox(ARRAY, arrayValue);
-    return array->length;
-}
-
 String UNIMPLEMENTED_SELECT = {
     .length = 20,
     .bytes = "Unimplemented select"
@@ -513,33 +372,6 @@ Box* runtimeIsConstr(Box* value, Box* constrName) {
     }
     return &FALSE_SINGLETON;
 }
-/* ================== IO ================== */
-
-void* putInt(int64_t c) {
-    printf("%lld\n", c);
-    fflush(stdout);
-    return 0;
-}
-
-void* putchard(double X) {
-    printf("%12.9lf\n", X);
-    fflush(stdout);
-    return 0;
-}
-
-void * runtimePutchar(Box* ch) {
-    char c = (char) unboxInt(ch);
-    putchar(c);
-    fflush(stdout);
-    return 0;
-}
-
-Box* println(Box* val) {
-    String * str = unbox(STRING, val);
-    printf("%s\n", str->bytes);
-    return &UNIT_SINGLETON;
-}
-
 
 /* =================== Arrays ================= */
 
