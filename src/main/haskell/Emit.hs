@@ -54,6 +54,7 @@ import Codegen
 import Type
 import Infer
 import EmitCommon
+import Desugar
 import qualified EmitDynamic as EmitDynamic
 import qualified EmitStatic as EmitStatic
 import qualified Syntax as S
