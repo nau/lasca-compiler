@@ -575,11 +575,3 @@ void initLascaRuntime(Runtime* runtime) {
         printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %lld, # structs = %lld\n",
           RUNTIME->functions->size, RUNTIME->types->size);
 }
-
-/*
-Box* lascaOpenFile(Box* filename, Box* mode) {
-    String* str = unbox(STRING, filename);
-    String* md = unbox(STRING, mode);
-    FILE* f = fopen(str->bytes, md->bytes);
-    return box
-}*/

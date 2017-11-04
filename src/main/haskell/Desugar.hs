@@ -73,7 +73,7 @@ transform transformer exprs = sequence [transformExpr transformer expr | expr <-
 --transformExpr :: (S.Expr -> LLVM S.Expr) -> S.Expr -> LLVM S.Expr
 transformExpr transformer expr = case expr of
     expr@(S.Ident _ n) -> do
-        modify (\s -> s { _usedVars = Set.insert n (_usedVars s)})
+        usedVars %= Set.insert n
         return expr
     S.Array meta exprs -> do
         exprs' <- mapM go exprs
@@ -114,7 +114,6 @@ transformExpr transformer expr = case expr of
     (S.Apply meta e args) -> do
         e' <- go e
         args' <- mapM go args
---        args' <- sequence [go arg | arg <- args]
         transformer (S.Apply meta e' args')
     f@(S.Function meta name tpe args e1) -> do
         let funcTypeToLlvm (S.Arg name _) (TypeFunc a b, acc) = (b, (name, a) : acc)
@@ -129,7 +128,7 @@ transformExpr transformer expr = case expr of
 
   where go e = transformExpr transformer e
 
-extractLambda2 meta args expr = do
+extractLambda meta args expr = do
     state <- get
     curFuncName <- gets _currentFunctionName
     let nms = _modNames state
@@ -198,7 +197,7 @@ delambdafy ctx exprs = let
                 let r = foldr (\(S.Arg n t) -> Map.insert n typeAny) Map.empty args
                 locals .= r
                 e' <- go e
-                res <- extractLambda2 m args e'
+                res <- extractLambda m args e'
                 modify (\s  -> s {_outers = oldOuters, _locals = oldLocals})
                 return res
             (S.Apply meta e args) -> do
