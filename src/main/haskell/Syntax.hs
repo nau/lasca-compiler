@@ -48,7 +48,6 @@ data Expr
     = EmptyExpr
     | Literal Meta Lit
     | Ident Meta Name
-    | Val Meta Name Expr
     | Apply Meta Expr [Expr]
     | Lam Meta Arg Expr
     | Select Meta Expr Expr
@@ -68,7 +67,6 @@ metaLens = Lens.lens (fst . getset) (snd . getset)
     where getset expr = case expr of
               Literal meta lit -> (meta, \ m -> Literal m lit)
               Ident meta name -> (meta, \ m -> Ident m name)
-              Val meta name expr -> (meta, \ m -> Val m name expr)
               Apply meta expr args -> (meta, \ m -> Apply m expr args)
               Lam meta name expr -> (meta, \ m -> Lam m name expr)
               Select meta tree expr -> (meta, \ m -> Select m tree expr)
@@ -97,7 +95,6 @@ withScheme f (Forall tv t) = Forall tv (f t)
 instance Eq Expr where
     (Literal _ l) == (Literal _ r) = l == r
     (Ident _ l) == (Ident _ r) = l == r
-    (Val _ nl l) == (Val _ nr r) = nl == nr && l == r
     (Apply _ nl l) == (Apply _ nr r) = nl == nr && l == r
     (Lam _ nl l) == (Lam _ nr r) = nl == nr && l == r
     (Select _ nl l) == (Select _ nr r) = nl == nr && l == r
@@ -115,7 +112,6 @@ instance Eq Expr where
 instance Show Expr where
   show (Literal _ l) = show l
   show (Ident meta n) = printf "%s: %s" n (show meta)
-  show (Val meta n e) = printf "val %s: %s = %s\n" n (show meta) (show e)
   show (Apply meta f e) = printf "%s(%s): %s" (show f) (intercalate "," $ map show e) (show meta)
   show (Lam _ a e) = printf "{ %s -> %s }\n" (show a) (show e)
   show (Select _ e f) = printf "%s.%s" (show e) (show f)
@@ -143,7 +139,6 @@ instance DebugPrint Expr where
     printExprWithType expr = case expr of
         Literal _ l -> show l
         Ident meta n -> printf "%s: %s" (show n) (show meta)
-        Val meta n e -> printf "val %s: %s = %s\n" (show n) (show meta) (printExprWithType e)
         Apply meta f e -> printf "%s(%s): %s" (printExprWithType f) (intercalate "," $ map printExprWithType e) (show meta)
         Lam _ a e -> printf "{ %s -> %s }\n" (printExprWithType a) (printExprWithType e)
         Select _ e f -> printf "%s.%s" (printExprWithType e) (printExprWithType f)
@@ -230,7 +225,7 @@ createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
     names expr = case expr of
         Package _ name -> packageName .= name
         Import _ name -> return () -- ignore imports
-        Val _ name _ -> do
+        Let _ name _ _ -> do
 --            qname <- qual name
 --            Debug.traceM ("QNAME = " ++ show qname)
             globalVals %= Set.insert name

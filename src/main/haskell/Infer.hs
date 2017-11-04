@@ -191,7 +191,6 @@ updateMeta f e =
         EmptyExpr -> e
         Literal meta lit -> Literal (f meta) lit
         Ident meta name -> Ident (f meta) name
-        Val meta name expr -> Val (f meta) name (updateMeta f expr)
         Apply meta expr exprs -> Apply (f meta) (updateMeta f expr) (map (updateMeta f) exprs)
         Lam meta name expr -> Lam (f meta) name (updateMeta f expr)
         Select meta tree expr -> Select (f meta) (updateMeta f tree) (updateMeta f expr)
@@ -289,13 +288,6 @@ setType e = modify (\s -> s {_current = e })
 
 infer :: Ctx -> TypeEnv -> Expr -> Infer (Subst, Type)
 infer ctx env ex = case ex of
-    Val meta n e -> do
-        (s, t) <- infer ctx env e
-        e' <- gets _current
-        setType $ Val (meta `withType` t) n e'
-    --    Debug.trace ("Val " ++ n ++ " " ++ show s ++ " " ++ show t) return (s, t)
-        return (s, t)
-
     Ident meta x -> do
         (s, t) <- lookupEnv env x
     --    traceM $ printf "Ident %s: %s = %s" x (show t) (show s)
@@ -543,7 +535,7 @@ collectNames exprs = forM_ exprs collectName
 
 collectName :: Expr -> State InferStuff ()
 collectName expr = case expr of
-    Val _ name _ -> do
+    Let _ name _ _ -> do
         names %= (++ [(name, expr)])
         return ()
     Function _ name _ _ _ -> do

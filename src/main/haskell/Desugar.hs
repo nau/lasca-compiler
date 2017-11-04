@@ -125,9 +125,6 @@ transformExpr transformer expr = case expr of
         modify (\s -> s { _currentFunctionName = name, _locals = argNames, _outers = Map.empty, _usedVars = Set.empty } )
         e' <- go e1
         transformer (S.Function meta name tpe args e')
-    S.Val meta name expr -> do
-        expr' <- go expr
-        return $ S.Val meta name expr'
     e -> transformer e
 
   where go e = transformExpr transformer e
@@ -218,9 +215,6 @@ delambdafy ctx exprs = let
                 modify (\s -> s { _currentFunctionName = name, _locals = argNames, _outers = Map.empty, _usedVars = Set.empty } )
                 e' <- go e1
                 return (S.Function meta name tpe args e')
-            S.Val meta name expr -> do
-                expr' <- go expr
-                return $ S.Val meta name expr'
             e -> return e
             where go e = delambdafyExpr e
 

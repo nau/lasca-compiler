@@ -99,7 +99,7 @@ typecheck ctx modo exprs = do
     else return (exprs, EmitDynamic.cgen)
 
 codegenTop ctx cgen topExpr = case topExpr of
-    this@(S.Val meta name expr) -> do
+    this@(S.Let meta name expr _) -> do
         modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
         let valType = llvmTypeOf this
     --    Debug.traceM $ printf "Cons %s: %s" (show name) (show valType)

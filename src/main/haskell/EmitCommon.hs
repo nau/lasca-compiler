@@ -126,9 +126,6 @@ defineStringConstants expr = case expr of
          mapM_ (\(S.Case p e) -> defineStringConstants e) cases
          return ()
     S.Lam{} -> error $ printf "defineStringConstants should be called after lambda lift! %s" (show expr)
-    S.Val meta name expr -> do
-        defineStringConstants expr
-        return ()
     S.Function meta name retType args expr -> do
         defineStringConstants expr
         return ()

@@ -389,7 +389,7 @@ factor =  try floatingLiteral
 
 globalValDef = do
     meta <- getMeta
-    valdef $ Val meta
+    valdef $ (\name e -> Let meta name e e)
 
 packageDef = do
     reserved "package"
