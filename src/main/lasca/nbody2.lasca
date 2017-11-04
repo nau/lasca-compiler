@@ -116,68 +116,18 @@ def loop1(bodies, i, dt) =
         loop1(res, i + 1, dt);
     } else bodies
 
-
 def update(body: Body, dt: Float) = Body(
-    body.x + dt * body.vx, body.y + dt * body.y, body.z + dt * body.vz,
+    body.x + dt * body.vx, body.y + dt * body.vy, body.z + dt * body.vz,
     body.vx, body.vy, body.vz, body.mass)
 
-def advance2(bodies: [Body], dt) = {
+def advance(bodies: [Body], dt) = {
     bodies1 = loop1(bodies, 0, dt); -- FIXME
     [
-      update(arrayApply(bodies1, 0), dt),
-      update(arrayApply(bodies1, 1), dt),
-      update(arrayApply(bodies1, 2), dt),
-      update(arrayApply(bodies1, 3), dt),
-      update(arrayApply(bodies1, 4), dt)
-    ]
-}
-
-def advance(bodies: [Body], dt) = {
-    r01 = advanceInner(bodies[0], bodies[1], dt);
-    r02 = advanceInner(r01[0],    bodies[2], dt);
-    r03 = advanceInner(r02[0],    bodies[3], dt);
-    r04 = advanceInner(r03[0],    bodies[4], dt);
-
-    r12 = advanceInner(r01[1],    r02[1], dt);
-    r13 = advanceInner(r12[0],    r03[1], dt);
-    r14 = advanceInner(r13[0],    r04[1], dt);
-
-    r23 = advanceInner(r12[1],    r13[1], dt);
-    r24 = advanceInner(r23[0],    r14[1], dt);
-
-    r34 = advanceInner(r23[1],    r24[1], dt);
-
-    sun = bodies[0];
-    sunVx = r04[0].vx;
-    sunVy = r04[0].vy;
-    sunVz = r04[0].vz;
-
-    jupiter = bodies[1];
-    jupiterVx = r14[0].vx;
-    jupiterVy = r14[0].vy;
-    jupiterVz = r14[0].vz;
-
-    saturn = bodies[2];
-    saturnVx = r24[0].vx;
-    saturnVy = r24[0].vy;
-    saturnVz = r24[0].vz;
-
-    uranus = bodies[3];
-    uranusVx = r34[0].vx;
-    uranusVy = r34[0].vy;
-    uranusVz = r34[0].vz;
-
-    neptune = bodies[4];
-    neptuneVx = r34[1].vx;
-    neptuneVy = r34[1].vy;
-    neptuneVz = r34[1].vz;
-
-    [
-      Body(sun.x + dt * sunVx,     sun.y + dt * sunVy,     sun.z + dt * sunVz,     sunVx, sunVy, sunVz, sun.mass),
-      Body(jupiter.x + dt * jupiterVx, jupiter.y + dt * jupiterVy, jupiter.z + dt * jupiterVz, jupiterVx, jupiterVy, jupiterVz, jupiter.mass),
-      Body(saturn.x + dt * saturnVx,  saturn.y + dt * saturnVy,  saturn.z + dt * saturnVz,  saturnVx,  saturnVy,  saturnVz, saturn.mass),
-      Body(uranus.x + dt * uranusVx,  uranus.y + dt * uranusVy,  uranus.z + dt * uranusVz,  uranusVx,  uranusVy,  uranusVz, uranus.mass),
-      Body(neptune.x + dt * neptuneVx, neptune.y + dt * neptuneVy, neptune.z + dt * neptuneVz,  neptuneVx,  neptuneVy,  neptuneVz, neptune.mass)
+      update(bodies1[0], dt),
+      update(bodies1[1], dt),
+      update(bodies1[2], dt),
+      update(bodies1[3], dt),
+      update(bodies1[4], dt)
     ]
 }
 
