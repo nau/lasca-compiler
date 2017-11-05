@@ -20,7 +20,7 @@ library
                         haskeline,
                         process,
                         containers,
-                        pretty >=1.1,
+                        prettyprinter >=1.1,
                         megaparsec >= 6.0.0,
                         scientific,
                         lens >= 4.15,

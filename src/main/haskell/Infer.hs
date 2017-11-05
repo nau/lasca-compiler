@@ -8,6 +8,7 @@ module Infer (
   typeCheck,
   inferExpr,
   showTypeError,
+  showPretty,
   defaultTyenv
 ) where
 
@@ -29,12 +30,22 @@ import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import Debug.Trace as Debug
 import Text.Printf
+import Data.Text.Prettyprint.Doc
+import Data.Text.Prettyprint.Doc.Render.String
 
 newtype TypeEnv = TypeEnv (Map.Map Name Type) deriving (Monoid)
 
+
+instance Pretty TypeEnv where
+    pretty (TypeEnv subst) = "Γ = {" <+> line <+> indent 2 elems <+> "}"
+      where elems = vcat $ map (\(name, scheme) -> pretty name <+> ":" <+> pretty scheme) (Map.toList subst)
+
 instance Show TypeEnv where
     show (TypeEnv subst) = "Γ = {\n" ++ elems ++ "}"
-      where elems = List.foldl' (\s (name, scheme) -> s ++ show name ++ " : " ++ show scheme ++ "\n") "" (Map.toList subst)
+      where elems = List.foldl' (\s (name, scheme) -> s ++ show name ++ " : " ++ showPretty scheme ++ "\n") "" (Map.toList subst)
+
+showPretty :: Pretty a => a -> String
+showPretty = renderString . layoutPretty defaultLayoutOptions . pretty
 
 data InferState = InferState {_count :: Int, _current :: Expr}
 makeLenses ''InferState

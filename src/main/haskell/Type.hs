@@ -5,6 +5,7 @@ import Data.List
 import Data.String
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Short as SBS
+import Data.Text.Prettyprint.Doc
 
 data Name = Name String | NS Name Name deriving (Eq, Ord)
 
@@ -51,6 +52,23 @@ instance Show Type where
   show (TypeFunc l r) = "(" ++ show l ++ " -> " ++ show r ++ ")"
   show (TypeApply t args) = "(" ++ show t ++ foldl (\acc a -> acc ++ " " ++ show a) "" args ++ ")"
   show (Forall targs t) = "∀(" ++ intercalate "," (map show targs) ++ ") => " ++ show t
+
+instance Pretty Name where
+    pretty n = case n of
+        Name s -> pretty s
+        NS prefix n -> pretty prefix <+> "_" <+> pretty n
+
+instance Pretty TVar where
+  pretty (TV s) = pretty s
+
+instance Pretty Type where
+    pretty t = case t of
+        (TVar (TV n)) -> pretty n
+        (TypeIdent s) -> pretty s
+        (TypeFunc l r) -> parens $ pretty l <+> "->" <+> pretty r
+        (TypeApply t args) -> parens $pretty t <+> foldl (\acc a -> acc <+> pretty a) "" args
+        (Forall targs t) -> "∀" <> parens (hsep (punctuate comma (map pretty targs))) <+> "=>" <+> pretty t
+
 
 infixr `TypeFunc`
 

@@ -89,7 +89,7 @@ typecheck ctx modo exprs = do
     then case typeCheck ctx exprs of
              Right (env, typedExprs) -> do
                  when (Opts.verboseMode opts) $ putStrLn "typechecked OK"
-                 when (Opts.printTypes opts) $ print env
+                 when (Opts.printTypes opts) $ putStrLn (showPretty env)
                  return (typedExprs, EmitStatic.cgen)
              Left e -> do
                  let sourceSBS = AST.moduleSourceFileName modo
