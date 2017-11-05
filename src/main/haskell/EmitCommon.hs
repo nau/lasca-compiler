@@ -159,23 +159,33 @@ gcMallocType tpe = do
     casted <- bitcast ptr (T.ptr tpe)
     return (ptr, casted)
 
-box t v = callFn (funcType ptrType [intType, ptrType]) "box" [t, v]
+unitTypePtrOp = constOp $ constRef ptrType "_UNIT"
+boolTypePtrOp = constOp $ constRef ptrType "_BOOL"
+intTypePtrOp = constOp $ constRef ptrType  "_INT"
+doubleTypePtrOp = constOp $ constRef ptrType "_DOUBLE"
+closureTypePtrOp = constOp $ constRef ptrType "_CLOSURE"
+arrayTypePtrOp = constOp $ constRef ptrType "_ARRAY"
+
+stringTypePtr = constRef ptrType "_STRING"
+stringTypePtrOp = constOp $ stringTypePtr
+
+box t v = callFn (funcType ptrType [ptrType, ptrType]) "box" [t, v]
 boxBool v = callFn (funcType ptrType [intType]) "boxBool" [v] -- todo change to i1
 boxInt v = callFn (funcType ptrType [intType]) "boxInt" [v]
 boxFloat64 v = callFn (funcType ptrType [T.double]) "boxFloat64" [v]
-unbox t v = callFn (funcType ptrType [intType, ptrType]) "unbox" [t, v]
+unbox t v = callFn (funcType ptrType [ptrType, ptrType]) "unbox" [t, v]
 
 
 boxLit (S.BoolLit b) meta = boxBool (constIntOp (boolToInt b))
 boxLit (S.IntLit  n) meta = boxInt (constIntOp n)
 boxLit (S.FloatLit  n) meta = boxFloat64 (constFloatOp n)
-boxLit S.UnitLit meta = box (constIntOp 0)  (constOp constNullPtr)
+boxLit S.UnitLit meta = return $ constOp $ constRef ptrType "UNIT_SINGLETON"
 boxLit (S.StringLit s) meta = do
     let name = getStringLitName s
     let len = 1 + (ByteString.length . UTF8.fromString $ s)
     let ref = global (stringStructType len) name
     ref' <- bitcast ref ptrType
-    box (constIntOp 4) ref'
+    box stringTypePtrOp ref'
 
 createPosition S.NoPosition = createStruct [constInt 0, constInt 0] -- Postion (0, 0) means No Position. Why not.
 createPosition S.Position{S.sourceLine, S.sourceColumn} = createStruct [constInt sourceLine, constInt sourceColumn]
@@ -212,10 +222,24 @@ boolToInt True = 1
 boolToInt False = 0
 
 declareStdFuncs = do
+    externalConst ptrType "UNIT_SINGLETON"
+    externalConst ptrType "UNIT"
+    externalConst ptrType "_UNIT"
+    externalConst ptrType "BOOL"
+    externalConst ptrType "_BOOL"
+    externalConst ptrType "INT"
+    externalConst ptrType "_INT"
+    externalConst ptrType "DOUBLE"
+    externalConst ptrType "_DOUBLE"
+    externalConst ptrType "CLOSURE"
+    externalConst ptrType "_CLOSURE"
+    externalConst ptrType "ARRAY"
+    externalConst ptrType "_ARRAY"
+    externalConst ptrType "_STRING"
     external T.void  "initLascaRuntime" [("runtime", ptrType)] False []
     external ptrType "gcMalloc" [("size", intType)] False []
-    external ptrType "box" [("t", intType), ("ptr", ptrType)] False [FA.GroupID 0]
-    external ptrType "unbox" [("t", intType), ("ptr", ptrType)] False [FA.GroupID 0]
+    external ptrType "box" [("t", ptrType), ("ptr", ptrType)] False [FA.GroupID 0]
+    external ptrType "unbox" [("t", ptrType), ("ptr", ptrType)] False [FA.GroupID 0]
     external intType "unboxInt" [("ptr", ptrType)] False [FA.GroupID 0]
     external T.double "unboxFloat64" [("ptr", ptrType)] False [FA.GroupID 0]
     external ptrType "boxError" [("n", ptrType)] False [FA.GroupID 0]
@@ -290,33 +314,45 @@ genRuntime opts fmt tst = defineConst "Runtime" runtimeStructType runtime
   where
     runtime = createStruct [constRef fmt "Functions", constRef tst "Types", constBool $ Opts.verboseMode opts]
 
-
+genTypeStruct :: Name -> LLVM C.Constant
+genTypeStruct name = do
+    let nm = show name
+    let sbsName = fromString nm
+    let sbsLiteralName = fromString (nm ++ ".Literal")
+    let typeName = fromString (nm ++ ".Type")
+    let (charArray, len) = createCharString nm
+    let laTypeStruct = createStruct [constRef (T.ArrayType (fromIntegral len) T.i8) sbsLiteralName]
+    defineConst sbsLiteralName (T.ArrayType (fromIntegral len) T.i8) charArray
+    defineConst typeName laTypeStructType laTypeStruct
+    return $ constRef laTypeStructType typeName
+    
 --genData :: Ctx -> [S.DataDef] -> ([S.Arg] -> [(SBS.ShortByteString, AST.Type)]) -> LLVM ([C.Constant])
 genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
-  where genDataStruct dd@(S.DataDef tid name constrs) = do
+  where genDataStruct dd@(S.DataDef name constrs) = do
+            typePtr <- genTypeStruct name
             defineStringLit (show name)
             let literalName = fromString $ "Data." ++ (show name)
             let numConstructors = length constrs
-            constructors <- genConstructors ctx dd
+            constructors <- genConstructors ctx typePtr dd
             let arrayOfConstructors = C.Array ptrType constructors
-            let struct = createStruct [constInt tid,
+            let struct = createStruct [typePtr,
                                        globalStringRefAsPtr (show name),
                                        constInt numConstructors,
                                        arrayOfConstructors] -- struct Data
             let dataStructType numConstructors = T.StructureType False [
-                      intType, ptrType, intType, T.ArrayType (fromIntegral numConstructors) ptrType
+                      ptrType, ptrType, intType, T.ArrayType (fromIntegral numConstructors) ptrType
                     ]
             defineConst literalName (dataStructType numConstructors) struct
             return (constRef (dataStructType numConstructors) literalName)
 
-        genConstructors ctx (S.DataDef tid name constrs) = do
+        genConstructors ctx typePtr (S.DataDef name constrs) = do
             forM (zip constrs [0..]) $ \ ((S.DataConst n args), tag) ->
-                defineConstructor ctx name n tid tag args
+                defineConstructor ctx typePtr name n tag args
 
-        defineConstructor ctx typeName name tid tag args  = do
+        defineConstructor ctx typePtr typeName name tag args  = do
           -- TODO optimize for zero args
             modState <- get
-            let codeGenResult = codeGen modState
+            let codeGenResult = codeGen typePtr modState
             let blocks = createBlocks codeGenResult
 
             if null args
@@ -325,9 +361,9 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
                 let dataValue = createStruct [constInt tag, C.Array ptrType []]
                 defineConst (fromString singletonName) dataValueStructType dataValue
 
-                let boxed = createStruct [constInt tid, constRef dataValueStructType (fromString singletonName)]
+                let boxed = createStruct [typePtr, constRef dataValueStructType (fromString singletonName)]
                 defineConst (fromString $ singletonName ++ ".Boxed") boxStructType boxed
-
+                -- TODO use constRef
                 let boxedRef = C.GlobalReference (T.ptr boxStructType) (AST.Name (fromString $ singletonName ++ ".Boxed"))
                 let ptrRef = C.BitCast boxedRef ptrType
                 defineStringLit (fromString $ show name)
@@ -336,8 +372,8 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
                 define ptrType (fromString $ show name) fargs blocks -- define constructor function
                 forM_ args $ \ (S.Arg name _) -> defineStringLit (show name) -- define fields names as strings
 
-            let structType = T.StructureType False [intType, ptrType, intType, T.ArrayType (fromIntegral len) ptrType]
-            let struct =  createStruct [constInt (fromIntegral tid), globalStringRefAsPtr (show name), constInt len, fieldsArray]
+            let structType = T.StructureType False [ptrType, ptrType, intType, T.ArrayType (fromIntegral len) ptrType]
+            let struct =  createStruct [typePtr, globalStringRefAsPtr (show name), constInt len, fieldsArray]
             let literalName = fromString $ (show typeName) ++ "." ++ show name
             defineConst literalName structType struct
 
@@ -351,7 +387,7 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
             fieldsArray = C.Array ptrType fields
             fields = map (\(S.Arg n _) -> globalStringRefAsPtr (show n)) args
 
-            codeGen modState = execCodegen [] modState $ do
+            codeGen typePtr modState = execCodegen [] modState $ do
                 entry <- addBlock entryBlockName
                 setBlock entry
                 (ptr, structPtr) <- gcMallocType dataValueStructType
@@ -363,7 +399,7 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
                     ref <- argToPtr arg
                     store p ref
                 -- remove boxing after removing runtimeIsConstr from genPattern, do a proper tag check instead
-                boxed <- box (constIntOp tid) ptr
+                boxed <- box (constOp typePtr) ptr
                 ret boxed
         --        ret ptr
 

@@ -113,6 +113,13 @@ define retty label argtys body = defineFunction retty label Linkage.External arg
 --external ::  Type -> SBS.ShortByteString -> [(SBS.ShortByteString, Type)] -> Bool -> [A.GroupID] -> LLVM ()
 external retty label argtys vararg funcAttrs = defineFunction retty label Linkage.External argtys [] vararg funcAttrs
 
+externalConst tpe nm = addDefn $ AST.GlobalDefinition $ globalVariableDefaults {
+    LLVM.AST.Global.linkage = Linkage.External,
+    LLVM.AST.Global.name = Name nm,
+    LLVM.AST.Global.isConstant = True,
+    LLVM.AST.Global.type' = tpe
+}
+
 ---------------------------------------------------------------------------------
 -- Types
 -------------------------------------------------------------------------------
@@ -433,6 +440,13 @@ getStringLitName s = name
 
 createStruct args = C.Struct Nothing False args
 
+createCharString s = (C.Array T.i8 bytes, len)
+  where
+    bytestring = UTF8.fromString s
+    constByte b = C.Int 8 (toInteger b)
+    bytes = map constByte (ByteString.unpack bytestring ++ [fromInteger 0])
+    len = ByteString.length bytestring + 1
+
 createString s = (createStruct [constInt (len - 1), C.Array T.i8 bytes], len)
   where
     bytestring = UTF8.fromString s
@@ -449,7 +463,9 @@ funcType retTy args = T.FunctionType retTy args False
 
 stringStructType len = T.StructureType False [intType, T.ArrayType (fromIntegral len) T.i8]
 
-boxStructOfType boxedType = T.StructureType False [intType, boxedType]
+laTypeStructType = T.StructureType False [ptrType]
+
+boxStructOfType boxedType = T.StructureType False [ptrType, boxedType]
 
 boxStructType = boxStructOfType ptrType
 

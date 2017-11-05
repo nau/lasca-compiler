@@ -166,7 +166,7 @@ data Pattern
 
 data DataConst = DataConst Name [Arg] deriving (Eq, Ord, Show)
 
-data DataDef = DataDef Int Name [DataConst]
+data DataDef = DataDef Name [DataConst]
     deriving (Show, Eq)
 
 emptyCtx opts = Context {
@@ -176,8 +176,7 @@ emptyCtx opts = Context {
     _globalVals = Set.empty,
     dataDefs = [],
     dataDefsNames = Set.empty,
-    dataDefsFields = Map.empty,
-    typeId = 1000
+    dataDefsFields = Map.empty
 }
 
 data Lit = IntLit Int
@@ -204,8 +203,7 @@ data Ctx = Context {
     _globalVals :: Set.Set Name,
     dataDefs :: [DataDef],
     dataDefsNames :: Set.Set Name,
-    dataDefsFields :: Map.Map Name (Map.Map Name (Arg, Int)),
-    typeId :: Int -- TODO remove this. Needed for type id generation. Move to ModuleState?
+    dataDefsFields :: Map.Map Name (Map.Map Name (Arg, Int))
 } deriving (Show, Eq)
 makeLenses ''Ctx
 
@@ -231,8 +229,7 @@ createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
             globalVals %= Set.insert name
         Function meta name tpe args _ -> globalFunctions %= Map.insert name expr
         Data _ name tvars consts -> do
-            id <- gets typeId
-            let dataDef = DataDef id name consts
+            let dataDef = DataDef name consts
             let (funcs, vals) = foldl (\(funcs, vals) (DataConst n args) ->
                                   if null args
                                   then (funcs, n : vals)
@@ -253,8 +250,7 @@ createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
             modify (\s -> s {
                 dataDefs =  dataDef : dataDefs s,
                 dataDefsNames = Set.insert name (dataDefsNames s),
-                dataDefsFields = Map.insert name argsWithIds (dataDefsFields s),
-                typeId = id + 1
+                dataDefsFields = Map.insert name argsWithIds (dataDefsFields s)
             })
             globalVals %= Set.union (Set.fromList vals)
             globalFunctions %= Map.union (Map.fromList funcs)

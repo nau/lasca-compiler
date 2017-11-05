@@ -10,29 +10,46 @@
 
 #include "lasca.h"
 
+#define STR(s) {.length = sizeof(s) - 1, .bytes = s}
+
+// Primitive Types
+const LaType _UNKNOWN = { .name = "Unknown" };
+const LaType _UNIT    = { .name = "Unit" };
+const LaType _BOOL    = { .name = "Bool" };
+const LaType _INT     = { .name = "Int" };
+const LaType _DOUBLE  = { .name = "Double" };
+const LaType _STRING  = { .name = "String" };
+const LaType _CLOSURE = { .name = "Closure" };
+const LaType _ARRAY   = { .name = "Array" };
+const LaType* UNKNOWN = &_UNKNOWN;
+const LaType* UNIT    = &_UNIT;
+const LaType* BOOL    = &_BOOL;
+const LaType* INT     = &_INT;
+const LaType* DOUBLE  = &_DOUBLE;
+const LaType* STRING  = &_STRING;
+const LaType* CLOSURE = &_CLOSURE;
+const LaType* ARRAY   = &_ARRAY;
+
 Box TRUE_SINGLETON = {
-    .type = BOOL,
+    .type = &_BOOL,
     .value.num = 1
 };
 Box FALSE_SINGLETON = {
-    .type = BOOL,
+    .type = &_BOOL,
     .value.num = 0
 };
 Box UNIT_SINGLETON = {
-    .type = UNIT
+    .type = &_UNIT
 };
-String EMPTY_STRING = {
-    .length = 0,
-    .bytes = "\00"
-};
+String EMPTY_STRING = STR("\00");
 Box EMPTY_STRING_BOX = {
-    .type = STRING,
+    .type = &_STRING,
     .value.ptr = &EMPTY_STRING
 };
 Box * UNIT_STRING;
 Box  INT_ARRAY[100];
 Box  DOUBLE_ZERO = {
-    .type = DOUBLE,
+    .type = &_DOUBLE,
     .value.dbl = 0.0
 };
 Environment ENV;
@@ -52,22 +69,13 @@ void *gcRealloc(void* old, size_t s) {
 }
 
 
-const char * __attribute__ ((const)) typeIdToName(int64_t typeId) {
-    switch (typeId) {
-        case 0: return "Unit";
-        case 1: return "Bool";
-        case 2: return "Int";
-        case 3: return "Double";
-        case 4: return "String";
-        case 5: return "<function>";
-        case 6: return "Array";
-        default: return "Unknown";
-    }
+const char * __attribute__ ((const)) typeIdToName(const LaType* typeId) {
+    return typeId->name;
 }
 
 /* =============== Boxing ================== */
 
-Box *box(int64_t type_id, void *value) {
+Box *box(const LaType* type_id, void *value) {
     Box* ti = gcMalloc(sizeof(Box));
     ti->type = type_id;
     ti->value.ptr = value;
@@ -82,7 +90,7 @@ Box * __attribute__ ((pure)) boxBool(int64_t i) {
 }
 
 Box * __attribute__ ((pure)) boxError(String *name) {
-    return box(-1, name);
+    return box(UNKNOWN, name);
 }
 
 Box * __attribute__ ((pure)) boxInt(int64_t i) {
@@ -120,21 +128,21 @@ Box * __attribute__ ((pure)) boxFunc(int64_t idx) {
     return boxClosure(idx, NULL);
 }
 
-void * __attribute__ ((pure)) unbox(int64_t expected, Box* ti) {
+void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti) {
   //  printf("unbox(%d, %d) ", ti->type, (int64_t) ti->value);
     if (ti->type == expected) {
         return ti->value.ptr;
-    } else if (ti->type == -1) {
+    } else if (ti->type == UNKNOWN) {
         String *name = (String *) ti->value.ptr;
         printf("AAAA!!! Undefined identifier %s\n", name->bytes);
         exit(1);
     } else {
-        printf("AAAA!!! Expected %s but got %s\n", typeIdToName(expected), typeIdToName(ti->type));
+        printf("AAAA!!! Expected %s but got %s %p != %p\n", typeIdToName(expected), typeIdToName(ti->type), expected, ti->type);
         exit(1);
     }
 }
 
-int64_t __attribute__ ((pure)) unboxInt(Box* ti) {
+int64_t __attribute__ ((pure)) unboxInt(const Box* ti) {
   //  printf("unbox(%d, %d) ", ti->type, (int64_t) ti->value);
     if (ti->type == INT) {
         return ti->value.num;
@@ -157,7 +165,8 @@ double __attribute__ ((pure)) unboxFloat64(Box* ti) {
 /* ==================== Runtime Ops ============== */
 
 Box* updateRef(Box* ref, Box* value) {
-    DataValue* dataValue = unbox(1000, ref);
+    assert(!strcmp(ref->type->name, "Ref"));
+    DataValue* dataValue = ref->value.ptr;
     Box* oldValue = dataValue->values[0];
     dataValue->values[0] = value;
     return oldValue;
@@ -168,20 +177,30 @@ void* die(Box* msg) {
     exit(1);
 }
 
-static int64_t isUserType(Box* v) {
-    int64_t type = v->type;
-    return type >= 1000 && (type < 1000 + RUNTIME->types->size);
+static int64_t isBuiltinType(const Box* v) {
+    const LaType* t = v->type;
+    return t == UNIT || t == BOOL || t == INT || t == DOUBLE
+      || t == STRING || t == CLOSURE || t == ARRAY/* || !strcmp(t->name, "Ref")*/;
 }
 
-#define DO_OP(op) if (lhs->type == INT) { result = boxInt(lhs->value.num op rhs->value.num); } else if (lhs->type == DOUBLE) { result = boxFloat64(lhs->value.dbl op rhs->value.dbl); } else { \
+static int64_t isUserType(const Box* v) {
+    return !isBuiltinType(v);
+}
+
+#define DO_OP(op) if (lhs->type == INT) { result = boxInt(lhs->value.num op rhs->value.num); } \
+                  else if (lhs->type == DOUBLE) { result = boxFloat64(lhs->value.dbl op rhs->value.dbl); } else { \
                         printf("AAAA!!! Type mismatch! Expected Int or Double for op but got %s\n", typeIdToName(lhs->type)); exit(1); }
 
-#define DO_CMP(op) switch (lhs->type){ \
-                   case BOOL:    { result = boxBool (lhs->value.num op rhs->value.num); break; } \
-                   case INT:     { result = boxBool (lhs->value.num op rhs->value.num); break; } \
-                   case DOUBLE:  { result = boxBool (lhs->value.dbl op rhs->value.dbl); break; } \
-                   default: {printf("AAAA!!! Type mismatch! Expected Bool, Int or Double but got %s\n", typeIdToName(lhs->type)); exit(1); }\
+#define DO_CMP(op) if (lhs->type == BOOL) { \
+                      result = boxBool (lhs->value.num op rhs->value.num); } \
+                   else if (lhs->type == INT) { \
+                      result = boxBool (lhs->value.num op rhs->value.num); } \
+                   else if (lhs->type == DOUBLE) { \
+                      result = boxBool (lhs->value.dbl op rhs->value.dbl); } \
+                   else { \
+                      printf("AAAA!!! Type mismatch! Expected Bool, Int or Double but got %s\n", typeIdToName(lhs->type)); exit(1); \
                    }
+                   
 Box* __attribute__ ((pure)) runtimeBinOp(int64_t code, Box* lhs, Box* rhs) {
     if (lhs->type != rhs->type) {
         printf("AAAA!!! Type mismatch! lhs = %s, rhs = %s\n", typeIdToName(lhs->type), typeIdToName(rhs->type));
@@ -320,19 +339,28 @@ Box* runtimeApply(Box* val, int64_t argc, Box* argv[], Position pos) {
 
 }
 
+Data* findDataType(const LaType* type) {
+    Types* types = RUNTIME->types;
+    for (int i = 0; i < types->size; i++) {
+        if (types->data[i]->type == type) return types->data[i];
+    }
+    printf("AAAA! Couldn't find type %s", type->name);
+    exit(1);
+}
+
 Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
     Functions* fs = RUNTIME->functions;
-    Types* types = RUNTIME->types;
+
+//    printf("isUserType %s %p %p\n", tree->type->name, tree->type, &_UNKNOWN);
     if (isUserType(tree)) {
-    //    printf("Found structs %d\n", structs->size);
 
         DataValue* dataValue = tree->value.ptr;
         // if rhs is not a local ident, nor a function, try to find this field in lhs data structure
-        if (ident->type == -1) {
+        if (ident->type == UNKNOWN) {
             String* name = ident->value.ptr; // should be identifier name
-      //      printf("Ident name %s\n", name->bytes);
-            Data* data = types->data[tree->type - 1000]; // find struct in global array of structs
-      //      printf("Found data type %s %d, tag %d\n", data->name->bytes, tree->type, dataValue->tag);
+//            printf("Ident name %s\n", name->bytes);
+            Data* data = findDataType(tree->type); // find struct in global array of structs
+//            printf("Found data type %s %s, tag %lld\n", data->name->bytes, tree->type->name, dataValue->tag);
             Struct* constr = data->constructors[dataValue->tag];
             int64_t numFields = constr->numFields;
             for (int64_t i = 0; i < numFields; i++) {
@@ -340,7 +368,7 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
         //        printf("Check field %d %s\n", field->length, field->bytes);
                 if (field->length == name->length && strncmp(field->bytes, name->bytes, name->length) == 0) {
                     Box* value = dataValue->values[i];
-          //          printf("Found value %d at index %d\n", value->type, i);
+//                    printf("Found value %s at index %lld\n", value->type->name, i);
           //          println(toString(value));
                     return value;
                 }
@@ -364,7 +392,7 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
 Box* runtimeIsConstr(Box* value, Box* constrName) {
     if (isUserType(value)) {
         String* name = unbox(STRING, constrName);
-        Data* data = RUNTIME->types->data[value->type - 1000];
+        Data* data = findDataType(value->type);
         DataValue* dv = value->value.ptr;
         String* realConstrName = data->constructors[dv->tag]->name;
         if (strncmp(realConstrName->bytes, name->bytes, fmin(realConstrName->length, name->length)) == 0)
@@ -445,7 +473,7 @@ Box* joinValues(int size, Box* values[], char* start, char* end) {
     return string;
 }
 
-Box* __attribute__ ((pure)) arrayToString(Box* arrayValue)  {
+Box* __attribute__ ((pure)) arrayToString(const Box* arrayValue)  {
     Array* array = unbox(ARRAY, arrayValue);
     if (array->length == 0) {
         return makeString("[]");
@@ -456,47 +484,49 @@ Box* __attribute__ ((pure)) arrayToString(Box* arrayValue)  {
 
 /* =============== Strings ============= */
 
-Box* __attribute__ ((pure)) toString(Box* value) {
+const Box* __attribute__ ((pure)) toString(const Box* value) {
     char buf[100]; // 100 chars is enough for all (c)
 
-    int64_t type = value->type;
-    switch (type) {
-        case UNIT: return UNIT_STRING;
-        case BOOL: return makeString(value->value.num == 0 ? "false" : "true");
-        case INT:
-            snprintf(buf, 100, "%lld", value->value.num);
-            return makeString(buf);
-        case DOUBLE:
-            snprintf(buf, 100, "%12.9lf", value->value.dbl);
-            return makeString(buf);
-        case STRING:  return value;
-        case CLOSURE: return makeString("<func>");
-        case ARRAY:   return arrayToString(value);
-        case -1: {
-            String *name = (String *) value->value.ptr;
-            printf("AAAA!!! Undefined identifier %s\n", name->bytes);
+    const LaType* type = value->type;
+    if (type == UNIT) {
+        return UNIT_STRING;
+    } else if (type == BOOL) {
+        return makeString(value->value.num == 0 ? "false" : "true");
+    } else if (type == INT) {
+        snprintf(buf, 100, "%lld", value->value.num);
+        return makeString(buf);
+    } else if (type == DOUBLE) {
+        snprintf(buf, 100, "%12.9lf", value->value.dbl);
+        return makeString(buf);
+    } else if (type == STRING) {
+        return value;
+    } else if (type == CLOSURE) {
+        return makeString("<func>");
+    } else if (type == ARRAY) {
+        return arrayToString(value);
+    } else if (!strcmp(type->name, "Ref")) {
+        DataValue* dataValue = value->value.ptr;
+        return toString(dataValue->values[0]);
+    } else if (!strcmp(type->name, "Unknown")) {
+        String *name = (String *) value->value.ptr;
+        printf("AAAA!!! Undefined identifier %s\n", name->bytes);
+        exit(1);
+    } else {
+        if (isUserType(value)) {
+            DataValue* dataValue = value->value.ptr;
+            Data* metaData = findDataType(type);
+            Struct* constr = metaData->constructors[dataValue->tag];
+            int64_t startlen = constr->name->length + 2; // ending 0 and possibly "(" if constructor has parameters
+            char start[startlen];
+            snprintf(start, startlen, "%s", constr->name->bytes);
+            if (constr->numFields > 0) {
+                strcat(start, "(");
+                return joinValues(constr->numFields, dataValue->values, start, ")");
+            } else return makeString(start);
+        } else {
+            printf("Unsupported type %s", typeIdToName(value->type));
             exit(1);
         }
-        case 1000: {
-            DataValue* dataValue = value->value.ptr;
-            return toString(dataValue->values[0]);
-        }
-        default:
-            if (isUserType(value)) {
-                DataValue* dataValue = value->value.ptr;
-                Data* metaData = RUNTIME->types->data[type - 1000];
-                Struct* constr = metaData->constructors[dataValue->tag];
-                int64_t startlen = constr->name->length + 2; // ending 0 and possibly "(" if constructor has parameters
-                char start[startlen];
-                snprintf(start, startlen, "%s", constr->name->bytes);
-                if (constr->numFields > 0) {
-                    strcat(start, "(");
-                    return joinValues(constr->numFields, dataValue->values, start, ")");
-                } else return makeString(start);
-            } else {
-                printf("Unsupported type %lld", value->type);
-                exit(1);
-            }
     }
 }
 

@@ -21,28 +21,23 @@ static const int64_t ZNOT = 50;                          // !x
 static const int64_t ZOR = 60;                           // x || y
 static const int64_t ZAND = 61;                          // x && y
 
-// Primitive Types
-static const int64_t UNIT     = 0;
-static const int64_t BOOL     = 1;
-static const int64_t INT      = 2;
-static const int64_t DOUBLE   = 3;
-static const int64_t STRING   = 4;
-static const int64_t CLOSURE  = 5;
-static const int64_t ARRAY    = 6;
+typedef struct {
+    int64_t length;
+    char bytes[];
+} String;
 
 typedef struct {
-    int64_t type;
+    const char* name;
+} LaType;
+
+typedef struct {
+    const LaType* type;
     union Value {
         int64_t num;
         double dbl;
         void* ptr;
     } value;
 } Box;
-
-typedef struct {
-    int64_t length;
-    char bytes[];
-} String;
 
 typedef struct {
     int64_t funcIdx;
@@ -66,7 +61,7 @@ typedef struct {
 } Functions;
 
 typedef struct {
-    int64_t typeId;
+    LaType* type;
   //  int64_t tag;   // it's not set now. Not sure we need this
     String* name;
     int64_t numFields;
@@ -74,7 +69,7 @@ typedef struct {
 } Struct;
 
 typedef struct {
-    int64_t typeId;
+    LaType* type;
     String* name;
     int64_t numValues;
     Struct* constructors[];
@@ -107,13 +102,22 @@ typedef struct {
 } Position;
 
 extern Box UNIT_SINGLETON;
+// Primitive Types
+extern const LaType* UNIT   ;
+extern const LaType* BOOL   ;
+extern const LaType* INT    ;
+extern const LaType* DOUBLE ;
+extern const LaType* STRING ;
+extern const LaType* CLOSURE;
+extern const LaType* ARRAY  ;
 
-Box *box(int64_t type_id, void *value);
-void * __attribute__ ((pure)) unbox(int64_t expected, Box* ti);
-int64_t __attribute__ ((pure)) unboxInt(Box* ti);
-Box* toString(Box* value);
-Box* println(Box* val);
+
+Box *box(const LaType* type_id, void *value);
+void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti);
+int64_t __attribute__ ((pure)) unboxInt(const Box* ti);
+const Box* toString(const Box* value);
+Box* println(const Box* val);
 Box* boxArray(size_t size, ...);
-const char * __attribute__ ((const)) typeIdToName(int64_t typeId);
+const char * __attribute__ ((const)) typeIdToName(const LaType* typeId);
 
 #endif

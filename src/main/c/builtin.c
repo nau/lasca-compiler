@@ -35,7 +35,8 @@ void * runtimePutchar(Box* ch) {
     return 0;
 }
 
-Box* println(Box* val) {
+Box* println(const Box* val) {
+//    printf("println: %p %p\n", STRING, val->type);
     String * str = unbox(STRING, val);
     printf("%s\n", str->bytes);
     return &UNIT_SINGLETON;
@@ -43,19 +44,19 @@ Box* println(Box* val) {
 
 int64_t runtimeCompare(Box* lhs, Box* rhs) {
     if (lhs->type != rhs->type) {
-        printf("AAAA!!! Type mismatch! lhs = %s, rhs = %s\n", typeIdToName(lhs->type), typeIdToName(rhs->type));
+        printf("AAAA!!! runtimeCompare: Type mismatch! lhs = %s, rhs = %s\n", typeIdToName(lhs->type), typeIdToName(rhs->type));
         exit(1);
     }
     int64_t result = 0;
-    switch (lhs->type) {
-        case BOOL:
-        case INT:
-        case DOUBLE: { result = // FIXME it's wrong for double
+    if (lhs->type == BOOL || lhs->type == INT || lhs->type == DOUBLE) {
+        result = // FIXME it's wrong for double
                 lhs->value.num < rhs->value.num ? -1 :
                 lhs->value.num == rhs->value.num ? 0 : 1;
-            break;
-        }
-        case STRING: result = strcmp(unsafeString(lhs)->bytes, unsafeString(rhs)->bytes); // TODO do proper unicode stuff
+    } else if (lhs->type == STRING) {
+        result = strcmp(unsafeString(lhs)->bytes, unsafeString(rhs)->bytes); // TODO do proper unicode stuff
+    } else {
+        printf("AAAA!!! runtimeCompare is not defined for type %s\n", typeIdToName(lhs->type));
+        exit(1);
     }
     result = result < 0 ? (int64_t) -1 : result == 0 ? 0 : 1;
     return result;

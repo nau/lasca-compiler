@@ -103,7 +103,7 @@ cgenIfDynamic ctx meta cond tr fl = do
     let test = do
             cond <- cgen ctx cond
             -- unbox Bool
-            voidPtrCond <- unbox (constIntOp 1) cond
+            voidPtrCond <- unbox boolTypePtrOp cond
             bool <- ptrtoint voidPtrCond T.i1
             instr (I.ICmp IP.EQ bool constTrue [])
     cgenIf resultType test (cgen ctx tr) (cgen ctx fl)
