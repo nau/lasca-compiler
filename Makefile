@@ -50,6 +50,8 @@ examples:
 	lasca -O2 -e --mode dynamic  src/main/lasca/nbody2.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e --mode static  src/main/lasca/nbody3.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e --mode dynamic  src/main/lasca/nbody3.lasca $(TEST_RTS) -- 50000
+	lasca -O2 -e --mode static  src/main/lasca/binarytrees.lasca $(TEST_RTS) -- 10
+	lasca -O2 -e --mode dynamic  src/main/lasca/binarytrees.lasca $(TEST_RTS) -- 10
 	lasca -O2 -e --mode static  src/main/lasca/Map.lasca $(TEST_RTS)
 	lasca -O2 -e --mode dynamic src/main/lasca/Map.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  src/main/lasca/ski.lasca $(TEST_RTS)
