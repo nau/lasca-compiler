@@ -253,22 +253,9 @@ cgenApply ctx meta expr args = do
             sargs <- bitcast sargsPtr ptrType -- runtimeApply accepts i8*, so need to bitcast. Remove when possible
             -- cdecl calling convension, arguments passed right to left
             sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0..] largs]
-            
 
-            closure <- unboxDirect e
-            closureTyped <- bitcast closure (T.ptr closureStructType)
-            enclosedArgsAddr <- getelementptr closureTyped [constIntOp 0, constInt32Op 1]
-            enclosedArgs <- load enclosedArgsAddr
---            Functions* fs = RUNTIME->functions;
---            Function f = fs->functions[closure->funcIdx];
-            funPtr <- funcPtrFromClosure closure
-            let argsTypes = map (const ptrType) args
-            funPtrTyped1 <- bitcast funPtr (T.ptr (funcType ptrType argsTypes))
-            funPtrTyped2 <- bitcast funPtr (T.ptr (funcType ptrType (ptrType : argsTypes)))
-
-            ptr <- ptrtoint enclosedArgs intType
-            let test = instr (I.ICmp IP.EQ ptr (constInt64Op 0) [])
-            cgenIf ptrType test (call funPtrTyped1 largs) (call funPtrTyped2 (enclosedArgs : largs))
+            let pos = createPosition $ S.pos meta
+            callFn (funcType ptrType [ptrType, intType, ptrType, positionStructType]) "runtimeApply" [e, argc, sargs, constOp pos]
 
 cgenArrayApply array idx = do
     boxedArrayPtr <- bitcast array (T.ptr $ boxStructOfType (T.ptr $ arrayStructType ptrType)) -- Box(type, &Array(len, &data[])

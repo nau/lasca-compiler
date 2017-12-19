@@ -7,6 +7,7 @@
 #include <string.h>
 #include <math.h>
 #include <gc.h>
+#include <ffi/ffi.h>
 
 #include "lasca.h"
 
@@ -200,7 +201,7 @@ static int64_t isUserType(const Box* v) {
                    else { \
                       printf("AAAA!!! Type mismatch! Expected Bool, Int or Double but got %s\n", typeIdToName(lhs->type)); exit(1); \
                    }
-                   
+
 Box* __attribute__ ((pure)) runtimeBinOp(int64_t code, Box* lhs, Box* rhs) {
     if (lhs->type != rhs->type) {
         printf("AAAA!!! Type mismatch! lhs = %s, rhs = %s\n", typeIdToName(lhs->type), typeIdToName(rhs->type));
@@ -277,66 +278,32 @@ Box* runtimeApply(Box* val, int64_t argc, Box* argv[], Position pos) {
             f.name->bytes, f.arity, (closure->args == NULL ? 0 : 1), argc, pos.line);
         exit(1);
     }
-    // TODO: use platform ABI, like it should be.
-    // Currently, it's hardcoded for applying a function with up to 6 arguments in dynamic mode
-    switch (f.arity) {
-        case 0: {
-            void* (*funcptr)() = f.funcPtr;
-            return funcptr();
-        }
-        case 1: {
-            void* (*funcptr)(Box*) = f.funcPtr;
-            return (argc == 1) ? funcptr(argv[0]) : funcptr(closure->args);
-        }
-        case 2: {
-            void* (*funcptr)(Box*, Box*) = f.funcPtr;
-            switch (argc) {
-                case 1: return funcptr(closure->args, argv[0]);
-                case 2: return funcptr(argv[0], argv[1]);
-            }
-        }
-        case 3: {
-            void* (*funcptr)(Box*, Box*, Box*) = f.funcPtr;
-                switch (argc) {
-                    case 2: return funcptr(closure->args, argv[0], argv[1]);
-                    case 3: return funcptr(argv[0], argv[1], argv[2]);
-                }
-        }
-        case 4: {
-            void* (*funcptr)(Box*, Box*, Box*, Box*) = f.funcPtr;
-            switch (argc) {
-                case 3: return funcptr(closure->args, argv[0], argv[1], argv[2]);
-                case 4: return funcptr(argv[0], argv[1], argv[2], argv[3]);
-            }
-        }
-        case 5: {
-            void* (*funcptr)(Box*, Box*, Box*, Box*, Box*) = f.funcPtr;
-            switch (argc) {
-                case 4: return funcptr(closure->args, argv[0], argv[1], argv[2], argv[3]);
-                case 5: return funcptr(argv[0], argv[1], argv[2], argv[3], argv[4]);
-            }
-        }
-        case 6: {
-            void* (*funcptr)(Box*, Box*, Box*, Box*, Box*, Box*) = f.funcPtr;
-            switch (argc) {
-                case 5: return funcptr(closure->args, argv[0], argv[1], argv[2], argv[3], argv[4]);
-                case 6: return funcptr(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
-            }
-        }
-        case 7: {
-            void* (*funcptr)(Box*, Box*, Box*, Box*, Box*, Box*, Box*) = f.funcPtr;
-            switch (argc) {
-                case 6: return funcptr(closure->args, argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
-                case 7: return funcptr(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5], argv[6]);
-            }
-        }
-        default:
-            printf("AAAA! Unsupported arity %lld at line: %lld\n", f.arity, pos.line);
-            exit(1);
-            break;
-    };
-    //  return NULL;
 
+    ffi_cif cif;
+    ffi_type *args[f.arity];
+    void *values[f.arity];
+    Box* rc;
+
+    if (argc == f.arity) {
+        // no enclosed arguments
+        for (int i = 0; i < f.arity; i++) {
+            args[i] = &ffi_type_pointer;
+            values[i] = &argv[i];
+        }
+    } else {
+        args[0] = &ffi_type_pointer;
+        values[0] = &closure->args;
+        for (int i = 1; i < f.arity; i++) {
+            args[i] = &ffi_type_pointer;
+            values[i] = &argv[i - 1];
+        }
+    }
+    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, f.arity, &ffi_type_pointer, args) != FFI_OK) {
+    		printf("AAAA!!! Function %s ffi_prep_cif call failed\n", f.name->bytes);
+        exit(1);
+    }
+    ffi_call(&cif, f.funcPtr, &rc, values);
+    return rc;
 }
 
 Data* findDataType(const LaType* type) {

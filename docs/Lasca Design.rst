@@ -393,6 +393,11 @@ I'm not buying these arguments, though.
 In practise, even the most mature FP languages don't have anything like that implemented in a usable form.
 
 
+Useful Links and Papers
+=======================
+A Critical Analysis of String APIs https://arxiv.org/pdf/1711.10713.pdf
+
+
 Optimizations
 =============
 # Common Subexpression Elimination

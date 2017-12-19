@@ -98,11 +98,13 @@ It would be nice to also support shebang #! for scripting
 
 .. code:: scala
 
-
+  /*
+      Main function
+  */
   def main() = println("Hello World")
 
 Block comment
-- Consider: ``/* */``, ``{- -}``, ``""" """``
+- Consider: ``/* */`` C-style, ``{- -}`` Haskell-style, ``""" """`` Python-style, and ``(* *)`` ML-style
 - Must be nestable! It's much easier to comment a code with comments.
 
 Comment-based extensions
