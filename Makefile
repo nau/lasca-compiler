@@ -3,7 +3,7 @@ IFORMAT = markdown
 FLAGS = --standalone --toc --highlight-style pygments
 
 #CC = gcc
-CC = clang-5.0 -Wno-nullability-completeness -Wno-expansion-to-defined
+CC = clang -Wno-nullability-completeness -Wno-expansion-to-defined
 CC_INCLUDE = -I/usr/local/include -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/
 LLC = llc-5.0
 
@@ -12,13 +12,19 @@ OPTS = -no-user-package-db -package-db .cabal-sandbox/*-packages.conf.d
 #TEST_RTS = +RTS -sstderr
 TEST_RTS =
 
-bench:
-	time lasca -O2 -e src/main/lasca/gen.lasca
+
 
 rts:
 	$(CC) -S -emit-llvm -g -O2 $(CC_INCLUDE) src/main/c/*.c*
 	$(CC) -shared -fPIC -g -O3 $(CC_INCLUDE)  -L/usr/local/lib -lgc -lstdc++ src/main/c/*.c* -o liblascart.so
 
+install:	
+	cp liblascart.so $(out)/liblascart.so
+	
+bench:
+	time lasca -O2 -e src/main/lasca/gen.lasca
+	
+	
 rtsDebug:
 	$(CC) -shared -fPIC -g -O0 -I/usr/local/include -L/usr/local/lib -lgc -lstdc++ src/main/c/*.c* -o liblascart.so
 
