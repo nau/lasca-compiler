@@ -12,6 +12,9 @@ OPTS = -no-user-package-db -package-db .cabal-sandbox/*-packages.conf.d
 #TEST_RTS = +RTS -sstderr
 TEST_RTS =
 
+build: rts test
+	stack build
+
 bench:
 	time lasca -O2 -e src/main/lasca/gen.lasca
 

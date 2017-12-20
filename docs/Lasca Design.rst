@@ -396,6 +396,8 @@ In practise, even the most mature FP languages don't have anything like that imp
 Useful Links and Papers
 =======================
 A Critical Analysis of String APIs https://arxiv.org/pdf/1711.10713.pdf
+Fixing Faults in C and Java Source Code: Abbreviated vs. Full-word
+Identifier Names http://www2.unibas.it/gscanniello/Giuseppe_Scanniello%40unibas/Home_files/TOSEM.pdf
 
 
 Optimizations
@@ -413,13 +415,6 @@ Annotations? Caches?
     def calculate(∀ a. Num a => x: a, y: a, z: a): a = x * y * z
     def calculate(∀ a. Num a => x: a, y: a, z: a): a = x * y * z
 
-# Automatic parallelisation
-
-Annotations? Macros?
-
-.. code:: scala
-    @par
-    def calculate(∀ a. Num a => x: a, y: a, z: a): a = x * y * z
 
 .. include:: LangsOverview.rst
 

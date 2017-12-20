@@ -33,6 +33,7 @@ Inspired by:
 - Python (docstrings, doctests, syntax)
 - Julia
 - Swift
+- Nim
 - Pony (ref caps, behaviours, actors)
 - Koka (https://github.com/koka-lang/koka) (algebraic effects)
  
@@ -54,7 +55,7 @@ Ideas
 - practical first, but as clean and concise as possible
 - prefer things done one way
 - LLVM backend
-- JavaScript backend (native or via emscripten)
+- JavaScript/WebAssembly backend (native or via LLVM/emscripten)
 - no OOP and data subclassing/inheritance?
 - syntactic sugar is ok
 - no null
@@ -75,7 +76,7 @@ Ideas
 - compile-time and runtime reflection
 - save/distribute AST (Scala TASTY). Full program optimization/reflection
 - important things must be greppable and googlable, call it searchability :)
-- compiler as a service (like Scala sbt)
+- compiler as a service: Language Server Protocol (https://langserver.org/)
 - markdown/rst comments/docs, doctest (Julia, Python)
 - CPS/Actors/π-calculus/STM?, non-blocking IO, reactive
 - import of a package must not introduce any side effects?! (hello Go)
@@ -193,16 +194,13 @@ Try it!
     
 Build on Mac OS
 ===============
-You need LLVM 4.0 installed, and latest Haskell Stack.
+You need LLVM 5.0 installed, and latest Haskell Stack.
 
-    brew install llvm-hs/homebrew-llvm/llvm-4.0
+    brew install llvm-hs/llvm/llvm-5.0 
     
     brew install boehmgc
 
     brew install haskell-stack
-    
-Update extra-lib-dirs in stack.yaml, add absolute path to a lasca-compiler directory. 
-ghc will search there for liblascart.so
     
 You need to build Lasca Runtime System library liblascart.so
 
@@ -244,8 +242,8 @@ Current n-body run:
     user      7m39.476s
     sys       0m38.716s
 
-    find src -name *.hs  | xargs cat | wc -l
+    find src -name "*.hs"  | xargs cat | wc -l
     3714
     
-    find src -name *.c  | xargs cat | wc -l
+    find src -name "*.c"  | xargs cat | wc -l
     681

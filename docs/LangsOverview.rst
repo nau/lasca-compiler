@@ -123,9 +123,7 @@ Lots of weird syntactic decisions, like #~ prefixes for field access/named argum
 
 Module system is weird. I'd consider type classes instead. Also, there
 is a paper "ML Modules and Haskell Type Classes: A Constructive
-Comparison", so looks those are interchangable.
-
-::
+Comparison", so looks those are interchangeable.
 
     This article demonstrates how to translate essential features of ML modules to
     Haskell type classes and vice versa.
