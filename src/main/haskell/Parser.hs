@@ -363,9 +363,10 @@ dataDef = do
     meta <- getMeta
     typeName <- upperIdentifier
     tvars <- many identifier
-    reservedOp "="
-    optional $ reservedOp "|"
-    constructors <-  dataConstructor `sepBy` reservedOp "|"
+    constructors <- option [] $ do
+        reservedOp "="
+        optional $ reservedOp "|"
+        dataConstructor `sepBy` reservedOp "|"
     return (Data meta (Name typeName) (List.map TV tvars) constructors)
 
 dataConstructor = do
