@@ -22,6 +22,7 @@ const LaType _DOUBLE  = { .name = "Double" };
 const LaType _STRING  = { .name = "String" };
 const LaType _CLOSURE = { .name = "Closure" };
 const LaType _ARRAY   = { .name = "Array" };
+const LaType _FILE_HANDLE   = { .name = "FileHandle" };
 const LaType* UNKNOWN = &_UNKNOWN;
 const LaType* UNIT    = &_UNIT;
 const LaType* BOOL    = &_BOOL;
@@ -30,6 +31,7 @@ const LaType* DOUBLE  = &_DOUBLE;
 const LaType* STRING  = &_STRING;
 const LaType* CLOSURE = &_CLOSURE;
 const LaType* ARRAY   = &_ARRAY;
+const LaType* FILE_HANDLE   = &_FILE_HANDLE;
 
 Box TRUE_SINGLETON = {
     .type = &_BOOL,
@@ -131,7 +133,13 @@ Box * __attribute__ ((pure)) boxFunc(int64_t idx) {
 
 void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti) {
   //  printf("unbox(%d, %d) ", ti->type, (int64_t) ti->value);
-    if (ti->type == expected) {
+    /* In most cases we can use pointer comparison,
+       but when we use Lasca defined type in C code, we also define a LaType
+       and we need to compare actual qualified type names.
+       TODO/FIXME: think how to make it better, now it's O(typename_length), show be O(1)
+       Likely, not an issue anyway.
+    */
+    if (ti->type == expected || strcmp(ti->type->name, expected->name) == 0) {
         return ti->value.ptr;
     } else if (ti->type == UNKNOWN) {
         String *name = (String *) ti->value.ptr;

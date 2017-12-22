@@ -3,5 +3,8 @@ package Hello
 --import List
 def main() = {
 --    list = Cons(1, Nil);
+    file = readFile("README.md");
+    println(file);
+    writeFile("test.md", file);
     println("Hello world!")
 }

@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -7,6 +8,7 @@
 #include <string.h>
 #include <math.h>
 #include <gc.h>
+#include <sys/stat.h>
 
 #include "lasca.h"
 
@@ -71,4 +73,53 @@ Box* arrayApply(Box* arrayValue, int64_t index) {
 int64_t arrayLength(Box* arrayValue) {
     Array* array = unbox(ARRAY, arrayValue);
     return array->length;
+}
+
+Box* lascaOpenFile(Box* filename, Box* mode) {
+    String *fname = unbox(STRING, filename);
+    String *fm = unbox(STRING, mode);
+    FILE *f = fopen(fname->bytes, fm->bytes);
+    if (f == NULL) {
+        printf("AAAA!!! lascaOpenFile error: %s\n", strerror(errno));
+        exit(1);
+    }
+    return box(FILE_HANDLE, f);
+}
+
+Box* lascaReadFile(Box* filename) {
+    String *fname = unbox(STRING, filename);
+    FILE *f = fopen(fname->bytes, "r");
+    if (f == NULL) {
+        printf("AAAA!!! lascaReadFile error: %s\n", strerror(errno));
+        exit(1);
+    }
+    struct stat st;
+    fstat(fileno(f), &st);
+    size_t size = st.st_size;
+    String *s = gcMalloc(sizeof(String) + size + 1);
+    s->length = size;
+    size_t read = fread(s->bytes, size, 1, f);
+    if (read != 1) {
+        printf("AAAA!!! lascaReadFile: Expected to read %zu bytes, but read only %zu: %s\n", size, read, strerror(errno));
+        exit(1);
+    }
+    fclose(f);
+    return box(STRING, s);
+}
+
+Box* lascaWriteFile(Box* filename, Box* string) {
+    String *fname = unbox(STRING, filename);
+    String *s = unbox(STRING, string);
+    FILE *f = fopen(fname->bytes, "w+");
+    if (f == NULL) {
+        printf("AAAA!!! lascaWriteFile error: %s\n", strerror(errno));
+        exit(1);
+    }
+    size_t read = fwrite(s->bytes, strlen(s->bytes), 1, f);
+    if (read != 1) {
+        printf("AAAA!!! lascaWriteFile: Couldn't write to file %s: %s\n", fname->bytes, strerror(errno));
+        exit(1);
+    }
+    fclose(f);
+    return &UNIT_SINGLETON;
 }

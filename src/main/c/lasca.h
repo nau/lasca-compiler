@@ -110,8 +110,9 @@ extern const LaType* DOUBLE ;
 extern const LaType* STRING ;
 extern const LaType* CLOSURE;
 extern const LaType* ARRAY  ;
+extern const LaType* FILE_HANDLE;
 
-
+void *gcMalloc(size_t s);
 Box *box(const LaType* type_id, void *value);
 void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti);
 int64_t __attribute__ ((pure)) unboxInt(const Box* ti);
