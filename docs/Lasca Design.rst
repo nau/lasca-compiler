@@ -306,6 +306,9 @@ Consider https://wiki.haskell.org/GHC/Memory_Management
 
 Per actor stack and heap. GC when actor is waiting. (See Erlang_, Pony_)
 
+Garbage Collection for Multicore NUMA Machines
+http://manticore.cs.uchicago.edu/papers/mspc11-numagc.pdf
+
 Concurrency
 ===========
 

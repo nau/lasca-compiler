@@ -306,7 +306,9 @@ genFunctionMap fns = do
                 m = foldl (\acc (S.DataConst n args) -> addConstr n args ++ acc) [] consts
             in m ++ s
         go s f@(S.Function meta name tpe args body) = do
-            if meta^.S.isExternal then (name, (externFuncLLvmType f), length args) : s
+            if meta^.S.isExternal
+            then let (S.Literal _ (S.StringLit externName)) = body
+                 in (qname externName, (externFuncLLvmType f), length args) : s
             else (name, (funcLLvmType f), length args) : s
         go s _ = s
 
