@@ -12,6 +12,7 @@
 module JIT (
   jit,
   runJIT,
+  withOptimizedModule,
   getLLAsString
 ) where
 
@@ -59,39 +60,36 @@ jit c = EE.withMCJIT c optlevel model ptrelim fastins
 passes :: Int -> PassSetSpec
 passes level = defaultCuratedPassSetSpec { optLevel = Just (fromIntegral level) }
 
-runJIT :: LascaOpts -> AST.Module -> IO AST.Module
+runJIT :: LascaOpts -> AST.Module -> IO ()
 runJIT opts mod = do
 --    let llvmAst = ppllvm mod
 --    TIO.putStrLn $ LT.toStrict llvmAst
-    withContext $ \context -> do
---        runtimeLl <- readFile "runtime.ll"
+    withOptimizedModule opts mod $ \context m -> do
+        jit context $ \executionEngine -> do
+            let args = lascaFiles opts
+            let len = length args
+            EE.withModuleInEngine executionEngine m $ \ee -> do
+                startFunPtr <- EE.getFunction ee (AST.Name "start")
+                case startFunPtr of
+                    Just fn -> do
+                        cargs <- mapM newCString args
+                        array <- mallocArray len
+                        pokeArray array cargs
+                        startFun (castFunPtr fn :: FunPtr (Int -> Ptr CString -> IO ())) len array
+                    Nothing -> putStrLn "Couldn't find function start!"
+            return ()
 
-        jit context $ \executionEngine ->
---            withModuleFromLLVMAssembly context runtimeLl $ \stdModule ->
-            withModuleFromAST context mod $ \m ->
-                withPassManager (passes (optimization opts)) $ \pm -> do
-                    -- Optimization Pass
+withOptimizedModule opts mod f = withContext $ \context -> do
+    withModuleFromAST context mod $ \m ->
+        withPassManager (passes (optimization opts)) $ \pm -> do
+            -- Optimization Pass
 --                    linkModules m stdModule
-                    runPassManager pm m
-                    optmod <- moduleAST m
-                    when (printLLVMAsm opts) $ do
-                        s <- moduleLLVMAssembly m
-                        Char8.putStrLn s
-                    let args = lascaFiles opts
-                    let len = length args
-                    EE.withModuleInEngine executionEngine m $ \ee -> do
-                        startFunPtr <- EE.getFunction ee (AST.Name "start")
-                        -- mainfn <- EE.getFunction ee (AST.Name "main")
-                        case startFunPtr of
-                            Just fn -> do
-                                cargs <- mapM newCString args
-                                array <- mallocArray len
-                                pokeArray array cargs
-                                startFun (castFunPtr fn :: FunPtr (Int -> Ptr CString -> IO ())) len array
-                            Nothing -> putStrLn "Couldn't find function start!"
-
-                    -- Return the optimized module
-                    return optmod
+            runPassManager pm m
+            optmod <- moduleAST m
+            when (printLLVMAsm opts) $ do
+                s <- moduleLLVMAssembly m
+                Char8.putStrLn s
+            f context m
 
 getLLAsString :: AST.Module -> IO String
 getLLAsString mod = do

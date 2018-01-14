@@ -15,17 +15,16 @@ Overview
 
 - strict
 - functional
-- practical
 - expression based
-- pattern matching
+- ADT and pattern matching
 - no null
 - strongly statically typed with type inference, and dynamic modes
-- System F with liquid types (`Liquid Haskell`_)
+- System F with optional liquid types (`Liquid Haskell`_)
 - type inference (Hindley-Milner alike)
-- type o (Haskell), or implicit instances (Idris)
+- type classes (Haskell), or implicit instances (Idris)
 - syntactic sugar for function application (named arguments, defaults, method calls), lenses, records, indexed access,
   applicatives and monads (do-notation).
-- multiple type checking passes (types, side-effects/purity checks, totality checks)
+- configurable type checking passes (types, side-effects/purity checks, totality checks)
 - immutable data by default
 - persisted data structures (see [1]_, [2]_)
 - message passing concurrency (see Erlang_ actors, Akka_) (or CPS like in Go?)
@@ -39,7 +38,7 @@ Inspired by:
 
 - Scala/Dotty
 - Haskell, Liquid Haskell
-- OCaml/SML/1ML
+- OCaml/SML/F#/1ML
 - Clojure (persisted data structures)
 - Idris/Agda (dependent types?)
 - Go (simplicity, speed, Any interface?, all-in-one compiler)
@@ -63,6 +62,16 @@ Domain
 * Web development
 
 Goals – substitute Go, Erlang, Java/Scala/Scala.js, Python, Julia and JavaScript/Node.js for server-side development.
+
+
+Platforms And OS
+================
+
+To simplify and speed-up development I suggest to concentrate on the most wide spread systems.
+Mainly x86-64 architecture, later ARM
+
+Operating Systems: MacOS X, Linux (Ubuntu LTS, NixOS), POSIX-compatible.
+
 
 
 Motivation
@@ -110,6 +119,62 @@ http://dl.acm.org/citation.cfm?id=2962592
 
 TDD is bullshit
 
+Defaults
+========
+
+One of the most important thing in almost every aspect of our life are defaults.
+What's default that's going to be choosen in most cases, unless it's reasonably bad for you.
+There is a psycological aspect of not willing to choose if a reasonable default is present.
+I claim it's an energy conservation mechanism at work :)
+
+Most people use default settings in most software they use.
+And that's one of the things that make Apple so great – they choose reasonable defaults for you.
+
+Right defaults are those, that are (or should be) used most of the time.
+For a modern functional programming modern language intended for server-side application development
+
+I consider the following to be good defaults:
+- strict for both structures and values
+- statically typed
+- effectful
+- immutable
+- green threads
+- no type annotations required (global type inference)
+- macros (hygienic is possible)
+- have a coding style, but don't force it with fmt-like tools.
+People tend to follow the rules, but go crazy when those are inavoidably forced. 
+No fmt tool know the reason why your formatting in this place is right.
+There should be one official standard coding style (see Python PEP 8, Scala Coding Style)
+
+And syntactically, I find these to be important:
+
+- avoid visual noise (reduce usage of special symbols #<>~, semicolons, braces etc)
+- visually appealing (reduce ugly symbols, like !#<>~) 
+- indentation significant (much cleaner looks)
+- allow adding operators but don't overuse them (i.g. hide the feature under a compiler flag, 
+force an operator to be a bridge to a normal function with an annotation or something)
+- support named arguments calls
+- do-notation
+
+Hence, I think most programming languages have wrong defaults in their design.
+
+Haskell: laziness, purity, easiness of adding a symbolic operator
+OCaml: bad syntax
+Go: mutable variables, global mutable state, compile error on unused imports (sic!), no generics
+Python: mutable variables, dynamic, not-so-strong type system
+JavaScript: mutable variables, dynamic wat?-weak type system
+F#: .NET
+
+Although laziness and purity are very nice and usefull features, they should not be _defaults_.
+There is a huge space of small effectfull programms (basically all scripts) that would benefit from
+clean statically typed ML-like language with type inference.
+
+
+Even Haskell people seem to agree that laziness was a poor decision. 
+You almost never need lazy data structures, and oh my god, how often you actually need a strict function argument.
+
+Scala and F# are almost there. But I'd rather have something much simplier, and not Microsoft/Oracle bound.
+
 Human perception driven approach for a programming language syntax design
 -------------------------------------------------------------------------
 
@@ -127,8 +192,8 @@ We can do a gradual typecheck, run in interpreter mode and do jitting.
 
 When things are getting... TODO
 
-Programme Lifecycle
--------------------
+Program Lifecycle
+-----------------
 
 Prototyping
    - Require fastest change-run cycles, it's very important!
@@ -401,6 +466,7 @@ Useful Links and Papers
 A Critical Analysis of String APIs https://arxiv.org/pdf/1711.10713.pdf
 Fixing Faults in C and Java Source Code: Abbreviated vs. Full-word
 Identifier Names http://www2.unibas.it/gscanniello/Giuseppe_Scanniello%40unibas/Home_files/TOSEM.pdf
+Fast 64-bit integers for Scala.js http://lampwww.epfl.ch/~doeraene/presentations/jslongs-vmm2017/
 
 
 Optimizations
@@ -426,7 +492,7 @@ Annotations? Caches?
 .. _Haskell Defered type checking: https://ghc.haskell.org/trac/ghc/wiki/DeferErrorsToRuntime
 .. _Akka: http://akka.io
 .. _Erlang: https://www.erlang.org
-.. _Boehm: https://www.hboehm.info/gc/
+.. _Boehm: http://www.hboehm.info/gc/
 .. _Pony: https://www.ponylang.org
 .. _Leon: https://github.com/epfl-lara/leon
 .. [1] https://en.wikipedia.org/wiki/Persistent_data_structure

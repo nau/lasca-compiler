@@ -33,6 +33,8 @@ import qualified Text.Megaparsec as Megaparsec
 import Control.Lens.TH
 
 import qualified LLVM.AST as AST
+import qualified LLVM.Module as LLVM
+import qualified LLVM.Target as LLVM
 
 greet :: LascaOpts -> IO ()
 greet opts | null (lascaFiles opts) = repl opts
@@ -91,18 +93,20 @@ processFile opts fname = do
 processModule :: LascaOpts -> AST.Module -> String -> IO ()
 processModule opts mod fname = if exec opts then
   do when (verboseMode opts) $ putStrLn "Running JIT"
-     m <- runJIT opts mod
-     return ()
+     runJIT opts mod
   else
-  do asm <- getLLAsString mod
-     writeFile (fname ++ ".ll") asm
+  do withOptimizedModule opts mod $ (\context m -> do
+          ll <- LLVM.moduleLLVMAssembly m
+          let asm = Char8.unpack ll
+          writeFile (fname ++ ".ll") asm
+          LLVM.withHostTargetMachine $ \tm -> LLVM.writeObjectToFile tm (LLVM.File (fname ++ ".o")) m)
      let name = takeWhile (/= '.') fname
      let optLevel = optimization opts
      let optimizationOpts = ["-O" ++ show optLevel | optLevel > 0]
      callProcess "clang-5.0"
        (optimizationOpts ++
           ["-e", "_start", "-g", "-o", name, "-L.", "-llascart",
-           fname ++ ".ll"])
+           fname ++ ".o"])
      return ()
 
 
