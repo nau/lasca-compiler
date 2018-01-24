@@ -366,13 +366,64 @@ type Tf64 = Tensor Float64
 Memory Management
 =================
 
-Concurrent Mark and Sweep for main actor. (Boehm_ conservative gc for starter).
-Consider https://wiki.haskell.org/GHC/Memory_Management
+For starter, just use Boehm_ conservative gc.
+
+Interesting Statistics
+----------------------
+
+The DaCapo Benchmarks: Java Benchmarking Development and
+Analysis (Extended Version)
+http://www.dacapobench.org/dacapo-TR-CS-06-01.pdf
+
+Most objects less than 128 bytes.
+
+Less than 10% objects survive a single collection (Generational Hypothesis).
+
+Mean Object Size
+===  ====== ====== ===========
+     Alloc  Live   Survival, %
+===  ====== ====== ===========
+Min  22     25     1.1
+Max  28,031 24,425 50.5
+Avg  77     110    8.7
+===  ====== ====== ===========
+
+Local Heaps
+-----------
 
 Per actor stack and heap. GC when actor is waiting. (See Erlang_, Pony_)
 
+These 3 papers share similar design decisions:
+
 Garbage Collection for Multicore NUMA Machines
 http://manticore.cs.uchicago.edu/papers/mspc11-numagc.pdf
+
+Multicore OCaml GC
+https://speakerdeck.com/kayceesrk/multicore-ocaml-gc
+
+Multicore Garbage Collection with Local Heaps
+https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/local-gc.pdf
+
+Brief Conclusion:
+
+"Our scaling results are not as dramatic as we had hoped when
+embarking on this line of research, and if we consider parallel
+throughput alone, it is not clear whether the improvements are
+worth the (substantial) increase in complexity imposed by the local heap
+collector over a stop-the-world implementation."
+
+So, as far as I understand, all the complexity of managing local heaps is not worth it
+in case of mutable data. So I'm thinking of just using Immix.
+
+Immix
+http://ts.data61.csiro.au/publications/nictaabstracts/Lin_BHN_16.abstract.pml
+https://gitlab.anu.edu.au/mu/immix-rust
+
+Summarizing Garbage Collection
+https://eschew.wordpress.com/2016/09/02/summarizing-gc/
+
+Data Structure Aware Garbage Collector
+http://www.cs.technion.ac.il/~erez/Papers/dsa-ismm-15.pdf
 
 Concurrency
 ===========

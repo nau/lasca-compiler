@@ -55,6 +55,7 @@ import Type
 import Infer
 import EmitCommon
 import Desugar
+import Namer
 import qualified EmitDynamic as EmitDynamic
 import qualified EmitStatic as EmitStatic
 import qualified Syntax as S
@@ -63,25 +64,26 @@ import qualified Options as Opts
 
 codegenModule :: Opts.LascaOpts -> AST.Module -> [S.Expr] -> IO AST.Module
 codegenModule opts modo exprs = do
-    let desugared = desugarExprs ctx desugarExpr exprs
+    let (named, state) = namerPhase opts exprs
+    let ctx = _context state
+    let mainPackage = _currentPackage state
+    let mainFunctionName = NS mainPackage "main"
+    let desugared = desugarExprs ctx desugarExpr named
     (exprs, cgen) <- typecheck ctx modo desugared -- TODO remove modo
     when (Opts.printAst opts) $ putStrLn $ List.intercalate "\n" (map S.printExprWithType exprs)
     let desugared = delambdafy ctx exprs -- must be after typechecking
+    let genModule cgen exprs = do
+            declareStdFuncs
+            fmt <- genFunctionMap exprs
+            let defs = reverse (S.dataDefs ctx)
+            tst <- genTypesStruct ctx defs
+            genRuntime opts fmt tst
+            forM_ exprs $ \expr -> do
+                defineStringConstants expr
+                codegenTop ctx cgen expr
+            codegenStartFunc ctx cgen (show mainFunctionName)
+    let modul cgen exprs = runLLVM modo $ genModule cgen exprs
     return $ modul cgen desugared
-  where
-    ctx = createGlobalContext opts exprs
-    modul cgen exprs = runLLVM modo $ genModule cgen exprs
-    genModule cgen exprs = do
-        declareStdFuncs
-        fmt <- genFunctionMap exprs
-        let defs = reverse (S.dataDefs ctx)
-        tst <- genTypesStruct ctx defs
-        genRuntime opts fmt tst
-        forM_ exprs $ \expr -> do
-            defineStringConstants expr
-            codegenTop ctx cgen expr
-        codegenStartFunc ctx cgen
-
 
 typecheck ctx modo exprs = do
     let opts = ctx ^. S.lascaOpts

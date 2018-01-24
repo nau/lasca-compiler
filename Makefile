@@ -7,8 +7,6 @@ CC = clang-5.0 -Wno-nullability-completeness -Wno-expansion-to-defined
 CC_INCLUDE = -I/usr/local/include -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/
 LLC = llc-5.0
 
-OPTS = -no-user-package-db -package-db .cabal-sandbox/*-packages.conf.d
-
 #TEST_RTS = +RTS -sstderr
 TEST_RTS =
 
@@ -38,6 +36,7 @@ examples:
 	lasca -O2 -e --mode static  src/main/lasca/array.lasca $(TEST_RTS)
 	lasca -O2 -e --mode dynamic src/main/lasca/array.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  src/main/lasca/data.lasca $(TEST_RTS)
+	lasca -O2 -e --mode dynamic src/main/lasca/data.lasca $(TEST_RTS)
 	lasca -O2 -e --mode dynamic src/main/lasca/dynamic.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  src/main/lasca/factorial.lasca $(TEST_RTS) -- 15
 	lasca -O2 -e --mode dynamic src/main/lasca/factorial.lasca $(TEST_RTS) -- 15

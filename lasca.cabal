@@ -20,6 +20,7 @@ library
                         haskeline,
                         process,
                         containers,
+                        multiset,
                         prettyprinter >=1.1,
                         megaparsec >= 6.0.0,
                         scientific,
@@ -39,6 +40,7 @@ library
   ghc-options:          -O0
                         -Wincomplete-patterns
                         -funbox-strict-fields
+                        -fhide-source-paths
 
   hs-source-dirs:       src/main/haskell
   exposed-modules:
@@ -46,6 +48,7 @@ library
                         Options
                         Infer
                         Desugar
+                        Namer
                         Emit
                         EmitCommon
                         EmitDynamic

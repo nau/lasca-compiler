@@ -1,4 +1,11 @@
+package Option
+
 data Option a = None | Some(v: a)
+
+def map(self, f: a -> b) = match self {
+    None -> None
+    Some(value) -> Some(f(value))
+}
 
 {-
 def main() = {

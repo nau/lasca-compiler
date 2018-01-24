@@ -83,6 +83,8 @@ metaLens = Lens.lens (fst . getset) (snd . getset)
 
 exprPosition expr = pos (expr ^. metaLens)
 
+showPosition meta = show (pos meta)
+
 getExprType expr = expr^.metaLens.exprType
 
 typeOf = fromSchema . getExprType
@@ -93,6 +95,7 @@ fromSchema t = t
 withScheme f (Forall tv t) = Forall tv (f t)
 
 instance Eq Expr where
+    EmptyExpr == EmptyExpr = True
     (Literal _ l) == (Literal _ r) = l == r
     (Ident _ l) == (Ident _ r) = l == r
     (Apply _ nl l) == (Apply _ nr r) = nl == nr && l == r
@@ -107,6 +110,7 @@ instance Eq Expr where
     (Data _ nl ltvars l) == (Data _ nr rtvars r) = nl == nr && ltvars == rtvars && l == r
     Package _ ln == Package _ rn = ln == rn
     Import _ ln == Import _ rn = ln == rn
+    _ == _ = False
 
 {-
 instance Show Expr where
@@ -160,7 +164,7 @@ data Case = Case Pattern Expr deriving (Eq, Ord, Show)
 data Pattern
     = LitPattern Lit
     | ConstrPattern Name [Pattern]
-    | VarPattern String
+    | VarPattern Name
     | WildcardPattern
     deriving (Eq, Ord, Show)
 
@@ -266,3 +270,21 @@ emptyLascaOpts = LascaOpts {
     printTypes = False,
     optimization = 0
 }
+
+builtinFunctions :: Map.Map Name Type
+builtinFunctions = Map.fromList [
+    ("unary-", Forall [a] (ta `TypeFunc` ta)),
+    (":=", Forall [a] ((typeRef ta) `TypeFunc` ta `TypeFunc` (typeRef ta))),
+    ("+",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
+    ("-",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
+    ("*",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
+    ("/",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
+    ("==", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
+    ("!=", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
+    ("<",  Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
+    ("<=", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
+    (">",  Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
+    (">=", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool))
+  ]
+  where a = TV "a"
+        ta = TVar a

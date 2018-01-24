@@ -1,10 +1,16 @@
-package Hello
+package Hello.Test
+
+import Option
+
+A = 5
 
 --import List
 def main() = {
 --    list = Cons(1, Nil);
-    file = readFile("README.md");
-    println(file);
+--    file = readFile("README.md");
+--    println(file);
 --    writeFile("test.md", file);
-    println("Hello world!")
+    s = Some(1);
+    str = map(s, {a -> toString(a + 1)});
+    println("Hello world! ${str}")
 }

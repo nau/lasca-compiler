@@ -193,7 +193,7 @@ createPosition S.Position{S.sourceLine, S.sourceColumn} = createStruct [constInt
 boxArray values = callFn (T.FunctionType ptrType [intType] True) "boxArray" (constIntOp (length values) : values)
 
 boxFunc name mapping = do
-    let idx = fromMaybe (error ("No such function " ++ show name)) (Map.lookup name mapping)
+    let idx = fromMaybe (error $ printf "No such function %s in mapping %s" (show name) (show mapping)) (Map.lookup name mapping)
     callFn (funcType ptrType [intType]) "boxFunc" [constIntOp idx]
 
 boxError name = do
@@ -275,22 +275,25 @@ genFunctionMap fns = do
     return funcMapType
   where
     funcMapType = functionsStructType (fromIntegral len)
-    defineNames = mapM (\(name, _, _) -> defineStringLit (show name)) funcsWithArities
+    defineNames = mapM (\name -> defineStringLit (show name)) entriesWithQNames
 
     len :: Int
     len = length funcsWithArities
 
-    array = C.Array functionStructType (fmap snd entries)
+    array = C.Array functionStructType (fmap snd entriesWithCNames)
 
     mapping :: Map.Map Name Int
     mapping = do
-        let entriesWithIdx = zip entries [0..]
-        let insert k new old = error $ "Function " ++ (show k) ++ " already defined! In entries " ++ (List.intercalate "\n" $ map show entries)
-        List.foldl' (\m ((name, _), idx) -> Map.insertWithKey insert name idx m) Map.empty entriesWithIdx
+        let entriesWithIdx = zip entriesWithQNames [0..]
+        let insert k new old = error $ "Function "
+              ++ (show k) ++ " already defined! In entries "
+              ++ (List.intercalate "\n" $ map show entriesWithQNames)
+        List.foldl' (\m (name, idx) -> Map.insertWithKey insert name idx m) Map.empty entriesWithIdx
 
 
 
-    entries = fmap (\(name, llvmType, arity) -> (name, struct name llvmType arity)) funcsWithArities
+    entriesWithCNames = fmap (\(name, cname, llvmType, arity) -> (cname, struct cname llvmType arity)) funcsWithArities
+    entriesWithQNames = fmap (\(name, cname, llvmType, arity) -> name) funcsWithArities
 
     struct1 = createStruct [constInt (len), array]
 
@@ -298,18 +301,18 @@ genFunctionMap fns = do
                             [globalStringRefAsPtr sname, constRef tpe (fromString sname), constInt arity]
                         where sname = show name
 
-    funcsWithArities = foldl go [] fns where
+    funcsWithArities = List.foldl' go [] fns where
         go s (S.Data _ name tvars consts) =
             -- Add data constructors as global functions
             let constrFuncType args = funcType (ptrType) (map (const ptrType) args)
-                addConstr n args = if null args then [] else [(n, (constrFuncType args), length args)]
+                addConstr n args = if null args then [] else [(n, n, (constrFuncType args), length args)]
                 m = foldl (\acc (S.DataConst n args) -> addConstr n args ++ acc) [] consts
             in m ++ s
         go s f@(S.Function meta name tpe args body) = do
             if meta^.S.isExternal
             then let (S.Literal _ (S.StringLit externName)) = body
-                 in (qname externName, (externFuncLLvmType f), length args) : s
-            else (name, (funcLLvmType f), length args) : s
+                 in (name, Name externName, (externFuncLLvmType f), length args) : s
+            else (name, name, (funcLLvmType f), length args) : s
         go s _ = s
 
 genRuntime opts fmt tst = defineConst "Runtime" runtimeStructType runtime
@@ -405,7 +408,7 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
                 ret boxed
         --        ret ptr
 
-codegenStartFunc ctx cgen = do
+codegenStartFunc ctx cgen mainName = do
     modState <- get
     define T.void "start" [("argc", intType), ("argv", ptrType)] (bls modState)
   where
@@ -415,7 +418,7 @@ codegenStartFunc ctx cgen = do
         instrDo $ callFnIns (funcType T.void [ptrType]) "initLascaRuntime" [constOp $ constRef runtimeStructType "Runtime"]
         instrDo $ callFnIns (funcType T.void [intType, ptrType]) "initEnvironment" [local intType "argc", localPtr "argv"]
         initGlobals
-        callFn (funcType ptrType []) "main" []
+        callFn (funcType ptrType []) mainName []
         terminator $ I.Do $ I.Ret Nothing []
         return ()
 

@@ -212,6 +212,8 @@ updateMeta f e =
         Let meta name expr body -> Let (f meta) name (updateMeta f expr) (updateMeta f body)
         Array meta exprs -> Array (f meta) (map (updateMeta f) exprs)
         this@Data{} -> this
+        Package{} -> e
+        Import{} -> e
 
 normalize schema@(Forall ts body) =
     let res = (Forall (fmap snd ord) (normtype body), ord)
@@ -252,21 +254,7 @@ extend (TypeEnv env) (x, s) = TypeEnv $ Map.insert x s env
 emptyTyenv = TypeEnv Map.empty
 
 defaultTyenv :: TypeEnv
-defaultTyenv = TypeEnv (Map.fromList [
-      ("unary-", Forall [a] (ta `TypeFunc` ta)),
-      ("+",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
-      ("-",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
-      ("*",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
-      ("/",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
-      ("==", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
-      ("!=", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
-      ("<",  Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
-      ("<=", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
-      (">",  Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
-      (">=", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool))
-    ])
-  where a = TV "a"
-        ta = TVar a
+defaultTyenv = TypeEnv builtinFunctions
 
 instantiate :: Type -> Infer Type
 instantiate (Forall as t) = do
@@ -341,6 +329,14 @@ infer ctx env ex = case ex of
 --            Debug.traceM $ printf "%s === %s, subst %s" (show subExprType) (show subApplyType) (show subst)
             setType $ Apply (meta `withType` subApplyType) expr1 args'
             return (subst, subApplyType)
+
+    Let meta x e1 EmptyExpr -> do
+        (s1, t1) <- infer ctx env e1
+        e1' <- gets _current
+--        Debug.traceM $ printf "Let %s = %s, type %s, subst %s, env %s" (show x) (show e1) (show t1) (show s1) (show env)
+        setType $ Let (meta `withType` t1) x e1' EmptyExpr
+--        when (not $ Set.null $ ftv s1) $ error $ printf "%s: Global val %s has free type variables: !" (showPosition meta) (show x) (ftv s1)
+        return (s1, t1)
 
     Let meta x e1 e2 -> do
         (s1, t1) <- infer ctx env e1
@@ -484,7 +480,7 @@ infer ctx env ex = case ex of
                 return (env, tv)       -- (0, a)
             (VarPattern n)    -> do                  -- (n -> a, a)
                 tv <- fresh
-                return (env `extend` (Name n, tv), tv)
+                return (env `extend` (n, tv), tv)
             (LitPattern lit) -> return (env, litType lit)   -- (0, litType)
             (ConstrPattern name args) -> do          -- (name -> a, a -> User)
                 (_, t) <- lookupEnv env name           -- t = String -> User
@@ -538,7 +534,8 @@ inferTop ctx env ((name, ex):xs) = case inferExpr ctx env ex of
 data InferStuff = InferStuff {
     _names :: [(Name, Expr)],
     _types :: [(Name, Type)],
-    _datas :: [Expr]
+    _datas :: [Expr],
+    _currentPackage :: Name
 }
 makeLenses ''InferStuff
 
@@ -546,13 +543,19 @@ collectNames exprs = forM_ exprs collectName
 
 collectName :: Expr -> State InferStuff ()
 collectName expr = case expr of
-    Let _ name _ _ -> do
+    Let _ name _ EmptyExpr -> do
         names %= (++ [(name, expr)])
         return ()
     Function _ name _ _ _ -> do
         names %= (++ [(name, expr)])
         return ()
     dat@(Data _ typeName tvars constrs) -> do
+        curPkg <- gets _currentPackage
+        let genTypes :: DataConst -> [(Name, Type)]
+            genTypes (DataConst name args) =
+                let tpe = normalizeType $ foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args
+                    accessors = map (\(Arg n tpe) -> (n, normalizeType $ TypeFunc dataTypeIdent tpe)) args
+                in (name, tpe) : accessors
         let constructorsTypes = constrs >>= genTypes
         types %= (++ constructorsTypes)
         datas %= (++ [dat])
@@ -562,12 +565,10 @@ collectName expr = case expr of
             [] -> TypeIdent typeName
             tvars -> TypeApply (TypeIdent typeName) (map TVar tvars)
 
-        genTypes :: DataConst -> [(Name, Type)]
-        genTypes (DataConst name args) =
-            let tpe = normalizeType $ foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args
-                accessors = map (\(Arg n tpe) -> (n, normalizeType $ TypeFunc dataTypeIdent tpe)) args
-            in (name, tpe) : accessors
-    Package{} -> return ()
+
+    Package meta name -> do
+        currentPackage .= name
+        return ()
     Import{} -> return ()
     _ -> error ("What the fuck " ++ show expr)
 

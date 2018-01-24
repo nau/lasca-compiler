@@ -81,6 +81,7 @@ typeString = TypeIdent "String"
 typeUnit = TypeIdent "Unit"
 typeArray t = TypeApply (TypeIdent "Array") [t]
 typeArrayInt = typeArray TypeInt
+typeRef a = TypeApply (TypeIdent "Ref") [a]
 
 isAny (TypeIdent "Any") = True
 isAny _ = False

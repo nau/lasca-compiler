@@ -143,7 +143,7 @@ extractLambda meta args expr = do
     let meta' = (S.exprType %~ addEnclosedArgsParameter) meta
     let generateEnclosedLocals ((S.Arg name tpe, _), idx) e = do
             let m = meta
-            let body = S.Apply m (S.Ident meta "arrayApply") [
+            let body = S.Apply m (S.Ident meta (NS "Prelude" "arrayApply")) [
                   S.Ident (meta `S.withType` enclosedArgType) "$enclosed",
                   S.Literal (meta `S.withType` TypeInt) $ S.IntLit idx]
             S.Let m name body e
@@ -218,7 +218,7 @@ delambdafy ctx exprs = let
             where go e = delambdafyExpr e
 
 desugarAssignment expr = case expr of
-    S.Apply meta (S.Ident imeta ":=") [ref, value] -> S.Apply meta (S.Ident imeta "updateRef") [ref, value]
+    S.Apply meta (S.Ident imeta ":=") [ref, value] -> S.Apply meta (S.Ident imeta (NS "Prelude" "updateRef")) [ref, value]
     _ -> expr
 
 desugarUnaryMinus expr = case expr of
@@ -251,14 +251,14 @@ genMatch ctx (S.Match meta expr cases) = do
     return $ S.Let meta matchName expr body
 genMatch ctx expr = return expr
 
-genFail = S.Apply S.emptyMeta (S.Ident S.emptyMeta "die") [S.Literal S.emptyMeta $ S.StringLit "Match error!"]
+genFail = S.Apply S.emptyMeta (S.Ident S.emptyMeta (NS "Prelude" "die")) [S.Literal S.emptyMeta $ S.StringLit "Match error!"]
 
 genPattern ctx lhs S.WildcardPattern rhs = const rhs
-genPattern ctx lhs (S.VarPattern name) rhs = const (S.Let S.emptyMeta (Name name) lhs rhs)
+genPattern ctx lhs (S.VarPattern name) rhs = const (S.Let S.emptyMeta name lhs rhs)
 genPattern ctx lhs (S.LitPattern literal) rhs = S.If S.emptyMeta (S.Apply S.emptyMeta (S.Ident S.emptyMeta "==") [lhs, S.Literal S.emptyMeta literal]) rhs
 genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
   where cond fail = S.If S.emptyMeta constrCheck (checkArgs name fail) fail
-        constrCheck = S.Apply S.emptyMeta (S.Ident S.emptyMeta "runtimeIsConstr") [lhs, S.Literal S.emptyMeta $ S.StringLit (show name)]
+        constrCheck = S.Apply S.emptyMeta (S.Ident S.emptyMeta (NS "Prelude" "runtimeIsConstr")) [lhs, S.Literal S.emptyMeta $ S.StringLit (show name)]
         constrMap = let cs = foldr (\ (S.DataDef _ constrs) acc -> constrs ++ acc) [] (S.dataDefs ctx)
                         tuples = fmap (\c@(S.DataConst n args) -> (n, args)) cs
                     in  Map.fromList tuples

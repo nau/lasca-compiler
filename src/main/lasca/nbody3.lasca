@@ -61,10 +61,10 @@ def offsetMomentum(bodies: [Body]) = {
     var pz = 0.0;
     for(0, 5, { i ->
         ibody = bodies[i];
-        mass = ibody.mass;
-        px := px.getRef + ibody.vx.getRef * mass;
-        py := py.getRef + ibody.vy.getRef * mass;
-        pz := pz.getRef + ibody.vz.getRef * mass;
+        m = ibody.mass;
+        px := px.getRef + ibody.vx.getRef * m;
+        py := py.getRef + ibody.vy.getRef * m;
+        pz := pz.getRef + ibody.vz.getRef * m;
         0
     });
     object = bodies[0];

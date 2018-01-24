@@ -1,3 +1,5 @@
+package Prelude
+
 extern def putchard(x: Float): Unit = "putchard"
 extern def putInt(d: Int): Unit = "putInt"
 extern def runtimePutchar(d: Int): Unit = "runtimePutchar"

@@ -19,8 +19,8 @@ def main() = {
     println(ident.toString);
     println(ident.n);
     println(no.toString);
-    x = p1.x + p1.y - p1.z.a;
-    println(toString(x == 11));
+    s = p1.x + p1.y - p1.z.a;
+    println(toString(s == 11));
     println("Hello")
 }
 

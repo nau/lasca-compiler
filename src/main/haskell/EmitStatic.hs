@@ -189,8 +189,8 @@ cgenApplyBinOp ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) = do
 --    let realRhsType = TypeInt
     llhs <- resolveBoxing anyTypeVar realLhsType llhs'
     lrhs <- resolveBoxing anyTypeVar realRhsType lrhs'
---    Debug.traceM $ printf "%s: %s <==> %s: %s" (show lhsType) (show realLhsType) (show rhsType) (show realRhsType)
     let code = fromMaybe (error ("Couldn't find binop " ++ show fn)) (Map.lookup fn binops)
+--    Debug.traceM $ printf "%s: %s <==> %s: %s, code %s" (show lhsType) (show realLhsType) (show rhsType) (show realRhsType) (show code)
     res <- case (code, realLhsType) of
         (10, TypeInt) -> add llhs lrhs >>= resolveBoxing returnType anyTypeVar
         (11, TypeInt) -> sub llhs lrhs >>= resolveBoxing returnType anyTypeVar
@@ -206,7 +206,7 @@ cgenApplyBinOp ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) = do
         (11, TypeFloat) -> fsub llhs lrhs >>= resolveBoxing returnType anyTypeVar
         (12, TypeFloat) -> fmul llhs lrhs >>= resolveBoxing returnType anyTypeVar
         (13, TypeFloat) -> fdiv llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        _  -> error $ printf "%s: Unsupported binary operation %s" (show $ S.exprPosition this) (S.printExprWithType this)
+        (c, t)  -> error $ printf "%s: Unsupported binary operation %s, code %s, type %s" (show $ S.exprPosition this) (S.printExprWithType this) (show c) (show t)
     return res
 
 cgenApply ctx meta expr args = do
@@ -217,7 +217,7 @@ cgenApply ctx meta expr args = do
     let isExtern fn = isGlobal fn && (funDecl fn ^. S.metaLens.S.isExternal)
     case expr of
          -- FIXME Here are BUGZZZZ!!!! :)
-        this@(S.Ident meta "arrayApply") -> do
+        this@(S.Ident meta (NS "Prelude" "arrayApply")) -> do
             let [arrayExpr, indexExpr] = args
             array <- cgen ctx arrayExpr -- should be a pointer to either boxed or unboxed array
             boxedIdx <- cgen ctx indexExpr

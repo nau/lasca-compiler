@@ -176,7 +176,7 @@ acase = do
 
 ptrn = litPattern
     <|> constrPattern
-    <|> (VarPattern <$> identifier)
+    <|> (VarPattern . Name <$> identifier)
     <|> wildcardPattern
 
 constrPattern = do
@@ -189,6 +189,14 @@ wildcardPattern = do
     return WildcardPattern
 
 litPattern = LitPattern <$> (boolLit <|> stringLit <|> try floatLit <|> integerLit)
+
+qi = do
+         i <- identifier
+         reservedOp "."
+         r <- qualIdent
+         return $ NS (Name i) r
+
+qualIdent = try qi <|> (Name <$> identifier)
 
 binops = [
           [postfixIndex, Ex.InfixL select, postfixApply],
@@ -390,23 +398,23 @@ factor =  try floatingLiteral
 
 globalValDef = do
     meta <- getMeta
-    valdef $ (\name e -> Let meta name e e)
+    valdef $ (\name e -> Let meta name e EmptyExpr)
 
 packageDef = do
     reserved "package"
     meta <- getMeta
-    name <- identifier
-    return $ Package meta (Name name)
+    name <- qualIdent
+    return $ Package meta name
 
 importDef = do
     reserved "import"
     meta <- getMeta
-    name <- identifier
-    return $ Import meta (Name name)
+    name <- qualIdent
+    return $ Import meta name
 
-annotations = do
-  reservedOp "@"
-  commaSep identifier
+annotations = some $ do
+    reservedOp "@"
+    identifier
 
 defn :: Parser Expr
 defn =  try packageDef
