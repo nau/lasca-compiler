@@ -134,7 +134,7 @@ def main() = {
     println("Test isEmpty should be true: ${emp.isEmpty}");
     println("Test size should be 0: ${emp.size}");
     println("Test isEmpty should be false: ${one.isEmpty}");
-    println("Test isEmpty should be true: ${delete(one, 1).isEmpty}");
+    println("Test isEmpty should be true: ${isEmpty(delete(one, 1))}");
 
     println("Test size should be 1: ${one.size}");
     println("Lookup should be one: ${lookup(one, 1)}");
@@ -156,6 +156,6 @@ def main() = {
 
     thou = test(1000, empty());
     println(toString(thou.size));
-    println(toString(delete(thou, 1000).size));
+    println(toString(size(delete(thou, 1000))));
 
 }

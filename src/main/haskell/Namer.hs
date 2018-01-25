@@ -58,6 +58,7 @@ emptyNamerPhaseState opts = NamerPhaseState {
     _context = emptyCtx opts
 }
 
+importedNames state = Map.restrictKeys (state^.exportedNames) (Set.insert (state^.currentPackage) (state^.importedPackages))
 
 findAllPackages state name = Map.foldrWithKey folder [] (state^.exportedNames)
   where
@@ -139,6 +140,18 @@ collectNames exprs = forM_ exprs $ \expr -> case expr of
         return ()
     _ -> error ("What the fuck " ++ show expr)
 
+qualifiedSelect expr = case expr of
+    Select meta (Ident _ p) (Ident _ n) -> Just $ NS p n
+    Select meta e (Ident _ n) -> fmap (\prefix -> NS prefix n) (qualifiedSelect e)
+    _ -> Nothing
+
+isFullyQualifiedName state (NS pkgName name) =
+    case Map.lookup pkgName (state^.exportedNames) of
+        -- correctly qualified name
+        Just names | Set.member name names -> True
+        _ -> False
+isFullyQualifiedName _ _ = False
+
 namerTransform :: Expr -> State NamerPhaseState Expr
 namerTransform expr = do
 --    Debug.traceM $ printf "Current expr %s" (show expr)
@@ -166,10 +179,17 @@ namerTransform expr = do
         Array meta exprs -> do
             exprs' <- mapM go exprs
             return $ Array meta exprs'
-        Select meta tree expr -> do
-            tree' <- go tree
-            expr' <- go expr
-            return $ Select meta tree' expr'
+        select@(Select meta tree expr) -> do
+            state <- get
+            case qualifiedSelect select of
+                Just name | isFullyQualifiedName state name -> do
+--                    Debug.traceM $ printf "Qualified Select %s" (show expr)
+                    return $ Ident meta name
+                _ -> do
+--                    Debug.traceM $ printf "Other Select %s" (show expr)
+                    tree' <- go tree
+                    expr' <- go expr
+                    return $ Select meta tree' expr'
         If meta cond true false -> do
             cond' <- go cond
             true' <- go true

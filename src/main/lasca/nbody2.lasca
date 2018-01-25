@@ -183,5 +183,5 @@ def main() = {
     initedBodies = bodies.init;
     println(initedBodies.energy.toString);
     advanced = calculate(initedBodies, numIterations);
-    println(energy(advanced).toString);
+    println(toString(energy(advanced)));
 }

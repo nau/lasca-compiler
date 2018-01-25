@@ -1,5 +1,8 @@
+package Data
 -- Records
 -- Dynamic mode
+import Option
+
 data Test = Test(a: Int)
 
 data Point = Point(x: Int, y: Int, z: Test)
@@ -14,6 +17,7 @@ def main() = {
     ident = Ident("test");
     num = Num(1);
     no = No;
+    some = Option.Some(1);
     list = Cons("1", Cons("2", Nil));
     println(list.toString);
     println(ident.toString);

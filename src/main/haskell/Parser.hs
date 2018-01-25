@@ -199,7 +199,8 @@ qi = do
 qualIdent = try qi <|> (Name <$> identifier)
 
 binops = [
-          [postfixIndex, Ex.InfixL select, postfixApply],
+          [postfixIndex, Ex.InfixL select],
+          [postfixApply],
           [unary "-"],
           [binary "*", binary "/" ],
           [binary "+", binary "-" ],

@@ -137,5 +137,5 @@ def main() = {
     bodies.offsetMomentum;
     println(bodies.energy.toString);
     calculate(bodies, numIterations);
-    println(energy(bodies).toString);
+    println(toString(energy(bodies)));
 }
