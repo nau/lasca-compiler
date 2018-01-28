@@ -10,8 +10,10 @@ import Control.Monad.State
 import qualified Data.Char as Char
 import           Data.List as List
 import           Data.Maybe
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.List.NonEmpty
+import Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Foldable
 import qualified Data.Scientific as Sci

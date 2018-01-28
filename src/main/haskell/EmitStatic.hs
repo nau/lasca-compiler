@@ -43,7 +43,9 @@ import Control.Monad.Except
 import Control.Applicative
 import qualified Control.Lens as Lens
 import Control.Lens.Operators
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
 import qualified Debug.Trace as Debug

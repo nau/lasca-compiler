@@ -27,6 +27,7 @@ import System.Directory
 import System.FilePath
 import System.Console.Haskeline
 import Data.List
+import Data.Set (Set)
 import qualified Data.Set as Set
 import Debug.Trace as Debug
 import qualified Text.Megaparsec as Megaparsec
@@ -124,7 +125,7 @@ repl opts = runInputT defaultSettings (loop (initModule "Lasca JIT"))
           Just modn -> loop modn
           Nothing -> loop mod
 
-loadImport :: Set.Set Name -> [Name] -> Name -> IO (Set.Set Name, [Expr])
+loadImport :: Set Name -> [Name] -> Name -> IO (Set Name, [Expr])
 loadImport imported importPath name = do
 --    Debug.traceM $ printf "loadImport %s %s %s" (show imported) (show importPath) (show name)
     when (name `elem` importPath) $ die (printf "Circular dependency in %s -> %s" (show importPath) (show name))
@@ -146,7 +147,7 @@ getImports exprs =
                           _ -> imports
                           ) [] exprs
 
-loadImports :: Set.Set Name -> [Name] -> [Expr] -> IO (Set.Set Name, [Expr])
+loadImports :: Set Name -> [Name] -> [Expr] -> IO (Set Name, [Expr])
 loadImports imported importPath exprs = do
     let imports = getImports exprs
     foldM (\acc@(imported, exprs) name -> do

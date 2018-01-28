@@ -26,14 +26,16 @@ import Control.Lens.Operators
 import Data.Monoid
 import qualified Data.List as List
 import Data.Foldable (foldr)
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
 import Debug.Trace as Debug
 import Text.Printf
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.String
 
-newtype TypeEnv = TypeEnv (Map.Map Name Type) deriving (Monoid)
+newtype TypeEnv = TypeEnv (Map Name Type) deriving (Monoid)
 
 
 instance Pretty TypeEnv where
@@ -55,7 +57,7 @@ normalizeType tpe = case Set.toList $ ftv tpe of
                   tvars -> Forall tvars tpe
 
 type Infer = ExceptT TypeError (State InferState)
-type Subst = Map.Map TVar Type
+type Subst = Map TVar Type
 
 data TypeError
     = UnificationFail Expr Type Type
@@ -84,7 +86,7 @@ showTypeError typeError = case typeError of
 
 class Substitutable a where
     substitute :: Subst -> a -> a
-    ftv   :: a -> Set.Set TVar
+    ftv   :: a -> Set TVar
 
 instance Substitutable Type where
     {-# INLINE substitute #-}

@@ -29,7 +29,9 @@ import Control.Applicative
 import qualified Control.Lens as Lens
 import Control.Lens.Operators
 import Control.Lens.TH
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.MultiSet as MSet
 import qualified Data.Sequence as Seq
@@ -41,9 +43,9 @@ import Options (LascaOpts)
 
 data NamerPhaseState = NamerPhaseState {
     _currentPackage :: Name,
-    _importedPackages :: Set.Set Name,
-    _exportedNames :: Map.Map Name (Set.Set Name),
-    _exportedTypes :: Map.Map Name (Set.Set Name),
+    _importedPackages :: Set Name,
+    _exportedNames :: Map Name (Set Name),
+    _exportedTypes :: Map Name (Set Name),
     _locals :: MSet.MultiSet Name,
     _context :: Ctx
 } deriving (Show)

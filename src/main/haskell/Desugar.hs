@@ -26,7 +26,9 @@ import Control.Applicative
 import qualified Control.Lens as Lens
 import Control.Lens.Operators
 import Control.Lens.TH
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
 import qualified Debug.Trace as Debug
@@ -40,9 +42,9 @@ import qualified Options as Opts
 data DesugarPhaseState = DesugarPhaseState {
     _modNames :: Names,
     _currentFunctionName :: Name,
-    _locals :: Map.Map Name Type.Type,
-    _outers :: Map.Map Name Type.Type,
-    _usedVars :: Set.Set Name,
+    _locals :: Map Name Type.Type,
+    _outers :: Map Name Type.Type,
+    _usedVars :: Set Name,
     _syntacticAst :: [S.Expr],
     _freshId :: Int
 } deriving (Show)

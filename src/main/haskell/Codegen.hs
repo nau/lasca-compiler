@@ -7,7 +7,9 @@ import Data.Word
 import Data.String
 import Data.List
 import Data.Function
+import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 -- import qualified Data.Text as Text
 import qualified Data.ByteString as ByteString
@@ -54,8 +56,8 @@ newtype LLVM a = LLVM { unLLVM :: State ModuleState a }
 data ModuleState = ModuleState {
     _llvmModule :: AST.Module,
     _globalValsInit :: [(LT.Name, S.Expr)],
-    functions :: Map.Map LT.Name Int,
-    structs :: Map.Map Int Int
+    functions :: Map LT.Name Int,
+    structs :: Map Int Int
 } deriving (Show)
 
 
@@ -139,7 +141,7 @@ ptrSize = 8 -- 64 bit architecture, TODO this is hardcode
 -- Names
 -------------------------------------------------------------------------------
 
-type Names = Map.Map BS.ByteString Int
+type Names = Map BS.ByteString Int
 
 uniqueName :: BS.ByteString -> Names -> (BS.ByteString, Names)
 uniqueName nm ns =
@@ -156,7 +158,7 @@ type SymbolTable = [(LT.Name, Operand)]
 data CodegenState
     = CodegenState {
       currentBlock :: Name                     -- Name of the active block to append to
-    , blocks       :: Map.Map Name BlockState  -- Blocks for function
+    , blocks       :: Map Name BlockState  -- Blocks for function
     , symtab       :: SymbolTable              -- Function scope symbol table
     , blockCount   :: Int                      -- Count of basic blocks
     , count        :: Word                     -- Count of unnamed instructions

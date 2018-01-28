@@ -44,7 +44,9 @@ import Control.Applicative
 import qualified Control.Lens as Lens
 import Control.Lens.Operators
 import Control.Lens.TH
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
 import qualified Debug.Trace as Debug
@@ -139,7 +141,7 @@ defineStringConstants expr = case expr of
 -- Operations
 -------------------------------------------------------------------------------
 
-binops :: Map.Map Name Int
+binops :: Map Name Int
 binops = Map.fromList [("+", 10), ("-", 11), ("*", 12), ("/", 13),
     ("==", 42), ("!=", 43), ("<", 44), ("<=", 45), (">=", 46), (">", 47)]
 
@@ -207,7 +209,7 @@ boxError name = do
 showSyms = show . map fst
 
 
-boxClosure :: Name -> Map.Map Name Int -> [S.Arg] -> Codegen AST.Operand
+boxClosure :: Name -> Map Name Int -> [S.Arg] -> Codegen AST.Operand
 boxClosure name mapping enclosedVars = do
     syms <- gets symtab
     let idx = fromMaybe (error ("Couldn't find " ++ show name ++ " in mapping:\n" ++ show mapping)) (Map.lookup name mapping)
@@ -282,7 +284,7 @@ genFunctionMap fns = do
 
     array = C.Array functionStructType (fmap snd entriesWithCNames)
 
-    mapping :: Map.Map Name Int
+    mapping :: Map Name Int
     mapping = do
         let entriesWithIdx = zip entriesWithQNames [0..]
         let insert k new old = error $ "Function "

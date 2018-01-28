@@ -6,7 +6,9 @@ module Syntax where
 import           Data.List
 import           Text.Printf
 import qualified Text.Megaparsec as Megaparsec
+import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Set (Set)
 import qualified Data.Set as Set
 import qualified Debug.Trace as Debug
 import Control.Monad.State
@@ -203,11 +205,11 @@ data Arg = Arg Name Type deriving (Eq, Ord, Show)
 data Ctx = Context {
     _lascaOpts :: LascaOpts,
     _packageName :: Name,
-    _globalFunctions :: Map.Map Name Expr,
-    _globalVals :: Set.Set Name,
+    _globalFunctions :: Map Name Expr,
+    _globalVals :: Set Name,
     dataDefs :: [DataDef],
-    dataDefsNames :: Set.Set Name,
-    dataDefsFields :: Map.Map Name (Map.Map Name (Arg, Int))
+    dataDefsNames :: Set Name,
+    dataDefsFields :: Map Name (Map Name (Arg, Int))
 } deriving (Show, Eq)
 makeLenses ''Ctx
 
@@ -271,7 +273,7 @@ emptyLascaOpts = LascaOpts {
     optimization = 0
 }
 
-builtinFunctions :: Map.Map Name Type
+builtinFunctions :: Map Name Type
 builtinFunctions = Map.fromList [
     ("unary-", Forall [a] (ta `TypeFunc` ta)),
     (":=", Forall [a] ((typeRef ta) `TypeFunc` ta `TypeFunc` (typeRef ta))),
