@@ -10,7 +10,7 @@ def main() = {
 --    file = readFile("README.md");
 --    println(file);
 --    writeFile("test.md", file);
-    s = Some(1);
+    s = Option.Some(1);
     str = map(s, {a -> toString(a + 1)});
     println("Hello world! ${str}")
 }

@@ -20,6 +20,7 @@ import qualified Data.ByteString
 import qualified Data.Text.Encoding
 import Data.Digest.Murmur32
 import Data.Maybe
+import Data.Foldable
 import qualified Data.List as List
 import Data.Word
 import Data.Int
@@ -44,6 +45,7 @@ import Options (LascaOpts)
 data NamerPhaseState = NamerPhaseState {
     _currentPackage :: Name,
     _importedPackages :: Set Name,
+    _packageQualifiers :: Map Name Name,  -- ^ MultiSet -> Data.MultiSet mapping
     _exportedNames :: Map Name (Set Name),
     _exportedTypes :: Map Name (Set Name),
     _locals :: MSet.MultiSet Name,
@@ -54,6 +56,7 @@ makeLenses ''NamerPhaseState
 emptyNamerPhaseState opts = NamerPhaseState {
     _currentPackage = Name "default", -- TODO check it
     _importedPackages = Set.empty,
+    _packageQualifiers = Map.empty,
     _exportedNames = Map.empty,
     _exportedTypes = Map.empty,
     _locals = MSet.empty,
@@ -154,6 +157,16 @@ isFullyQualifiedName state (NS pkgName name) =
         _ -> False
 isFullyQualifiedName _ _ = False
 
+isQualifiedName state qualifier name = do
+    let fqpn = Map.lookup qualifier (state^.packageQualifiers)
+    any (\fqpn -> isFullyQualifiedName state (NS fqpn name)) fqpn
+
+findQualifiedName state qualifier name = do
+    fqpn <- Map.lookup qualifier (state^.packageQualifiers)
+    names <- Map.lookup fqpn (state^.exportedNames)
+    if Set.member name names then return $ NS fqpn name else Nothing
+
+
 namerTransform :: Expr -> State NamerPhaseState Expr
 namerTransform expr = do
 --    Debug.traceM $ printf "Current expr %s" (show expr)
@@ -161,11 +174,15 @@ namerTransform expr = do
         Package _ name -> do
             currentPackage .= name
             importedPackages .= Set.empty
+            packageQualifiers .= Map.empty
             locals .= MSet.empty
 --            Debug.traceM $ printf "Current package %s" (show name)
             return expr
         Import _ name -> do
             importedPackages %= Set.insert name
+            case name of
+                NS prefix qual -> packageQualifiers %= Map.insert qual name
+                _ -> return ()
 --            Debug.traceM $ printf "importedPackages %s" (show name)
             return expr
         Data meta name tvars constrs -> do
@@ -187,6 +204,9 @@ namerTransform expr = do
                 Just name | isFullyQualifiedName state name -> do
 --                    Debug.traceM $ printf "Qualified Select %s" (show expr)
                     return $ Ident meta name
+                Just nm@(NS qualifier name) | isQualifiedName state qualifier name -> do
+                    let fqname = fromMaybe (error $ "Couldn't find name " ++ show nm) $ findQualifiedName state qualifier name
+                    return $ Ident meta fqname
                 _ -> do
 --                    Debug.traceM $ printf "Other Select %s" (show expr)
                     tree' <- go tree

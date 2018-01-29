@@ -12,9 +12,15 @@ def isRight(self: Either a b) = match self {
     _ -> true
 }
 
+def map(self: Either a b, f: b -> c) = match self {
+    Right(r) -> Right(f(r))
+    _ -> self
+}
 
 def main() = {
     l = Left("Test");
     r = Right(123);
+    r1 = map(r, { r -> r + 2 });
     println("Left is ${isLeft(l)}, right is left ${r.isLeft}, right is right ${r.isRight}");
+    println("r1 should be 125 and is: ${r1}");
 }
