@@ -1,4 +1,4 @@
-{-# LANGUAGE Strict #-}
+{-# LANGUAGE StrictData #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Desugar where
@@ -135,7 +135,8 @@ extractLambda meta args expr = do
     curFuncName <- gets _currentFunctionName
     let nms = _modNames state
     let syntactic = _syntacticAst state
-    let outerVars = Map.keysSet $ _outers state
+    -- lambda args are in locals. Shadow outers with same names.
+    let outerVars = Set.difference (Map.keysSet $ _outers state) (Map.keysSet $ _locals state)
     let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
     let enclosedArgs = map (\n -> (S.Arg n typeAny, _outers state Map.! n)) usedOuterVars
     let (funcName', nms') = uniqueName (fromString $ (show curFuncName) ++ "_lambda") nms
@@ -150,7 +151,8 @@ extractLambda meta args expr = do
                   S.Literal (meta `S.withType` TypeInt) $ S.IntLit idx]
             S.Let m name body e
     let expr1 = foldr generateEnclosedLocals expr (zip enclosedArgs [0..])
-    let func = S.Function meta' funcName typeAny (S.Arg "$enclosed" typeAny : args) expr1
+    let func = if null enclosedArgs then S.Function meta funcName typeAny args expr
+               else S.Function meta' funcName typeAny (S.Arg "$enclosed" typeAny : args) expr1
     modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
     s <- get
 --    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" funcName (show outerVars) (show usedOuterVars) (show s)
@@ -164,7 +166,7 @@ delambdafy ctx exprs = let
 
     where delambdafyExpr expr = case expr of
             expr@(S.Ident _ n) -> do
-                modify (\s -> s { _usedVars = Set.insert n (_usedVars s)})
+                usedVars %= Set.insert n
                 return expr
             S.Array meta exprs -> do
                 exprs' <- mapM go exprs

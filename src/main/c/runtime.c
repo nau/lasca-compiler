@@ -125,12 +125,6 @@ Box * boxClosure(int64_t idx, Box* args) {
     return box(CLOSURE, cl);
 }
 
-Box * __attribute__ ((pure)) boxFunc(int64_t idx) {
-//    printf("boxFunc(%d)\n", idx);
-//    fflush(stdout);
-    return boxClosure(idx, NULL);
-}
-
 void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti) {
   //  printf("unbox(%d, %d) ", ti->type, (int64_t) ti->value);
     /* In most cases we can use pointer comparison,

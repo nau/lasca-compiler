@@ -194,10 +194,6 @@ createPosition S.Position{S.sourceLine, S.sourceColumn} = createStruct [constInt
 
 boxArray values = callFn (T.FunctionType ptrType [intType] True) "boxArray" (constIntOp (length values) : values)
 
-boxFunc name mapping = do
-    let idx = fromMaybe (error $ printf "No such function %s in mapping %s" (show name) (show mapping)) (Map.lookup name mapping)
-    callFn (funcType ptrType [intType]) "boxFunc" [constIntOp idx]
-
 boxError name = do
     modify (\s -> s { generatedStrings = name : generatedStrings s })
     let strLitName = getStringLitName name
@@ -212,7 +208,7 @@ showSyms = show . map fst
 boxClosure :: Name -> Map Name Int -> [S.Arg] -> Codegen AST.Operand
 boxClosure name mapping enclosedVars = do
     syms <- gets symtab
-    let idx = fromMaybe (error ("Couldn't find " ++ show name ++ " in mapping:\n" ++ show mapping)) (Map.lookup name mapping)
+    let idx = fromMaybe (error $ printf "No such function %s in mapping %s" (show name) (show mapping)) (Map.lookup name mapping)
     let argc = length enclosedVars
     let findArg n = fromMaybe (error ("Couldn't find " ++ show n ++ " variable in symbols " ++ showSyms syms)) (lookup n syms)
     args <- forM enclosedVars $  \(S.Arg n _) -> load (findArg n)
@@ -247,7 +243,6 @@ declareStdFuncs = do
     external ptrType "boxError" [("n", ptrType)] False [FA.GroupID 0]
     external ptrType "boxInt" [("d", intType)] False [FA.GroupID 0]
     external ptrType "boxBool" [("d", intType)] False [FA.GroupID 0]
-    external ptrType "boxFunc" [("id", intType)] False [FA.GroupID 0]
     external ptrType "boxClosure" [("id", intType), ("argv", ptrType)] False []
     external ptrType "boxFloat64" [("d", T.double)] False [FA.GroupID 0]
     external ptrType "boxArray" [("size", intType)] True [FA.GroupID 0]

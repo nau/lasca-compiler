@@ -76,7 +76,7 @@ cgen ctx (S.Ident meta name) = do
       Just x ->
   --       Debug.trace ("Local " ++ show name)
           load x
-      Nothing | name `Map.member` S._globalFunctions ctx -> boxFunc name mapping
+      Nothing | name `Map.member` S._globalFunctions ctx -> boxClosure name mapping []
               | name `Set.member` S._globalVals ctx -> load (global ptrType (nameToSBS name))
               | otherwise -> boxError (show name)
 cgen ctx (S.Literal meta l) = do
@@ -93,8 +93,7 @@ cgen ctx (S.Apply meta expr args) = cgenApply ctx meta expr args
 cgen ctx (S.BoxFunc _ funcName enclosedVars) = do
     modState <- gets moduleState
     let mapping = functions modState
-    if null enclosedVars then boxFunc funcName mapping
-    else boxClosure funcName mapping enclosedVars
+    boxClosure funcName mapping enclosedVars
 cgen ctx m@S.Match{} =
     error $ printf "Match expressions should be already desugared! %s at: %s" (show m) (show $ S.exprPosition m)
 cgen ctx (S.If meta cond tr fl) = cgenIfDynamic ctx meta cond tr fl
