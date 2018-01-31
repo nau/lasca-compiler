@@ -16,12 +16,14 @@ build: rts test
 bench:
 	time lasca -O2 -e src/main/lasca/gen.lasca
 
-rts:
-	$(CC) -S -emit-llvm -g -O2 $(CC_INCLUDE) src/main/c/*.c*
-	$(CC) -shared -fPIC -g -O3 $(CC_INCLUDE)  -L/usr/local/lib -lgc -lffi src/main/c/*.c* -o liblascart.so
+liblascart.so:
+	$(CC) -shared -fPIC -g -O3 $(CC_INCLUDE)  -L/usr/local/lib -lgc -lffi rts/*.c* -o liblascart.so
+
+rts: liblascart.so
+	$(CC) -S -emit-llvm -g -O2 $(CC_INCLUDE) rts/*.c*
 
 rtsDebug:
-	$(CC) -shared -fPIC -g -O0 -I/usr/local/include -L/usr/local/lib -lgc -lffi src/main/c/*.c* -o liblascart.so
+	$(CC) -shared -fPIC -g -O0 -I/usr/local/include -L/usr/local/lib -lgc -lffi rts/*.c* -o liblascart.so
 
 rusts:
 	cd src/main/rust && cargo build && cp target/debug/liblascarts.dylib ../../../
