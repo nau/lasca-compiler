@@ -42,7 +42,7 @@ library
                         -funbox-strict-fields
                         -fhide-source-paths
 
-  hs-source-dirs:       src/main/haskell
+  hs-source-dirs:       src/lib
   exposed-modules:
                         Compiler
                         Options
