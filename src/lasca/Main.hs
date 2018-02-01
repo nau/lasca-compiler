@@ -1,7 +1,7 @@
 {-# LANGUAGE Strict #-}
 module Main where
 
-import qualified Compiler
+import qualified Lasca.Compiler
 
 main :: IO ()
-main = Compiler.main
+main = Lasca.Compiler.main

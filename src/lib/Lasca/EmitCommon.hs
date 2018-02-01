@@ -1,7 +1,7 @@
 {-# LANGUAGE Strict #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module EmitCommon where
+module Lasca.EmitCommon where
 
 import qualified LLVM.Module
 import qualified LLVM.Context
@@ -51,11 +51,11 @@ import qualified Data.Set as Set
 import qualified Data.Sequence as Seq
 import qualified Debug.Trace as Debug
 
-import Codegen
-import Type
-import qualified Syntax as S
-import Syntax (Ctx, createGlobalContext)
-import qualified Options as Opts
+import Lasca.Codegen
+import Lasca.Type
+import qualified Lasca.Syntax as S
+import Lasca.Syntax (Ctx, createGlobalContext)
+import qualified Lasca.Options as Opts
 
 
 externalTypeMapping :: Type -> AST.Type

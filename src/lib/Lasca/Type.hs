@@ -1,5 +1,5 @@
 {-# LANGUAGE Strict #-}
-module Type where
+module Lasca.Type where
 
 import Data.List
 import Data.String

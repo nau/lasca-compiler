@@ -9,7 +9,7 @@
 --
 --------------------------------------------------------------------
 {-# LANGUAGE Strict #-}
-module JIT (
+module Lasca.JIT (
   jit,
   runJIT,
   withOptimizedModule,
@@ -26,8 +26,8 @@ import           Foreign.Ptr          (FunPtr, Ptr, castFunPtr)
 import           Foreign.C.String
 import           Foreign.C.Types
 import Foreign.Marshal.Array
-import           Syntax
-import Options
+import           Lasca.Syntax
+import Lasca.Options
 
 import           Control.Monad.Except
 

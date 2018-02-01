@@ -1,5 +1,5 @@
 {-# LANGUAGE Strict #-}
-module Emit (codegenModule) where
+module Lasca.Emit (codegenModule) where
 
 import qualified LLVM.Module
 import qualified LLVM.Context
@@ -52,17 +52,17 @@ import System.Exit
 import System.Directory
 import System.FilePath
 
-import Codegen
-import Type
-import Infer
-import EmitCommon
-import Desugar
-import Namer
-import qualified EmitDynamic as EmitDynamic
-import qualified EmitStatic as EmitStatic
-import qualified Syntax as S
-import Syntax (Ctx, createGlobalContext)
-import qualified Options as Opts
+import Lasca.Codegen
+import Lasca.Type
+import Lasca.Infer
+import Lasca.EmitCommon
+import Lasca.Desugar
+import Lasca.Namer
+import qualified Lasca.EmitDynamic as EmitDynamic
+import qualified Lasca.EmitStatic as EmitStatic
+import qualified Lasca.Syntax as S
+import Lasca.Syntax (Ctx, createGlobalContext)
+import qualified Lasca.Options as Opts
 
 codegenModule :: Opts.LascaOpts -> AST.Module -> [S.Expr] -> IO AST.Module
 codegenModule opts modo exprs = do

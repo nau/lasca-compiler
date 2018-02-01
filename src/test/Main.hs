@@ -3,10 +3,10 @@ import Test.Tasty.SmallCheck as SC
 import Test.Tasty.QuickCheck as QC
 import Test.Tasty.HUnit
 import qualified Text.Megaparsec as Megaparsec
-import Parser
-import Syntax
-import Infer
-import Type
+import Lasca.Parser
+import Lasca.Syntax
+import Lasca.Infer
+import Lasca.Type
 
 import Data.List
 import Data.Ord

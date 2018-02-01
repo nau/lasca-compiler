@@ -1,4 +1,4 @@
-module Options (
+module Lasca.Options (
     LascaOpts(..),
     parseOptions
 ) where

@@ -1,14 +1,14 @@
 {-# LANGUAGE Strict #-}
-module Compiler where
+module Lasca.Compiler where
 
-import Parser
-import Codegen
-import Emit
-import JIT
-import Infer
-import Type
-import Syntax
-import Options
+import Lasca.Parser
+import Lasca.Codegen
+import Lasca.Emit
+import Lasca.JIT
+import Lasca.Infer
+import Lasca.Type
+import Lasca.Syntax
+import Lasca.Options
 
 
 import Control.Monad

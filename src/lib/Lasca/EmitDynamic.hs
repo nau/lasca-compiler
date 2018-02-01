@@ -1,6 +1,6 @@
 {-# LANGUAGE Strict #-}
 
-module EmitDynamic where
+module Lasca.EmitDynamic where
 
 import LLVM.Module
 import LLVM.Context
@@ -53,13 +53,13 @@ import System.Exit
 import System.Directory
 import System.FilePath
 
-import Codegen
-import Type
-import EmitCommon
-import Infer
-import qualified Syntax as S
-import Syntax (Ctx, createGlobalContext)
-import qualified Options as Opts
+import Lasca.Codegen
+import Lasca.Type
+import Lasca.EmitCommon
+import Lasca.Infer
+import qualified Lasca.Syntax as S
+import Lasca.Syntax (Ctx, createGlobalContext)
+import qualified Lasca.Options as Opts
 
 cgen :: Ctx -> S.Expr -> Codegen AST.Operand
 cgen ctx (S.Let meta a b c) = do

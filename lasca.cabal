@@ -44,21 +44,21 @@ library
 
   hs-source-dirs:       src/lib
   exposed-modules:
-                        Compiler
-                        Options
-                        Infer
-                        Desugar
-                        Namer
-                        Emit
-                        EmitCommon
-                        EmitDynamic
-                        EmitStatic
-                        Codegen
-                        JIT
-                        Lexer
-                        Parser
-                        Syntax
-                        Type
+                        Lasca.Compiler
+                        Lasca.Options
+                        Lasca.Infer
+                        Lasca.Desugar
+                        Lasca.Namer
+                        Lasca.Emit
+                        Lasca.EmitCommon
+                        Lasca.EmitDynamic
+                        Lasca.EmitStatic
+                        Lasca.Codegen
+                        Lasca.JIT
+                        Lasca.Lexer
+                        Lasca.Parser
+                        Lasca.Syntax
+                        Lasca.Type
 executable lasca
   other-extensions:     GADTs
   build-depends:        base >=4.9,

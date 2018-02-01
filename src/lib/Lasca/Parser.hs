@@ -1,5 +1,5 @@
 {-# LANGUAGE Strict            #-}
-module Parser (
+module Lasca.Parser (
   parseExpr,
   parseToplevelFilename,
   parseToplevel
@@ -23,15 +23,15 @@ import Text.Megaparsec.Char
 import Text.Megaparsec.Pos
 
 
-import           Lexer
-import Syntax
-import           Type
-import Infer
+import           Lasca.Lexer
+import  Lasca.Syntax as S
+import           Lasca.Type
+import Lasca.Infer
 
 getMeta = do
     state <- getParserState
     let SourcePos _ sl sc :| _ = statePos state
-    let meta = emptyMeta { pos = Position {Syntax.sourceLine = unPos sl, Syntax.sourceColumn = unPos sc} }
+    let meta = emptyMeta { pos = Position {S.sourceLine = unPos sl, S.sourceColumn = unPos sc} }
     return meta
 
 integerLiteral = do

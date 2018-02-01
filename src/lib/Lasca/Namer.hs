@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Namer (
+module Lasca.Namer (
     NamerPhaseState(..),
     namerPhase
 ) where
@@ -38,9 +38,9 @@ import qualified Data.MultiSet as MSet
 import qualified Data.Sequence as Seq
 import qualified Debug.Trace as Debug
 
-import Syntax
-import Type
-import Options (LascaOpts)
+import Lasca.Syntax
+import Lasca.Type
+import Lasca.Options (LascaOpts)
 
 data NamerPhaseState = NamerPhaseState {
     _currentPackage :: Name,

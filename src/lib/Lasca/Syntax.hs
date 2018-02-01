@@ -1,6 +1,6 @@
 {-# LANGUAGE Strict #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Syntax where
+module Lasca.Syntax where
 
 --import           Data.Text
 import           Data.List
@@ -17,8 +17,8 @@ import Control.Applicative
 import qualified Control.Lens as Lens
 import Control.Lens.Operators
 import Control.Lens.TH
-import           Type
-import Options
+import           Lasca.Type
+import Lasca.Options
 
 data Position = NoPosition | Position {sourceLine :: Int, sourceColumn :: Int} deriving (Eq, Ord)
 

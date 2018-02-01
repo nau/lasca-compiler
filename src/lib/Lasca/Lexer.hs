@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies     #-}
 {-# LANGUAGE FlexibleContexts #-}
-module Lexer where
+module Lasca.Lexer where
 
 import Data.Void
 import Data.Scientific

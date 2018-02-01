@@ -1,6 +1,6 @@
 {-# LANGUAGE Strict #-}
 
-module EmitStatic where
+module Lasca.EmitStatic where
 
 import LLVM.Module
 import LLVM.Context
@@ -53,13 +53,13 @@ import System.Exit
 import System.Directory
 import System.FilePath
 
-import Codegen
-import Type
-import EmitCommon
-import Infer
-import qualified Syntax as S
-import Syntax (Ctx, createGlobalContext)
-import qualified Options as Opts
+import Lasca.Codegen as Codegen
+import Lasca.Type
+import Lasca.EmitCommon
+import Lasca.Infer
+import qualified Lasca.Syntax as S
+import Lasca.Syntax (Ctx, createGlobalContext)
+import qualified Lasca.Options as Opts
 
 dataTypeHasField ctx typeName fieldName =
     typeName `Set.member` (S.dataDefsNames ctx) && fieldName `Map.member` (S.dataDefsFields ctx Map.! typeName)

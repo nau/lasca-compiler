@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE Strict #-}
 
-module Codegen where
+module Lasca.Codegen where
 
 import Data.Word
 import Data.String
@@ -42,8 +42,8 @@ import Data.Digest.Murmur32
 
 import qualified Debug.Trace as Debug
 
-import qualified Syntax as S
-import qualified Type as LT
+import qualified Lasca.Syntax as S
+import qualified Lasca.Type as LT
 
 
 -------------------------------------------------------------------------------

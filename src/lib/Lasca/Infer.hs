@@ -3,7 +3,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Infer (
+module Lasca.Infer (
   normalizeType,
   typeCheck,
   inferExpr,
@@ -14,8 +14,8 @@ module Infer (
 
 import Prelude hiding (foldr)
 
-import Type
-import Syntax
+import Lasca.Type
+import Lasca.Syntax
 
 import Control.Monad.State
 import Control.Monad.Except
