@@ -132,7 +132,7 @@ loadImport imported importPath name = do
     if name `Set.member` imported
     then return (imported, [])
     else do
-        let path = "src/main/lasca/" ++ show name ++ ".lasca"
+        let path = "examples/" ++ show name ++ ".lasca"
         p <- readFile path
         case parseToplevel p of
             Left err -> die $ Megaparsec.parseErrorPretty err

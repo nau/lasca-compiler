@@ -220,7 +220,7 @@ Add bash completion config for lasca compiler options:
     
 Run hello.lasca
      
-    lasca --exec src/main/lasca/hello.lasca
+    lasca --exec examples/hello.lasca
     
 If you want to build everything with profiling support
 uncomment -rtsopts, -prof, -fprof-auto ghc options in stack.yaml, and run
@@ -234,7 +234,7 @@ Current n-body run:
     http://benchmarksgame.alioth.debian.org/u64q/nbody.html
     Currently it's quite slow due to boxing.
 
-    $ time lasca -e -O2 src/main/lasca/nbody.lasca -- 50000000
+    $ time lasca -e -O2 examples/nbody.lasca -- 50000000
     -0.169075164
     -0.169059907
 

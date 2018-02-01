@@ -50,7 +50,7 @@ typerTests = testGroup "Typer tests"
       parseAndInferExpr "match true { true -> 1 false -> 2 }" @?= (TypeIdent "Int")
   ]
 
-benchTests = testGroup "Bench" [testCase "gen10k" $ parseAndInferFile "src/main/lasca/gen5k.lasca"]
+benchTests = testGroup "Bench" [testCase "gen10k" $ parseAndInferFile "examples/gen5k.lasca"]
 
 parseAndInferExpr str = let
     expr = fromRight $ parseExpr str
@@ -58,7 +58,7 @@ parseAndInferExpr str = let
   in infered
 
 parseAndInferFile fname = do
-  p <- readFile "src/main/lasca/Prelude.lasca"
+  p <- readFile "examples/Prelude.lasca"
   let preludeExprs = fromRight $ parseToplevel p
   file <- readFile fname
   case parseToplevel file of
