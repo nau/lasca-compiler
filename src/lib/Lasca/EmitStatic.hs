@@ -62,10 +62,10 @@ import Lasca.Syntax (Ctx)
 import qualified Lasca.Options as Opts
 
 dataTypeHasField ctx typeName fieldName =
-    typeName `Set.member` (S.dataDefsNames ctx) && fieldName `Map.member` (S.dataDefsFields ctx Map.! typeName)
+    typeName `Set.member` (S._dataDefsNames ctx) && fieldName `Map.member` (S._dataDefsFields ctx Map.! typeName)
 
 isDataType ctx tpe = case tpe of
-    TypeIdent name | name `Set.member` (S.dataDefsNames ctx) -> True
+    TypeIdent name | name `Set.member` (S._dataDefsNames ctx) -> True
     _ -> False
 
 isFuncType (TypeFunc _ _) = True
@@ -137,7 +137,7 @@ cgenSelect ctx this@(S.Select meta tree expr) = do
            let pos = createPosition $ S.pos meta
            tree <- cgen ctx tree
            let (S.Ident _ fieldName) = expr
-           let fieldsWithIndex = (S.dataDefsFields ctx) Map.! tpeName
+           let fieldsWithIndex = (S._dataDefsFields ctx) Map.! tpeName
     --            Debug.traceM $ printf "fieldsWithIndex %s" (show fieldsWithIndex)
            let (S.Arg n declaredFieldType, idx) = fromMaybe (error $ printf "No such field %s in %s" (show fieldName) (show tpeName)) (Map.lookup fieldName fieldsWithIndex)
            let len = length fieldsWithIndex

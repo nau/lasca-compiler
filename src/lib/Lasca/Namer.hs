@@ -90,36 +90,32 @@ resolveNonLocalName name meta s = do
                 Nothing -> error $ printf "%s: No such package imported: %s at %s.\nAdd import %s" (showPosition meta) (show pkg) (show meta) (show pkg)
 
 
-processData (Data _ name tvars consts) = do
+processData (Data meta name tvars consts) = do
     let dataDef = DataDef name consts
-    let (funcs, vals) = foldl (\(funcs, vals) (DataConst n args) ->
-                          if null args
-                          then (funcs, n : vals)
-                          else let dataTypeIdent = TypeIdent name
-                                   tpe = (foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args) -- FIXME forall
-                                   meta = emptyMetaWithType tpe
-                                   funDef = Function meta n dataTypeIdent args EmptyExpr
-                               in ((n, funDef) : funcs, vals)) ([], []) consts
-    -- FIXME Merge with above, create State?
-    let argsWithIds = List.foldl' (\acc (DataConst _ args) ->
-                                      fst $ List.foldl' (\(acc, idx) arg@(Arg n t)  ->
-                                          if n `Map.member` acc
-                                          then error $ printf "Field %s already defined in data %s" (show n) (show name)
-                                          else (Map.insert n (arg, idx) acc, idx + 1) -- field name -> (S.Arg, field index in constructor) mapping
-                                      ) (acc, 0) args
-                                  ) Map.empty consts
-
-
+    let (funcs, vals, fieldsMap) = List.foldl' processConstructor ([], [], Map.empty) consts
     state <- get
     let s = state^.context
-    context .= s {
-        dataDefs =  dataDef : dataDefs s,
-        dataDefsNames = Set.insert name (dataDefsNames s),
-        dataDefsFields = Map.insert name argsWithIds (dataDefsFields s)
-    }
+    context.dataDefs %= (:) dataDef
+    context.dataDefsNames %= Set.insert name
+    context.dataDefsFields %= Map.insert name fieldsMap
     context.globalVals %= Set.union (Set.fromList vals)
     context.globalFunctions %= Map.union (Map.fromList funcs)
+  where
+    processConstructor (funcs, vals, fieldsMap) (DataConst n args) =
+        let updatedArgsWithIds = processConstructorArguments fieldsMap args
+            (updatedFuncs, updatedVals) = if null args then (funcs, n : vals)
+                else let dataTypeIdent = TypeIdent name
+                         tpe = (foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args) -- FIXME forall
+                         m = meta `withType` tpe
+                         funDef = Function meta n dataTypeIdent args EmptyExpr
+                     in ((n, funDef) : funcs, vals)
+        in (updatedFuncs, updatedVals, updatedArgsWithIds)
 
+    processConstructorArguments fieldsMap args = List.foldl' (\fields (arg@(Arg n t), idx)  ->
+            if n `Map.member` fields
+            then error $ printf "Field %s already defined in data %s" (show n) (show name)
+            else Map.insert n (arg, idx) fields -- field name -> (S.Arg, field index in constructor) mapping
+        ) fieldsMap (zip args [0..])
 
 collectNames exprs = forM_ exprs $ \expr -> case expr of
     Let _ name _ EmptyExpr -> do

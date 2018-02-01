@@ -263,7 +263,7 @@ genPattern ctx lhs (S.LitPattern literal) rhs = S.If S.emptyMeta (S.Apply S.empt
 genPattern ctx lhs (S.ConstrPattern name args) rhs = cond
   where cond fail = S.If S.emptyMeta constrCheck (checkArgs name fail) fail
         constrCheck = S.Apply S.emptyMeta (S.Ident S.emptyMeta (NS "Prelude" "runtimeIsConstr")) [lhs, S.Literal S.emptyMeta $ S.StringLit (show name)]
-        constrMap = let cs = foldr (\ (S.DataDef _ constrs) acc -> constrs ++ acc) [] (S.dataDefs ctx)
+        constrMap = let cs = foldr (\ (S.DataDef _ constrs) acc -> constrs ++ acc) [] (S._dataDefs ctx)
                         tuples = fmap (\c@(S.DataConst n args) -> (n, args)) cs
                     in  Map.fromList tuples
         checkArgs nm fail =  case Map.lookup nm constrMap of

@@ -180,9 +180,9 @@ emptyCtx opts = Context {
     _packageName = Name defaultPackageName,
     _globalFunctions = Map.empty,
     _globalVals = Set.empty,
-    dataDefs = [],
-    dataDefsNames = Set.empty,
-    dataDefsFields = Map.empty
+    _dataDefs = [],
+    _dataDefsNames = Set.empty,
+    _dataDefsFields = Map.empty
 }
 
 data Lit = IntLit Int
@@ -207,9 +207,9 @@ data Ctx = Context {
     _packageName :: Name,
     _globalFunctions :: Map Name Expr,
     _globalVals :: Set Name,
-    dataDefs :: [DataDef],
-    dataDefsNames :: Set Name,
-    dataDefsFields :: Map Name (Map Name (Arg, Int))
+    _dataDefs :: [DataDef],
+    _dataDefsNames :: Set Name,
+    _dataDefsFields :: Map Name (Map Name (Arg, Int))
 } deriving (Show, Eq)
 makeLenses ''Ctx
 

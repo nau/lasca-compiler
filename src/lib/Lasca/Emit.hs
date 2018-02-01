@@ -77,7 +77,7 @@ codegenModule opts modo exprs = do
     let genModule cgen exprs = do
             declareStdFuncs
             fmt <- genFunctionMap exprs
-            let defs = reverse (S.dataDefs ctx)
+            let defs = reverse (S._dataDefs ctx)
             tst <- genTypesStruct ctx defs
             genRuntime opts fmt tst
             forM_ exprs $ \expr -> do
