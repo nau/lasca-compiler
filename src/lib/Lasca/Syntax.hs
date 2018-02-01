@@ -213,66 +213,6 @@ data Ctx = Context {
 } deriving (Show, Eq)
 makeLenses ''Ctx
 
-createGlobalContext :: LascaOpts -> [Expr] -> Ctx
-createGlobalContext opts exprs = execState (loop exprs) (emptyCtx opts)
-  where
-    loop [] = return ()
-    loop (e:exprs) = do
-        names e
-        loop exprs
-
-    qual name = do
-        pkg <- gets _packageName
-        return $ qualify pkg name
-
-    names :: Expr -> State Ctx ()
-    names expr = case expr of
-        Package _ name -> packageName .= name
-        Import _ name -> return () -- ignore imports
-        Let _ name _ _ -> do
---            qname <- qual name
---            Debug.traceM ("QNAME = " ++ show qname)
-            globalVals %= Set.insert name
-        Function meta name tpe args _ -> globalFunctions %= Map.insert name expr
-        Data _ name tvars consts -> do
-            let dataDef = DataDef name consts
-            let (funcs, vals) = foldl (\(funcs, vals) (DataConst n args) ->
-                                  if null args
-                                  then (funcs, n : vals)
-                                  else let dataTypeIdent = TypeIdent name
-                                           tpe = (foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args) -- FIXME forall
-                                           meta = emptyMetaWithType tpe
-                                           funDef = Function meta n dataTypeIdent args EmptyExpr
-                                       in ((n, funDef) : funcs, vals)) ([], []) consts
-            -- FIXME Merge with above, create State?
-            let argsWithIds = foldl' (\acc (DataConst _ args) ->
-                                              fst $ foldl' (\(acc, idx) arg@(Arg n t)  ->
-                                                  if n `Map.member` acc
-                                                  then error $ printf "Field %s already defined in data %s" (show n) (show name)
-                                                  else (Map.insert n (arg, idx) acc, idx + 1) -- field name -> (S.Arg, field index in constructor) mapping
-                                              ) (acc, 0) args
-                                          ) Map.empty consts
-
-            modify (\s -> s {
-                dataDefs =  dataDef : dataDefs s,
-                dataDefsNames = Set.insert name (dataDefsNames s),
-                dataDefsFields = Map.insert name argsWithIds (dataDefsFields s)
-            })
-            globalVals %= Set.union (Set.fromList vals)
-            globalFunctions %= Map.union (Map.fromList funcs)
-        expr -> error $ "Wat? Expected toplevel expression, but got " ++ show expr
-
-emptyLascaOpts = LascaOpts {
-    lascaFiles  = [],
-    mode = "static",
-    exec = False,
-    verboseMode = False,
-    printLLVMAsm = False,
-    printAst = False,
-    printTypes = False,
-    optimization = 0
-}
-
 builtinFunctions :: Map Name Type
 builtinFunctions = Map.fromList [
     ("unary-", Forall [a] (ta `TypeFunc` ta)),

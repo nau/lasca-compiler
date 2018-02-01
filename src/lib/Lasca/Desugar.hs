@@ -36,7 +36,7 @@ import qualified Debug.Trace as Debug
 import Lasca.Codegen
 import Lasca.Type as Type
 import qualified Lasca.Syntax as S
-import Lasca.Syntax (Ctx, createGlobalContext)
+import Lasca.Syntax (Ctx)
 import qualified Lasca.Options as Opts
 
 data DesugarPhaseState = DesugarPhaseState {

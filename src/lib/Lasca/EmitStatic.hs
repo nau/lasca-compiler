@@ -58,7 +58,7 @@ import Lasca.Type
 import Lasca.EmitCommon
 import Lasca.Infer
 import qualified Lasca.Syntax as S
-import Lasca.Syntax (Ctx, createGlobalContext)
+import Lasca.Syntax (Ctx)
 import qualified Lasca.Options as Opts
 
 dataTypeHasField ctx typeName fieldName =

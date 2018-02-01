@@ -61,7 +61,7 @@ import Lasca.Namer
 import qualified Lasca.EmitDynamic as EmitDynamic
 import qualified Lasca.EmitStatic as EmitStatic
 import qualified Lasca.Syntax as S
-import Lasca.Syntax (Ctx, createGlobalContext)
+import Lasca.Syntax (Ctx)
 import qualified Lasca.Options as Opts
 
 codegenModule :: Opts.LascaOpts -> AST.Module -> [S.Expr] -> IO AST.Module

@@ -1,6 +1,7 @@
 module Lasca.Options (
     LascaOpts(..),
-    parseOptions
+    parseOptions,
+    emptyLascaOpts
 ) where
 
 import Options.Applicative
@@ -16,6 +17,17 @@ data LascaOpts = LascaOpts
     , printTypes   :: Bool
     , optimization :: Int
     } deriving (Show, Eq)
+
+emptyLascaOpts = LascaOpts {
+    lascaFiles  = [],
+    mode = "static",
+    exec = False,
+    verboseMode = False,
+    printLLVMAsm = False,
+    printAst = False,
+    printTypes = False,
+    optimization = 0
+}
 
 optimizeOpt :: Parser Int
 optimizeOpt = option auto

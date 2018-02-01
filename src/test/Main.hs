@@ -7,6 +7,7 @@ import Lasca.Parser
 import Lasca.Syntax
 import Lasca.Infer
 import Lasca.Type
+import Lasca.Options
 
 import Data.List
 import Data.Ord
@@ -54,7 +55,7 @@ benchTests = testGroup "Bench" [testCase "gen10k" $ parseAndInferFile "examples/
 
 parseAndInferExpr str = let
     expr = fromRight $ parseExpr str
-    Right (infered, _) = inferExpr (createGlobalContext emptyLascaOpts [expr]) defaultTyenv expr
+    Right (infered, _) = inferExpr (emptyCtx emptyLascaOpts) defaultTyenv expr
   in infered
 
 parseAndInferFile fname = do
@@ -65,6 +66,6 @@ parseAndInferFile fname = do
     Left err -> error $ Megaparsec.parseErrorPretty err
     Right ex -> do
       let exprs = preludeExprs ++ ex
-      let typeEnv = typeCheck (createGlobalContext emptyLascaOpts exprs) exprs
+      let typeEnv = typeCheck (emptyCtx emptyLascaOpts) exprs
       print typeEnv
       1 @?= 1
