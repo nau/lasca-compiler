@@ -1,4 +1,3 @@
-{-# LANGUAGE Strict #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -116,6 +115,7 @@ processData (Data meta name tvars consts) = do
             then error $ printf "Field %s already defined in data %s" (show n) (show name)
             else Map.insert n (arg, idx) fields -- field name -> (S.Arg, field index in constructor) mapping
         ) fieldsMap (zip args [0..])
+processData expr = error $ printf "%s: This should not happen: %s" (show $ exprPosition expr) (show expr)
 
 collectNames exprs = forM_ exprs $ \expr -> case expr of
     Let _ name _ EmptyExpr -> do

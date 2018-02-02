@@ -1,4 +1,3 @@
-{-# LANGUAGE Strict #-}
 module Lasca.Type where
 
 import Data.List

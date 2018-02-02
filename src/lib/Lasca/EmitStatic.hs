@@ -1,5 +1,3 @@
-{-# LANGUAGE Strict #-}
-
 module Lasca.EmitStatic where
 
 import LLVM.Module

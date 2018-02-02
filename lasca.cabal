@@ -14,6 +14,7 @@ library
                         NamedFieldPuns
                         FlexibleContexts
                         PatternSynonyms
+                        StrictData
   build-depends:        base >=4.9,
                         text,
                         utf8-string,

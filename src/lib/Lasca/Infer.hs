@@ -576,7 +576,7 @@ collectName expr = case expr of
 
 typeCheck :: Ctx -> [Expr] -> Either TypeError (TypeEnv, [Expr])
 typeCheck ctx exprs = do
-    let stuff = execState (collectNames exprs) (InferStuff {_names = [], _types = [], _datas = []})
+    let stuff = execState (collectNames exprs) (InferStuff {_names = [], _types = [], _datas = [], _currentPackage = Name "default"})
     let namedExprs = stuff ^. names
     let dataConstructorsEnv = Map.fromList $ stuff ^. types
     let (TypeEnv te) = defaultTyenv

@@ -1,14 +1,3 @@
---------------------------------------------------------------------
--- |
--- Module    :  JIT
--- Copyright :  (c) Stephen Diehl 2013
--- License   :  MIT
--- Maintainer:  stephen.m.diehl@gmail.com
--- Stability :  experimental
--- Portability: non-portable
---
---------------------------------------------------------------------
-{-# LANGUAGE Strict #-}
 module Lasca.JIT (
   jit,
   runJIT,

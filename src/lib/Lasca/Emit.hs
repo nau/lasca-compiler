@@ -1,4 +1,3 @@
-{-# LANGUAGE Strict #-}
 module Lasca.Emit (codegenModule) where
 
 import qualified LLVM.Module

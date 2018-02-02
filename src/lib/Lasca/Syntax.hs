@@ -1,4 +1,3 @@
-{-# LANGUAGE Strict #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Lasca.Syntax where
 
@@ -93,8 +92,6 @@ typeOf = fromSchema . getExprType
 
 fromSchema (Forall _ t) = t
 fromSchema t = t
-
-withScheme f (Forall tv t) = Forall tv (f t)
 
 instance Eq Expr where
     EmptyExpr == EmptyExpr = True

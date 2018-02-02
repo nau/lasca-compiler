@@ -1,5 +1,3 @@
-{-# LANGUAGE Strict #-}
-
 module Lasca.EmitDynamic where
 
 import LLVM.Module
