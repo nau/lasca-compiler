@@ -178,6 +178,7 @@ emptyCtx opts = Context {
     _globalFunctions = Map.empty,
     _globalVals = Set.empty,
     _dataDefs = [],
+    _constructorArgs = Map.empty,
     _dataDefsNames = Set.empty,
     _dataDefsFields = Map.empty
 }
@@ -205,6 +206,7 @@ data Ctx = Context {
     _globalFunctions :: Map Name Expr,
     _globalVals :: Set Name,
     _dataDefs :: [DataDef],
+    _constructorArgs :: Map Name [Arg], -- data -> constructor -> fields
     _dataDefsNames :: Set Name,
     _dataDefsFields :: Map Name (Map Name (Arg, Int))
 } deriving (Show, Eq)
