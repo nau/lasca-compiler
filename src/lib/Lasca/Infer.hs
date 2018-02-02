@@ -536,8 +536,7 @@ inferTop ctx env ((name, ex):xs) = case inferExpr ctx env ex of
 data InferStuff = InferStuff {
     _names :: [(Name, Expr)],
     _types :: [(Name, Type)],
-    _datas :: [Expr],
-    _currentPackage :: Name
+    _datas :: [Expr]
 }
 makeLenses ''InferStuff
 
@@ -552,7 +551,6 @@ collectName expr = case expr of
         names %= (++ [(name, expr)])
         return ()
     dat@(Data _ typeName tvars constrs) -> do
-        curPkg <- gets _currentPackage
         let genTypes :: DataConst -> [(Name, Type)]
             genTypes (DataConst name args) =
                 let tpe = normalizeType $ foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args
@@ -566,17 +564,13 @@ collectName expr = case expr of
         dataTypeIdent = case tvars of
             [] -> TypeIdent typeName
             tvars -> TypeApply (TypeIdent typeName) (map TVar tvars)
-
-
-    Package meta name -> do
-        currentPackage .= name
-        return ()
+    Package meta name -> return ()
     Import{} -> return ()
     _ -> error ("What the fuck " ++ show expr)
 
 typeCheck :: Ctx -> [Expr] -> Either TypeError (TypeEnv, [Expr])
 typeCheck ctx exprs = do
-    let stuff = execState (collectNames exprs) (InferStuff {_names = [], _types = [], _datas = [], _currentPackage = Name "default"})
+    let stuff = execState (collectNames exprs) (InferStuff {_names = [], _types = [], _datas = []})
     let namedExprs = stuff ^. names
     let dataConstructorsEnv = Map.fromList $ stuff ^. types
     let (TypeEnv te) = defaultTyenv
