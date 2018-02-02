@@ -327,9 +327,9 @@ genTypeStruct name = do
     defineConst typeName laTypeStructType laTypeStruct
     return $ constRef laTypeStructType typeName
     
---genData :: Ctx -> [S.DataDef] -> ([S.Arg] -> [(SBS.ShortByteString, AST.Type)]) -> LLVM ([C.Constant])
+--genData :: Ctx -> [S.Expr] -> ([S.Arg] -> [(SBS.ShortByteString, AST.Type)]) -> LLVM ([C.Constant])
 genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
-  where genDataStruct dd@(S.DataDef name constrs) = do
+  where genDataStruct dd@(S.Data meta name tvars constrs) = do
             typePtr <- genTypeStruct name
             defineStringLit (show name)
             let literalName = fromString $ "Data." ++ (show name)
@@ -346,7 +346,7 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
             defineConst literalName (dataStructType numConstructors) struct
             return (constRef (dataStructType numConstructors) literalName)
 
-        genConstructors ctx typePtr (S.DataDef name constrs) = do
+        genConstructors ctx typePtr (S.Data meta name tvars constrs) = do
             forM (zip constrs [0..]) $ \ ((S.DataConst n args), tag) ->
                 defineConstructor ctx typePtr name n tag args
 

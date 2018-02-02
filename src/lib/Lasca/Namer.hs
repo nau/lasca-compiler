@@ -89,19 +89,18 @@ resolveNonLocalName name meta s = do
                 Nothing -> error $ printf "%s: No such package imported: %s at %s.\nAdd import %s" (showPosition meta) (show pkg) (show meta) (show pkg)
 
 
-processData (Data meta name tvars consts) = do
-    let dataDef = DataDef name consts
+processData expr@(Data meta name tvars consts) = do
     state <- get
     let newCtx = execState (processConstructors consts) (state^.context)
     context .= newCtx
-    context.dataDefs %= (:) dataDef
+    context.dataDefs %= (:) expr
     context.dataDefsNames %= Set.insert name
   where
     processConstructors constrs = forM constrs processConstructor
 
     processConstructor (DataConst constrName args) = do
         processConstructorArguments constrName args
-        if null args then globalVals %= Set.insert constrName
+        if null args then globalVals %= Map.insert constrName expr
         else do let dataTypeIdent = TypeIdent name
                     tpe = (foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args) -- FIXME forall
                     m = meta `withType` tpe
@@ -239,7 +238,7 @@ namerTransform expr = do
             e' <- go e
             curPkg <- gets _currentPackage
             let fqn = NS curPkg name
-            context.globalVals %= Set.insert fqn
+            context.globalVals %= Map.insert fqn expr
             return (Let meta fqn e' EmptyExpr)
         Let meta n e body -> do
             locals %= MSet.insert n

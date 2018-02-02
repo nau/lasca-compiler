@@ -533,47 +533,44 @@ inferTop ctx env ((name, ex):xs) = case inferExpr ctx env ex of
                             Left err -> Left err
                             Right (ty, exs) -> Right (ty, ex' : exs)
 
-data InferStuff = InferStuff {
-    _names :: [(Name, Expr)],
-    _types :: [(Name, Type)],
-    _datas :: [Expr]
-}
+data InferStuff = InferStuff { _names :: [(Name, Expr)] }
 makeLenses ''InferStuff
 
-collectNames exprs = forM_ exprs collectName
-
-collectName :: Expr -> State InferStuff ()
-collectName expr = case expr of
+collectNames exprs = forM_ exprs $ \expr -> case expr of
     Let _ name _ EmptyExpr -> do
         names %= (++ [(name, expr)])
         return ()
     Function _ name _ _ _ -> do
         names %= (++ [(name, expr)])
         return ()
-    dat@(Data _ typeName tvars constrs) -> do
+    _ -> return ()
+
+createTypeEnvironment exprs = List.foldl' folder [] exprs
+  where
+    folder types (Data _ typeName tvars constrs) = do
         let genTypes :: DataConst -> [(Name, Type)]
             genTypes (DataConst name args) =
                 let tpe = normalizeType $ foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args
                     accessors = map (\(Arg n tpe) -> (n, normalizeType $ TypeFunc dataTypeIdent tpe)) args
                 in (name, tpe) : accessors
         let constructorsTypes = constrs >>= genTypes
-        types %= (++ constructorsTypes)
-        datas %= (++ [dat])
-        return ()
+        types ++ constructorsTypes
       where
         dataTypeIdent = case tvars of
             [] -> TypeIdent typeName
             tvars -> TypeApply (TypeIdent typeName) (map TVar tvars)
-    Package meta name -> return ()
-    Import{} -> return ()
-    _ -> error ("What the fuck " ++ show expr)
 
 typeCheck :: Ctx -> [Expr] -> Either TypeError (TypeEnv, [Expr])
 typeCheck ctx exprs = do
-    let stuff = execState (collectNames exprs) (InferStuff {_names = [], _types = [], _datas = []})
+    -- TODO use flow analysis to find order of typing functions/vals and mutually recursive functions
+    let stuff = execState (collectNames exprs) (InferStuff {_names = []})
     let namedExprs = stuff ^. names
-    let dataConstructorsEnv = Map.fromList $ stuff ^. types
+    let dataConstructorsEnv = Map.fromList $ createTypeEnvironment (ctx^.dataDefs)
     let (TypeEnv te) = defaultTyenv
     let typeEnv = TypeEnv (Map.union te dataConstructorsEnv)
     let res = inferTop ctx typeEnv namedExprs
-    fmap (\(typeEnv, exprs) -> (typeEnv, stuff ^. datas ++ exprs)) res
+    fmap (\(typeEnv, exprs) -> (typeEnv, ctx^.dataDefs ++ exprs)) res
+
+
+isData Data{} = True
+isData _ = False

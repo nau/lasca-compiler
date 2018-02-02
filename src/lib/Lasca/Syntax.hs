@@ -169,14 +169,11 @@ data Pattern
 
 data DataConst = DataConst Name [Arg] deriving (Eq, Ord, Show)
 
-data DataDef = DataDef Name [DataConst]
-    deriving (Show, Eq)
-
 emptyCtx opts = Context {
     _lascaOpts = opts,
     _packageName = Name defaultPackageName,
     _globalFunctions = Map.empty,
-    _globalVals = Set.empty,
+    _globalVals = Map.empty,
     _dataDefs = [],
     _constructorArgs = Map.empty,
     _dataDefsNames = Set.empty,
@@ -204,8 +201,8 @@ data Ctx = Context {
     _lascaOpts :: LascaOpts,
     _packageName :: Name,
     _globalFunctions :: Map Name Expr,
-    _globalVals :: Set Name,
-    _dataDefs :: [DataDef],
+    _globalVals :: Map Name Expr,
+    _dataDefs :: [Expr],
     _constructorArgs :: Map Name [Arg], -- data -> constructor -> fields
     _dataDefsNames :: Set Name,
     _dataDefsFields :: Map Name (Map Name (Arg, Int))
