@@ -1,0 +1,6 @@
+Data_Cons(1, Data_Cons(2, Data_Nil))
+Data_Ident(test)
+test
+Data_No
+true
+Hello

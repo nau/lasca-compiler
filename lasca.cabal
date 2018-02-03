@@ -77,14 +77,23 @@ executable lasca
 test-suite lasca-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      src/test
-  main-is:             Main.hs
+  main-is:             TestMain.hs
   default-extensions:  OverloadedStrings
   build-depends:       base >=4.9,
                        lasca,
                        text,
+                       bytestring,
+                       shelly,
                        utf8-string,
                        megaparsec >= 6.0.0,
-                       tasty, tasty-hunit, tasty-smallcheck, tasty-quickcheck
+                       Glob,
+                       filepath,
+                       tasty,
+                       tasty-hunit,
+                       tasty-smallcheck,
+                       tasty-quickcheck,
+                       tasty-golden,
+                       tasty-program
   ghc-options:         -threaded -rtsopts
   extra-lib-dirs:      .
   default-language:    Haskell2010

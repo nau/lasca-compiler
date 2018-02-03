@@ -1,0 +1,21 @@
+runtimeCompare = -1
+Test isEmpty should be true: true
+Test size should be 0: 0
+Test isEmpty should be false: false
+Test isEmpty should be true: true
+Test size should be 1: 1
+Lookup should be one: Option_Some(one)
+Lookup should be none: Option_None
+Test size should be 2: 2
+Lookup should be two: Option_Some(two)
+Lookup should be none: Option_None
+Test size should be 3: 3
+Lookup should be three: Option_Some(three)
+Lookup should be none: Option_None
+Test size should be 4: 4
+Lookup should be four: Option_Some(four)
+4 is member of four: true
+Lookup should be none: Option_None
+Map_Bin(4, 2, two, Map_Bin(1, 1, one, Map_Tip, Map_Tip), Map_Bin(2, 3, three, Map_Tip, Map_Bin(1, 4, four, Map_Tip, Map_Tip)))
+1000
+999

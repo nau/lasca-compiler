@@ -54,6 +54,8 @@ examples:
 	lasca -O2 -e --mode dynamic  examples/nbody3.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e --mode static  examples/binarytrees.lasca $(TEST_RTS) -- 10
 	lasca -O2 -e --mode dynamic  examples/binarytrees.lasca $(TEST_RTS) -- 10
+	lasca -O2 -e --mode static  examples/Option.lasca $(TEST_RTS)
+	lasca -O2 -e --mode dynamic examples/Option.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  examples/Map.lasca $(TEST_RTS)
 	lasca -O2 -e --mode dynamic examples/Map.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  examples/ski.lasca $(TEST_RTS)

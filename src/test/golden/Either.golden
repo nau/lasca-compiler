@@ -1,0 +1,2 @@
+Left is true, right is left false, right is right true
+r1 should be 125 and is: Either_Right(125)
