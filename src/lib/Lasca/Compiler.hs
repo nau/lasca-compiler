@@ -41,9 +41,6 @@ import qualified LLVM.AST as AST
 import qualified LLVM.Module as LLVM
 import qualified LLVM.Target as LLVM
 
-initModule :: String -> AST.Module
-initModule name = emptyModule name
-
 parsePhase opts filename = do
     file <- readFile filename
     let importPreludeAst = Import emptyMeta "Prelude"
@@ -93,7 +90,7 @@ typerPhase opts ctx filename exprs = do
             die $ (source ++ ":" ++ showTypeError e)
 
 codegenPhase opts ctx filename exprs mainFunctionName = do
-    let modo = initModule filename
+    let modo = emptyModule filename
     let cgen = if mode opts == "static" then EmitStatic.cgen else EmitDynamic.cgen
     runLLVM modo $  do
         declareStdFuncs

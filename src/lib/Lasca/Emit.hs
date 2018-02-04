@@ -1,66 +1,15 @@
 module Lasca.Emit (codegenTop) where
 
-import qualified LLVM.Module
-import qualified LLVM.Context
-import qualified LLVM.Analysis
-import qualified LLVM.PassManager
-
-import qualified LLVM.AST as AST
-import qualified LLVM.AST.Global
-import qualified LLVM.AST.Type as T
-import qualified LLVM.AST.Instruction as I
-import qualified LLVM.AST.Constant as C
-import qualified LLVM.AST.Float as F
-import qualified LLVM.AST.IntegerPredicate as IP
-import qualified LLVM.AST.FloatingPointPredicate as FP
-import qualified LLVM.AST.FunctionAttribute as FA
-
--- import qualified Data.Text as Text
-import qualified Data.ByteString as ByteString
-import qualified Data.Text.Encoding as Encoding
 import Text.Printf
-import qualified Data.ByteString.UTF8 as UTF8
 import Data.String
-import qualified Data.ByteString.Char8 as Char8
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Short as SBS
 
-import LLVM.ExecutionEngine ( withMCJIT, withModuleInEngine, getFunction )
-
-import qualified Data.Text
-import qualified Data.ByteString
-import qualified Data.Text.Encoding
-import Data.Digest.Murmur32
-import Data.Maybe
-import qualified Data.List as List
-import Data.Word
-import Data.Int
 import Control.Monad.State
-import Control.Monad.Except
-import Control.Applicative
-import qualified Control.Lens as Lens
 import Control.Lens.Operators
-import Control.Lens.TH
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import Data.Set (Set)
-import qualified Data.Set as Set
-import qualified Data.Sequence as Seq
-import qualified Debug.Trace as Debug
-import System.Exit
-import System.Directory
-import System.FilePath
 
 import Lasca.Codegen
 import Lasca.Type
-import Lasca.Infer
 import Lasca.EmitCommon
-import Lasca.Desugar
-import Lasca.Namer
-import qualified Lasca.EmitDynamic as EmitDynamic
-import qualified Lasca.EmitStatic as EmitStatic
 import Lasca.Syntax
-import qualified Lasca.Options as Opts
 
 codegenTop ctx cgen topExpr = case topExpr of
     this@(Let meta name expr _) -> do
