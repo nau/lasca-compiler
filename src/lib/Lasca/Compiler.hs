@@ -1,8 +1,13 @@
 module Lasca.Compiler where
 
 import Lasca.Parser
+import Lasca.Namer
+import Lasca.Desugar
 import Lasca.Codegen
+import Lasca.EmitCommon
 import Lasca.Emit
+import qualified Lasca.EmitStatic as EmitStatic
+import qualified Lasca.EmitDynamic as EmitDynamic
 import Lasca.JIT
 import Lasca.Infer
 import Lasca.Type
@@ -36,38 +41,16 @@ import qualified LLVM.AST as AST
 import qualified LLVM.Module as LLVM
 import qualified LLVM.Target as LLVM
 
-greet :: LascaOpts -> IO ()
-greet opts | null (lascaFiles opts) = repl opts
-           | otherwise = do
-   let file = head (lascaFiles opts)
-   processFile opts file
-   return ()
-
 initModule :: String -> AST.Module
 initModule name = emptyModule name
 
-process :: LascaOpts -> AST.Module -> String -> IO (Maybe AST.Module)
-process opts modo source = do
-  let res = parseToplevel source
-  case res of
-    Left err -> die (show err)
-    Right ex -> do
-      ast <- codegen opts modo ex
-      return $ Just ast
-
-codegen :: LascaOpts -> AST.Module -> [Expr] -> IO AST.Module
-codegen opts modo fns = do
-  ast <- codegenModule opts modo fns
-  runJIT opts ast
-  return ast
-
-genModule :: LascaOpts -> AST.Module -> String -> IO AST.Module
-genModule opts modo source = do
+parsePhase opts filename = do
+    file <- readFile filename
     let importPreludeAst = Import emptyMeta "Prelude"
-    let filePath = Char8.unpack (SBS.fromShort $ AST.moduleSourceFileName modo)
+    let filePath = filename
     dir <- getCurrentDirectory
     let absoluteFilePath = dir </> filePath
-    case parseToplevelFilename absoluteFilePath source of
+    case parseToplevelFilename absoluteFilePath file of
       Left err -> do
           die $ Megaparsec.parseErrorPretty err
       Right exprs -> do
@@ -78,51 +61,68 @@ genModule opts modo source = do
           when (verboseMode opts) $ putStrLn ("Parsed OK, imported " ++ show imported)
           when (printAst opts) $ mapM_ print ex
           when (verboseMode opts) $ putStrLn("Compiler mode is " ++ mode opts)
-          codegenModule opts modo ex
+          return ex
 
-readMod :: LascaOpts -> String -> IO AST.Module
-readMod opts fname = do
-  file <- readFile fname
-  genModule opts (initModule fname) file
+runPhases opts filename = do
+    exprs <- parsePhase opts filename
+    let (named, state) = namerPhase opts exprs
+    let ctx = _context state
+    let mainPackage = _currentPackage state
+    let mainFunctionName = NS mainPackage "main"
+    let desugared = desugarExprs ctx desugarExpr named
+    typed <- if mode opts == "static"
+             then typerPhase opts ctx filename desugared
+             else return desugared
+    when (printAst opts) $ putStrLn $ intercalate "\n" (map printExprWithType exprs)
+    let desugared2 = delambdafy ctx typed -- must be after typechecking
+    let mod = codegenPhase opts ctx filename desugared2 mainFunctionName
+    if exec opts then do
+        when (verboseMode opts) $ putStrLn "Running JIT"
+        runJIT opts mod
+    else compileExecutable opts filename mod
 
-processFile :: LascaOpts -> String -> IO ()
-processFile opts fname = do
-  mod <- readMod opts fname
-  processModule opts mod fname
+typerPhase opts ctx filename exprs = do
+    case typeCheck ctx exprs of
+        Right (env, typedExprs) -> do
+            when (verboseMode opts) $ putStrLn "typechecked OK"
+            when (printTypes opts) $ putStrLn (showPretty env)
+            return typedExprs
+        Left e -> do
+            dir <- getCurrentDirectory
+            let source = dir </> filename
+            die $ (source ++ ":" ++ showTypeError e)
 
-processModule :: LascaOpts -> AST.Module -> String -> IO ()
-processModule opts mod fname = if exec opts then
-  do when (verboseMode opts) $ putStrLn "Running JIT"
-     runJIT opts mod
-  else
-  do withOptimizedModule opts mod $ (\context m -> do
-          ll <- LLVM.moduleLLVMAssembly m
-          let asm = Char8.unpack ll
-          writeFile (fname ++ ".ll") asm
-          LLVM.withHostTargetMachine $ \tm -> LLVM.writeObjectToFile tm (LLVM.File (fname ++ ".o")) m)
-     let name = takeWhile (/= '.') fname
-     let optLevel = optimization opts
-     let optimizationOpts = ["-O" ++ show optLevel | optLevel > 0]
-     callProcess "clang-5.0"
-       (optimizationOpts ++
+codegenPhase opts ctx filename exprs mainFunctionName = do
+    let modo = initModule filename
+    let cgen = if mode opts == "static" then EmitStatic.cgen else EmitDynamic.cgen
+    runLLVM modo $  do
+        declareStdFuncs
+        fmt <- genFunctionMap exprs
+        let defs = reverse (_dataDefs ctx)
+        tst <- genTypesStruct ctx defs
+        genRuntime opts fmt tst
+        forM_ exprs $ \expr -> do
+            defineStringConstants expr
+            codegenTop ctx cgen expr
+        codegenStartFunc ctx cgen (show mainFunctionName)
+
+processMainFile :: LascaOpts -> String -> IO ()
+processMainFile opts filename = runPhases opts filename
+
+compileExecutable opts fname mod = do
+    withOptimizedModule opts mod $ (\context m -> do
+        ll <- LLVM.moduleLLVMAssembly m
+        let asm = Char8.unpack ll
+        writeFile (fname ++ ".ll") asm
+        LLVM.withHostTargetMachine $ \tm -> LLVM.writeObjectToFile tm (LLVM.File (fname ++ ".o")) m)
+    let name = takeWhile (/= '.') fname
+    let optLevel = optimization opts
+    let optimizationOpts = ["-O" ++ show optLevel | optLevel > 0]
+    callProcess "clang-5.0"
+      (optimizationOpts ++
           ["-e", "_start", "-g", "-o", name, "-L.", "-llascart",
            fname ++ ".o"])
-     return ()
-
-
-repl :: LascaOpts -> IO ()
-repl opts = runInputT defaultSettings (loop (initModule "Lasca JIT"))
-  where
-  loop :: AST.Module -> InputT IO ()
-  loop mod = do
-    minput <- getInputLine "ready> "
-    case minput of
-      Nothing -> outputStrLn "Goodbye."
-      Just input -> do
-        modn <- lift $ process opts mod input
-        case modn of
-          Just modn -> loop modn
-          Nothing -> loop mod
+    return ()
 
 loadImport :: Set Name -> [Name] -> Name -> IO (Set Name, [Expr])
 loadImport imported importPath name = do
@@ -154,5 +154,13 @@ loadImports imported importPath exprs = do
         return $ (Set.union imported newImported, newExprs ++ exprs)
         ) (imported, exprs) imports
 
-main :: IO ()
-main = parseOptions >>= greet
+runLasca opts = do
+    if null (lascaFiles opts)
+    then die ("need file") -- TODO show help
+    else do
+        let file = head (lascaFiles opts)
+        processMainFile opts file
+
+main = do
+    opts <- parseOptions
+    runLasca opts

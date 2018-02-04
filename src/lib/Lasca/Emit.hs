@@ -1,4 +1,4 @@
-module Lasca.Emit (codegenModule) where
+module Lasca.Emit (codegenTop) where
 
 import qualified LLVM.Module
 import qualified LLVM.Context
@@ -59,58 +59,19 @@ import Lasca.Desugar
 import Lasca.Namer
 import qualified Lasca.EmitDynamic as EmitDynamic
 import qualified Lasca.EmitStatic as EmitStatic
-import qualified Lasca.Syntax as S
-import Lasca.Syntax (Ctx)
+import Lasca.Syntax
 import qualified Lasca.Options as Opts
 
-codegenModule :: Opts.LascaOpts -> AST.Module -> [S.Expr] -> IO AST.Module
-codegenModule opts modo exprs = do
-    let (named, state) = namerPhase opts exprs
-    let ctx = _context state
-    let mainPackage = _currentPackage state
-    let mainFunctionName = NS mainPackage "main"
-    let desugared = desugarExprs ctx desugarExpr named
-    (exprs, cgen) <- typecheck ctx modo desugared -- TODO remove modo
-    when (Opts.printAst opts) $ putStrLn $ List.intercalate "\n" (map S.printExprWithType exprs)
-    let desugared = delambdafy ctx exprs -- must be after typechecking
-    let genModule cgen exprs = do
-            declareStdFuncs
-            fmt <- genFunctionMap exprs
-            let defs = reverse (S._dataDefs ctx)
-            tst <- genTypesStruct ctx defs
-            genRuntime opts fmt tst
-            forM_ exprs $ \expr -> do
-                defineStringConstants expr
-                codegenTop ctx cgen expr
-            codegenStartFunc ctx cgen (show mainFunctionName)
-    let modul cgen exprs = runLLVM modo $ genModule cgen exprs
-    return $ modul cgen desugared
-
-typecheck ctx modo exprs = do
-    let opts = ctx ^. S.lascaOpts
-    if Opts.mode opts == "static"
-    then case typeCheck ctx exprs of
-             Right (env, typedExprs) -> do
-                 when (Opts.verboseMode opts) $ putStrLn "typechecked OK"
-                 when (Opts.printTypes opts) $ putStrLn (showPretty env)
-                 return (typedExprs, EmitStatic.cgen)
-             Left e -> do
-                 let sourceSBS = AST.moduleSourceFileName modo
-                 dir <- getCurrentDirectory
-                 let source = dir </> Char8.unpack (SBS.fromShort sourceSBS)
-                 die $ (source ++ ":" ++ showTypeError e)
-    else return (exprs, EmitDynamic.cgen)
-
 codegenTop ctx cgen topExpr = case topExpr of
-    this@(S.Let meta name expr _) -> do
+    this@(Let meta name expr _) -> do
         modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
         let valType = llvmTypeOf this
     --    Debug.traceM $ printf "Cons %s: %s" (show name) (show valType)
         defineGlobal (nameToSBS name) valType (Just $ defaultValueForType valType)
 
-    f@(S.Function meta name tpe args body) ->
-        if meta ^. S.isExternal then do
-            let (S.Literal _ (S.StringLit externName)) = body
+    f@(Function meta name tpe args body) ->
+        if meta ^. isExternal then do
+            let (Literal _ (StringLit externName)) = body
             external (externalTypeMapping tpe) (fromString externName) (externArgsToSig args) False []
         else do
             modState <- get
@@ -120,10 +81,10 @@ codegenTop ctx cgen topExpr = case topExpr of
             let retType = mappedReturnType args funcType
             define retType (nameToSBS name) largs blocks
       where
-        funcType = S.typeOf f
+        funcType = typeOf f
         largs = map (\(n, t) -> (nameToSBS n, t)) argsWithTypes
 
-        funcTypeToLlvm (S.Arg name _) (TypeFunc a b, acc) = (b, (name, typeMapping a) : acc)
+        funcTypeToLlvm (Arg name _) (TypeFunc a b, acc) = (b, (name, typeMapping a) : acc)
         funcTypeToLlvm arg t = error $ "AAA3" ++ show arg ++ show t
 
         argsWithTypes = do
@@ -141,8 +102,8 @@ codegenTop ctx cgen topExpr = case topExpr of
                 assign n var
             cgen ctx body >>= ret
 
-    (S.Data _ name tvars constructors) -> return ()
-    S.Package{} -> return ()
-    S.Import{} -> return ()
+    (Data _ name tvars constructors) -> return ()
+    Package{} -> return ()
+    Import{} -> return ()
     _ -> error $ printf "Expression of this kind should not get to codegenTop. It's a bug. %s at %s"
-            (show topExpr) (show $ S.exprPosition topExpr)
+            (show topExpr) (show $ exprPosition topExpr)
