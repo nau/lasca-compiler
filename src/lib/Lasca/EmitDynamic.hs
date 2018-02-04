@@ -112,10 +112,12 @@ cgenSelect ctx this@(S.Select meta tree expr) = do
     e <- cgen ctx expr
     let pos = createPosition $ S.pos meta
     callFn (funcType ptrType [ptrType, ptrType, positionStructType]) "runtimeSelect" [tree, e, constOp pos]
+cgenSelect ctx e = error ("cgenSelect should only be called on Select, but called on" ++ show e)
 
 cgenApplyUnOp ctx this@(S.Apply meta op@(S.Ident _ "unary-") [expr]) = do
     lexpr <- cgen ctx expr
     callFn (funcType ptrType [intType, ptrType]) "runtimeUnaryOp" [constIntOp 1, lexpr]
+cgenApplyUnOp ctx e = error ("cgenApplyUnOp should only be called on Apply, but called on" ++ show e)
 
 cgenApplyBinOp ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) = do
     llhs <- cgen ctx lhs
@@ -123,7 +125,7 @@ cgenApplyBinOp ctx (S.Apply meta (S.Ident _ fn) [lhs, rhs]) = do
     let code = fromMaybe (error ("Couldn't find binop " ++ show fn)) (Map.lookup fn binops)
     let codeOp = constIntOp code
     callFn (funcType ptrType [intType, ptrType, ptrType]) "runtimeBinOp" [codeOp, llhs, lrhs]
-
+cgenApplyBinOp ctx e = error ("cgenApplyBinOp should only be called on Apply, but called on" ++ show e)
 
 cgenApply ctx meta expr args = do
     syms <- gets symtab

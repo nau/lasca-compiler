@@ -162,7 +162,7 @@ cgenSelect ctx this@(S.Select meta tree expr) = do
     --      traceM $ printf "Method call %s: %s" name (show identType)
            cgen ctx (S.Apply meta expr [tree])
        _ -> error $ printf "Unsupported select: %s at %s" (show this) (show $ S.pos meta)
-
+cgenSelect ctx e = error ("cgenSelect should only be called on Select, but called on" ++ show e)
 
 cgenApplyUnOp ctx this@(S.Apply meta op@(S.Ident _ "unary-") [expr]) = do
     lexpr' <- cgen ctx expr
@@ -172,8 +172,10 @@ cgenApplyUnOp ctx this@(S.Apply meta op@(S.Ident _ "unary-") [expr]) = do
     res <- case S.typeOf expr of
         TypeInt   -> sub (constIntOp 0) lexpr >>= resolveBoxing returnType anyTypeVar
         TypeFloat -> fsub (constFloatOp 0.0) lexpr >>= resolveBoxing returnType anyTypeVar
+        t -> error ("Only TypeInt | TypeFloat supported but given " ++ show t)
 --    Debug.traceM $ printf "Doing unary- %s with type %s" (show this) (show $ S.typeOf op)
     return res
+cgenApplyUnOp ctx e = error ("cgenApplyUnOp should only be called on Apply, but called on" ++ show e)
 
 
 cgenApplyBinOp ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) = do
@@ -207,6 +209,7 @@ cgenApplyBinOp ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) = do
         (13, TypeFloat) -> fdiv llhs lrhs >>= resolveBoxing returnType anyTypeVar
         (c, t)  -> error $ printf "%s: Unsupported binary operation %s, code %s, type %s" (show $ S.exprPosition this) (S.printExprWithType this) (show c) (show t)
     return res
+cgenApplyBinOp ctx e = error ("cgenApplyBinOp should only be called on Apply, but called on" ++ show e)
 
 cgenApply ctx meta expr args = do
     syms <- gets symtab

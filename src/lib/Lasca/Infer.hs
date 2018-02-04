@@ -217,6 +217,7 @@ updateMeta f e =
         Package{} -> e
         Import{} -> e
 
+-- For now don't allow Forall inside Forall
 normalize schema@(Forall ts body) =
     let res = (Forall (fmap snd ord) (normtype body), ord)
     in {-Debug.trace (show res)-} res
@@ -229,6 +230,7 @@ normalize schema@(Forall ts body) =
     fv (TypeIdent _)   = []
     fv (TypeApply t [])       = error "Should not be TypeApply without arguments!" -- TODO use NonEmpty List?
     fv (TypeApply t args)   = fv t ++ (args >>= fv)  -- FIXME args?
+    fv Forall{} = error ("Forall inside forall: " ++ show schema)
 
     normtype (TypeFunc a b)  = TypeFunc  (normtype a) (normtype b)
     normtype (TypeApply a b) = TypeApply (normtype a) (map normtype b)
@@ -237,6 +239,7 @@ normalize schema@(Forall ts body) =
         case lookup a ord of
             Just x -> {-Debug.trace (printf "lookup for %s, found %s" (show a) (show x))-} (TVar x)
             Nothing -> error $ printf "Type variable %s not in signature %s" (show a) (show schema)
+    normtype Forall{} = error ("Forall inside forall: " ++ show schema)
 normalize t = (t, [])
 
 substype schema (TypeFunc a b)  ord = TypeFunc  (substype schema a ord) (substype schema b ord)
@@ -246,6 +249,8 @@ substype schema t@(TVar a)        ord =
     case lookup a ord of
         Just x -> TVar x
         Nothing -> t
+substype schema t@Forall{} ord = error ("Forall inside forall: " ++ show t)
+
 
 initState :: Expr -> InferState
 initState e = InferState { _count = 0, _current = e}
@@ -559,6 +564,7 @@ createTypeEnvironment exprs = List.foldl' folder [] exprs
         dataTypeIdent = case tvars of
             [] -> TypeIdent typeName
             tvars -> TypeApply (TypeIdent typeName) (map TVar tvars)
+    folder _ e = error ("createTypeEnvironment should only be called with Data declarations, but was called on " ++ show e)
 
 typeCheck :: Ctx -> [Expr] -> Either TypeError (TypeEnv, [Expr])
 typeCheck ctx exprs = do

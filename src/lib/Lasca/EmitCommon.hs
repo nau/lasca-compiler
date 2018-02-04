@@ -70,7 +70,10 @@ externArgsToSig = map (\(S.Arg name tpe) -> (fromString (show name), externalTyp
 externArgsToLlvmTypes args = map snd (externArgsToSig args)
 
 externFuncLLvmType (S.Function _ _ tpe args _) = funcType (externalTypeMapping tpe) (externArgsToLlvmTypes args)
+externFuncLLvmType e = error ("externFuncLLvmType should only be called on Function, but called on" ++ show e)
+
 funcLLvmType (S.Function _ _ tpe args _) = funcType (ptrType) (map (const ptrType) args)
+funcLLvmType e = error ("funcLLvmType should only be called on Function, but called on" ++ show e)
 
 staticArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
 staticArgsToSig = map (\(S.Arg name tpe) -> (nameToSBS name, typeMapping tpe))
@@ -345,10 +348,12 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
                     ]
             defineConst literalName (dataStructType numConstructors) struct
             return (constRef (dataStructType numConstructors) literalName)
+        genDataStruct e = error ("genDataStruct should only be called on Data, but called on" ++ show e)
 
         genConstructors ctx typePtr (S.Data meta name tvars constrs) = do
             forM (zip constrs [0..]) $ \ ((S.DataConst n args), tag) ->
                 defineConstructor ctx typePtr name n tag args
+        genConstructors ctx typePtr e = error ("genConstructors should only be called on Data, but called on" ++ show e)
 
         defineConstructor ctx typePtr typeName name tag args  = do
           -- TODO optimize for zero args
