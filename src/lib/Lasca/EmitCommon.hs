@@ -411,7 +411,7 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
 
 codegenStartFunc ctx cgen mainName = do
     modState <- get
-    define T.void "start" [("argc", intType), ("argv", ptrType)] (bls modState)
+    define T.void "main" [("argc", intType), ("argv", ptrType)] (bls modState)
   where
     bls modState = createBlocks $ execCodegen [] modState $ do
         entry <- addBlock entryBlockName

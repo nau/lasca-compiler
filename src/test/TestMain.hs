@@ -69,14 +69,14 @@ typerTests = testGroup "Typer tests"
       parseAndInferExpr "match true { true -> 1 false -> 2 }" @?= (TypeIdent "Int")
   ]
 
-data Mode = Dynamic | Static | Both
+data Mode = Dyn | Stat | Both
 data Config = Script { name :: String, compMode :: Mode, arguments :: [T.Text] }
 
 examples = [
     Script "array.lasca" Both [],
     Script "binarytrees.lasca" Both ["10"],
     Script "data.lasca" Both [],
-    Script "dynamic.lasca" Dynamic [],
+    Script "dynamic.lasca" Dyn [],
     Script "Either.lasca" Both [],
     Script "factorial.lasca" Both ["15"],
     Script "hello.lasca" Both [],
@@ -98,8 +98,8 @@ mkGoldenTests s@(Script path mode args) = do
     let goldenPath = "src" </> "test" </> "golden" </> (replaceExtension path ".golden")
     let script = prependPath "examples" s
     let tests = case mode of
-          Both -> [ goldenVsString testName goldenPath (action (script `withMode` Static)),
-                    goldenVsString testName goldenPath (action (script `withMode` Dynamic))]
+          Both -> [ goldenVsString testName goldenPath (action (script `withMode` Stat)),
+                    goldenVsString testName goldenPath (action (script `withMode` Dyn))]
           _ -> [goldenVsString testName goldenPath (action script)]
     return tests
   where
@@ -114,8 +114,8 @@ runLasca path mode args = shelly $ do
             [] -> []
             ars -> "--" : args
     case mode of
-        Static -> run "lasca" (["-e", "-O2", "--mode", "static", path] ++ extraArgs)
-        Dynamic -> run "lasca" (["-e", "-O2", "--mode", "dynamic", path] ++ extraArgs)
+        Stat -> run "lasca" (["-e", "-O2", "--mode", "static", path] ++ extraArgs)
+        Dyn -> run "lasca" (["-e", "-O2", "--mode", "dynamic", path] ++ extraArgs)
         Both -> do
             run "lasca" (["-e", "-O2", "--mode", "static", path] ++ extraArgs)
             run "lasca" (["-e", "-O2", "--mode", "dynamic", path] ++ extraArgs)

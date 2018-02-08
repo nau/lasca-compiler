@@ -57,7 +57,7 @@ parsePhase opts filename = do
 --          print exprs
           when (verboseMode opts) $ putStrLn ("Parsed OK, imported " ++ show imported)
           when (printAst opts) $ mapM_ print ex
-          when (verboseMode opts) $ putStrLn("Compiler mode is " ++ mode opts)
+          when (verboseMode opts) $ putStrLn ("Compiler mode is " ++ (show $ mode opts))
           return ex
 
 runPhases opts filename = do
@@ -67,7 +67,7 @@ runPhases opts filename = do
     let mainPackage = _currentPackage state
     let mainFunctionName = NS mainPackage "main"
     let desugared = desugarExprs ctx desugarExpr named
-    typed <- if mode opts == "static"
+    typed <- if mode opts == Static
              then typerPhase opts ctx filename desugared
              else return desugared
     when (printAst opts) $ putStrLn $ intercalate "\n" (map printExprWithType exprs)
@@ -91,7 +91,7 @@ typerPhase opts ctx filename exprs = do
 
 codegenPhase opts ctx filename exprs mainFunctionName = do
     let modo = emptyModule filename
-    let cgen = if mode opts == "static" then EmitStatic.cgen else EmitDynamic.cgen
+    let cgen = if mode opts == Static then EmitStatic.cgen else EmitDynamic.cgen
     runLLVM modo $  do
         declareStdFuncs
         fmt <- genFunctionMap exprs
@@ -115,10 +115,9 @@ compileExecutable opts fname mod = do
     let name = takeWhile (/= '.') fname
     let optLevel = optimization opts
     let optimizationOpts = ["-O" ++ show optLevel | optLevel > 0]
-    callProcess "clang-5.0"
+    callProcess "clang"
       (optimizationOpts ++
-          ["-e", "_start", "-g", "-o", name, "-L.", "-llascart",
-           fname ++ ".o"])
+          ["-g", "-o", name, "-llascart", fname ++ ".o"])
     return ()
 
 loadImport :: Set Name -> [Name] -> Name -> IO (Set Name, [Expr])

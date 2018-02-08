@@ -35,9 +35,7 @@ library
                         directory,
                         filepath,
                         mtl
-  extra-libraries:      lascart
   default-language:     Haskell2010
-  extra-lib-dirs:       .
   ghc-options:          -O0
                         -Wincomplete-patterns
                         -funbox-strict-fields
@@ -65,7 +63,6 @@ executable lasca
   build-depends:        base >=4.9,
                         lasca
   Extra-libraries:      lascart
-  extra-lib-dirs:       .
   default-language:     Haskell2010
   ghc-options:          -O0
                         -rtsopts
@@ -95,7 +92,6 @@ test-suite lasca-test
                        tasty-golden,
                        tasty-program
   ghc-options:         -threaded -rtsopts
-  extra-lib-dirs:      .
   default-language:    Haskell2010
 --executable gencode
 --  other-extensions:    GADTs

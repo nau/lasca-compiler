@@ -7,7 +7,7 @@
 #include <string.h>
 #include <math.h>
 #include <gc.h>
-#include <ffi/ffi.h>
+#include <ffi.h>
 
 #include "lasca.h"
 

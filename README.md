@@ -226,7 +226,14 @@ If you want to build everything with profiling support
 uncomment -rtsopts, -prof, -fprof-auto ghc options in stack.yaml, and run
     
     stack build --executable-profiling --library-profiling
-   
+
+
+Install on Ubuntu
+=================
+
+    sudo apt-get install haskell-stack   
+    stack upgrade 
+    sudo apt-get install llvm-5.0-dev libgc-dev zlib1g-dev 
     
 Current n-body run:
 --------------------

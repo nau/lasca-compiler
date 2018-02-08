@@ -2,26 +2,20 @@ PANDOC = pandoc
 IFORMAT = markdown
 FLAGS = --standalone --toc --highlight-style pygments
 
-#CC = gcc
-CC = clang-5.0 -Wno-nullability-completeness -Wno-expansion-to-defined
-CC_INCLUDE = -I/usr/local/include -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/
-LLC = llc-5.0
-
 #TEST_RTS = +RTS -sstderr
 TEST_RTS =
 
 build: rts test
 	stack build
 
+install: build
+	stack install
+
 bench:
 	time lasca -O2 -e examples/gen.lasca
 
 rts:
-	$(CC) -S -emit-llvm -g -O2 $(CC_INCLUDE) rts/*.c*
-	$(CC) -shared -fPIC -g -O3 $(CC_INCLUDE)  -L/usr/local/lib -lgc -lffi rts/*.c* -o liblascart.so
-
-rtsDebug:
-	$(CC) -shared -fPIC -g -O0 -I/usr/local/include -L/usr/local/lib -lgc -lffi rts/*.c* -o liblascart.so
+	mkdir -p build && cd build && cmake .. && make install
 
 rusts:
 	cd rts/rust && cargo build && cp target/debug/liblascarts.dylib ../../../
@@ -81,4 +75,4 @@ release: install_and_examples
 designpdf:
 	rst2pdf -b 1 docs/Lasca\ Design.rst
 
-.PHONY: clean examples rts
+.PHONY: clean examples rts install

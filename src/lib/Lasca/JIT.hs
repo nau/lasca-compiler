@@ -36,7 +36,7 @@ import qualified Data.ByteString.Char8 as Char8
 
 import qualified LLVM.ExecutionEngine as EE
 
-foreign import ccall "dynamic" startFun :: FunPtr (Int -> Ptr CString -> IO ()) -> Int -> Ptr CString -> IO ()
+foreign import ccall "dynamic" mainFun :: FunPtr (Int -> Ptr CString -> IO ()) -> Int -> Ptr CString -> IO ()
 
 jit :: Context -> (EE.MCJIT -> IO a) -> IO a
 jit c = EE.withMCJIT c optlevel model ptrelim fastins
@@ -58,13 +58,13 @@ runJIT opts mod = do
             let args = lascaFiles opts
             let len = length args
             EE.withModuleInEngine executionEngine m $ \ee -> do
-                startFunPtr <- EE.getFunction ee (AST.Name "start")
-                case startFunPtr of
+                mainFunPtr <- EE.getFunction ee (AST.Name "main")
+                case mainFunPtr of
                     Just fn -> do
                         cargs <- mapM newCString args
                         array <- mallocArray len
                         pokeArray array cargs
-                        startFun (castFunPtr fn :: FunPtr (Int -> Ptr CString -> IO ())) len array
+                        mainFun (castFunPtr fn :: FunPtr (Int -> Ptr CString -> IO ())) len array
                     Nothing -> putStrLn "Couldn't find function start!"
             return ()
 

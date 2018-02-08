@@ -1,5 +1,6 @@
 module Lasca.Options (
     LascaOpts(..),
+    TypingMode(..),
     parseOptions,
     emptyLascaOpts
 ) where
@@ -7,9 +8,19 @@ module Lasca.Options (
 import Options.Applicative
 import Data.Semigroup ((<>))
 
+data TypingMode = Static | Dynamic deriving (Eq)
+instance Show TypingMode where
+    show Static = "static"
+    show Dynamic = "dynamic"
+
+instance Read TypingMode where
+    readsPrec _ "static" =  [(Static, "")]
+    readsPrec _ "dynamic" = [(Dynamic, "")]
+    readsPrec _ _ = []
+
 data LascaOpts = LascaOpts
     { lascaFiles   :: [String]
-    , mode         :: String
+    , mode         :: TypingMode
     , exec         :: Bool
     , verboseMode  :: Bool
     , printLLVMAsm :: Bool
@@ -20,7 +31,7 @@ data LascaOpts = LascaOpts
 
 emptyLascaOpts = LascaOpts {
     lascaFiles  = [],
-    mode = "static",
+    mode = Static,
     exec = False,
     verboseMode = False,
     printLLVMAsm = False,
@@ -38,11 +49,11 @@ optimizeOpt = option auto
 
 lascaOptsParser :: Parser LascaOpts
 lascaOptsParser = LascaOpts
-  <$> many (argument str (metavar "FILES..."))
-  <*> strOption
+  <$> some (argument str (metavar "FILES..."))
+  <*> option auto
       ( long "mode"
       <> short 'm'
-      <> value "static"
+      <> value Static
       <> help "Compiler mode. Options are [dynamic | static]. Static by default."
       )
   <*> switch
@@ -60,12 +71,12 @@ lascaOptsParser = LascaOpts
         <> help "Print AST" )
   <*> switch
         ( long "print-types"
-        <> help "Print infered types" )
+        <> help "Print inferred types" )
   <*> optimizeOpt
 
 
 parseOptions = execParser opts
   where opts = info (helper <*> lascaOptsParser)
                 ( fullDesc
-               <> progDesc "Print a greeting for TARGET"
-               <> header "Lasca compiler" )
+               <> progDesc "Lasca Compiler 0.1"
+               <> header "Lasca Compiler 0.1" )
