@@ -212,32 +212,19 @@ Box* __attribute__ ((pure)) runtimeBinOp(int64_t code, Box* lhs, Box* rhs) {
 
     Box* result = NULL;
 
-    switch (code) {
-        case ADD: DO_OP(+); break;
-        case SUB: DO_OP(-); break;
-        case MUL: DO_OP(*); break;
-        case DIV: DO_OP(/); break;
-        case EQ:
-            DO_CMP(==);
-            break;
-        case NE:
-            DO_CMP(!=);
-            break;
-        case LT:
-            DO_CMP(<);
-            break;
-        case LE:
-            DO_CMP(<=);
-            break;
-        case GE:
-            DO_CMP(>=);
-            break;
-        case GT:
-            DO_CMP(>);
-            break;
-        default:
-            printf("AAAA!!! Unsupported binary operation %lli", code);
-            exit(1);
+    if (code == ADD) { DO_OP(+); } 
+    else if (code == SUB) { DO_OP(-); }
+    else if (code == MUL) {DO_OP(*);}
+    else if (code == DIV) {DO_OP(/);}
+    else if (code == EQ) {DO_CMP(==);}
+    else if (code == NE) {DO_CMP(!=);}
+    else if (code == LT) {DO_CMP(<);}
+    else if (code == LE) {DO_CMP(<=);}
+    else if (code == GE) {DO_CMP(>=);}
+    else if (code == GT) {DO_CMP(>);}
+    else { 
+	printf("AAAA!!! Unsupported binary operation %lli", code);
+        exit(1);
     }
     return result;
 }

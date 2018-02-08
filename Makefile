@@ -5,17 +5,17 @@ FLAGS = --standalone --toc --highlight-style pygments
 #TEST_RTS = +RTS -sstderr
 TEST_RTS =
 
-build: rts test
+build: rts 
 	stack build
 
 install: build
-	stack install
+	stack install && stack test
 
 bench:
 	time lasca -O2 -e examples/gen.lasca
 
 rts:
-	mkdir -p build && cd build && cmake .. && make install
+	mkdir -p build && cd build && cmake .. && make && sudo make install
 
 rusts:
 	cd rts/rust && cargo build && cp target/debug/liblascarts.dylib ../../../
