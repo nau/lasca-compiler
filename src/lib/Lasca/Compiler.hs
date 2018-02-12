@@ -35,6 +35,7 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import Debug.Trace as Debug
 import qualified Text.Megaparsec as Megaparsec
+import Control.Applicative
 import Control.Lens.TH
 
 import qualified LLVM.AST as AST
@@ -171,18 +172,29 @@ codegenPhase opts ctx filename exprs mainFunctionName = do
 processMainFile :: LascaOpts -> String -> IO ()
 processMainFile opts filename = runPhases opts filename
 
+findCCompiler = do
+    ccEnv <- lookupEnv "CC"
+    cl5 <- findExecutable "clang-5"
+    clang <- findExecutable "clang"
+    gcc <- findExecutable "gcc"
+    return $ ccEnv <|> cl5 <|> clang <|> gcc
+
 compileExecutable opts fname mod = do
     withOptimizedModule opts mod $ (\context m -> do
         ll <- LLVM.moduleLLVMAssembly m
         let asm = Char8.unpack ll
         writeFile (fname ++ ".ll") asm
         LLVM.withHostTargetMachine $ \tm -> LLVM.writeObjectToFile tm (LLVM.File (fname ++ ".o")) m)
-    let name = takeWhile (/= '.') fname
+    let outputPath = case outputFile opts of
+          [] -> dropExtension fname
+          path -> path
     let optLevel = optimization opts
     let optimizationOpts = ["-O" ++ show optLevel | optLevel > 0]
-    callProcess "clang"
-      (optimizationOpts ++
-          ["-g", "-o", name, "-llascart", fname ++ ".o"])
+    result <- findCCompiler
+    let cc = fromMaybe (error "Did find C compiler. Install Clang or GCC, or define CC environment variable") result
+    let args = optimizationOpts ++ ["-g", "-o", outputPath, "-llascart", fname ++ ".o"]
+    when (verboseMode opts) $ putStrLn (cc ++ " " ++ show args)
+    callProcess cc args
     return ()
 
 runLasca opts = do

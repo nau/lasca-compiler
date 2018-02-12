@@ -121,7 +121,7 @@ runLasca path mode args = shelly $ do
             run "lasca" (["-e", "-O2", "--mode", "dynamic", path] ++ extraArgs)
 
 compileTests = [
-        testProgram "Compile hello.lasca" "lasca" ["-O2", "examples/hello.lasca"] Nothing
+        testProgram "Compile hello.lasca" "lasca" ["-O2", "-o", "hello", "examples/hello.lasca"] Nothing
     ]
 
 benchTests = testGroup "Bench" [

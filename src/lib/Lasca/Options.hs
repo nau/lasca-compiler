@@ -21,6 +21,7 @@ instance Read TypingMode where
 data LascaOpts = LascaOpts
     { lascaFiles   :: [String]
     , mode         :: TypingMode
+    , outputFile   :: String
     , exec         :: Bool
     , verboseMode  :: Bool
     , printLLVMAsm :: Bool
@@ -32,6 +33,7 @@ data LascaOpts = LascaOpts
 emptyLascaOpts = LascaOpts {
     lascaFiles  = [],
     mode = Static,
+    outputFile = "",
     exec = False,
     verboseMode = False,
     printLLVMAsm = False,
@@ -55,6 +57,11 @@ lascaOptsParser = LascaOpts
       <> short 'm'
       <> value Static
       <> help "Compiler mode. Options are [dynamic | static]. Static by default."
+      )
+  <*> strOption
+      ( short 'o'
+      <> value ""
+      <> help "Write output to FILE"
       )
   <*> switch
       ( long "exec"
