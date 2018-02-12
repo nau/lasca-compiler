@@ -27,7 +27,7 @@ addons:
       - libgc-dev
       - zlib1g-dev
       - clang 
-      - libffi  
+      - libffi-dev
 
 before_install:
 # Download and unpack the stack executable

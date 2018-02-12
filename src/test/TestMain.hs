@@ -73,9 +73,9 @@ data Mode = Dyn | Stat | Both
 data Config = Script { name :: String, compMode :: Mode, arguments :: [T.Text] }
 
 examples = [
-    Script "array.lasca" Both [],
+    Script "Array.lasca" Both [],
     Script "binarytrees.lasca" Both ["10"],
-    Script "data.lasca" Both [],
+    Script "Data.lasca" Both [],
     Script "dynamic.lasca" Dyn [],
     Script "Either.lasca" Both [],
     Script "factorial.lasca" Both ["15"],
@@ -117,7 +117,7 @@ runLasca path mode args = shelly $ do
         Stat -> run "lasca" (["-e", "-O2", "--mode", "static", path] ++ extraArgs)
         Dyn -> run "lasca" (["-e", "-O2", "--mode", "dynamic", path] ++ extraArgs)
         Both -> do
-            run "lasca" (["-e", "-O2", "--mode", "static", path] ++ extraArgs)
+            run "lasca" (["-e", "-O2", "--mode", "static", "--verbose", path] ++ extraArgs)
             run "lasca" (["-e", "-O2", "--mode", "dynamic", path] ++ extraArgs)
 
 compileTests = [

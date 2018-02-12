@@ -1,5 +1,3 @@
-package Hello.Test
-
 import Option
 
 A = 5

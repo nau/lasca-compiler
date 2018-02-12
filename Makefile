@@ -15,7 +15,7 @@ bench:
 	time lasca -O2 -e examples/gen.lasca
 
 rts:
-	mkdir -p build && cd build && cmake .. && make && sudo make install
+	mkdir -p build && cd build && cmake .. && make && make install
 
 rusts:
 	cd rts/rust && cargo build && cp target/debug/liblascarts.dylib ../../../
@@ -24,7 +24,7 @@ lasca: rts
 	stack install
 
 test:
-	stack test
+	stack test --fast -j 8
 
 examples:
 	lasca -O2 -e --mode static  examples/array.lasca $(TEST_RTS)

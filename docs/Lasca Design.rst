@@ -535,6 +535,11 @@ Annotations? Caches?
     def calculate(∀ a. Num a => x: a, y: a, z: a): a = x * y * z
     def calculate(∀ a. Num a => x: a, y: a, z: a): a = x * y * z
 
+Support Standards/Specifications
+================================
+
+- Support the XDG Base Directory Specification
+
 
 .. include:: LangsOverview.rst
 

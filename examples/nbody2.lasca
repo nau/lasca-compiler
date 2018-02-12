@@ -1,4 +1,3 @@
-package Nbody2
 Pi = 3.141592653589793
 SolarMass = 4.0 * Pi * Pi
 DaysPerYear = 365.24

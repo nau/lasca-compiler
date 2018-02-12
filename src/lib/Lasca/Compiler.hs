@@ -42,23 +42,88 @@ import qualified LLVM.Module as LLVM
 import qualified LLVM.Target as LLVM
 
 parsePhase opts filename = do
-    file <- readFile filename
-    let importPreludeAst = Import emptyMeta "Prelude"
-    let filePath = filename
+    exists <- doesFileExist filename
+    if exists then do
+        absoluteFilePath <- canonicalizePath filename
+        file <- readFile absoluteFilePath
+        case parseToplevelFilename absoluteFilePath file of
+          Left err -> die $ Megaparsec.parseErrorPretty err
+          Right exprs -> do
+              exprs1 <- fixPackageAndImportPrelude filename exprs
+              searchPaths <- moduleSearchPaths
+              (imported, ex) <- loadImports searchPaths Set.empty [] exprs1
+    --          Debug.traceM $ printf "AAA %s\n%s" (show  exprs1) (show ex)
+              when (verboseMode opts) $ putStrLn ("Parsed OK, imported " ++ show imported)
+              when (printAst opts) $ mapM_ print ex
+              when (verboseMode opts) $ putStrLn ("Compiler mode is " ++ (show $ mode opts))
+              return ex
+    else error $ printf "Couldn't open file %s" (show filename)
+
+fixPackageAndImportPrelude filename exprs = case exprs of
+    (pkg@(Package _ name): exprs) -> do
+        when (takeBaseName filename /= (last $ nameToList name)) $
+          die $ printf "Wrong package name in file %s. Package name should match file name, but was %s)" (filename) (show name)
+        return $ pkg : insertImportPrelude name exprs
+    _ -> do
+        let name = Name $ takeBaseName filename
+        let pkg = Package emptyMeta name
+        return $ pkg : insertImportPrelude name exprs
+
+insertImportPrelude name exprs = if name == Name "Prelude" then exprs else Import emptyMeta "Prelude" : exprs
+
+nameToList (Name n) = [n]
+nameToList (NS prefix n) = nameToList prefix ++ nameToList n
+
+moduleSearchPaths = do
     dir <- getCurrentDirectory
-    let absoluteFilePath = dir </> filePath
-    case parseToplevelFilename absoluteFilePath file of
-      Left err -> do
-          die $ Megaparsec.parseErrorPretty err
-      Right exprs -> do
-          let exprs' = (importPreludeAst : exprs)
-          (imported, ex) <- loadImports Set.empty [] exprs'
---          Debug.traceM $ printf "AAA %s\n%s" (show  exprs') (show ex)
---          print exprs
-          when (verboseMode opts) $ putStrLn ("Parsed OK, imported " ++ show imported)
-          when (printAst opts) $ mapM_ print ex
-          when (verboseMode opts) $ putStrLn ("Compiler mode is " ++ (show $ mode opts))
-          return ex
+    lascaPathEnv <- lookupEnv "LASCAPATH"
+    let lascaPaths = splitSearchPath $ fromMaybe "" lascaPathEnv
+    absPaths <- mapM canonicalizePath lascaPaths
+    existingPaths <- filterM doesDirectoryExist absPaths
+    -- TODO add XDB paths
+    return $ nub $ dir : existingPaths
+
+findModulePath searchPaths name = do
+    let relPath = (path name) <.> "lasca"
+    result <- findFile searchPaths relPath
+    case result of
+        Just file -> return file
+        Nothing -> error $ printf "Couldn't find module %s. Search path: %s" (show name) (show $ intercalate "," searchPaths)
+  where
+    path (Name n) = n
+    path (NS prefix n) = path prefix </> path n
+
+parseModule searchPaths name = loadImport searchPaths Set.empty [] name
+
+loadImports :: [FilePath] -> Set Name -> [Name] -> [Expr] -> IO (Set Name, [Expr])
+loadImports searchPaths imported importPath exprs = do
+    let imports = getImports exprs
+--    Debug.traceM $ printf "loadImports2 %s %s %s" (show imported) (show importPath) (show $ imports)
+    foldM (\(imported, exprs) name -> do
+        (newImported, newExprs) <- loadImport searchPaths imported importPath name
+        return $ (Set.union imported newImported, newExprs ++ exprs)
+        ) (imported, exprs) imports
+
+loadImport searchPaths imported importPath name = do
+--    Debug.traceM $ printf "loadImport %s %s %s" (show imported) (show importPath) (show name)
+    when (name `elem` importPath) $ die (printf "Circular dependency in %s -> %s" (show importPath) (show name))
+    if name `Set.member` imported
+    then return (imported, [])
+    else do
+        absoluteFilePath <- findModulePath searchPaths name
+        file <- readFile absoluteFilePath
+        case parseToplevelFilename absoluteFilePath file of
+          Left err -> die $ Megaparsec.parseErrorPretty err
+          Right exprs -> do
+              exprs1 <- fixPackageAndImportPrelude absoluteFilePath exprs
+              (newImported, importedExprs) <- loadImports searchPaths imported (name : importPath) exprs1
+              return $ (Set.insert name newImported, importedExprs)
+
+getImports exprs =
+    foldl' (\imports expr -> case expr of
+              Import _ name -> name : imports
+              _ -> imports
+           ) [] exprs
 
 runPhases opts filename = do
     exprs <- parsePhase opts filename
@@ -119,36 +184,6 @@ compileExecutable opts fname mod = do
       (optimizationOpts ++
           ["-g", "-o", name, "-llascart", fname ++ ".o"])
     return ()
-
-loadImport :: Set Name -> [Name] -> Name -> IO (Set Name, [Expr])
-loadImport imported importPath name = do
---    Debug.traceM $ printf "loadImport %s %s %s" (show imported) (show importPath) (show name)
-    when (name `elem` importPath) $ die (printf "Circular dependency in %s -> %s" (show importPath) (show name))
-    if name `Set.member` imported
-    then return (imported, [])
-    else do
-        let path = "examples/" ++ show name ++ ".lasca"
-        p <- readFile path
-        case parseToplevel p of
-            Left err -> die $ Megaparsec.parseErrorPretty err
-            Right moduleExprs -> do
-                (newImported, importedExprs) <- loadImports imported (name : importPath) moduleExprs
-                return $ (newImported, importedExprs)
-
-
-getImports exprs =
-    foldl' (\imports expr -> case expr of
-                          Import _ name -> name : imports
-                          _ -> imports
-                          ) [] exprs
-
-loadImports :: Set Name -> [Name] -> [Expr] -> IO (Set Name, [Expr])
-loadImports imported importPath exprs = do
-    let imports = getImports exprs
-    foldM (\acc@(imported, exprs) name -> do
-        (newImported, newExprs) <- loadImport imported importPath name
-        return $ (Set.union imported newImported, newExprs ++ exprs)
-        ) (imported, exprs) imports
 
 runLasca opts = do
     if null (lascaFiles opts)
