@@ -192,7 +192,7 @@ compileExecutable opts fname mod = do
     let optimizationOpts = ["-O" ++ show optLevel | optLevel > 0]
     result <- findCCompiler
     let cc = fromMaybe (error "Did find C compiler. Install Clang or GCC, or define CC environment variable") result
-    let args = optimizationOpts ++ ["-g", "-o", outputPath, "-llascart", fname ++ ".o"]
+    let args = optimizationOpts ++ ["-g", "-o", outputPath, "-L.","-llascart", fname ++ ".o"]
     when (verboseMode opts) $ putStrLn (cc ++ " " ++ show args)
     callProcess cc args
     return ()
