@@ -9,36 +9,67 @@
 # named .travis.yml
 
 # Use new container infrastructure to enable caching
-sudo: enabled
+sudo: false
 
 # Do not choose a language; we provide our own build tools.
 language: generic
+
+dist: trusty
 
 # Caching so the next build will be fast too.
 cache:
   directories:
   - $HOME/.stack
+  - $HOME/llvm-build-5.0.0
+  - $HOME/llvm-src-5.0.0
+
+env:
+  global:
+    - GCC=gcc-5
+    - GXX=g++-5
+    - LLVM_VER=5.0.0
+    - LASCAPATH=$TRAVIS_BUILD_DIR/examples
 
 # Ensure necessary system libraries are present
 addons:
   apt:
     packages:
-      - llvm-5.0-dev
       - libgc-dev
-      - zlib1g-dev
-      - clang 
       - libffi-dev
 
 before_install:
+# Prune path, see https://github.com/travis-ci/travis-ci/issues/5326
+- export PATH="$(echo $PATH | tr ':' "\n" | sed '/\/opt\/python/d' | tr "\n" ":" | sed "s|::|:|g")"
 # Download and unpack the stack executable
 - mkdir -p ~/.local/bin
 - export PATH=$HOME/.local/bin:$PATH
 - travis_retry curl -L https://www.stackage.org/stack/linux-x86_64 | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+- export CC=/usr/bin/$GCC
+- export CXX=/usr/bin/$GXX
+- export LD_LIBRARY_PATH=$HOME/llvm-build-${LLVM_VER}/lib:$LD_LIBRARY_PATH
+- export PATH=$HOME/llvm-build-${LLVM_VER}/bin:$PATH
+- mkdir -p $HOME/bin
+- export PATH=$HOME/bin:$PATH
+
 
 install:
-# Build dependencies
-- make install
+ - curl https://cmake.org/files/v3.9/cmake-3.9.2-Linux-x86_64.tar.gz | tar -xzf - -C $HOME
+ - export PATH=$HOME/cmake-3.9.2-Linux-x86_64/bin:$PATH
+ - curl -L https://github.com/ninja-build/ninja/releases/download/v1.7.2/ninja-linux.zip -o ninja-linux.zip
+ - unzip ninja-linux.zip -d $HOME/bin
+ - curl http://releases.llvm.org/${LLVM_VER}/llvm-${LLVM_VER}.src.tar.xz | tar -xJf - -C $HOME
+ - rsync -ac $HOME/llvm-${LLVM_VER}.src/ $HOME/llvm-src-${LLVM_VER}
+ - cd $HOME/llvm-src-${LLVM_VER}
+ - mkdir -p build && cd build
+ - cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$HOME/llvm-build-${LLVM_VER} -DLLVM_PARALLEL_LINK_JOBS=1 -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_BUILD_LLVM_DYLIB=True -DLLVM_LINK_LLVM_DYLIB=True -GNinja ..
+ - ninja -j4 install
+ - cd $TRAVIS_BUILD_DIR
+ - ln -s $HOME/llvm-build-${LLVM_VER}/bin/llvm-config $HOME/bin/llvm-config
+ - llvm-config --version
+ - $GCC --version
+ - $GXX --version
 
 script:
 # Build the package, its tests, and its docs and run the tests
 - make
+- stack test
