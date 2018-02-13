@@ -5,7 +5,7 @@ Lasca Language
 
 Lasca is Scala shifted towards Haskell. 
 
-Lasca is a LLVM-based statically typed general purpose programming language.
+Lasca is a LLVM-based statically or dynamically typed general purpose programming language.
 
 It has a 'dynamic' compilation mode, meaning instant code generation without compile time type checking/inference, 
 allowing instant compilation/execution cycle, like dynamic languages give.
@@ -228,12 +228,23 @@ uncomment -rtsopts, -prof, -fprof-auto ghc options in stack.yaml, and run
     stack build --executable-profiling --library-profiling
 
 
-Install on Ubuntu
+Build on Ubuntu
 =================
 
-    sudo apt-get install haskell-stack   
-    stack upgrade 
-    sudo apt-get install llvm-5.0-dev libgc-dev zlib1g-dev 
+Requirements: Haskell Stack > 1.6, Cabal > 2.0, LLVM 5, CMake
+   
+Don't install Haskell Stack from apt. It's likely to be older than 1.6 and won't be able to upgrade:
+https://askubuntu.com/questions/986596/how-to-upgrade-haskell-stack-on-ubuntu-16-04
+
+Do this instead:
+    
+    wget -qO- https://get.haskellstack.org/ | sh
+    
+    sudo apt install llvm-5.0-dev libgc-dev zlib1g-dev cmake
+    stack build -j 8
+    export LASCAPATH=${lasca-compiler-dir}/examples
+    stack test   
+            
     
 Current n-body run:
 --------------------

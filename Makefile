@@ -15,7 +15,7 @@ bench:
 	time lasca -O2 -e examples/gen.lasca
 
 rts:
-	mkdir -p build && cd build && cmake .. && make && make install
+	mkdir -p build && cd build && cmake .. && make && cp rts/liblascart.a .. && cp rts/liblascart.a $(LASCAPATH)
 
 rusts:
 	cd rts/rust && cargo build && cp target/debug/liblascarts.dylib ../../../

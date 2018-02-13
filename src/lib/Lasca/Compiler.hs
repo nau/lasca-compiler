@@ -24,6 +24,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Short as SBS
 
 import System.IO
+import System.Info
 import System.Environment
 import System.Exit
 import System.Process
@@ -191,8 +192,16 @@ compileExecutable opts fname mod = do
     let optLevel = optimization opts
     let optimizationOpts = ["-O" ++ show optLevel | optLevel > 0]
     result <- findCCompiler
+    lascaPathEnv <- lookupEnv "LASCAPATH"
+    absLascaPathEnv <- mapM canonicalizePath lascaPathEnv
+    let lascaPath = fromMaybe "." absLascaPathEnv
     let cc = fromMaybe (error "Did find C compiler. Install Clang or GCC, or define CC environment variable") result
-    let args = optimizationOpts ++ ["-g", "-o", outputPath, "-L.","-llascart", fname ++ ".o"]
+        libLascaLink = if os == "darwin"
+                       then ["-rdynamic", "-llascart"]
+                       else ["-rdynamic", "-Wl,--whole-archive", "-lliblascart.a" , "-Wl,--no-whole-archive"]
+        libDirs = ["-L" ++ lascaPath]
+        links = ["-lgc", "-lffi", "-lm"]
+    let args = optimizationOpts ++ libDirs ++ [ "-g"] ++ links ++ libLascaLink ++ [ "-o", outputPath, fname ++ ".o"]
     when (verboseMode opts) $ putStrLn (cc ++ " " ++ show args)
     callProcess cc args
     return ()
