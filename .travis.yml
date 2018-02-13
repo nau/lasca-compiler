@@ -75,5 +75,5 @@ install:
 
 script:
 # Build the package, its tests, and its docs and run the tests
-- make
-- stack test
+- make rts
+# - stack test
