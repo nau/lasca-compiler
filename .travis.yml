@@ -36,6 +36,8 @@ addons:
     packages:
       - libgc-dev
       - libffi-dev
+      - gcc-5
+      - g++-5
 
 before_install:
 # Prune path, see https://github.com/travis-ci/travis-ci/issues/5326
