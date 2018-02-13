@@ -38,6 +38,8 @@ addons:
       - libffi-dev
       - gcc-5
       - g++-5
+    sources:
+      - ubuntu-toolchain-r-test
 
 before_install:
 # Prune path, see https://github.com/travis-ci/travis-ci/issues/5326
