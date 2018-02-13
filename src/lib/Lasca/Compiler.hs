@@ -198,10 +198,10 @@ compileExecutable opts fname mod = do
     let cc = fromMaybe (error "Did find C compiler. Install Clang or GCC, or define CC environment variable") result
         libLascaLink = if os == "darwin"
                        then ["-rdynamic", "-llascart"]
-                       else ["-rdynamic", "-Wl,--whole-archive", "-lliblascart.a" , "-Wl,--no-whole-archive"]
+                       else ["-rdynamic", "-Wl,--whole-archive", "-llascart" , "-Wl,--no-whole-archive"]
         libDirs = ["-L" ++ lascaPath]
         links = ["-lgc", "-lffi", "-lm"]
-    let args = optimizationOpts ++ libDirs ++ [ "-g"] ++ links ++ libLascaLink ++ [ "-o", outputPath, fname ++ ".o"]
+    let args = optimizationOpts ++ libDirs ++ [ "-g"] ++ libLascaLink ++ links ++ [ "-o", outputPath, fname ++ ".o"]
     when (verboseMode opts) $ putStrLn (cc ++ " " ++ show args)
     callProcess cc args
     return ()
