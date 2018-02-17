@@ -88,10 +88,11 @@ transformExpr transformer expr = case expr of
         false' <- go false
         transformer (If meta cond' true' false')
     Match meta expr cases -> do
+        expr1 <- go expr
         cases1 <- forM cases $ \(Case p expr) -> do
             e <- go expr
             return $ Case p e
-        transformer (Match meta expr cases1)
+        transformer (Match meta expr1 cases1)
     (Let meta n e body) -> do
         case typeOf e of
           TypeFunc a b -> locals %= Map.insert n a
@@ -184,10 +185,11 @@ delambdafy ctx exprs = let
               false' <- go false
               return (If meta cond' true' false')
           Match meta expr cases -> do
+              expr1 <- go expr
               cases1 <- forM cases $ \(Case p expr) -> do
                   e <- go expr
                   return $ Case p e
-              return (Match meta expr cases1)
+              return (Match meta expr1 cases1)
           (Let meta n e body) -> do
               case typeOf e of
                 TypeFunc a b -> locals %= Map.insert n a
