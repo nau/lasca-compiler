@@ -1,13 +1,25 @@
 import Option
 
-A = 5
+B = A
 
+A = foo()
+
+def foo() = bar() + baz()
+
+def bar() = 1
+
+def baz() = 2
+
+
+def quix() = foo()
 --import List
 def main() = {
 --    list = Cons(1, Nil);
 --    file = readFile("README.md");
 --    println(file);
 --    writeFile("test.md", file);
+    a = foo();
+    b = quix();
     s = Option.Some(1);
     str = map(s, {a -> toString(a + 1)});
     println("Hello world! ${str}")

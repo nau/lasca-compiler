@@ -26,6 +26,7 @@ import Control.Lens.Operators
 import Data.Monoid
 import qualified Data.List as List
 import Data.Foldable (foldr)
+import Data.Maybe
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
@@ -566,7 +567,76 @@ createTypeEnvironment exprs = List.foldl' folder [] exprs
             tvars -> TypeApply (TypeIdent typeName) (map TVar tvars)
     folder _ e = error ("createTypeEnvironment should only be called with Data declarations, but was called on " ++ show e)
 
-typeCheck :: Ctx -> [Expr] -> Either TypeError (TypeEnv, [Expr])
+data Node = Node {
+    nodeName :: Name,
+    calledBy :: Set Name
+} deriving (Show, Eq, Ord)
+
+data Deps = Deps {
+    _moduleName :: Name,
+    _curFuncCalls :: Set Name,
+    _nodes :: Map Name Node
+} deriving (Show, Eq, Ord)
+makeLenses ''Deps
+
+anal exprs = execState (traverseTree asdf exprs) (
+    Deps { _moduleName = Name "undefined", _curFuncCalls = Set.empty, _nodes = Map.empty })
+
+inModule name mod = nameToList mod `List.isPrefixOf` nameToList name
+
+asdf :: Expr -> State Deps ()
+asdf expr = do
+    state <- get
+    case expr of
+        Package _ name -> moduleName .= name
+        Ident _ name | inModule name (state^.moduleName) -> do
+--            Debug.traceM $ printf "%s in module %s" (show name) (show (state^.moduleName))
+            curFuncCalls %= Set.insert name
+        Let _ name e EmptyExpr -> do
+--            Debug.traceM $ printf "Val %s in module %s" (show name) (show (state^.moduleName))
+            let mapping = state^.nodes
+                calls = Set.toList $ state^.curFuncCalls
+                emptyNode n = Node { nodeName = n, calledBy = Set.empty }
+                combine2 new Nothing = Just new
+                combine2 new (Just old) = Just $ old { calledBy = Set.union (calledBy old) (calledBy new) }
+
+            nodes %= Map.alter (combine2 (emptyNode name)) name
+            state <- get
+--            Debug.traceM $ printf "Node for %s: %s" (show name) (show (Map.lookup name (state^.nodes)))
+            forM calls $ \call ->
+                nodes %= Map.alter (combine2 (Node { nodeName = call, calledBy = Set.singleton name })) call
+            curFuncCalls .= Set.empty
+            return ()    
+        Function _ name _ _ _ -> do
+--            Debug.traceM $ printf "Function %s in module %s" (show name) (show (state^.moduleName))
+            let mapping = state^.nodes
+                calls = Set.toList $ state^.curFuncCalls
+                emptyNode n = Node { nodeName = n, calledBy = Set.empty }
+                combine2 new Nothing = Just new
+                combine2 new (Just old) = Just $ old { calledBy = Set.union (calledBy old) (calledBy new) }
+
+            nodes %= Map.alter (combine2 (emptyNode name)) name
+            state <- get
+--            Debug.traceM $ printf "Node for %s: %s" (show name) (show (Map.lookup name (state^.nodes)))
+            forM calls $ \call ->
+                nodes %= Map.alter (combine2 (Node { nodeName = call, calledBy = Set.singleton name })) call
+            curFuncCalls .= Set.empty
+            return ()
+        _ -> return ()
+    return ()
+
+linear nodes names = do
+    let r = List.foldl' (\p n -> p ++ dependencies n) [] names
+        rr = reverse . List.nub . reverse
+--        rr = List.nub
+    rr r
+  where
+    dependencies name = let cBy = calledBy (fromMaybe (error $ show name) $ Map.lookup name nodes)
+                            cBy1 = Set.delete name cBy
+                        in  List.foldl' (\p n -> p ++ dependencies n) [name] cBy1
+
+
+--typeCheck :: Ctx -> [Expr] -> Either TypeError (TypeEnv, [Expr])
 typeCheck ctx exprs = do
     -- TODO use flow analysis to find order of typing functions/vals and mutually recursive functions
     let stuff = execState (collectNames exprs) (InferStuff {_names = []})
@@ -574,9 +644,56 @@ typeCheck ctx exprs = do
     let dataConstructorsEnv = Map.fromList $ createTypeEnvironment (ctx^.dataDefs)
     let (TypeEnv te) = defaultTyenv
     let typeEnv = TypeEnv (Map.union te dataConstructorsEnv)
-    let res = inferTop ctx typeEnv namedExprs
-    fmap (\(typeEnv, exprs) -> (typeEnv, ctx^.dataDefs ++ exprs)) res
 
+    let depanal = anal exprs
+--    putStrLn $ printf "DepAnalisys: %s" (show depanal)
+    let names = map fst namedExprs
+--    print names
+--    putStrLn $ printf "Linear: names %s" (show $ linear (_nodes depanal) names)
+    let ordered = linear (_nodes depanal) names
+    let mapping = Map.fromList namedExprs
+    
+    let orderedNamedExprs = ordered >>= (\n -> map (\r -> (n, r)) (maybeToList $ Map.lookup n mapping))
+--    putStrLn $ "Ordered " ++ show orderedNamedExprs
+    let res = inferTop ctx typeEnv orderedNamedExprs
+    return $ fmap (\(typeEnv, exprs) -> (typeEnv, ctx^.dataDefs ++ exprs)) res
+
+traverseTree :: Monad m => (Expr -> m a) -> [Expr] -> m [a]
+traverseTree traverser exprs = sequence [traverseExpr traverser e | e <- exprs ]
+
+traverseExpr :: Monad m => (Expr -> m a) -> Expr -> m a
+traverseExpr traverser expr = case expr of
+    Array meta exprs -> do
+        mapM go exprs
+        traverser expr
+    Select meta tree expr -> do
+        go tree
+        go expr
+        traverser expr
+    (If meta cond true false) -> do
+        go cond
+        go true
+        go false
+        traverser expr
+    Match meta ex cases -> do
+        forM cases $ \(Case p expr) -> go expr
+        traverser expr
+    (Let meta n e body) -> do
+        go e
+        go body
+        traverser expr
+    l@(Lam m a@(Arg n t) e) -> do
+        go e
+        traverser expr
+    (Apply meta e args) -> do
+        go e
+        mapM go args
+        traverser expr
+    f@(Function meta name tpe args e1) -> do
+        go e1
+        traverser expr
+    e -> traverser e
+    where go e = traverseExpr traverser e
 
 isData Data{} = True
 isData _ = False

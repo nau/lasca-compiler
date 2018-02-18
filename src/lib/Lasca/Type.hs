@@ -28,6 +28,9 @@ nameToSBS = fromString . show
 nameToBS :: Name -> BS.ByteString
 nameToBS = fromString . show
 
+nameToList (Name n) = [n]
+nameToList (NS prefix n) = nameToList prefix ++ nameToList n
+
 defaultPackageName = "Main"
 defaultPackageQName = Name defaultPackageName
 

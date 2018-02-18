@@ -425,6 +425,9 @@ https://eschew.wordpress.com/2016/09/02/summarizing-gc/
 Data Structure Aware Garbage Collector
 http://www.cs.technion.ac.il/~erez/Papers/dsa-ismm-15.pdf
 
+Bounding Data Races in Space and Time
+http://kcsrk.info/papers/pldi18-memory.pdf
+
 Concurrency
 ===========
 

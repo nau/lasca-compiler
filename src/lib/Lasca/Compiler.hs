@@ -32,6 +32,8 @@ import System.Directory
 import System.FilePath
 import System.Console.Haskeline
 import Data.List
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Debug.Trace as Debug
@@ -72,9 +74,6 @@ fixPackageAndImportPrelude filename exprs = case exprs of
         return $ pkg : insertImportPrelude name exprs
 
 insertImportPrelude name exprs = if name == Name "Prelude" then exprs else Import emptyMeta "Prelude" : exprs
-
-nameToList (Name n) = [n]
-nameToList (NS prefix n) = nameToList prefix ++ nameToList n
 
 moduleSearchPaths = do
     dir <- getCurrentDirectory
@@ -146,7 +145,8 @@ runPhases opts filename = do
     else compileExecutable opts filename mod
 
 typerPhase opts ctx filename exprs = do
-    case typeCheck ctx exprs of
+    result <- typeCheck ctx exprs
+    case result of
         Right (env, typedExprs) -> do
             when (verboseMode opts) $ putStrLn "typechecked OK"
             when (printTypes opts) $ putStrLn (showPretty env)

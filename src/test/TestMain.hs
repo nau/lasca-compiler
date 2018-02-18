@@ -142,6 +142,6 @@ parseAndInferFile fname = do
         Left err -> error $ Megaparsec.parseErrorPretty err
         Right ex -> do
             let exprs = preludeExprs ++ ex
-            let typeEnv = typeCheck (emptyCtx emptyLascaOpts) exprs
+            typeEnv <- typeCheck (emptyCtx emptyLascaOpts) exprs
             print typeEnv
             True @?= True
