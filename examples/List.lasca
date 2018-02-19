@@ -2,7 +2,7 @@ package List
 
 data List a = Nil | Cons(head: a, tail: List a)
 
-def empty(l) = match l {
+def isEmpty(l) = match l {
     Nil -> true
     Cons(_, _) -> false
 }
@@ -24,11 +24,16 @@ def map(self, f) = match self {
     Cons(hd, tl) -> Cons(f(hd), map(tl, f))
 }
 
+def filter(self, p: a -> Bool) = match self {
+    Nil -> Nil
+    Cons(hd, tl) -> if p(hd) then Cons(hd, filter(tl, p)) else filter(tl, p)
+}
+
 
 def main() = {
     list = Cons("1", Cons("2", Nil));
     len = list.length;
     ints = map(list, toInt);
 --    ints2 = map(ints, { i -> i + 10});
-    println("Hello world! ${list}. Is empty: ${list.empty}, length = ${len.toString}");
+    println("Hello world! ${list}. Is empty: ${list.isEmpty}, length = ${len.toString}");
 }

@@ -1,7 +1,8 @@
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <stdarg.h>
 #include <unistd.h>
 #include <string.h>
@@ -258,12 +259,12 @@ Box* runtimeApply(Box* val, int64_t argc, Box* argv[], Position pos) {
     Functions* fs = RUNTIME->functions;
     Closure *closure = unbox(CLOSURE, val);
     if (closure->funcIdx >= fs->size) {
-        printf("AAAA!!! No such function with id %lld, max id is %lld at line: %lld\n", (int64_t) closure->funcIdx, fs->size, pos.line);
+        printf("AAAA!!! No such function with id %"PRId64", max id is %"PRId64" at line: %"PRId64"\n", (int64_t) closure->funcIdx, fs->size, pos.line);
         exit(1);
     }
     Function f = fs->functions[closure->funcIdx];
     if (f.arity != argc + (closure->args == NULL ? 0 : 1)) {
-        printf("AAAA!!! Function %s takes %lld params, but passed %d enclosed params and %lld params instead at line: %lld\n",
+        printf("AAAA!!! Function %s takes %"PRId64" params, but passed %d enclosed params and %"PRId64" params instead at line: %"PRId64"\n",
             f.name->bytes, f.arity, (closure->args == NULL ? 0 : 1), argc, pos.line);
         exit(1);
     }
@@ -316,7 +317,7 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
             String* name = ident->value.ptr; // should be identifier name
 //            printf("Ident name %s\n", name->bytes);
             Data* data = findDataType(tree->type); // find struct in global array of structs
-//            printf("Found data type %s %s, tag %lld\n", data->name->bytes, tree->type->name, dataValue->tag);
+//            printf("Found data type %s %s, tag %"PRId64"\n", data->name->bytes, tree->type->name, dataValue->tag);
             Struct* constr = data->constructors[dataValue->tag];
             int64_t numFields = constr->numFields;
             for (int64_t i = 0; i < numFields; i++) {
@@ -324,12 +325,12 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
         //        printf("Check field %d %s\n", field->length, field->bytes);
                 if (field->length == name->length && strncmp(field->bytes, name->bytes, name->length) == 0) {
                     Box* value = dataValue->values[i];
-//                    printf("Found value %s at index %lld\n", value->type->name, i);
+//                    printf("Found value %s at index %"PRId64"\n", value->type->name, i);
           //          println(toString(value));
                     return value;
                 }
             }
-            printf("Couldn't find field %s at line: %lld\n", name->bytes, pos.line);
+            printf("Couldn't find field %s at line: %"PRId64"\n", name->bytes, pos.line);
         } else if (ident->type == CLOSURE) {
               // FIXME fix for closure?  check arity?
               Closure* f = unbox(CLOSURE, ident);
@@ -449,7 +450,7 @@ const Box* __attribute__ ((pure)) toString(const Box* value) {
     } else if (type == BOOL) {
         return makeString(value->value.num == 0 ? "false" : "true");
     } else if (type == INT) {
-        snprintf(buf, 100, "%lld", value->value.num);
+        snprintf(buf, 100, "%"PRId64, value->value.num);
         return makeString(buf);
     } else if (type == DOUBLE) {
         snprintf(buf, 100, "%12.9lf", value->value.dbl);
@@ -558,6 +559,6 @@ void initLascaRuntime(Runtime* runtime) {
         INT_ARRAY[i].value.num = i;
     }
     if (runtime->verbose)
-        printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %lld, # structs = %lld\n",
+        printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %"PRId64", # structs = %"PRId64"\n",
           RUNTIME->functions->size, RUNTIME->types->size);
 }

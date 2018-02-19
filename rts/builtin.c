@@ -1,8 +1,9 @@
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 #include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <stdarg.h>
 #include <unistd.h>
 #include <string.h>
@@ -19,7 +20,7 @@ String* unsafeString(Box* b) {
 
 
 void* putInt(int64_t c) {
-    printf("%lld\n", c);
+    printf("%"PRId64"\n", c);
     fflush(stdout);
     return 0;
 }
