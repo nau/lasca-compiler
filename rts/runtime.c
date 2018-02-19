@@ -224,7 +224,7 @@ Box* __attribute__ ((pure)) runtimeBinOp(int64_t code, Box* lhs, Box* rhs) {
     else if (code == GE) {DO_CMP(>=);}
     else if (code == GT) {DO_CMP(>);}
     else { 
-	printf("AAAA!!! Unsupported binary operation %lli", code);
+	      printf("AAAA!!! Unsupported binary operation %"PRId64, code);
         exit(1);
     }
     return result;
@@ -244,7 +244,7 @@ Box* __attribute__ ((pure)) runtimeUnaryOp(int64_t code, Box* expr) {
             }
             break;
         default:
-            printf("AAAA!!! Unsupported unary operation %lli", code);
+            printf("AAAA!!! Unsupported unary operation %"PRId64, code);
             exit(1);
     }
     return result;
