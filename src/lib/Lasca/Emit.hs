@@ -9,7 +9,27 @@ import Control.Lens.Operators
 import Lasca.Codegen
 import Lasca.Type
 import Lasca.EmitCommon
+import qualified Lasca.EmitStatic as EmitStatic
 import Lasca.Syntax
+
+genExternalFuncWrapper f@(Function meta name returnType externArgs (Literal _ (StringLit externName))) = do
+    modState <- get
+    let codeGenResult = codeGen modState
+        blocks = createBlocks codeGenResult
+        retType = typeMapping returnType
+    define retType (nameToSBS name) (toSig externArgs) blocks
+  where
+    codeGen modState = execCodegen [] modState $ do
+        entry <- addBlock entryBlockName
+        setBlock entry
+        let argTypes = map (\(Arg n t) -> t) externArgs
+        largs <- forM externArgs $ \(Arg n tpe) -> do
+            let argName = nameToSBS n
+            EmitStatic.resolveBoxing EmitStatic.anyTypeVar tpe (localPtr argName)
+        res <- callFn (externFuncLLvmType f) externName largs
+        wrapped <- EmitStatic.resolveBoxing returnType EmitStatic.anyTypeVar res
+        ret wrapped
+genExternalFuncWrapper other = error $ "genExternalFuncWrapper got " ++ (show other)
 
 codegenTop ctx cgen topExpr = case topExpr of
     this@(Let meta name expr _) -> do
@@ -22,6 +42,7 @@ codegenTop ctx cgen topExpr = case topExpr of
         if meta ^. isExternal then do
             let (Literal _ (StringLit externName)) = body
             external (externalTypeMapping tpe) (fromString externName) (externArgsToSig args) False []
+            genExternalFuncWrapper f
         else do
             modState <- get
             let codeGenResult = codeGen modState

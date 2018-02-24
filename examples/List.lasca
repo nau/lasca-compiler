@@ -19,10 +19,7 @@ def foldr(self: List a, z: b, f: a -> b -> b): b = match self {
 
 def length(l) = foldl(l, 0, { e, acc -> acc + 1})
 
-def map(self, f) = match self {
-    Nil -> Nil
-    Cons(hd, tl) -> Cons(f(hd), map(tl, f))
-}
+def map(self, f) = foldl(self, Nil, { e, acc -> Cons(f(e), acc) })
 
 def filter(self, p: a -> Bool) = match self {
     Nil -> Nil
@@ -34,6 +31,7 @@ def main() = {
     list = Cons("1", Cons("2", Nil));
     len = list.length;
     ints = map(list, toInt);
---    ints2 = map(ints, { i -> i + 10});
+    ints2 = map(ints, { i -> i + 10});
+    println(toString(ints2));
     println("Hello world! ${list}. Is empty: ${list.isEmpty}, length = ${len.toString}");
 }

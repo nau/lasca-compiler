@@ -1,1 +1,2 @@
+List_Cons(11, List_Cons(12, List_Nil))
 Hello world! List_Cons(1, List_Cons(2, List_Nil)). Is empty: false, length = 2

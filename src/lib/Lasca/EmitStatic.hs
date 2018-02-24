@@ -215,8 +215,6 @@ cgenApply ctx meta expr args = do
     syms <- gets symtab
     let symMap = Map.fromList syms
     let isGlobal fn = (fn `Map.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
-    let funDecl fn = (ctx ^. S.globalFunctions) Map.! fn
-    let isExtern fn = isGlobal fn && (funDecl fn ^. S.metaLens.S.isExternal)
     case expr of
          -- FIXME Here are BUGZZZZ!!!! :)
         this@(S.Ident meta (NS "Prelude" "arrayApply")) -> do
@@ -227,16 +225,6 @@ cgenApply ctx meta expr args = do
 --            callFn "arrayApply" [array, idx]
             cgenArrayApply array idx
                     
-        S.Ident _ fn | isExtern fn -> do
-            let f@(S.Function _ _ returnType externArgs (S.Literal _ (S.StringLit externName))) = S._globalFunctions ctx Map.! fn
-            let argTypes = map (\(S.Arg n t) -> t) externArgs
---            Debug.traceM $ printf "Calling external %s(%s): %s" fn (show argTypes) (show returnType)
-            largs <- forM (zip args argTypes) $ \(arg, tpe) -> do
-                a <- cgen ctx arg
-                resolveBoxing anyTypeVar tpe a
-            res <- callFn (externFuncLLvmType f) externName largs
-            resolveBoxing returnType anyTypeVar res
-
         S.Ident _ fn | isGlobal fn -> do
 --            Debug.traceM $ printf "Calling %s" fn
             let f = S._globalFunctions ctx Map.! fn
