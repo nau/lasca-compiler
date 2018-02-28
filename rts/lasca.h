@@ -114,11 +114,13 @@ extern const LaType* FILE_HANDLE;
 
 void *gcMalloc(size_t s);
 Box *box(const LaType* type_id, void *value);
+Box * __attribute__ ((pure)) boxInt(int64_t i);
 void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti);
 int64_t __attribute__ ((pure)) unboxInt(const Box* ti);
 const Box* toString(const Box* value);
 Box* println(const Box* val);
 Box* boxArray(size_t size, ...);
+Array* createArray(size_t size);
 const char * __attribute__ ((const)) typeIdToName(const LaType* typeId);
 
 #endif

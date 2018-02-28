@@ -22,5 +22,9 @@ def main() = {
     b = quix();
     s = Option.Some(1);
     str = map(s, {a -> toString(a + 1)});
-    println("Hello world! ${str}")
+    greeting = "Вітаю, Світ!";
+    array = greeting.unicodePoints;
+    println(toString(array));
+    println(toString(codePointAt(greeting, 2)));
+    println("Вітаю, Світ! ${str}")
 }

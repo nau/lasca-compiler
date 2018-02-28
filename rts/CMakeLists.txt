@@ -1,4 +1,4 @@
-add_library(objlib OBJECT runtime.c builtin.c lasca.h)
+add_library(objlib OBJECT runtime.c builtin.c lasca.h utf8proc/utf8proc.c utf8proc/utf8proc.h)
 add_library (lascart SHARED $<TARGET_OBJECTS:objlib>)
 add_library (lascartStatic  $<TARGET_OBJECTS:objlib>)
 set_target_properties(lascartStatic PROPERTIES OUTPUT_NAME lascart)
@@ -28,7 +28,7 @@ find_path(GC_INCLUDE_PATH gc.h PATHS ${GC_INCLUDE_DIR})
 find_library(GC_LIBRARY gc PATHS ${GC_LIBRARY_DIR})
 message("Found gc.h in ${GC_INCLUDE_PATH}")
 
-target_include_directories(objlib PRIVATE ${GC_INCLUDE_PATH} ${FFI_INCLUDE_PATH} )
+target_include_directories(objlib PRIVATE ${GC_INCLUDE_PATH} ${FFI_INCLUDE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/utf8proc)
 
 target_link_libraries(lascart m ${GC_LIBRARY} ${FFI_LIBRARY})
 target_link_libraries(lascartStatic m ${GC_LIBRARY} ${FFI_LIBRARY})

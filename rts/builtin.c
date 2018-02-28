@@ -10,6 +10,7 @@
 #include <math.h>
 #include <gc.h>
 #include <sys/stat.h>
+#include <utf8proc.h>
 
 #include "lasca.h"
 
@@ -36,6 +37,48 @@ void * runtimePutchar(Box* ch) {
     putchar(c);
     fflush(stdout);
     return 0;
+}
+
+Box* unicodePoints(Box* string) {
+    utf8proc_int32_t codepoint = 0;
+    utf8proc_ssize_t readIdx = 0;
+    size_t idx = 0;
+    String * str = unbox(STRING, string);
+    Array* result = createArray(str->length);
+    for (;; idx++) {
+        readIdx += utf8proc_iterate((const utf8proc_uint8_t *) str->bytes + readIdx, -1, &codepoint);
+        if (codepoint == 0) break;
+        else if (codepoint == -1) {
+            printf("Invalid UTF-8 near position %zd\n", readIdx);
+            exit(1);
+        }
+        result->data[idx] = boxInt(codepoint);
+    }
+    result->length = idx;
+    return box(ARRAY, result);
+}
+
+int64_t codePointAt(Box* string, int64_t index) {
+    utf8proc_int32_t codepoint = 0;
+    utf8proc_ssize_t readIdx = 0;
+    size_t idx = 0;
+    String * str = unbox(STRING, string);
+    if (index < 0) {
+        printf("Index is out of range %zd\n", index);
+        exit(1);
+    }
+    for (; idx <= index; idx++) {
+        readIdx += utf8proc_iterate((const utf8proc_uint8_t *) str->bytes + readIdx, -1, &codepoint);
+        if (codepoint == 0) {
+            printf("Index is out of range %zd\n", index);
+            exit(1);
+        }
+        else if (codepoint == -1) {
+            printf("Invalid UTF-8 near position %zd\n", readIdx);
+            exit(1);
+        }
+    }
+    return codepoint;
 }
 
 Box* println(const Box* val) {

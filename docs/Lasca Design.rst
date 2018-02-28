@@ -523,25 +523,31 @@ Identifier Names http://www2.unibas.it/gscanniello/Giuseppe_Scanniello%40unibas/
 Fast 64-bit integers for Scala.js http://lampwww.epfl.ch/~doeraene/presentations/jslongs-vmm2017/
 
 
-Optimizations
-=============
-# Common Subexpression Elimination
-
-Looks like LLVM does it with Global Value Numbering
-
-# Automatic Memoization
-
-Annotations? Caches?
-
-.. code:: scala
-    @cache(type=[LRU/LFU], size=100)
-    def calculate(∀ a. Num a => x: a, y: a, z: a): a = x * y * z
-    def calculate(∀ a. Num a => x: a, y: a, z: a): a = x * y * z
-
 Support Standards/Specifications
 ================================
 
 - Support the XDG Base Directory Specification
+- http://utf8everywhere.org/
+- Unicode 10.0.0
+
+String/Char, Unicode Support
+============================
+
+This is quite nontrivial stuff.
+
+Encoding – UTF-8.
+
+type String – UTF-8 encoded immutable byte array.
+type Int32 – code point.
+type Char – extended grapheme cluster. See Swift Character.
+     Looks, like it's the closest thing in Unicode, that people would call a character, anyway.
+I'm not sure we need Char as built-in type.
+
+Use utf8proc library from Julia lang: https://github.com/JuliaLang/utf8proc
+
+Links:
+- https://developer.apple.com/library/content/documentation/Cocoa/Conceptual/Strings/Articles/stringsClusters.html
+
 
 
 .. include:: LangsOverview.rst

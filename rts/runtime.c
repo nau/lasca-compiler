@@ -9,6 +9,7 @@
 #include <math.h>
 #include <gc.h>
 #include <ffi.h>
+#include <utf8proc.h>
 
 #include "lasca.h"
 
@@ -559,6 +560,7 @@ void initLascaRuntime(Runtime* runtime) {
         INT_ARRAY[i].value.num = i;
     }
     if (runtime->verbose)
-        printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %"PRId64", # structs = %"PRId64"\n",
-          RUNTIME->functions->size, RUNTIME->types->size);
+        printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %"PRId64
+               ", # structs = %"PRId64", utf8proc version %s\n",
+          RUNTIME->functions->size, RUNTIME->types->size, utf8proc_version());
 }
