@@ -1,0 +1,4 @@
+lascaCompileRegex: jit is 1, unicode: 1 opts: 80000, err: 100, off: 0, pat: (Scala|Haskell|Python|Rust|Ocaml|Java)
+true
+lascaRegexReplace::PCRE2_ERROR_NOMEMORY asked 20 but needed 89 for subst: $1 (consider Lasca instead of $1)
+Haskell (consider Lasca instead of Haskell) or Python (consider Lasca instead of Python)

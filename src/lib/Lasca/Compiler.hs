@@ -200,7 +200,7 @@ compileExecutable opts fname mod = do
                        then ["-rdynamic", "-llascart"]
                        else ["-rdynamic", "-Wl,--whole-archive", "-llascart" , "-Wl,--no-whole-archive"]
         libDirs = ["-L" ++ lascaPath]
-        links = ["-lgc", "-lffi", "-lm"]
+        links = ["-lgc", "-lffi", "-lm", "-lpcre2-8"]
     let args = optimizationOpts ++ libDirs ++ [ "-g"] ++ libLascaLink ++ links ++ [ "-o", outputPath, fname ++ ".o"]
     when (verboseMode opts) $ putStrLn (cc ++ " " ++ show args)
     callProcess cc args

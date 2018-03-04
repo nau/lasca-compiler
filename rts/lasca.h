@@ -102,6 +102,8 @@ typedef struct {
 } Position;
 
 extern Box UNIT_SINGLETON;
+extern Box TRUE_SINGLETON;
+extern Box FALSE_SINGLETON;
 // Primitive Types
 extern const LaType* UNIT   ;
 extern const LaType* BOOL   ;
@@ -111,6 +113,7 @@ extern const LaType* STRING ;
 extern const LaType* CLOSURE;
 extern const LaType* ARRAY  ;
 extern const LaType* FILE_HANDLE;
+extern const LaType* PATTERN;
 
 void *gcMalloc(size_t s);
 Box *box(const LaType* type_id, void *value);

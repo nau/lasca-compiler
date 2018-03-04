@@ -17,6 +17,11 @@ bench:
 rts:
 	mkdir -p build && cd build && cmake .. && make && cp rts/liblascart.a .. && cp rts/liblascart.a $(LASCAPATH)
 
+relink: rts
+	rm -rf .stack-work/dist/x86_64-osx/Cabal-2.0.1.0/build/Lasca/lasca
+	rm -rf .stack-work/install
+	stack build --fast -j 8 --copy-bins
+
 rusts:
 	cd rts/rust && cargo build && cp target/debug/liblascarts.dylib ../../../
     

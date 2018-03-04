@@ -25,6 +25,7 @@ const LaType _STRING  = { .name = "String" };
 const LaType _CLOSURE = { .name = "Closure" };
 const LaType _ARRAY   = { .name = "Array" };
 const LaType _FILE_HANDLE   = { .name = "FileHandle" };
+const LaType _PATTERN   = { .name = "Pattern" };
 const LaType* UNKNOWN = &_UNKNOWN;
 const LaType* UNIT    = &_UNIT;
 const LaType* BOOL    = &_BOOL;
@@ -34,6 +35,7 @@ const LaType* STRING  = &_STRING;
 const LaType* CLOSURE = &_CLOSURE;
 const LaType* ARRAY   = &_ARRAY;
 const LaType* FILE_HANDLE   = &_FILE_HANDLE;
+const LaType* PATTERN   = &_PATTERN;
 
 Box TRUE_SINGLETON = {
     .type = &_BOOL,

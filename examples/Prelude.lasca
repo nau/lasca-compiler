@@ -20,6 +20,11 @@ extern def runtimeCompare(lhs: a, rhs: a): Int = "runtimeCompare"
 data Ref a = Ref(getRef: a)
 
 data FileHandle
+data Pattern
+
+extern def compilePattern(pattern: String): Pattern = "lascaCompileRegex"
+extern def matchRegex(pattern: Pattern, str: String): Pattern = "lascaMatchRegex"
+extern def regexReplace(pattern: Pattern, str: String, replacement: String): String = "lascaRegexReplace"
 
 extern def openFile(filename: String, mode: String): FileHandle = "lascaOpenFile"
 extern def readFile(filename: String): String = "lascaReadFile"

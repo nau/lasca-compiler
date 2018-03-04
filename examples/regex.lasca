@@ -1,0 +1,6 @@
+def main() = {
+    regex = compilePattern("(Scala|Haskell|Python|Rust|Ocaml|Java)");
+    println(toString(matchRegex(regex, "Haskell")));
+    replaced = regexReplace(regex, "Haskell or Python", "\$1 (consider Lasca instead of \$1)");
+    println(replaced);
+}

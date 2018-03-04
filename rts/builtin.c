@@ -1,4 +1,5 @@
 #define __STDC_FORMAT_MACROS
+#define PCRE2_CODE_UNIT_WIDTH 8
 #include <inttypes.h>
 #include <assert.h>
 #include <errno.h>
@@ -11,6 +12,7 @@
 #include <gc.h>
 #include <sys/stat.h>
 #include <utf8proc.h>
+#include <pcre2.h>
 
 #include "lasca.h"
 
@@ -166,4 +168,104 @@ Box* lascaWriteFile(Box* filename, Box* string) {
     }
     fclose(f);
     return &UNIT_SINGLETON;
+}
+
+void finalizePcre2Code(Box* pattern, void* unused) {
+//    printf("finalizePcre2Code\n");
+    pcre2_code *re = pattern->value.ptr;
+    pcre2_code_free(re);
+}
+
+Box* lascaCompileRegex(Box* ptrn) {
+    String* string = unbox(STRING, ptrn);
+    PCRE2_SPTR pattern = (PCRE2_SPTR) string->bytes;
+    int errornumber = 0;
+    PCRE2_SIZE erroroffset = 0;
+    int32_t option_bits = 0;
+
+    pcre2_code *re = pcre2_compile(
+      pattern,               /* the pattern */
+      string->length, 
+      PCRE2_UTF,                     /* default options */
+      &errornumber,          /* for error number */
+      &erroroffset,          /* for error offset */
+      NULL);
+
+
+    int32_t isJit = 0, unicode = 0;
+    pcre2_config(PCRE2_CONFIG_JIT, &isJit);
+    pcre2_config(PCRE2_CONFIG_UNICODE, &unicode);
+    (void)pcre2_pattern_info(re, PCRE2_INFO_ALLOPTIONS, &option_bits);
+    printf("lascaCompileRegex: jit is %d, unicode: %d opts: %x, err: %d, off: %zu, pat: %s\n", isJit, unicode, option_bits, errornumber, erroroffset, pattern);
+    
+
+    /* Compilation failed: print the error message and exit. */
+
+    if (re == NULL) {
+        PCRE2_UCHAR buffer[256];
+        pcre2_get_error_message(errornumber, buffer, sizeof(buffer));
+        printf("PCRE2 compilation failed at offset %d: %s\n", (int)erroroffset, buffer);
+        exit(1);
+    }
+    Box* boxedRe = box(PATTERN, re);
+    GC_register_finalizer(boxedRe, (GC_finalization_proc)finalizePcre2Code, 0, 0, 0);
+    return boxedRe;
+}
+
+Box* lascaMatchRegex(Box* ptrn, Box* string) {
+    pcre2_code *re = unbox(PATTERN, ptrn);
+    String* subject = unbox(STRING, string);
+    pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, NULL);
+
+    int rc = pcre2_match(
+      re,                   /* the compiled pattern */
+      (PCRE2_SPTR) subject->bytes,              /* the subject string */
+      subject->length,       /* the length of the subject */
+      0,                    /* start at offset 0 in the subject */
+      PCRE2_NO_JIT,
+      match_data,           /* block for storing the result */
+      NULL);                /* use default match context */
+
+    pcre2_match_data_free(match_data);   /* Release memory used for the match */
+    if (rc < 0) {
+        switch(rc) {
+            case PCRE2_ERROR_NOMATCH: printf("No match\n"); break;
+            default: printf("Matching error %d\n", rc); break;
+        }
+        return &FALSE_SINGLETON;
+    }
+    else return &TRUE_SINGLETON;
+}
+
+Box* lascaRegexReplace(Box* ptrn, Box* string, Box* replace) {
+    pcre2_code *re = unbox(PATTERN, ptrn);
+    String* subject = unbox(STRING, string);
+    String* subst = unbox(STRING, replace);
+    
+    uint32_t options = PCRE2_SUBSTITUTE_GLOBAL | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH;
+    size_t len = subject->length * 1.2; // approximate
+    PCRE2_SIZE outlengthptr = len;
+    String* val = gcMalloc(sizeof(String) + len + 1);  // null terminated
+    
+    int rc = pcre2_substitute(re, (PCRE2_SPTR) subject->bytes, subject->length, 0, options, 0, 0,
+                (PCRE2_SPTR) subst->bytes, subst->length, (PCRE2_UCHAR *) val->bytes, &outlengthptr);
+
+    if (rc == PCRE2_ERROR_NOMEMORY) {
+        printf("lascaRegexReplace::PCRE2_ERROR_NOMEMORY asked %zu but needed %zu for subst: %s\n",
+                len, outlengthptr, subst->bytes);
+        // outlengthptr should contain required length in code units, bytes here,
+        // including space for trailing zero, see https://www.pcre.org/current/doc/html/pcre2api.html#SEC36
+        val = gcMalloc(sizeof(String) + outlengthptr);
+        rc = pcre2_substitute(re, (PCRE2_SPTR) subject->bytes, subject->length, 0, options, 0, 0,
+                (PCRE2_SPTR) subst->bytes, subst->length, (PCRE2_UCHAR *) val->bytes, &outlengthptr);
+    }
+    val->length = outlengthptr;
+
+    if (rc < 0) {
+        PCRE2_UCHAR buffer[256];
+        pcre2_get_error_message(rc, buffer, sizeof(buffer));
+        printf("PCRE2 substitution error %d: %s\n", rc, buffer);
+        exit(1);
+    }
+    return box(STRING, val);
 }

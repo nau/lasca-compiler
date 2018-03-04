@@ -223,40 +223,6 @@ Refactoring
    - IDE support!
 
 
-Entropy
--------
-
-- Entropy must be in "perceptive" range.
-- Not too much of duplication.
-- Not too much of entropy
-
-Too much entropy:
-
-.. code:: haskell
-
-	foldl :: (a -> b -> a) -> a -> [b] -> a
-	foldl f z []     = z
-	foldl f z (x:xs) = foldl f (f z x) xs
-
-Better:
-
-.. code:: scala
-
-	def foldLeft[A, B](col: List[A], z: B, f: (B, A) => B): B =
-	  (col, z, f) match {
-		case (Nil, z, f) => z
-		case (x :: xs, z, f) => xs.foldLeft(z, f(z, x))
-	  }
-
-Optimal?
-
-.. code:: scala
-
-	def foldl(col: Seq a, zero: z, f: z -> a -> z): a = match
-	  [] zero _        -> zero
-	  (x :: xs) zero f -> xs.foldl zero (f zero x)
-	end
-
 Vision
 ======
 
@@ -267,6 +233,12 @@ When you need to write a shell script or quickly prototype an idea – use gradu
 When you need speed – compile before use, types are inferred
 
 When you need speed and correctness – compile and validate your liquid types with CVC4/Z3 solvers.
+
+Language Features
+=================
+
+- Computation Expressions (F#) – considered
+- Active Patterns (F#) - considered
 
 
 Type System

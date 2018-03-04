@@ -36,6 +36,7 @@ addons:
     packages:
       - libgc-dev
       - libffi-dev
+      - libpcre2-dev
       - gcc-5
       - g++-5
     sources:

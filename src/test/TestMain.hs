@@ -87,6 +87,7 @@ examples = [
     Script "nbody2.lasca" Both ["50000"],
     Script "nbody3.lasca" Both ["50000"],
     Script "Option.lasca" Both [],
+    Script "regex.lasca" Both [],
     Script "ski.lasca" Both []
   ]
 
