@@ -1,0 +1,27 @@
+
+data CodepointIterator = CodepointIterator(str: String, index: Ref Int, strlen: Int)
+
+def codePoints(s) = CodepointIterator(s, Ref(0), codepointsLength(s))
+
+def done(iter: CodepointIterator) = iter.index.getRef == iter.strlen
+def next(iter: CodepointIterator) = {
+    idx = iter.index.getRef;
+    iter.index := idx + 1;
+    codePointAt(iter.str, idx);
+}
+
+def foreach(s: String, f: Int -> a): Unit = {
+    iter = codePoints(s);
+    foreachGo(iter, f);
+--    ()
+}
+
+def foreachGo(iter, f) = if iter.done then {} else {
+    f(next(iter));
+    foreachGo(iter, f)
+}
+
+def main() = {
+    foreach("Teástuͤ", { cp -> println(cp.toString) });
+    println(toString(codepointsLength("uͤ")));
+}
