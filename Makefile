@@ -32,10 +32,10 @@ test:
 	stack test --fast -j 8
 
 examples:
-	lasca -O2 -e --mode static  examples/array.lasca $(TEST_RTS)
-	lasca -O2 -e --mode dynamic examples/array.lasca $(TEST_RTS)
-	lasca -O2 -e --mode static  examples/data.lasca $(TEST_RTS)
-	lasca -O2 -e --mode dynamic examples/data.lasca $(TEST_RTS)
+	lasca -O2 -e --mode static  examples/Array.lasca $(TEST_RTS)
+	lasca -O2 -e --mode dynamic examples/Array.lasca $(TEST_RTS)
+	lasca -O2 -e --mode static  examples/Data.lasca $(TEST_RTS)
+	lasca -O2 -e --mode dynamic examples/Data.lasca $(TEST_RTS)
 	lasca -O2 -e --mode dynamic examples/dynamic.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  examples/factorial.lasca $(TEST_RTS) -- 15
 	lasca -O2 -e --mode dynamic examples/factorial.lasca $(TEST_RTS) -- 15
@@ -43,18 +43,18 @@ examples:
 	lasca -O2 -e --mode static  examples/hello.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  examples/lambda.lasca $(TEST_RTS)
 	lasca -O2 -e --mode dynamic examples/lambda.lasca $(TEST_RTS)
-	lasca -O2 -e --mode static  examples/list.lasca $(TEST_RTS)
-	lasca -O2 -e --mode dynamic examples/list.lasca $(TEST_RTS)
+	lasca -O2 -e --mode static  examples/List.lasca $(TEST_RTS)
+	lasca -O2 -e --mode dynamic examples/List.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  examples/nbody.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e --mode dynamic examples/nbody.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e --mode static  examples/nbody2.lasca $(TEST_RTS) -- 50000
-	lasca -O2 -e --mode dynamic  examples/nbody2.lasca $(TEST_RTS) -- 50000
+	lasca -O2 -e --mode dynamic examples/nbody2.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e --mode static  examples/nbody3.lasca $(TEST_RTS) -- 50000
-	lasca -O2 -e --mode dynamic  examples/nbody3.lasca $(TEST_RTS) -- 50000
+	lasca -O2 -e --mode dynamic examples/nbody3.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e --mode static  examples/binarytrees.lasca $(TEST_RTS) -- 10
-	lasca -O2 -e --mode dynamic  examples/binarytrees.lasca $(TEST_RTS) -- 10
-	lasca -O2 -e --mode static  examples/Option.lasca $(TEST_RTS)
-	lasca -O2 -e --mode dynamic examples/Option.lasca $(TEST_RTS)
+	lasca -O2 -e --mode dynamic examples/binarytrees.lasca $(TEST_RTS) -- 10
+	lasca -O2 -e --mode static  libs/base/Option.lasca $(TEST_RTS)
+	lasca -O2 -e --mode dynamic libs/base/Option.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  examples/Map.lasca $(TEST_RTS)
 	lasca -O2 -e --mode dynamic examples/Map.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  examples/ski.lasca $(TEST_RTS)

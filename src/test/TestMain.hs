@@ -86,7 +86,7 @@ examples = [
     Script "nbody.lasca" Both ["50000"],
     Script "nbody2.lasca" Both ["50000"],
     Script "nbody3.lasca" Both ["50000"],
-    Script "Option.lasca" Both [],
+--    Script "Option.lasca" Both [],
     Script "regex.lasca" Both [],
     Script "strings.lasca" Both [],
     Script "ski.lasca" Both []
@@ -137,7 +137,7 @@ parseAndInferExpr str = let
   in infered
 
 parseAndInferFile fname = do
-    p <- Prelude.readFile "examples/Prelude.lasca"
+    p <- Prelude.readFile "libs/base/Prelude.lasca"
     let preludeExprs = fromRight $ parseToplevel p
     file <- Prelude.readFile fname
     case parseToplevel file of
