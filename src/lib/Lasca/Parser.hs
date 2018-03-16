@@ -402,11 +402,11 @@ globalValDef = do
     meta <- getMeta
     valdef $ (\name e -> Let meta name e EmptyExpr)
 
-packageDef = do
-    reserved "package"
+moduleDef = do
+    reserved "module"
     meta <- getMeta
     name <- qualIdent
-    return $ Package meta name
+    return $ Module meta name
 
 importDef = do
     reserved "import"
@@ -419,7 +419,7 @@ annotations = some $ do
     identifier
 
 defn :: Parser Expr
-defn =  try packageDef
+defn =  try moduleDef
     <|> try importDef
     <|> try extern
     <|> try function

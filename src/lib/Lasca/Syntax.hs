@@ -59,7 +59,7 @@ data Expr
     | Let Meta Name Expr Expr
     | Array Meta [Expr]
     | Data Meta Name [TVar] [DataConst]
-    | Package Meta Name
+    | Module Meta Name
     | Import Meta Name
     deriving (Ord, Show)
 
@@ -78,7 +78,7 @@ metaLens = Lens.lens (fst . getset) (snd . getset)
               Array meta exprs -> (meta, \ m -> Array m exprs)
               Data meta name tvars constrs -> (meta, \ m -> Data m name tvars constrs)
               BoxFunc meta name args -> (meta, \m -> BoxFunc m name args)
-              Package meta name -> (meta, \m -> Package m name)
+              Module meta name -> (meta, \m -> Module m name)
               Import meta name -> (meta, \m -> Import m name)
               _ -> error $ "Should not happen :) " ++ show expr
 
@@ -107,7 +107,7 @@ instance Eq Expr where
     (Let _ nl al l) == (Let _ nr ar r) = nl == nr && al == ar && l == r
     (Array _ l) == (Array _ r) = l == r
     (Data _ nl ltvars l) == (Data _ nr rtvars r) = nl == nr && ltvars == rtvars && l == r
-    Package _ ln == Package _ rn = ln == rn
+    Module _ ln == Module _ rn = ln == rn
     Import _ ln == Import _ rn = ln == rn
     _ == _ = False
 
@@ -154,7 +154,7 @@ instance DebugPrint Expr where
         Let meta n e b -> printf "%s = %s;\n%s: %s" (show n) (printExprWithType e) (printExprWithType b) (show meta)
         Array _ es -> printf "[%s]" (intercalate "," $ map printExprWithType es)
         Data _ n tvars cs -> printf "data %s %s = %s\n" (show n) (show tvars) (intercalate "\n| " $ map show cs)
-        Package meta name -> printf "package %s" (show name)
+        Module meta name -> printf "module %s" (show name)
         Import meta name -> printf "import %s" (show name)
         EmptyExpr -> ""
 
@@ -171,7 +171,7 @@ data DataConst = DataConst Name [Arg] deriving (Eq, Ord, Show)
 
 emptyCtx opts = Context {
     _lascaOpts = opts,
-    _packageName = Name defaultPackageName,
+    _moduleName = Name defaultModuleName,
     _globalFunctions = Map.empty,
     _globalVals = Map.empty,
     _dataDefs = [],
@@ -199,7 +199,7 @@ data Arg = Arg Name Type deriving (Eq, Ord, Show)
 
 data Ctx = Context {
     _lascaOpts :: LascaOpts,
-    _packageName :: Name,
+    _moduleName :: Name,
     _globalFunctions :: Map Name Expr,
     _globalVals :: Map Name Expr,
     _dataDefs :: [Expr],

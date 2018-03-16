@@ -1,4 +1,4 @@
-package Array
+module Array
 
 def for(start: Int, end: Int, f: Int -> Int) = {
     if start < end then {

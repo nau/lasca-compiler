@@ -1,4 +1,4 @@
-package List
+module List
 
 data List a = Nil | Cons(head: a, tail: List a)
 

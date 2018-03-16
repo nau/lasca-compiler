@@ -12,7 +12,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
 type Parser = Parsec Void String
 
 ops = ["+","*","-","/",";", "==", ":=", "=",",",".","<",">","|",":"]
-keywords = ["package", "import", "data", "def", "extern", "if", "then", "else", "in", "let", "true", "false", "match", "do", "lazy", "var"]
+keywords = ["module", "import", "data", "def", "extern", "if", "then", "else", "in", "let", "true", "false", "match", "do", "lazy", "var"]
 
 sc :: Parser () -- ‘sc’ stands for “space consumer”
 sc = L.space (void space1) lineComment blockComment

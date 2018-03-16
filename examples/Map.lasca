@@ -1,4 +1,4 @@
-package Map
+module Map
 
 import Option
 

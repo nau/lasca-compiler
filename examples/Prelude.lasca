@@ -1,4 +1,4 @@
-package Prelude
+module Prelude
 
 extern def putchard(x: Float): Unit = "putchard"
 extern def putInt(d: Int): Unit = "putInt"

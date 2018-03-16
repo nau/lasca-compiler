@@ -16,7 +16,7 @@ instance Show Name where
         Name s -> s
         NS prefix n -> show prefix ++ "_" ++ show n
 
-qualify pkg name = if pkg == defaultPackageQName then name else NS pkg name
+qualify mod name = if mod == defaultModuleQName then name else NS mod name
 
 qnameToString n = show n
 
@@ -31,8 +31,8 @@ nameToBS = fromString . show
 nameToList (Name n) = [n]
 nameToList (NS prefix n) = nameToList prefix ++ nameToList n
 
-defaultPackageName = "Main"
-defaultPackageQName = Name defaultPackageName
+defaultModuleName = "Main"
+defaultModuleQName = Name defaultModuleName
 
 newtype TVar = TV String
   deriving (Eq, Ord)

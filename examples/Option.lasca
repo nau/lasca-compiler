@@ -1,4 +1,4 @@
-package Option
+module Option
 
 data Option a = None | Some(v: a)
 

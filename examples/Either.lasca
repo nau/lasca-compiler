@@ -1,4 +1,4 @@
-package Either
+module Either
 
 data Either a b = Left(left: a) | Right(right: b)
 

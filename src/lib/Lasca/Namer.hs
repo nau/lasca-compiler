@@ -42,9 +42,9 @@ import Lasca.Type
 import Lasca.Options (LascaOpts)
 
 data NamerPhaseState = NamerPhaseState {
-    _currentPackage :: Name,
-    _importedPackages :: Set Name,
-    _packageQualifiers :: Map Name Name,  -- ^ MultiSet -> Data.MultiSet mapping
+    _currentModule :: Name,
+    _importedModules :: Set Name,
+    _moduleQualifiers :: Map Name Name,  -- ^ MultiSet -> Data.MultiSet mapping
     _exportedNames :: Map Name (Set Name),
     _exportedTypes :: Map Name (Set Name),
     _locals :: MSet.MultiSet Name,
@@ -53,20 +53,20 @@ data NamerPhaseState = NamerPhaseState {
 makeLenses ''NamerPhaseState
 
 emptyNamerPhaseState opts = NamerPhaseState {
-    _currentPackage = Name "default", -- TODO check it
-    _importedPackages = Set.empty,
-    _packageQualifiers = Map.empty,
+    _currentModule = Name "default", -- TODO check it
+    _importedModules = Set.empty,
+    _moduleQualifiers = Map.empty,
     _exportedNames = Map.empty,
     _exportedTypes = Map.empty,
     _locals = MSet.empty,
     _context = emptyCtx opts
 }
 
-importedNames state = Map.restrictKeys (state^.exportedNames) (Set.insert (state^.currentPackage) (state^.importedPackages))
+importedNames state = Map.restrictKeys (state^.exportedNames) (Set.insert (state^.currentModule) (state^.importedModules))
 
-findAllPackages state name = Map.foldrWithKey folder [] (state^.exportedNames)
+findAllModules state name = Map.foldrWithKey folder [] (state^.exportedNames)
   where
-    folder pkg names res = if Set.member name names then pkg : res else res
+    folder mod names res = if Set.member name names then mod : res else res
 
 resolveName name meta = do
     s <- get
@@ -76,17 +76,17 @@ resolveName name meta = do
 
 resolveNonLocalName name meta s = do
     case name of
-        Name n -> case findAllPackages s name of
-            [pkg] -> (NS pkg name)
+        Name n -> case findAllModules s name of
+            [mod] -> (NS mod name)
             [] -> error $ printf "%s: Couldn't find name %s. Exported Names %s" (showPosition meta) (show n) (show (s^.exportedNames))
-            pkgs -> error $ printf "%s: Ambiguous name %s found in packages %s" (showPosition meta) (show n) (show pkgs)
-        NS pkg n ->
-            case Map.lookup pkg (s^.exportedNames) of
+            mods -> error $ printf "%s: Ambiguous name %s found in modules %s" (showPosition meta) (show n) (show mods)
+        NS mod n ->
+            case Map.lookup mod (s^.exportedNames) of
                 -- correctly qualified name
                 Just names | Set.member n names -> name
                 -- incorrectly qualified name, TODO add levenshtein distance based suggestions
-                Just names -> error $ printf "%s: Couldn't find name %s in package %s." (showPosition meta) (show n) (show pkg)
-                Nothing -> error $ printf "%s: No such package imported: %s at %s.\nAdd import %s" (showPosition meta) (show pkg) (show meta) (show pkg)
+                Just names -> error $ printf "%s: Couldn't find name %s in module %s." (showPosition meta) (show n) (show mod)
+                Nothing -> error $ printf "%s: No such module imported: %s at %s.\nAdd import %s" (showPosition meta) (show mod) (show meta) (show mod)
 
 
 processData expr@(Data meta name tvars consts) = do
@@ -121,21 +121,21 @@ processData expr = error $ printf "%s: This should not happen: %s" (show $ exprP
 
 collectNames exprs = forM_ exprs $ \expr -> case expr of
     Let _ name _ EmptyExpr -> do
-        curPkg <- gets _currentPackage
-        exportedNames %= Map.adjust (Set.insert name) curPkg -- add this val name as current package exported name
+        curMod <- gets _currentModule
+        exportedNames %= Map.adjust (Set.insert name) curMod -- add this val name as current module exported name
         return ()
     Function _ name _ _ _ -> do
-        curPkg <- gets _currentPackage
-        exportedNames %= Map.adjust (Set.insert name) curPkg -- add this function name as current package exported name
+        curMod <- gets _currentModule
+        exportedNames %= Map.adjust (Set.insert name) curMod -- add this function name as current module exported name
         return ()
     dat@(Data _ typeName tvars constrs) -> do
-        curPkg <- gets _currentPackage
+        curMod <- gets _currentModule
         let constrNames = Set.fromList $ constrs >>= (\(DataConst name args) -> name : (fmap (\(Arg n t) -> n) args))
-        exportedNames %= Map.adjust (Set.union constrNames) curPkg
+        exportedNames %= Map.adjust (Set.union constrNames) curMod
         return ()
-    Package _ name -> do
-        currentPackage .= name
-        -- for now, support only unique package names per file
+    Module _ name -> do
+        currentModule .= name
+        -- for now, support only unique module names per file
         exportedNames %= Map.insert name Set.empty
         exportedTypes %= Map.insert name Set.empty
         return ()
@@ -148,19 +148,19 @@ qualifiedSelect expr = case expr of
     Select meta e (Ident _ n) -> fmap (\prefix -> NS prefix n) (qualifiedSelect e)
     _ -> Nothing
 
-isFullyQualifiedName state (NS pkgName name) =
-    case Map.lookup pkgName (state^.exportedNames) of
+isFullyQualifiedName state (NS modName name) =
+    case Map.lookup modName (state^.exportedNames) of
         -- correctly qualified name
         Just names | Set.member name names -> True
         _ -> False
 isFullyQualifiedName _ _ = False
 
 isQualifiedName state qualifier name = do
-    let fqpn = Map.lookup qualifier (state^.packageQualifiers)
+    let fqpn = Map.lookup qualifier (state^.moduleQualifiers)
     any (\fqpn -> isFullyQualifiedName state (NS fqpn name)) fqpn
 
 findQualifiedName state qualifier name = do
-    fqpn <- Map.lookup qualifier (state^.packageQualifiers)
+    fqpn <- Map.lookup qualifier (state^.moduleQualifiers)
     names <- Map.lookup fqpn (state^.exportedNames)
     if Set.member name names then return $ NS fqpn name else Nothing
 
@@ -169,24 +169,24 @@ namerTransform :: Expr -> State NamerPhaseState Expr
 namerTransform expr = do
 --    Debug.traceM $ printf "Current expr %s" (show expr)
     case expr of
-        Package _ name -> do
-            currentPackage .= name
-            importedPackages .= Set.empty
-            packageQualifiers .= Map.empty
+        Module _ name -> do
+            currentModule .= name
+            importedModules .= Set.empty
+            moduleQualifiers .= Map.empty
             locals .= MSet.empty
---            Debug.traceM $ printf "Current package %s" (show name)
+--            Debug.traceM $ printf "Current module %s" (show name)
             return expr
         Import _ name -> do
-            importedPackages %= Set.insert name
+            importedModules %= Set.insert name
             case name of
-                NS prefix qual -> packageQualifiers %= Map.insert qual name
+                NS prefix qual -> moduleQualifiers %= Map.insert qual name
                 _ -> return ()
---            Debug.traceM $ printf "importedPackages %s" (show name)
+--            Debug.traceM $ printf "importedModules %s" (show name)
             return expr
         Data meta name tvars constrs -> do
-            curPkg <- gets _currentPackage
-            let renamedArgs args = fmap (\(Arg name t) -> Arg (NS curPkg name) t) args
-            let renamed = map (\(DataConst name args) -> DataConst (NS curPkg name) (renamedArgs args)) constrs
+            curMod <- gets _currentModule
+            let renamedArgs args = fmap (\(Arg name t) -> Arg (NS curMod name) t) args
+            let renamed = map (\(DataConst name args) -> DataConst (NS curMod name) (renamedArgs args)) constrs
             let updated = Data meta name tvars renamed
             processData updated
             return updated
@@ -236,8 +236,8 @@ namerTransform expr = do
         -- global val
         Let meta name e EmptyExpr -> do
             e' <- go e
-            curPkg <- gets _currentPackage
-            let fqn = NS curPkg name
+            curMod <- gets _currentModule
+            let fqn = NS curMod name
             context.globalVals %= Map.insert fqn expr
             return (Let meta fqn e' EmptyExpr)
         Let meta n e body -> do
@@ -260,8 +260,8 @@ namerTransform expr = do
             e' <- go e1
 --            Debug.traceM $ printf "Current Function %s" (show name)
             locals .= MSet.empty
-            curPkg <- gets _currentPackage
-            let fqn = NS curPkg name
+            curMod <- gets _currentModule
+            let fqn = NS curMod name
             context.globalFunctions %= Map.insert fqn expr
             return (Function meta fqn tpe args e')
         e -> return e

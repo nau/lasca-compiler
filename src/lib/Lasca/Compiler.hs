@@ -53,7 +53,7 @@ parsePhase opts filename = do
         case parseToplevelFilename absoluteFilePath file of
           Left err -> die $ Megaparsec.parseErrorPretty err
           Right exprs -> do
-              exprs1 <- fixPackageAndImportPrelude filename exprs
+              exprs1 <- fixModuleAndImportPrelude filename exprs
               searchPaths <- moduleSearchPaths
               (imported, ex) <- loadImports searchPaths Set.empty [] exprs1
     --          Debug.traceM $ printf "AAA %s\n%s" (show  exprs1) (show ex)
@@ -63,15 +63,15 @@ parsePhase opts filename = do
               return ex
     else error $ printf "Couldn't open file %s" (show filename)
 
-fixPackageAndImportPrelude filename exprs = case exprs of
-    (pkg@(Package _ name): exprs) -> do
+fixModuleAndImportPrelude filename exprs = case exprs of
+    (mod@(Module _ name): exprs) -> do
         when (takeBaseName filename /= (last $ nameToList name)) $
-          die $ printf "Wrong package name in file %s. Package name should match file name, but was %s)" (filename) (show name)
-        return $ pkg : insertImportPrelude name exprs
+          die $ printf "Wrong module name in file %s. Module name should match file name, but was %s)" (filename) (show name)
+        return $ mod : insertImportPrelude name exprs
     _ -> do
         let name = Name $ takeBaseName filename
-        let pkg = Package emptyMeta name
-        return $ pkg : insertImportPrelude name exprs
+        let mod = Module emptyMeta name
+        return $ mod : insertImportPrelude name exprs
 
 insertImportPrelude name exprs = if name == Name "Prelude" then exprs else Import emptyMeta "Prelude" : exprs
 
@@ -116,7 +116,7 @@ loadImport searchPaths imported importPath name = do
         case parseToplevelFilename absoluteFilePath file of
           Left err -> die $ Megaparsec.parseErrorPretty err
           Right exprs -> do
-              exprs1 <- fixPackageAndImportPrelude absoluteFilePath exprs
+              exprs1 <- fixModuleAndImportPrelude absoluteFilePath exprs
               (newImported, importedExprs) <- loadImports searchPaths imported (name : importPath) exprs1
               return $ (Set.insert name newImported, importedExprs)
 
@@ -130,8 +130,8 @@ runPhases opts filename = do
     exprs <- parsePhase opts filename
     let (named, state) = namerPhase opts exprs
     let ctx = _context state
-    let mainPackage = _currentPackage state
-    let mainFunctionName = NS mainPackage "main"
+    let mainModule = _currentModule state
+    let mainFunctionName = NS mainModule "main"
     let desugared = desugarExprs ctx desugarExpr named
     typed <- if mode opts == Static
              then typerPhase opts ctx filename desugared

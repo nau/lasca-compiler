@@ -73,7 +73,7 @@ codegenTop ctx cgen topExpr = case topExpr of
             cgen ctx body >>= ret
 
     (Data _ name tvars constructors) -> return ()
-    Package{} -> return ()
+    Module{} -> return ()
     Import{} -> return ()
     _ -> error $ printf "Expression of this kind should not get to codegenTop. It's a bug. %s at %s"
             (show topExpr) (show $ exprPosition topExpr)

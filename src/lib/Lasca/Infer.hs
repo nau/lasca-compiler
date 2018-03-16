@@ -215,7 +215,7 @@ updateMeta f e =
         Let meta name expr body -> Let (f meta) name (updateMeta f expr) (updateMeta f body)
         Array meta exprs -> Array (f meta) (map (updateMeta f) exprs)
         this@Data{} -> this
-        Package{} -> e
+        Module{} -> e
         Import{} -> e
 
 -- For now don't allow Forall inside Forall
@@ -573,14 +573,14 @@ data Node = Node {
 } deriving (Show, Eq, Ord)
 
 data Deps = Deps {
-    _moduleName :: Name,
+    _modName :: Name,
     _curFuncCalls :: Set Name,
     _nodes :: Map Name Node
 } deriving (Show, Eq, Ord)
 makeLenses ''Deps
 
 anal exprs = execState (traverseTree asdf exprs) (
-    Deps { _moduleName = Name "undefined", _curFuncCalls = Set.empty, _nodes = Map.empty })
+    Deps { _modName = Name "undefined", _curFuncCalls = Set.empty, _nodes = Map.empty })
 
 inModule name mod = nameToList mod `List.isPrefixOf` nameToList name
 
@@ -588,12 +588,12 @@ asdf :: Expr -> State Deps ()
 asdf expr = do
     state <- get
     case expr of
-        Package _ name -> moduleName .= name
-        Ident _ name | inModule name (state^.moduleName) -> do
---            Debug.traceM $ printf "%s in module %s" (show name) (show (state^.moduleName))
+        Module _ name -> modName .= name
+        Ident _ name | inModule name (state^.modName) -> do
+--            Debug.traceM $ printf "%s in module %s" (show name) (show (state^.modName))
             curFuncCalls %= Set.insert name
         Let _ name e EmptyExpr -> do
---            Debug.traceM $ printf "Val %s in module %s" (show name) (show (state^.moduleName))
+--            Debug.traceM $ printf "Val %s in module %s" (show name) (show (state^.modName))
             let mapping = state^.nodes
                 calls = Set.toList $ state^.curFuncCalls
                 emptyNode n = Node { nodeName = n, calledBy = Set.empty }
@@ -608,7 +608,7 @@ asdf expr = do
             curFuncCalls .= Set.empty
             return ()    
         Function _ name _ _ _ -> do
---            Debug.traceM $ printf "Function %s in module %s" (show name) (show (state^.moduleName))
+--            Debug.traceM $ printf "Function %s in module %s" (show name) (show (state^.modName))
             let mapping = state^.nodes
                 calls = Set.toList $ state^.curFuncCalls
                 emptyNode n = Node { nodeName = n, calledBy = Set.empty }
