@@ -118,14 +118,15 @@ Box * __attribute__ ((pure)) boxFloat64(double i) {
     return ti;
 }
 
-Box * boxClosure(int64_t idx, Box* args) {
+Box * boxClosure(int64_t idx, int64_t argc, Box** args) {
     Closure* cl = gcMalloc(sizeof(Closure));
-//    printf("boxClosure(%d, %p)\n", idx, args);
-//    fflush(stdout);
+  //  printf("boxClosure(%d, %d, %p)\n", idx, argc, args);
+  //  fflush(stdout);
     cl->funcIdx = idx;
-    cl->args = args;
-//    printf("Enclose %d, argc = %d, args[0].type = %d, args[1].type = %d\n", idx, argc, args[0]->type, args[1]->type);
-//    fflush(stdout);
+    cl->argc = argc;
+    cl->argv = args;
+  //  printf("Enclose %d, argc = %d, args[0].type = %d, args[1].type = %d\n", idx, argc, args[0]->type, args[1]->type);
+  //  fflush(stdout);
     return box(CLOSURE, cl);
 }
 
@@ -266,9 +267,9 @@ Box* runtimeApply(Box* val, int64_t argc, Box* argv[], Position pos) {
         exit(1);
     }
     Function f = fs->functions[closure->funcIdx];
-    if (f.arity != argc + (closure->args == NULL ? 0 : 1)) {
-        printf("AAAA!!! Function %s takes %"PRId64" params, but passed %d enclosed params and %"PRId64" params instead at line: %"PRId64"\n",
-            f.name->bytes, f.arity, (closure->args == NULL ? 0 : 1), argc, pos.line);
+    if (f.arity != argc + closure->argc) {
+        printf("AAAA!!! Function %s takes %"PRId64" params, but passed %"PRId64" enclosed params and %"PRId64" params instead at line: %"PRId64"\n",
+            f.name->bytes, f.arity, closure->argc, argc, pos.line);
         exit(1);
     }
 
@@ -277,19 +278,9 @@ Box* runtimeApply(Box* val, int64_t argc, Box* argv[], Position pos) {
     void *values[f.arity];
     Box* rc;
 
-    if (argc == f.arity) {
-        // no enclosed arguments
-        for (int i = 0; i < f.arity; i++) {
-            args[i] = &ffi_type_pointer;
-            values[i] = &argv[i];
-        }
-    } else {
-        args[0] = &ffi_type_pointer;
-        values[0] = &closure->args;
-        for (int i = 1; i < f.arity; i++) {
-            args[i] = &ffi_type_pointer;
-            values[i] = &argv[i - 1];
-        }
+    for (int i = 0; i < f.arity; i++) {
+        args[i] = &ffi_type_pointer;
+        values[i] = (i < closure->argc) ? &closure->argv[i] : &argv[i - closure->argc];
     }
     if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, f.arity, &ffi_type_pointer, args) != FFI_OK) {
     		printf("AAAA!!! Function %s ffi_prep_cif call failed\n", f.name->bytes);

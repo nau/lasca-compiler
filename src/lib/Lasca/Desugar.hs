@@ -144,18 +144,9 @@ extractLambda meta args expr = do
     let enclosedArgs = map (\n -> (Arg n typeAny, _outers state Map.! n)) usedOuterVars
     let (funcName', nms') = uniqueName (fromString $ (show curFuncName) ++ "_lambda") nms
     let funcName = Name $ Char8.unpack funcName'
-    let enclosedArgType = TypeApply (TypeIdent "Array") [typeAny]
-    let addEnclosedArgsParameter t = TypeFunc enclosedArgType t -- HACK with Array type
-    let meta' = (exprType %~ addEnclosedArgsParameter) meta
-    let generateEnclosedLocals ((Arg name tpe, _), idx) e = do
-            let m = meta
-            let body = Apply m (Ident meta (NS "Prelude" "arrayApply")) [
-                  Ident (meta `withType` enclosedArgType) "$enclosed",
-                  Literal (meta `withType` TypeInt) $ IntLit idx]
-            Let m name body e
-    let expr1 = foldr generateEnclosedLocals expr (zip enclosedArgs [0..])
-    let func = if null enclosedArgs then Function meta funcName typeAny args expr
-               else Function meta' funcName typeAny (Arg "$enclosed" typeAny : args) expr1
+    let asdf t = foldr (\(_, t) resultType -> TypeFunc t resultType) t enclosedArgs
+    let meta' = (S.exprType %~ asdf) meta
+    let func = S.Function meta' funcName typeAny (map fst enclosedArgs ++ args) expr
     modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
     s <- get
 --    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" funcName (show outerVars) (show usedOuterVars) (show s)

@@ -213,10 +213,19 @@ boxClosure name mapping enclosedVars = do
     let idx = fromMaybe (error $ printf "No such function %s in mapping %s" (show name) (show mapping)) (Map.lookup name mapping)
     let argc = length enclosedVars
     let findArg n = fromMaybe (error ("Couldn't find " ++ show n ++ " variable in symbols " ++ showSyms syms)) (lookup n syms)
-    args <- forM enclosedVars $  \(S.Arg n _) -> load (findArg n)
+    let args = map (\(S.Arg n _) -> findArg n) enclosedVars
+    sargsPtr <- gcMalloc (constIntOp $ ptrSize * argc)
+    sargsPtr1 <- bitcast sargsPtr (T.ptr ptrType)
+    let asdf (idx, arg) = do
+            p <- getelementptr sargsPtr1 [idx]
+            bc1 <- bitcast p (T.ptr ptrType)
+            bc <- load arg
+            store bc1 bc
 
-    sargsPtr <- if null enclosedVars then return constNullPtrOp else boxArray args
-    callFn (funcType ptrType [intType, ptrType]) "boxClosure" [constIntOp idx, sargsPtr]
+    let sargs = sargsPtr
+    sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0 .. argc] args]
+    callFn (funcType ptrType [intType, intType, ptrType]) "boxClosure" [constIntOp idx, constIntOp argc, sargsPtr]
+
 
 boolToInt True = 1
 boolToInt False = 0
@@ -245,7 +254,7 @@ declareStdFuncs = do
     external ptrType "boxError" [("n", ptrType)] False [FA.GroupID 0]
     external ptrType "boxInt" [("d", intType)] False [FA.GroupID 0]
     external ptrType "boxBool" [("d", intType)] False [FA.GroupID 0]
-    external ptrType "boxClosure" [("id", intType), ("argv", ptrType)] False []
+    external ptrType "boxClosure" [("id", intType), ("argc", intType), ("argv", ptrType)] False []
     external ptrType "boxFloat64" [("d", T.double)] False [FA.GroupID 0]
     external ptrType "boxArray" [("size", intType)] True [FA.GroupID 0]
     external ptrType "runtimeBinOp"  [("code",  intType), ("lhs",  ptrType), ("rhs", ptrType)] False [FA.GroupID 0]

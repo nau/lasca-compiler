@@ -474,7 +474,7 @@ arrayStructType elemType = T.StructureType False [intType, T.ptr elemType]
 
 positionStructType = T.StructureType False [intType, intType]
 
-closureStructType = T.StructureType False [intType, ptrType]
+closureStructType = T.StructureType False [intType, intType, ptrType]
 
 functionStructType = T.StructureType False [ptrType, ptrType, intType]
 

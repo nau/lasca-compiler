@@ -41,7 +41,8 @@ typedef struct {
 
 typedef struct {
     int64_t funcIdx;
-    Box* args;  // boxed Array of boxed enclosed arguments
+    int64_t argc;
+    Box** argv;
 } Closure;
 
 typedef struct {
