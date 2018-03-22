@@ -222,7 +222,7 @@ cgenApply ctx meta expr args = do
             array <- cgen ctx arrayExpr -- should be a pointer to either boxed or unboxed array
             boxedIdx <- cgen ctx indexExpr
             idx <- unboxInt boxedIdx
---            callFn "arrayApply" [array, idx]
+--            callFn (funcType ptrType [ptrType, intType]) "arrayApply" [array, idx]
             cgenArrayApply array idx
                     
         S.Ident _ fn | isGlobal fn -> do
@@ -251,15 +251,9 @@ cgenArrayApply array idx = do
     boxedArrayPtr <- bitcast array (T.ptr $ boxStructOfType (T.ptr $ arrayStructType ptrType)) -- Box(type, &Array(len, &data[])
     arrayStructAddr <- getelementptr boxedArrayPtr [constIntOp 0, constInt32Op 1]
     arrayStructPtr <- load arrayStructAddr
-    arraysize <- getelementptr arrayStructPtr [constIntOp 0, constInt32Op 0]
-    size <- load arraysize
     -- TODO check idx is in bounds, eliminatable
-    arrayDataAddr <- getelementptr arrayStructPtr [constInt64Op 0, constInt32Op 1]
-    arraDataPtr <- load arrayDataAddr
-    arrayDataArray <- bitcast arraDataPtr (T.ptr (T.ArrayType 0 ptrType))
-    ptr' <- getelementptr arrayDataArray [constInt64Op 0, idx]
-    load ptr'
-
+    ptr <- getelementptr arrayStructPtr [constIntOp 0, constInt32Op 1, idx]
+    load ptr
 
 -------------------------------------------------------------------------------
 -- Compilation

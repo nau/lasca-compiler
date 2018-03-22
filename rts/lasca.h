@@ -47,7 +47,7 @@ typedef struct {
 
 typedef struct {
     int64_t length;
-    Box** data;
+    Box* data[];
 } Array;
 
 typedef struct {

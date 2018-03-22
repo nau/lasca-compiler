@@ -356,9 +356,8 @@ Box* runtimeIsConstr(Box* value, Box* constrName) {
 
 
 Array* createArray(size_t size) {
-    Array * array = gcMalloc(sizeof(Array));
+    Array * array = gcMalloc(sizeof(Array) + sizeof(Box*) * size);
     array->length = size;
-    array->data = (size > 0 ) ? gcMalloc(sizeof(Box*) * size) : NULL;
     return array;
 }
 
@@ -372,22 +371,6 @@ Box* boxArray(size_t size, ...) {
     }
     va_end (argp);                  /* Clean up. */
     return box(ARRAY, array);
-}
-
-Box* append(Box* arrayValue, Box* value) {
-    Array* array = unbox(ARRAY, arrayValue);
-    Array * newArray = createArray(array->length + 1);
-    memcpy(newArray->data, array->data, sizeof(Box*) * array->length);
-    newArray->data[array->length] = value;
-    return box(ARRAY, newArray);
-}
-
-Box* prepend(Box* arrayValue, Box* value) {
-    Array* array = unbox(ARRAY, arrayValue);
-    Array * newArray = createArray(array->length + 1);
-    memcpy(newArray->data + 1, array->data, sizeof(Box*) * array->length);
-    newArray->data[0] = value;
-    return box(ARRAY, newArray);
 }
 
 Box* __attribute__ ((pure)) makeString(char * str) {

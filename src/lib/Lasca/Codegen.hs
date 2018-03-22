@@ -470,7 +470,7 @@ boxStructOfType boxedType = T.StructureType False [ptrType, boxedType]
 
 boxStructType = boxStructOfType ptrType
 
-arrayStructType elemType = T.StructureType False [intType, T.ptr elemType]
+arrayStructType elemType = T.StructureType False [intType, T.ArrayType 0 elemType]
 
 positionStructType = T.StructureType False [intType, intType]
 
