@@ -258,7 +258,7 @@ lambdaLiftPhase ctx exprs = let
           e -> return e
           where go e = lambdaLiftExpr e
 
-delambdafy ctx exprs = let
+delambdafyPhase ctx exprs = let
         (desugared, st) = runState (mapM delambdafyExpr exprs) emptyDesugarPhaseState
         syn = _syntacticAst st
     in syn ++ desugared
@@ -345,16 +345,18 @@ desugarAndOr expr = case expr of
     Apply meta (Ident _ "and") [lhs, rhs] -> If meta lhs rhs (Literal emptyMeta (BoolLit False))
     e -> e
 
-desugarExpr ctx expr = do
-    let desugarFunc = desugarAndOr . desugarAssignment . desugarUnaryMinus
-    let expr1 = desugarFunc expr
-    expr2 <- genMatch ctx expr1
-    return expr2
-
-desugarExprs ctx func exprs = let
-    (desugared, st) = runState (transform (func ctx) exprs) emptyDesugarPhaseState
+desugarPhase ctx exprs = let
+    (desugared, st) = runState (transform desugarExpr exprs) emptyDesugarPhaseState
     syn = _syntacticAst st
   in syn ++ desugared
+
+  where
+    desugarExpr expr = do
+        let desugarFunc = desugarAndOr . desugarAssignment . desugarUnaryMinus
+        let expr1 = desugarFunc expr
+        expr2 <- genMatch ctx expr1
+        return expr2
+
 
 --genMatch :: Ctx -> Expr -> Expr
 genMatch ctx m@(Match meta expr []) = error $ "Should be at least on case in match expression: " ++ show m

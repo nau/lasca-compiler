@@ -245,7 +245,7 @@ cgenApply ctx meta expr args = do
             sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0..] largs]
 
             let pos = createPosition $ S.pos meta
-            callFn (funcType ptrType [ptrType, intType, ptrType, positionStructType]) "runtimeApply" [e, argc, sargs, constOp pos]
+            callBuiltin "runtimeApply" [e, argc, sargs, constOp pos]
 
 cgenArrayApply array idx = do
     boxedArrayPtr <- bitcast array (T.ptr $ boxStructOfType (T.ptr $ arrayStructType ptrType)) -- Box(type, &Array(len, &data[])

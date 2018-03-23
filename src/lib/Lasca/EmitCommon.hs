@@ -155,7 +155,7 @@ sizeOfType tpe = do
     sizeof <- ptrtoint nullptr intType
     return sizeof
 
-gcMalloc size = callFn (funcType ptrType [intType]) "gcMalloc" [size]
+gcMalloc size = callBuiltin "gcMalloc" [size]
 
 gcMallocType tpe = do
     size <- sizeOfType tpe
@@ -173,11 +173,11 @@ arrayTypePtrOp = constOp $ constRef ptrType "_ARRAY"
 stringTypePtr = constRef ptrType "_STRING"
 stringTypePtrOp = constOp $ stringTypePtr
 
-box t v = callFn (funcType ptrType [ptrType, ptrType]) "box" [t, v]
-boxBool v = callFn (funcType ptrType [intType]) "boxBool" [v] -- todo change to i1
-boxInt v = callFn (funcType ptrType [intType]) "boxInt" [v]
-boxFloat64 v = callFn (funcType ptrType [T.double]) "boxFloat64" [v]
-unbox t v = callFn (funcType ptrType [ptrType, ptrType]) "unbox" [t, v]
+box t v = callBuiltin "box" [t, v]
+boxBool v = callBuiltin "boxBool" [v] -- todo change to i1
+boxInt v = callBuiltin "boxInt" [v]
+boxFloat64 v = callBuiltin "boxFloat64" [v]
+unbox t v = callBuiltin "unbox" [t, v]
 
 
 boxLit (S.BoolLit b) meta = boxBool (constIntOp (boolToInt b))
@@ -194,7 +194,7 @@ boxLit (S.StringLit s) meta = do
 createPosition S.NoPosition = createStruct [constInt 0, constInt 0] -- Postion (0, 0) means No Position. Why not.
 createPosition S.Position{S.sourceLine, S.sourceColumn} = createStruct [constInt sourceLine, constInt sourceColumn]
 
-boxArray values = callFn (T.FunctionType ptrType [intType] True) "boxArray" (constIntOp (length values) : values)
+boxArray values = callBuiltin "boxArray" (constIntOp (length values) : values)
 
 boxError name = do
     modify (\s -> s { generatedStrings = name : generatedStrings s })
@@ -202,7 +202,7 @@ boxError name = do
     let len = length name + 1
     let ref = global (stringStructType len) strLitName
     ref <- bitcast ref ptrType
-    callFn (funcType ptrType [ptrType]) "boxError" [ref]
+    callBuiltin "boxError" [ref]
 
 showSyms = show . map fst
 
@@ -224,11 +224,35 @@ boxClosure name mapping enclosedVars = do
 
     let sargs = sargsPtr
     sequence_ [asdf (constIntOp i, a) | (i, a) <- zip [0 .. argc] args]
-    callFn (funcType ptrType [intType, intType, ptrType]) "boxClosure" [constIntOp idx, constIntOp argc, sargsPtr]
+    callBuiltin "boxClosure" [constIntOp idx, constIntOp argc, sargsPtr]
 
 
 boolToInt True = 1
 boolToInt False = 0
+
+
+
+builtinFuncs = do
+  let external resType name params vararg attrs = (name, (resType, params, vararg, attrs))
+  Map.fromList $
+    [ external T.void  "initLascaRuntime" [("runtime", ptrType)] False []
+    , external ptrType "gcMalloc" [("size", intType)] False []
+    , external ptrType "box" [("t", ptrType), ("ptr", ptrType)] False [FA.GroupID 0]
+    , external ptrType "unbox" [("t", ptrType), ("ptr", ptrType)] False [FA.GroupID 0]
+    , external intType "unboxInt" [("ptr", ptrType)] False [FA.GroupID 0]
+    , external T.double "unboxFloat64" [("ptr", ptrType)] False [FA.GroupID 0]
+    , external ptrType "boxError" [("n", ptrType)] False [FA.GroupID 0]
+    , external ptrType "boxInt" [("d", intType)] False [FA.GroupID 0]
+    , external ptrType "boxBool" [("d", intType)] False [FA.GroupID 0]
+    , external ptrType "boxClosure" [("id", intType), ("argc", intType), ("argv", ptrType)] False []
+    , external ptrType "boxFloat64" [("d", T.double)] False [FA.GroupID 0]
+    , external ptrType "boxArray" [("size", intType)] True [FA.GroupID 0]
+    , external ptrType "runtimeBinOp"  [("code",  intType), ("lhs",  ptrType), ("rhs", ptrType)] False [FA.GroupID 0]
+    , external ptrType "runtimeUnaryOp"  [("code",  intType), ("expr",  ptrType)] False [FA.GroupID 0]
+    , external ptrType "runtimeApply"  [("func", ptrType), ("argc", intType), ("argv", ptrType), ("pos", positionStructType)] False []
+    , external ptrType "runtimeSelect" [("tree", ptrType), ("expr", ptrType), ("pos", positionStructType)] False [FA.GroupID 0]
+    , external T.void  "initEnvironment" [("argc", intType), ("argv", ptrType)] False []
+    ]
 
 declareStdFuncs = do
     externalConst ptrType "UNIT_SINGLETON"
@@ -245,25 +269,19 @@ declareStdFuncs = do
     externalConst ptrType "ARRAY"
     externalConst ptrType "_ARRAY"
     externalConst ptrType "_STRING"
-    external T.void  "initLascaRuntime" [("runtime", ptrType)] False []
-    external ptrType "gcMalloc" [("size", intType)] False []
-    external ptrType "box" [("t", ptrType), ("ptr", ptrType)] False [FA.GroupID 0]
-    external ptrType "unbox" [("t", ptrType), ("ptr", ptrType)] False [FA.GroupID 0]
-    external intType "unboxInt" [("ptr", ptrType)] False [FA.GroupID 0]
-    external T.double "unboxFloat64" [("ptr", ptrType)] False [FA.GroupID 0]
-    external ptrType "boxError" [("n", ptrType)] False [FA.GroupID 0]
-    external ptrType "boxInt" [("d", intType)] False [FA.GroupID 0]
-    external ptrType "boxBool" [("d", intType)] False [FA.GroupID 0]
-    external ptrType "boxClosure" [("id", intType), ("argc", intType), ("argv", ptrType)] False []
-    external ptrType "boxFloat64" [("d", T.double)] False [FA.GroupID 0]
-    external ptrType "boxArray" [("size", intType)] True [FA.GroupID 0]
-    external ptrType "runtimeBinOp"  [("code",  intType), ("lhs",  ptrType), ("rhs", ptrType)] False [FA.GroupID 0]
-    external ptrType "runtimeUnaryOp"  [("code",  intType), ("expr",  ptrType)] False [FA.GroupID 0]
-    external ptrType "runtimeApply"  [("func", ptrType), ("argc", intType), ("argv", ptrType), ("pos", positionStructType)] False []
-    external ptrType "runtimeSelect" [("tree", ptrType), ("expr", ptrType), ("pos", positionStructType)] False [FA.GroupID 0]
-    external T.void  "initEnvironment" [("argc", intType), ("argv", ptrType)] False []
+    forM (Map.toList builtinFuncs) $ \(name, args) -> do
+        let (restype, params, vararg, attrs) = args
+        external restype name params vararg attrs
   --  external ptrType "runtimeIsConstr" [("value", ptrType), ("name", ptrType)] False [FA.GroupID 0]
     addDefn $ AST.FunctionAttributes (FA.GroupID 0) [FA.ReadOnly]
+
+callBuiltin :: SBS.ShortByteString -> [AST.Operand] -> Codegen AST.Operand
+callBuiltin name args = do
+    let (restype, params, vararg, attrs) = builtinFuncs Map.! name
+        ps = map snd params
+        ftype = T.FunctionType restype ps vararg
+    call (global ftype name) args
+{-# INLINE callBuiltin #-}
 
 
 myshow funcsWithArities = do

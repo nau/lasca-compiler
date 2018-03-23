@@ -132,15 +132,15 @@ runPhases opts filename = do
     let ctx = _context state
     let mainModule = _currentModule state
     let mainFunctionName = NS mainModule "main"
-    let desugared = desugarExprs ctx desugarExpr named
+    let desugared = desugarPhase ctx named
     typed <- if mode opts == Static
              then typerPhase opts ctx filename desugared
              else return desugared
     when (printAst opts) $ putStrLn $ intercalate "\n" (map printExprWithType exprs)
 
     let desugared2 = lambdaLiftPhase ctx typed -- must be after typechecking
-    let desugared3 = delambdafy ctx desugared2 -- must be after typechecking
-    let mod = codegenPhase opts ctx filename desugared3 mainFunctionName
+    let desugared3 = delambdafyPhase ctx desugared2 -- must be after typechecking
+    let mod = codegenPhase ctx filename desugared3 mainFunctionName
     if exec opts then do
         when (verboseMode opts) $ putStrLn "Running JIT"
         runJIT opts mod
@@ -158,7 +158,8 @@ typerPhase opts ctx filename exprs = do
             let source = dir </> filename
             die $ (source ++ ":" ++ showTypeError e)
 
-codegenPhase opts ctx filename exprs mainFunctionName = do
+codegenPhase ctx filename exprs mainFunctionName = do
+    let opts = _lascaOpts ctx
     let modo = emptyModule filename
     let cgen = if mode opts == Static then EmitStatic.cgen else EmitDynamic.cgen
     runLLVM modo $  do
