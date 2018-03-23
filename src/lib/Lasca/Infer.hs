@@ -286,6 +286,7 @@ lookupEnv (TypeEnv env) x =
     case Map.lookup x env of
         Nothing -> do
             expr <- gets _current
+            Debug.traceM $ printf "Env %s" (show env)
             throwError $ UnboundVariable expr x
         Just s  -> do t <- instantiate s
                       return (nullSubst, t)
@@ -345,6 +346,18 @@ infer ctx env ex = case ex of
         setType $ Let (meta `withType` t1) x e1' EmptyExpr
 --        when (not $ Set.null $ ftv s1) $ error $ printf "%s: Global val %s has free type variables: !" (showPosition meta) (show x) (ftv s1)
         return (s1, t1)
+
+    Let meta x f@(Function _ name _ _ _) e2 -> do
+        (s1, t1) <- infer ctx env f
+        e1' <- gets _current
+        let env' = substitute s1 env
+            t'   = generalize env' t1
+        (s2, t2) <- infer ctx (env' `extend` (name, t')) e2
+        e2' <- gets _current
+        setType $ Let (meta `withType` t2) x e1' e2'
+        let subst = s2 `compose` s1
+    --    traceM $ printf "let %s: %s in %s = %s" x (show $ substitute subst t1) (show t2) (show subst)
+        return (subst, t2)
 
     Let meta x e1 e2 -> do
         (s1, t1) <- infer ctx env e1

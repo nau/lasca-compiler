@@ -1,6 +1,16 @@
+def test() = {
+    a = 1;
+    def inner(i) = {
+        def inner2(a) = a + 4;
+        a + 2 + i - inner2(100);
+    };
+    println(toString(inner(3)))
+--    println(toString(inner() + three()))
+}
 
 def main() = {
     b = println;
+    test();
     c = "Hello";
     a = { s, d -> b(c) };
     a("test", 1)

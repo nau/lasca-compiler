@@ -39,7 +39,7 @@ import qualified Lasca.Options as Opts
 
 data DesugarPhaseState = DesugarPhaseState {
     _modNames :: Names,
-    _currentFunctionName :: Name,
+    _functionStack :: [Name],
     _locals :: Map Name Type.Type,
     _outers :: Map Name Type.Type,
     _usedVars :: Set Name,
@@ -50,7 +50,7 @@ makeLenses ''DesugarPhaseState
 
 emptyDesugarPhaseState = DesugarPhaseState {
     _modNames = Map.empty,
-    _currentFunctionName = "",
+    _functionStack = [],
     _locals = Map.empty,
     _outers = Map.empty,
     _usedVars = Set.empty,
@@ -66,6 +66,9 @@ freshName n = do
 uncurryLambda expr = go expr ([], expr) where
   go (Lam _ name e) result = let (args, body) = go e result in (name : args, body)
   go e (args, _) = (args, e)
+
+curryLambda meta args expr = foldr (Lam meta) expr args
+
 
 --transform :: (Expr -> LLVM Expr) -> [Expr] -> LLVM [Expr]
 transform transformer exprs = sequence [transformExpr transformer expr | expr <- exprs]
@@ -123,35 +126,137 @@ transformExpr transformer expr = case expr of
         let argsWithTypes = reverse $ snd $ foldr funcTypeToLlvm (funcType, []) (reverse args)
         let argNames = Map.fromList argsWithTypes
         modify (\s -> s {
-            _currentFunctionName = name,
+            _functionStack = name : (_functionStack s),
             _locals = argNames,
             _outers = Map.empty,
             _usedVars = Set.empty } )
         e' <- go e1
+        functionStack %= tail
         transformer (Function meta name tpe args e')
     e -> transformer e
 
   where go e = transformExpr transformer e
 
-extractLambda meta args expr = do
+extractFunction meta name args expr = do
     state <- get
-    curFuncName <- gets _currentFunctionName
     let nms = _modNames state
     let syntactic = _syntacticAst state
     -- lambda args are in locals. Shadow outers with same names.
     let outerVars = Set.difference (Map.keysSet $ _outers state) (Map.keysSet $ _locals state)
     let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
     let enclosedArgs = map (\n -> (Arg n typeAny, _outers state Map.! n)) usedOuterVars
-    let (funcName', nms') = uniqueName (fromString $ (show curFuncName) ++ "_lambda") nms
+    let (funcName', nms') = uniqueName (fromString name) nms
     let funcName = Name $ Char8.unpack funcName'
     let asdf t = foldr (\(_, t) resultType -> TypeFunc t resultType) t enclosedArgs
     let meta' = (S.exprType %~ asdf) meta
     let func = S.Function meta' funcName typeAny (map fst enclosedArgs ++ args) expr
     modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
-    s <- get
---    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" funcName (show outerVars) (show usedOuterVars) (show s)
+--    s <- get
+--    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" (show funcName) (show outerVars) (show usedOuterVars) (show s)
     return (BoxFunc meta' funcName (map fst enclosedArgs))
 
+lambdaLiftPhase ctx exprs = let
+        (desugared, st) = runState (mapM lambdaLiftExpr exprs) emptyDesugarPhaseState
+        syn = _syntacticAst st
+    in syn ++ desugared
+
+    where
+      lambdaLiftExpr expr = case expr of
+          expr@(Ident _ n) -> do
+              usedVars %= Set.insert n
+              return expr
+          Array meta exprs -> do
+              exprs' <- mapM go exprs
+              return $ Array meta exprs'
+          Select meta tree expr -> do
+              tree' <- go tree
+              expr' <- go expr
+              return $ Select meta tree' expr'
+          (If meta cond true false) -> do
+              cond' <- go cond
+              true' <- go true
+              false' <- go false
+              return (If meta cond' true' false')
+          Match meta expr cases -> do
+              expr1 <- go expr
+              cases1 <- forM cases $ \(Case p expr) -> do
+                  e <- go expr
+                  return $ Case p e
+              return (Match meta expr1 cases1)
+          (Let meta n f@(Function _ name _ _ _) body) -> do
+              {- Hack. This transforms
+                  def outer() =
+                      let _1 = def inner(i) = i in
+                      let _2 = inner(2) in _2
+                  To
+                  def outer_inner(i) = i
+                  def outer() =
+                      let inner = BoxFunc outer_inner in
+                      let _2 = inner(2) in _2
+                  To avoid Ident rewriting and shadowing tracking.
+                  This is less efficient due to runtimeApply FFI calls instead of direct calls
+                  TODO: do proper lambdalifting.
+              -}
+              closure <- go f
+              body' <- go body
+              return (Let meta name closure body')
+          (Let meta n e body) -> do
+              case typeOf e of
+                TypeFunc a b -> locals %= Map.insert n a
+                _ -> locals %= Map.insert n typeAny
+              e' <- go e
+              body' <- go body
+              return (Let meta n e' body')
+          l@(Lam m a@(Arg n t) e) -> do
+              oldOuters <- gets _outers
+              oldUsedVars <- gets _usedVars
+              oldLocals <- gets _locals
+              modify (\s -> s { _outers = Map.union (_outers s) (_locals s) } )
+              let (args, e) = uncurryLambda l
+              let r = foldr (\(Arg n t) -> Map.insert n typeAny) Map.empty args
+              locals .= r
+              e' <- go e
+              modify (\s  -> s {_outers = oldOuters, _locals = oldLocals})
+              return (curryLambda m args e')
+          (Apply meta e args) -> do
+              e' <- go e
+              args' <- mapM go args
+      --        args' <- sequence [go arg | arg <- args]
+              return (Apply meta e' args')
+          f@(Function meta name tpe args e1) -> do
+              let funcTypeToLlvm (Arg name _) (TypeFunc a b, acc) = (b, (name, a) : acc)
+                  funcTypeToLlvm arg t = error $ "AAA2" ++ show arg ++ show t
+              let funcType = typeOf f
+              let argsWithTypes = reverse $ snd $ foldr funcTypeToLlvm (funcType, []) (reverse args)
+              let argNames = Map.fromList argsWithTypes
+              outerFuncStack <- gets _functionStack
+
+              res <- case outerFuncStack of
+                  [] -> do  modify (\s -> s {
+                                _functionStack = [name],
+                                _locals = argNames,
+                                _outers = Map.empty,
+                                _usedVars = Set.empty } )
+                            e' <- go e1
+                            return (Function meta name tpe args e')
+                  _  -> do  oldOuters <- gets _outers
+                            oldUsedVars <- gets _usedVars
+                            oldLocals <- gets _locals
+                            modify (\s -> s {
+                                _functionStack = name : (_functionStack s),
+                                _outers = Map.union (_outers s) (_locals s),
+                                _locals = argNames } )
+                            e' <- go e1
+                            stack <- gets _functionStack
+                            let fullName = List.intercalate "_" (map show . reverse $ stack)
+                            r <- extractFunction meta fullName args e'
+                            modify (\s  -> s {_outers = oldOuters, _locals = oldLocals})
+                            return r
+
+              functionStack %= tail
+              return res
+          e -> return e
+          where go e = lambdaLiftExpr e
 
 delambdafy ctx exprs = let
         (desugared, st) = runState (mapM delambdafyExpr exprs) emptyDesugarPhaseState
@@ -189,16 +294,20 @@ delambdafy ctx exprs = let
               body' <- go body
               return (Let meta n e' body')
           l@(Lam m a@(Arg n t) e) -> do
-              oldOuters <- gets _outers
-              oldUsedVars <- gets _usedVars
-              oldLocals <- gets _locals
+              state <- get
+              let stack = state^.functionStack
+                  oldOuters = _outers state
+                  oldUsedVars = _usedVars state
+                  oldLocals = _locals state
               modify (\s -> s { _outers = Map.union (_outers s) (_locals s) } )
               let (args, e) = uncurryLambda l
               let r = foldr (\(Arg n t) -> Map.insert n typeAny) Map.empty args
               locals .= r
               e' <- go e
-              res <- extractLambda m args e'
+              let fullName = List.intercalate "_" (map show . reverse $ Name "lambda" : stack)
+              res <- extractFunction m fullName args e'
               modify (\s  -> s {_outers = oldOuters, _locals = oldLocals})
+
               return res
           (Apply meta e args) -> do
               e' <- go e
@@ -212,11 +321,12 @@ delambdafy ctx exprs = let
               let argsWithTypes = reverse $ snd $ foldr funcTypeToLlvm (funcType, []) (reverse args)
               let argNames = Map.fromList argsWithTypes
               modify (\s -> s {
-                  _currentFunctionName = name,
+                  _functionStack = name : (_functionStack s),
                   _locals = argNames,
                   _outers = Map.empty,
                   _usedVars = Set.empty } )
               e' <- go e1
+              functionStack %= tail
               return (Function meta name tpe args e')
           e -> return e
           where go e = delambdafyExpr e

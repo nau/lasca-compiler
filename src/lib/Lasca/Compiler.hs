@@ -137,8 +137,10 @@ runPhases opts filename = do
              then typerPhase opts ctx filename desugared
              else return desugared
     when (printAst opts) $ putStrLn $ intercalate "\n" (map printExprWithType exprs)
-    let desugared2 = delambdafy ctx typed -- must be after typechecking
-    let mod = codegenPhase opts ctx filename desugared2 mainFunctionName
+
+    let desugared2 = lambdaLiftPhase ctx typed -- must be after typechecking
+    let desugared3 = delambdafy ctx desugared2 -- must be after typechecking
+    let mod = codegenPhase opts ctx filename desugared3 mainFunctionName
     if exec opts then do
         when (verboseMode opts) $ putStrLn "Running JIT"
         runJIT opts mod

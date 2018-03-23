@@ -22,4 +22,4 @@ Apparently the right way to print int64_t in printf/snprintf family functions is
     uint64_t i;
     printf("%" PRId64 "\n", i);
 
-Fucking hell.
+Sigh.

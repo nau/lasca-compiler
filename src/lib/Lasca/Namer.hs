@@ -48,6 +48,7 @@ data NamerPhaseState = NamerPhaseState {
     _exportedNames :: Map Name (Set Name),
     _exportedTypes :: Map Name (Set Name),
     _locals :: MSet.MultiSet Name,
+    _callStack :: [Name],
     _context :: Ctx
 } deriving (Show)
 makeLenses ''NamerPhaseState
@@ -59,6 +60,7 @@ emptyNamerPhaseState opts = NamerPhaseState {
     _exportedNames = Map.empty,
     _exportedTypes = Map.empty,
     _locals = MSet.empty,
+    _callStack = [],
     _context = emptyCtx opts
 }
 
@@ -256,14 +258,26 @@ namerTransform expr = do
             args' <- mapM go args
             return (Apply meta e' args')
         Function meta name tpe args e1 -> do
-            locals .= MSet.fromList (map (\(Arg n t) -> n) args)
-            e' <- go e1
 --            Debug.traceM $ printf "Current Function %s" (show name)
-            locals .= MSet.empty
-            curMod <- gets _currentModule
-            let fqn = NS curMod name
-            context.globalFunctions %= Map.insert fqn expr
-            return (Function meta fqn tpe args e')
+            let argNames = MSet.fromList (map (\(Arg n t) -> n) args)
+            outerStack <- gets _callStack
+            callStack %= (:) name
+            case outerStack of
+                [] -> do  locals .= argNames
+                          e' <- go e1
+                          callStack %= tail
+                          curMod <- gets _currentModule
+                          let fqn = NS curMod name
+                          context.globalFunctions %= Map.insert fqn expr
+                          locals .= MSet.empty
+                          return (Function meta fqn tpe args e')
+                _  -> do  oldLocals <- gets _locals
+                          let names = MSet.insert name argNames
+                          locals %= MSet.union names
+                          e' <- go e1
+                          callStack %= tail
+                          locals .= MSet.insert name oldLocals
+                          return (Function meta name tpe args e')
         e -> return e
         where go e = namerTransform e
 

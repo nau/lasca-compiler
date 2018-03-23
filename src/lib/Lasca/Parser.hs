@@ -394,6 +394,7 @@ factor =  try floatingLiteral
       <|> try variable
       <|> try matchExpr
       <|> try closure
+      <|> try function
       <|> ifthen
       <|> block
       <|> parens expr
