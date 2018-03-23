@@ -209,7 +209,7 @@ updateMeta f e =
         Lam meta name expr -> Lam (f meta) name (updateMeta f expr)
         Select meta tree expr -> Select (f meta) (updateMeta f tree) (updateMeta f expr)
         Match meta expr cases -> Match (f meta) (updateMeta f expr) (map (\(Case pat e) -> Case pat (updateMeta f e)) cases)
-        this@BoxFunc{} -> this
+        this@Closure{} -> this
         Function meta name tpe args expr -> Function (f meta) name tpe args (updateMeta f expr)
         If meta cond tr fl -> If (f meta) (updateMeta f cond) (updateMeta f tr) (updateMeta f fl)
         Let meta name expr body -> Let (f meta) name (updateMeta f expr) (updateMeta f body)

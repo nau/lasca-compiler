@@ -101,7 +101,7 @@ cgen ctx this@(S.Select meta tree expr) = cgenSelect ctx this
 cgen ctx this@(S.Apply meta (S.Ident _ "unary-") [expr]) = cgenApplyUnOp ctx this
 cgen ctx this@(S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = cgenApplyBinOp ctx this
 cgen ctx (S.Apply meta expr args) = cgenApply ctx meta expr args
-cgen ctx (S.BoxFunc _ funcName enclosedVars) = do
+cgen ctx (S.Closure _ funcName enclosedVars) = do
     modState <- gets moduleState
     let mapping = functions modState
     boxClosure funcName mapping enclosedVars

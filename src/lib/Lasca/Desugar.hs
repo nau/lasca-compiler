@@ -153,7 +153,7 @@ extractFunction meta name args expr = do
     modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
 --    s <- get
 --    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" (show funcName) (show outerVars) (show usedOuterVars) (show s)
-    return (BoxFunc meta' funcName (map fst enclosedArgs))
+    return (Closure meta' funcName (map fst enclosedArgs))
 
 lambdaLiftPhase ctx exprs = let
         (desugared, st) = runState (mapM lambdaLiftExpr exprs) emptyDesugarPhaseState
@@ -191,7 +191,7 @@ lambdaLiftPhase ctx exprs = let
                   To
                   def outer_inner(i) = i
                   def outer() =
-                      let inner = BoxFunc outer_inner in
+                      let inner = Closure outer_inner in
                       let _2 = inner(2) in _2
                   To avoid Ident rewriting and shadowing tracking.
                   This is less efficient due to runtimeApply FFI calls instead of direct calls

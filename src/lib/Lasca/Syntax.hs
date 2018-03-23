@@ -53,7 +53,7 @@ data Expr
     | Lam Meta Arg Expr
     | Select Meta Expr Expr
     | Match Meta Expr [Case]
-    | BoxFunc Meta Name [Arg]   -- LLVM codegen only
+    | Closure Meta Name [Arg]   -- LLVM codegen only
     | Function Meta Name Type [Arg] Expr
     | If Meta Expr Expr Expr
     | Let Meta Name Expr Expr
@@ -77,7 +77,7 @@ metaLens = Lens.lens (fst . getset) (snd . getset)
               Let meta name expr body -> (meta, \ m -> Let m name expr body)
               Array meta exprs -> (meta, \ m -> Array m exprs)
               Data meta name tvars constrs -> (meta, \ m -> Data m name tvars constrs)
-              BoxFunc meta name args -> (meta, \m -> BoxFunc m name args)
+              Closure meta name args -> (meta, \m -> Closure m name args)
               Module meta name -> (meta, \m -> Module m name)
               Import meta name -> (meta, \m -> Import m name)
               _ -> error $ "Should not happen :) " ++ show expr
@@ -101,7 +101,7 @@ instance Eq Expr where
     (Lam _ nl l) == (Lam _ nr r) = nl == nr && l == r
     (Select _ nl l) == (Select _ nr r) = nl == nr && l == r
     (Match _ nl l) == (Match _ nr r) = nl == nr && l == r
-    (BoxFunc _ nl l) == (BoxFunc _ nr r) = nl == nr && l == r
+    (Closure _ nl l) == (Closure _ nr r) = nl == nr && l == r
     (Function metal nl _ al l) == (Function metar nr _ ar r) = nl == nr && al == ar && l == r && (metal^.isExternal) == (metar^.isExternal)
     (If _ nl al l) == (If _ nr ar r) = nl == nr && al == ar && l == r
     (Let _ nl al l) == (Let _ nr ar r) = nl == nr && al == ar && l == r
@@ -119,7 +119,7 @@ instance Show Expr where
   show (Lam _ a e) = printf "{ %s -> %s }\n" (show a) (show e)
   show (Select _ e f) = printf "%s.%s" (show e) (show f)
   show (Match _ e cs) = printf "match %s {\n%s}\n" (show e) (show cs)
-  show (BoxFunc meta f args) = printf "BoxFunc %s($args)" (show f) (intercalate "," $ map show args)
+  show (Closure meta f args) = printf "Closure %s($args)" (show f) (intercalate "," $ map show args)
   show (Function meta f t args b) =
       if _isExternal meta then
            printf "extern def %s(%s): %s\n" f (intercalate "," $ map show args) (show t)
@@ -146,7 +146,7 @@ instance DebugPrint Expr where
         Lam _ a e -> printf "{ %s -> %s }\n" (printExprWithType a) (printExprWithType e)
         Select _ e f -> printf "%s.%s" (printExprWithType e) (printExprWithType f)
         Match _ e cs -> printf "match %s {\n%s}\n" (printExprWithType e) (show cs)
-        BoxFunc meta f args -> printf "BoxFunc %s(%s)" (show f) (intercalate "," $ map show args)
+        Closure meta f args -> printf "Closure %s(%s)" (show f) (intercalate "," $ map show args)
         Function meta f t args b -> if _isExternal meta
             then printf "extern def %s(%s): %s\n" (show f) (intercalate "," $ map printExprWithType args) (show t)
             else printf "--  %s : %s\ndef %s(%s): %s = %s\n" (show f) (show meta) (show f) (intercalate "," $ map printExprWithType args) (show t) (printExprWithType b)

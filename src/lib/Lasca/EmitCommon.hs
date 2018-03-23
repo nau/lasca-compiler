@@ -136,7 +136,7 @@ defineStringConstants expr = case expr of
     S.Module{} -> return ()
     S.Import{} -> return ()
     S.EmptyExpr -> return ()
-    S.BoxFunc{} -> return ()
+    S.Closure{} -> return ()
     S.Data{} -> return ()
 
 -------------------------------------------------------------------------------
