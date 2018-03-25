@@ -46,17 +46,6 @@ Neptune = Body(
 
 Sun = Body(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, SolarMass)
 
-def go(bodies: [Body], i, pxyz: [Float]) = {
-    body = bodies[i];
-    updatedPs = [
-        pxyz[0] + body.vx * body.mass,
-        pxyz[1] + body.vy * body.mass,
-        pxyz[2] + body.vz * body.mass
-    ];
-    if i == 0 then updatedPs else go(bodies, i - 1, updatedPs)
-}
-
-
 def offsetMomentum(object, px, py, pz) = {
     vx = -px / SolarMass;
     vy = -py / SolarMass;
@@ -65,6 +54,16 @@ def offsetMomentum(object, px, py, pz) = {
 }
 
 def init(bodies: [Body]) = {
+    def go(bodies: [Body], i, pxyz: [Float]) = {
+        body = bodies[i];
+        updatedPs = [
+            pxyz[0] + body.vx * body.mass,
+            pxyz[1] + body.vy * body.mass,
+            pxyz[2] + body.vz * body.mass
+        ];
+        if i == 0 then updatedPs else go(bodies, i - 1, updatedPs)
+    };
+
     len = arrayLength(bodies);
     pxyzInit = [0.0, 0.0, 0.0];
     offsets = go(bodies, len - 1, pxyzInit);
@@ -103,24 +102,25 @@ def updateIdx(bodies: [Body], i, j, from: Body, to: Body) = [
     if i == 4 then from else if j == 4 then to else bodies[4]
 ]
 
-def loop2(bodies: [Body], i: Int, j: Int, dt: Float) =
-    if j < 5 then {
-        res = advanceInner(bodies[i], bodies[j], dt);
-        newBodies = updateIdx(bodies, i, j, res[0], res[1]);
-        loop2(newBodies, i, j + 1, dt);
-    } else bodies
-
-def loop1(bodies, i, dt) =
-    if i < 5 then {
-        res = loop2(bodies, i, i + 1, dt);
-        loop1(res, i + 1, dt);
-    } else bodies
-
 def update(body: Body, dt: Float) = Body(
     body.x + dt * body.vx, body.y + dt * body.vy, body.z + dt * body.vz,
     body.vx, body.vy, body.vz, body.mass)
 
 def advance(bodies: [Body], dt) = {
+    def loop1(bodies, i, dt) = {
+        def loop2(bodies: [Body], i: Int, j: Int, dt: Float) =
+            if j < 5 then {
+                res = advanceInner(bodies[i], bodies[j], dt);
+                newBodies = updateIdx(bodies, i, j, res[0], res[1]);
+                loop2(newBodies, i, j + 1, dt);
+            } else bodies;
+
+        if i < 5 then {
+            res = loop2(bodies, i, i + 1, dt);
+            loop1(res, i + 1, dt);
+        } else bodies
+    };
+
     bodies1 = loop1(bodies, 0, dt); -- FIXME
     [
       update(bodies1[0], dt),
@@ -133,15 +133,16 @@ def advance(bodies: [Body], dt) = {
 
 def squared(x: Float, y: Float, z: Float) = x * x + y * y + z * z
 
-def energyInner(from, to) = {
-    dx = from.x - to.x;
-    dy = from.y - to.y;
-    dz = from.z - to.z;
-    distance = sqrt(squared(dx, dy, dz));
-    from.mass * to.mass / distance;
-}
-
 def energy(bodies: [Body]) = {
+    def energyInner(from, to) = {
+        dx = from.x - to.x;
+        dy = from.y - to.y;
+        dz = from.z - to.z;
+        distance = sqrt(squared(dx, dy, dz));
+        from.mass * to.mass / distance;
+    };
+
+
     sun = bodies[0];
     jupiter = bodies[1];
     saturn = bodies[2];

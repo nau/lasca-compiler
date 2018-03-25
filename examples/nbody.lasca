@@ -44,17 +44,6 @@ Neptune = [
 
 Sun = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, SolarMass]
 
-
-def go(bodies: [[Float]], i: Int, pxyz: [Float]) = {
-    body = bodies[i];
-    updatedPs = [
-        pxyz[0] + body[3] * body[6],
-        pxyz[1] + body[4] * body[6],
-        pxyz[2] + body[5] * body[6]
-    ];
-    if i == 0 then updatedPs else go(bodies, i - 1, updatedPs);
-}
-
 def offsetMomentum(object: [Float], px, py, pz) = {
     vx = -px / SolarMass;
     vy = -py / SolarMass;
@@ -66,6 +55,16 @@ def offsetMomentum(object: [Float], px, py, pz) = {
 }
 
 def init(bodies: [[Float]]) = {
+    def go(bodies: [[Float]], i: Int, pxyz: [Float]) = {
+        body = bodies[i];
+        updatedPs = [
+            pxyz[0] + body[3] * body[6],
+            pxyz[1] + body[4] * body[6],
+            pxyz[2] + body[5] * body[6]
+        ];
+        if i == 0 then updatedPs else go(bodies, i - 1, updatedPs);
+    };
+
     len = arrayLength(bodies);
     pxyzInit = [0.0, 0.0, 0.0];
     offsets = go(bodies, len - 1, pxyzInit);
@@ -73,30 +72,30 @@ def init(bodies: [[Float]]) = {
     [sun, bodies[1], bodies[2], bodies[3], bodies[4]]
 }
 
-def advanceInner(from: [Float], to: [Float], dt) = {
-    dx = from[0] - to[0];
-    dy = from[1] - to[1];
-    dz = from[2] - to[2];
-    dSquared = dx * dx + dy * dy + dz * dz;
-    distance = sqrt(dSquared);
-    mag = dt / (dSquared * distance);
-    toMass = to[6];
-    fromMass = from[6];
-    toMassMag = toMass * mag;
-    fromMassMag = fromMass * mag;
-    fromVx = from[3] - dx * toMassMag;
-    fromVy = from[4] - dy * toMassMag;
-    fromVz = from[5] - dz * toMassMag;
-    toVx   = to[3]   + dx * fromMassMag;
-    toVy   = to[4]   + dy * fromMassMag;
-    toVz   = to[5]   + dz * fromMassMag;
-    [
-      [from[0], from[1], from[2], fromVx, fromVy, fromVz, fromMass],
-      [to[0], to[1], to[2], toVx, toVy, toVz, toMass]
-    ]
-}
-
 def advance(bodies: [[Float]], dt) = {
+    def advanceInner(from: [Float], to: [Float], dt) = {
+        dx = from[0] - to[0];
+        dy = from[1] - to[1];
+        dz = from[2] - to[2];
+        dSquared = dx * dx + dy * dy + dz * dz;
+        distance = sqrt(dSquared);
+        mag = dt / (dSquared * distance);
+        toMass = to[6];
+        fromMass = from[6];
+        toMassMag = toMass * mag;
+        fromMassMag = fromMass * mag;
+        fromVx = from[3] - dx * toMassMag;
+        fromVy = from[4] - dy * toMassMag;
+        fromVz = from[5] - dz * toMassMag;
+        toVx   = to[3]   + dx * fromMassMag;
+        toVy   = to[4]   + dy * fromMassMag;
+        toVz   = to[5]   + dz * fromMassMag;
+        [
+          [from[0], from[1], from[2], fromVx, fromVy, fromVz, fromMass],
+          [to[0], to[1], to[2], toVx, toVy, toVz, toMass]
+        ]
+    };
+
     r01 = advanceInner(bodies[0], bodies[1], dt);
     r02 = advanceInner(r01[0],    bodies[2], dt);
     r03 = advanceInner(r02[0],    bodies[3], dt);
@@ -153,15 +152,15 @@ def advance(bodies: [[Float]], dt) = {
 
 def squared(x: Float, y, z) = x * x + y * y + z * z
 
-def energyInner(from: [Float], to: [Float]) = {
-    dx = from[0] - to[0];
-    dy = from[1] - to[1];
-    dz = from[2] - to[2];
-    distance = sqrt(squared(dx, dy, dz));
-    from[6] * to[6] / distance;
-}
-
 def energy(bodies: [[Float]]) = {
+    def energyInner(from: [Float], to: [Float]) = {
+        dx = from[0] - to[0];
+        dy = from[1] - to[1];
+        dz = from[2] - to[2];
+        distance = sqrt(squared(dx, dy, dz));
+        from[6] * to[6] / distance;
+    };
+
     sun = bodies[0];
     sunVx = sun[3];
     sunVy = sun[4];

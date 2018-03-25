@@ -22,17 +22,17 @@ stretchDepth = maxDepth + 1
 
 def pow(n) = if n == 0 then 1 else 2 * pow(n-1)
 
-def loop2(d, i, niter, c) = if i == niter then c else loop2(d, i + 1, niter, c + check(make(d)))
-
-def loop1(d, i) = if i < ((maxDepth - d) / 2 + 1) then {
-    dd = d + i * 2;
-    niter = pow(maxDepth - dd + minDepth);
-    c = loop2(dd, 0, niter, 0);
-    println("${niter}\t trees of depth ${d}\t check: ${c}");
-    loop1(d, i + 1);
-} else 0
-
 def main() = {
+    def loop1(d, i) = if i < ((maxDepth - d) / 2 + 1) then {
+        def loop2(d, i, niter, c) =
+            if i == niter then c else loop2(d, i + 1, niter, c + check(make(d)));
+        dd = d + i * 2;
+        niter = pow(maxDepth - dd + minDepth);
+        c = loop2(dd, 0, niter, 0);
+        println("${niter}\t trees of depth ${d}\t check: ${c}");
+        loop1(d, i + 1);
+    } else 0;
+
     c = check(make(stretchDepth));
     println("stretch tree of depth ${stretchDepth}\t check: ${c}");
     longLivedTree = make(maxDepth);

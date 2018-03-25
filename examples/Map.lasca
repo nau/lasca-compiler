@@ -73,16 +73,19 @@ def balance(k, x, l, r) = {
     else Bin(l.size + r.size + 1, k, x, l, r)
 }
 
-def insertGo(self, orig, kx, x) = match self {
-    Tip -> single(orig, x)
-    Bin(s, ky, y, l, r) -> match runtimeCompare(kx, ky) {
-        -1 -> let l1 = insertGo(l, orig, kx, x) in balance(ky, y, l1, r)
-        1  -> let r1 = insertGo(r, orig, kx, x) in balance(ky, y, l, r1)
-        0  -> Bin(s, orig, x, l, r)
-    }
-}
 
-def insert(self, k, x) = insertGo(self, k, k, x)
+
+def insert(self, k, x) = {
+    def insertGo(self, orig, kx, x) = match self {
+        Tip -> single(orig, x)
+        Bin(s, ky, y, l, r) -> match runtimeCompare(kx, ky) {
+            -1 -> let l1 = insertGo(l, orig, kx, x) in balance(ky, y, l1, r)
+            1  -> let r1 = insertGo(r, orig, kx, x) in balance(ky, y, l, r1)
+            0  -> Bin(s, orig, x, l, r)
+        }
+    };
+    insertGo(self, k, k, x)
+}
 
 def minViewSure(k, x, l, r) = match l {
     Tip -> View(k, x, r)
