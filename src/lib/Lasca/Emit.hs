@@ -1,7 +1,9 @@
-module Lasca.Emit (codegenTop) where
+module Lasca.Emit (codegenTop, collectGlobals) where
 
 import Text.Printf
 import Data.String
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 
 import Control.Monad.State
 import Control.Lens.Operators
@@ -30,6 +32,15 @@ genExternalFuncWrapper f@(Function meta name returnType externArgs (Literal _ (S
         wrapped <- EmitStatic.resolveBoxing returnType EmitStatic.anyTypeVar res
         ret wrapped
 genExternalFuncWrapper other = error $ "genExternalFuncWrapper got " ++ (show other)
+
+
+collectGlobals ctx exprs = do
+    execState (mapM toplevel exprs) ctx
+  where
+    toplevel expr = case expr of
+        Let meta name expr EmptyExpr -> globalVals %= Map.insert name expr
+        Function meta name tpe args body -> globalFunctions %= Map.insert name expr
+        _ -> return ()
 
 codegenTop ctx cgen topExpr = case topExpr of
     this@(Let meta name expr _) -> do

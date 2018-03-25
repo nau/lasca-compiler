@@ -44,6 +44,7 @@ data DesugarPhaseState = DesugarPhaseState {
     _outers :: Map Name Type.Type,
     _usedVars :: Set Name,
     _syntacticAst :: [Expr],
+    _renames :: Map Name Name,
     _freshId :: Int
 } deriving (Show)
 makeLenses ''DesugarPhaseState
@@ -55,6 +56,7 @@ emptyDesugarPhaseState = DesugarPhaseState {
     _outers = Map.empty,
     _usedVars = Set.empty,
     _syntacticAst = [],
+    _renames = Map.empty,
     _freshId = 1
 }
 
@@ -155,6 +157,24 @@ extractFunction meta name args expr = do
 --    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" (show funcName) (show outerVars) (show usedOuterVars) (show s)
     return (Closure meta' funcName (map fst enclosedArgs))
 
+{-
+  Only basic lambda lifting. Buggy as hell.
+  Lifted function renaming is wrong in some cases of shadowing. FIXME
+  Only simple inner functions are lifted. FIXME
+  Inner function can be self recursive.
+  Inner functions can't be mutually recursive. FIXME
+  Only define before use semantics.  FIXME: allow mutual recursion
+  Doesn't support passing enclosed arguments to inner recursive functions: FIXME
+  def outer() =
+      a = 1
+      def fact(n) = if n == 1 then a else n * fact(n - 1)
+      fact(2)
+  Should be rewritten as:
+  def outer_fact($a, n) = if n == 1 then $a else n * fact($a, n - 1)
+  def outer() =
+        a = 1
+        outer_fact(a, 2)
+-}
 lambdaLiftPhase ctx exprs = let
         (desugared, st) = runState (mapM lambdaLiftExpr exprs) emptyDesugarPhaseState
         syn = _syntacticAst st
@@ -162,9 +182,11 @@ lambdaLiftPhase ctx exprs = let
 
     where
       lambdaLiftExpr expr = case expr of
-          expr@(Ident _ n) -> do
+          Ident meta name -> do
+              renames <- gets _renames
+              let n = Map.findWithDefault name name renames
               usedVars %= Set.insert n
-              return expr
+              return $ Ident meta n
           Array meta exprs -> do
               exprs' <- mapM go exprs
               return $ Array meta exprs'
@@ -183,29 +205,15 @@ lambdaLiftPhase ctx exprs = let
                   e <- go expr
                   return $ Case p e
               return (Match meta expr1 cases1)
-          (Let meta n f@(Function _ name _ _ _) body) -> do
-              {- Hack. This transforms
-                  def outer() =
-                      let _1 = def inner(i) = i in
-                      let _2 = inner(2) in _2
-                  To
-                  def outer_inner(i) = i
-                  def outer() =
-                      let inner = Closure outer_inner in
-                      let _2 = inner(2) in _2
-                  To avoid Ident rewriting and shadowing tracking.
-                  This is less efficient due to runtimeApply FFI calls instead of direct calls
-                  TODO: do proper lambdalifting.
-              -}
-              closure <- go f
-              body' <- go body
-              return (Let meta name closure body')
           (Let meta n e body) -> do
+              oldRenames <- gets _renames
               case typeOf e of
                 TypeFunc a b -> locals %= Map.insert n a
                 _ -> locals %= Map.insert n typeAny
+              renames %= Map.delete n
               e' <- go e
               body' <- go body
+              renames .= oldRenames
               return (Let meta n e' body')
           l@(Lam m a@(Arg n t) e) -> do
               oldOuters <- gets _outers
@@ -246,9 +254,10 @@ lambdaLiftPhase ctx exprs = let
                                 _functionStack = name : (_functionStack s),
                                 _outers = Map.union (_outers s) (_locals s),
                                 _locals = argNames } )
-                            e' <- go e1
                             stack <- gets _functionStack
                             let fullName = List.intercalate "_" (map show . reverse $ stack)
+                            renames %= Map.insert name (Name fullName)
+                            e' <- go e1
                             r <- extractFunction meta fullName args e'
                             modify (\s  -> s {_outers = oldOuters, _locals = oldLocals})
                             return r

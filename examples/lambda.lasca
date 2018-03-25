@@ -1,10 +1,6 @@
 def test() = {
-    a = 1;
-    def inner(i) = {
-        def inner2(a) = a + 4;
-        a + 2 + i - inner2(100);
-    };
-    println(toString(inner(3)))
+    def fact(n) = if n == 1 then 1 else n * fact(n - 1) ;
+    println(toString(fact(3)))
 --    println(toString(inner() + three()))
 }
 

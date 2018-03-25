@@ -240,7 +240,6 @@ namerTransform expr = do
             e' <- go e
             curMod <- gets _currentModule
             let fqn = NS curMod name
-            context.globalVals %= Map.insert fqn expr
             return (Let meta fqn e' EmptyExpr)
         Let meta n e body -> do
             locals %= MSet.insert n
@@ -268,7 +267,6 @@ namerTransform expr = do
                           callStack %= tail
                           curMod <- gets _currentModule
                           let fqn = NS curMod name
-                          context.globalFunctions %= Map.insert fqn expr
                           locals .= MSet.empty
                           return (Function meta fqn tpe args e')
                 _  -> do  oldLocals <- gets _locals

@@ -158,10 +158,11 @@ typerPhase opts ctx filename exprs = do
             let source = dir </> filename
             die $ (source ++ ":" ++ showTypeError e)
 
-codegenPhase ctx filename exprs mainFunctionName = do
-    let opts = _lascaOpts ctx
+codegenPhase context filename exprs mainFunctionName = do
+    let opts = _lascaOpts context
     let modo = emptyModule filename
     let cgen = if mode opts == Static then EmitStatic.cgen else EmitDynamic.cgen
+    let ctx = collectGlobals context exprs
     runLLVM modo $  do
         declareStdFuncs
         fmt <- genFunctionMap exprs
