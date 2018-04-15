@@ -1,8 +1,6 @@
 module Lasca.JIT (
-  jit,
   runJIT,
-  withOptimizedModule,
-  getLLAsString
+  withOptimizedModule
 ) where
 
 import           Data.Int
@@ -11,7 +9,7 @@ import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.IO as TIO
 import System.IO
-import           Foreign.Ptr          (FunPtr, Ptr, castFunPtr)
+import           Foreign.Ptr          
 import           Foreign.C.String
 import           Foreign.C.Types
 import Foreign.Marshal.Array
@@ -24,49 +22,71 @@ import qualified LLVM.AST             as AST
 import           LLVM.CodeModel
 import           LLVM.Context
 import           LLVM.Module          as Mod
-import           LLVM.Target
+import LLVM.Target hiding (withHostTargetMachine)
 
 import           LLVM.Analysis
 import           LLVM.PassManager
 import           LLVM.Transforms
+import           LLVM.OrcJIT
+import           LLVM.Linking (loadLibraryPermanently, getSymbolAddressInProcess)
+import qualified LLVM.CodeGenOpt as CodeGenOpt
+import qualified LLVM.CodeModel as CodeModel
+import qualified LLVM.Relocation as Reloc
 --import LLVM.Pretty (ppllvm)
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as Char8
 
-import qualified LLVM.ExecutionEngine as EE
-
 foreign import ccall "dynamic" mainFun :: FunPtr (Int -> Ptr CString -> IO ()) -> Int -> Ptr CString -> IO ()
-
-jit :: Context -> (EE.MCJIT -> IO a) -> IO a
-jit c = EE.withMCJIT c optlevel model ptrelim fastins
-  where
-    optlevel = Just 2  -- optimization level
-    model    = Nothing -- code model ( Default )
-    ptrelim  = Nothing -- frame pointer elimination
-    fastins  = Nothing -- fast instruction selection
 
 passes :: Int -> PassSetSpec
 passes level = defaultCuratedPassSetSpec { optLevel = Just (fromIntegral level) }
 
+withHostTargetMachine :: (TargetMachine -> IO a) -> IO a
+withHostTargetMachine f = do
+  initializeAllTargets
+  triple <- getProcessTargetTriple
+  cpu <- getHostCPUName
+  features <- getHostCPUFeatures
+  (target, _) <- lookupTarget Nothing triple
+  withTargetOptions $ \options ->
+    withTargetMachine target triple cpu features options Reloc.PIC CodeModel.Default CodeGenOpt.Default f
+
+
+resolver :: IRCompileLayer l -> SymbolResolver
+resolver compileLayer =
+  SymbolResolver
+    (\s -> findSymbol compileLayer s True)
+    (\s ->
+       fmap
+         (\a -> JITSymbol a (JITSymbolFlags False True))
+         (getSymbolAddressInProcess s))
+nullResolver :: MangledSymbol -> IO JITSymbol
+nullResolver s = return (JITSymbol 0 (JITSymbolFlags False False))
+
+{-
+  Read https://purelyfunctional.org/posts/2018-04-02-llvm-hs-jit-external-function.html
+  for explanation.
+-}
 runJIT :: LascaOpts -> AST.Module -> IO ()
 runJIT opts mod = do
---    let llvmAst = ppllvm mod
---    TIO.putStrLn $ LT.toStrict llvmAst
+    b <- loadLibraryPermanently Nothing
+    unless (not b) (error "Couldn’t load library")
     withOptimizedModule opts mod $ \context m -> do
-        jit context $ \executionEngine -> do
-            let args = lascaFiles opts
-            let len = length args
-            EE.withModuleInEngine executionEngine m $ \ee -> do
-                mainFunPtr <- EE.getFunction ee (AST.Name "main")
-                case mainFunPtr of
-                    Just fn -> do
-                        cargs <- mapM newCString args
-                        array <- mallocArray len
-                        pokeArray array cargs
-                        mainFun (castFunPtr fn :: FunPtr (Int -> Ptr CString -> IO ())) len array
-                    Nothing -> putStrLn "Couldn't find function start!"
-            return ()
+        withHostTargetMachine $ \tm ->
+            withObjectLinkingLayer $ \linkingLayer ->
+                withIRCompileLayer linkingLayer tm $ \compileLayer -> do
+                    withModule compileLayer m
+                        (resolver compileLayer) $ \moduleHandle -> do
+                            mainSymbol <- mangleSymbol compileLayer "main"
+                            JITSymbol mainFn _ <- findSymbol compileLayer mainSymbol True
+                            let args = lascaFiles opts
+                            let len = length args
+                            cargs <- mapM newCString args
+                            array <- mallocArray len
+                            pokeArray array cargs
+                            result <- mainFun (castPtrToFunPtr (wordPtrToPtr mainFn)) len array
+                            return ()
 
 withOptimizedModule opts mod f = withContext $ \context -> do
     withModuleFromAST context mod $ \m ->
@@ -79,12 +99,3 @@ withOptimizedModule opts mod f = withContext $ \context -> do
                 s <- moduleLLVMAssembly m
                 Char8.putStrLn s
             f context m
-
-getLLAsString :: AST.Module -> IO String
-getLLAsString mod = do
-    s <- withContext $ \context ->
-        withModuleFromAST context mod $ \m -> do
-            putStrLn "Getting LLVM assembly..."
-            moduleLLVMAssembly m
-    return $ Char8.unpack s
-
