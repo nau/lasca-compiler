@@ -129,8 +129,8 @@ unify (l `TypeFunc` r) (l' `TypeFunc` r')  = do
     s2 <- unify (substitute s1 r) (substitute s1 r')
     return (s2 `compose` s1)
 
-unify (TypeIdent "Any") t = return nullSubst
-unify t (TypeIdent "Any") = return nullSubst
+unify TypeAny t = return nullSubst
+unify t TypeAny = return nullSubst
 unify t (TVar a) = bind a t
 unify (TVar a) t = bind a t
 unify (TypeIdent a) (TypeIdent b) | a == b = return nullSubst
@@ -278,8 +278,8 @@ generalize env t  = case Set.toList $ ftv t `Set.difference` ftv env of
     vars -> Forall vars t
 
 ops = Map.fromList [
-    ("and", TypeBool `TypeFunc` TypeBool `TypeFunc` TypeBool),
-    ("or", TypeBool `TypeFunc` TypeBool `TypeFunc` TypeBool)
+    ("and", TypeBool ==> TypeBool ==> TypeBool),
+    ("or", TypeBool ==> TypeBool ==> TypeBool)
     ]
 
 --lookupEnv :: TypeEnv -> String -> Infer (Subst, Type)
@@ -402,12 +402,12 @@ infer ctx env ex = case ex of
 
     Lam meta arg@(Arg x argType) e -> do
         case argType of
-            TypeIdent "Any" -> do
+            TypeAny -> do
                 tv <- fresh
                 let env' = env `extend` (x, tv)
                 (s1, t1) <- infer ctx env' e
                 e' <- gets _current
-                let resultType = substitute s1 tv `TypeFunc` t1
+                let resultType = substitute s1 tv ==> t1
                 setCurrentExpr $ Lam (meta `withType` resultType) arg e'
                 return (s1, resultType)
             _ -> do
@@ -415,7 +415,7 @@ infer ctx env ex = case ex of
                 let env' = env `extend` (x, argType)
                 (s1, t1) <- infer ctx env' e
                 e' <- gets _current
-                let resultType = substitute s1 argType `TypeFunc` t1
+                let resultType = substitute s1 argType ==> t1
                 setCurrentExpr $ Lam (meta `withType` resultType) arg e'
                 return (s1, resultType)
 
@@ -423,21 +423,21 @@ infer ctx env ex = case ex of
         if meta^.isExternal
         then do
             let argToType (Arg _ t) = t
-            let f z t = z `TypeFunc` t
+            let f z t = z ==> t
             let ts = map argToType args
             let t = normalizeType $ foldr f tpe ts
             return (nullSubst, t)
         else do
             -- functions are recursive, so do Fixpoint for inference
-            let nameArg = Arg name typeAny
+            let nameArg = Arg name TypeAny
             let curried = foldr (Lam meta) e (nameArg : args)
             tv <- fresh
             tv1 <- fresh
             -- fixpoint
             (s1, ttt) <- infer ctx env curried
-            let composedType = substitute s1 (TypeFunc ttt tv1)
+            let composedType = substitute s1 (ttt ==> tv1)
 --            traceM $ "composedType " ++ show composedType
-            s2 <- unify composedType ((tv `TypeFunc` tv) `TypeFunc` tv)
+            s2 <- unify composedType ((tv ==> tv) ==> tv)
             let (s, t) = (s2 `compose` s1, substitute s2 tv1)
             e' <- gets _current
             let uncurried = foldr (\_ (Lam _ _ e) -> e) e' (nameArg : args)
@@ -455,7 +455,7 @@ infer ctx env ex = case ex of
 
     Array meta exprs -> do
         tv <- fresh
-        let tpe = foldr (\_ t -> tv `TypeFunc` t) (typeArray tv) exprs
+        let tpe = foldr (\_ t -> tv ==> t) (TypeArray tv) exprs
         (subst, t, exprs') <- inferPrim ctx env exprs tpe
         setCurrentExpr $ Array (meta `withType` t) exprs'
         return (subst, t)
@@ -507,13 +507,22 @@ infer ctx env ex = case ex of
             (ConstrPattern name args) -> do          -- (name -> a, a -> User)
                 (_, t) <- lookupEnv env name           -- t = String -> User
                 result <- fresh                        -- result = a
-                (env', pattype) <- foldM (\ (accEnv, accType) pat -> do { (e, t) <- getPatType env pat; return (accEnv `mappend` e, TypeFunc t accType) }) (env, result) (reverse args)
+
+                let inferArgs (accEnv, accType) pat = do
+                      (e, t) <- getPatType env pat
+                      return (accEnv `mappend` e, t ==> accType)
+
+                (env', pattype) <- foldM inferArgs (env, result) (reverse args)
   --                  Debug.traceM $ "Holy shit " ++ show env' ++ ", " ++ show pattype
                 subst <- unify pattype t
                 let restpe = substitute subst result
                 let env'' =  substitute subst env'
   --                  Debug.traceM $ printf "restpe = %s" (show restpe)
                 return (env'', restpe)                   -- (name -> String, User)
+
+
+
+                
 
     Literal meta lit -> do
         let tpe = litType lit
@@ -524,8 +533,8 @@ infer ctx env ex = case ex of
 litType (IntLit _)    = TypeInt
 litType (FloatLit _)  = TypeFloat
 litType (BoolLit _)   = TypeBool
-litType (StringLit _) = typeString
-litType UnitLit       = typeUnit
+litType (StringLit _) = TypeString
+litType UnitLit       = TypeUnit
 
 
 inferPrim :: Ctx -> TypeEnv -> [Expr] -> Type -> Infer (Subst, Type, [Expr])
@@ -573,7 +582,7 @@ createTypeEnvironment exprs = List.foldl' folder [] exprs
     folder types (Data _ typeName tvars constrs) = do
         let genTypes :: DataConst -> [(Name, Type)]
             genTypes (DataConst name args) =
-                let tpe = normalizeType $ foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args
+                let tpe = normalizeType $ foldr (\(Arg _ tpe) acc -> tpe ==> acc) dataTypeIdent args
                     accessors = map (\(Arg n tpe) -> (n, normalizeType $ TypeFunc dataTypeIdent tpe)) args
                 in (name, tpe) : accessors
         let constructorsTypes = constrs >>= genTypes
@@ -596,13 +605,13 @@ data Deps = Deps {
 } deriving (Show, Eq, Ord)
 makeLenses ''Deps
 
-anal exprs = execState (traverseTree asdf exprs) (
+anal exprs = execState (traverseTree collectDeps exprs) (
     Deps { _modName = Name "undefined", _curFuncCalls = Set.empty, _nodes = Map.empty })
 
 inModule name mod = nameToList mod `List.isPrefixOf` nameToList name
 
-asdf :: Expr -> State Deps ()
-asdf expr = do
+collectDeps :: Expr -> State Deps ()
+collectDeps expr = do
     state <- get
     case expr of
         Module _ name -> modName .= name

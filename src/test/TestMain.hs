@@ -66,7 +66,7 @@ parserTests = testGroup "Parser tests"
 typerTests = testGroup "Typer tests"
   [
     testCase "Pattern matching" $
-      parseAndInferExpr "match true { true -> 1 false -> 2 }" @?= (TypeIdent "Int")
+      parseAndInferExpr "match true { true -> 1 false -> 2 }" @?= TypeInt
   ]
 
 data Mode = Dyn | Stat | Both

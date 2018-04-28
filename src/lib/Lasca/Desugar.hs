@@ -102,7 +102,7 @@ transformExpr transformer expr = case expr of
     (Let meta n e body) -> do
         case typeOf e of
           TypeFunc a b -> locals %= Map.insert n a
-          _ -> locals %= Map.insert n typeAny
+          _ -> locals %= Map.insert n TypeAny
         e' <- go e
         body' <- go body
         transformer (Let meta n e' body')
@@ -112,7 +112,7 @@ transformExpr transformer expr = case expr of
         modify (\s -> s { _outers = Map.union (_outers s) (_locals s) } )
         let r = case typeOf l of
                     TypeFunc a b -> Map.singleton n a
-                    _ -> Map.singleton n typeAny
+                    _ -> Map.singleton n TypeAny
         locals .= r
         e' <- go e
         res <- transformer (Lam m a e')
@@ -147,12 +147,12 @@ extractFunction meta name args expr = do
     -- lambda args are in locals. Shadow outers with same names.
     let outerVars = Set.difference (Map.keysSet $ _outers state) (Map.keysSet $ _locals state)
     let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
-    let enclosedArgs = map (\n -> (Arg n typeAny, _outers state Map.! n)) usedOuterVars
+    let enclosedArgs = map (\n -> (Arg n TypeAny, _outers state Map.! n)) usedOuterVars
     let (funcName', nms') = uniqueName (fromString name) nms
     let funcName = Name $ Char8.unpack funcName'
-    let asdf t = foldr (\(_, t) resultType -> TypeFunc t resultType) t enclosedArgs
+    let asdf t = foldr (\(_, t) resultType -> t ==> resultType) t enclosedArgs
     let meta' = (S.exprType %~ asdf) meta
-    let func = S.Function meta' funcName typeAny (map fst enclosedArgs ++ args) expr
+    let func = S.Function meta' funcName TypeAny (map fst enclosedArgs ++ args) expr
     modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
 --    s <- get
 --    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" (show funcName) (show outerVars) (show usedOuterVars) (show s)
@@ -210,7 +210,7 @@ lambdaLiftPhase ctx exprs = let
               oldRenames <- gets _renames
               case typeOf e of
                 TypeFunc a b -> locals %= Map.insert n a
-                _ -> locals %= Map.insert n typeAny
+                _ -> locals %= Map.insert n TypeAny
               renames %= Map.delete n
               e' <- go e
               body' <- go body
@@ -222,7 +222,7 @@ lambdaLiftPhase ctx exprs = let
               oldLocals <- gets _locals
               modify (\s -> s { _outers = Map.union (_outers s) (_locals s) } )
               let (args, e) = uncurryLambda l
-              let r = foldr (\(Arg n t) -> Map.insert n typeAny) Map.empty args
+              let r = foldr (\(Arg n t) -> Map.insert n TypeAny) Map.empty args
               locals .= r
               e' <- go e
               modify (\s  -> s {_outers = oldOuters, _locals = oldLocals})
@@ -299,7 +299,7 @@ delambdafyPhase ctx exprs = let
           (Let meta n e body) -> do
               case typeOf e of
                 TypeFunc a b -> locals %= Map.insert n a
-                _ -> locals %= Map.insert n typeAny
+                _ -> locals %= Map.insert n TypeAny
               e' <- go e
               body' <- go body
               return (Let meta n e' body')
@@ -311,7 +311,7 @@ delambdafyPhase ctx exprs = let
                   oldLocals = _locals state
               modify (\s -> s { _outers = Map.union (_outers s) (_locals s) } )
               let (args, e) = uncurryLambda l
-              let r = foldr (\(Arg n t) -> Map.insert n typeAny) Map.empty args
+              let r = foldr (\(Arg n t) -> Map.insert n TypeAny) Map.empty args
               locals .= r
               e' <- go e
               let fullName = List.intercalate "_" (map show . reverse $ Name "lambda" : stack)
@@ -391,15 +391,15 @@ genMatch ctx m@(Match meta expr cases) = do
 genMatch ctx expr = return expr
 
 genFail ctx resultType = do
-    let die = Ident (metaType (TypeFunc typeString resultType)) (NS "Prelude" "die")
-    let expr = Apply (metaType resultType) die [Literal (metaType typeString) $ StringLit "Match error!"]
+    let die = Ident (metaType (TypeString ==> resultType)) (NS "Prelude" "die")
+    let expr = Apply (metaType resultType) die [Literal (metaType TypeString) $ StringLit "Match error!"]
     expr
 
 genPattern ctx exprType resultType lhs ptrn rhs = case ptrn of
     WildcardPattern -> const rhs
     VarPattern name -> const (Let (metaType resultType) name lhs rhs)
     LitPattern literal -> do
-      let eqFun = Ident (metaType $ TypeFunc exprType (TypeFunc exprType TypeBool)) "=="
+      let eqFun = Ident (metaType $ exprType ==> exprType ==> TypeBool) "=="
       let applyEq = Apply (metaType TypeBool) eqFun [lhs, Literal (metaType exprType) literal]
       If (metaType resultType) applyEq rhs
     ConstrPattern name args -> cond
@@ -415,11 +415,11 @@ genPattern ctx exprType resultType lhs ptrn rhs = case ptrn of
         constrCheck = if isStaticMode ctx
             then do
                 let tag = ctorTag exprType name
-                    checkTag = Ident (metaType $ TypeFunc exprType (TypeFunc TypeInt TypeBool)) (NS "Prelude" "runtimeCheckTag")
+                    checkTag = Ident (metaType $ exprType ==> TypeInt ==> TypeBool) (NS "Prelude" "runtimeCheckTag")
                 Apply (metaType TypeBool) checkTag [lhs, Literal (metaType TypeInt) (IntLit tag)]
             else do
-                let isConstr = Ident (metaType $ TypeFunc exprType (TypeFunc typeString TypeBool)) (NS "Prelude" "runtimeIsConstr")
-                    ctorName = Literal (metaType typeString) $ StringLit (show name)
+                let isConstr = Ident (metaType $ exprType ==> TypeString ==> TypeBool) (NS "Prelude" "runtimeIsConstr")
+                    ctorName = Literal (metaType TypeString) $ StringLit (show name)
                 Apply (metaType TypeBool) isConstr [lhs, ctorName]
         constrMap = ctx ^. constructorArgs
         checkArgs nm fail =  case Map.lookup nm constrMap of
@@ -427,7 +427,7 @@ genPattern ctx exprType resultType lhs ptrn rhs = case ptrn of
             Just constrArgs | length args == length constrArgs -> do
                 let argParam = zip args constrArgs
                 foldr (\(a, Arg n t) acc -> do
-                        let select = Select (metaType t) lhs (Ident (metaType $ TypeFunc exprType t) n)
+                        let select = Select (metaType t) lhs (Ident (metaType $ exprType ==> t) n)
                         genPattern ctx t resultType select a acc fail
                     ) rhs argParam
             Just constrArgs -> error $ printf "Constructor %s has %d parameters, but %d given"

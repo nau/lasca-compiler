@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleInstances #-}
 module Lasca.Syntax where
 
 --import           Data.Text
@@ -37,7 +38,7 @@ instance Show Position where
     show NoPosition = "<unknown>"
     show Position{sourceLine = sl, sourceColumn = sc} = show sl ++ ":" ++ show sc
 
-emptyMeta = Meta { pos = NoPosition, _exprType = typeAny, _isExternal = False, _annots = [] }
+emptyMeta = Meta { pos = NoPosition, _exprType = TypeAny, _isExternal = False, _annots = [] }
 
 withMetaPos line col = emptyMeta { pos = Position {sourceLine = line, sourceColumn = col} }
 
@@ -219,18 +220,32 @@ isStaticMode ctx = mode (_lascaOpts ctx) == Static
 
 builtinFunctions :: Map Name Type
 builtinFunctions = Map.fromList [
-    ("unary-", Forall [a] (ta `TypeFunc` ta)),
-    (":=", Forall [a] ((typeRef ta) `TypeFunc` ta `TypeFunc` (typeRef ta))),
-    ("+",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
-    ("-",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
-    ("*",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
-    ("/",  Forall [a] (ta `TypeFunc` ta `TypeFunc` ta)),
-    ("==", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
-    ("!=", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
-    ("<",  Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
-    ("<=", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
-    (">",  Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool)),
-    (">=", Forall [a] (ta `TypeFunc` ta `TypeFunc` TypeBool))
+    ("unary-", Forall [a] (ta ==> ta)),
+    (":=", Forall [a] (TypeRef ta ==> ta ==> TypeRef ta)),
+    ("+",  Forall [a] (ta ==> ta ==> ta)),
+    ("-",  Forall [a] (ta ==> ta ==> ta)),
+    ("*",  Forall [a] (ta ==> ta ==> ta)),
+    ("/",  Forall [a] (ta ==> ta ==> ta)),
+    ("==", Forall [a] (ta ==> ta ==> TypeBool)),
+    ("!=", Forall [a] (ta ==> ta ==> TypeBool)),
+    ("<",  Forall [a] (ta ==> ta ==> TypeBool)),
+    ("<=", Forall [a] (ta ==> ta ==> TypeBool)),
+    (">",  Forall [a] (ta ==> ta ==> TypeBool)),
+    (">=", Forall [a] (ta ==> ta ==> TypeBool))
   ]
   where a = TV "a"
         ta = TVar a
+
+{- Expr Builder DSL -}
+
+class Literal a where
+    lit :: a -> Lit
+
+instance Literal Int where lit v = IntLit v
+instance Literal Double where lit v = FloatLit v
+instance Literal Bool where lit v = BoolLit v
+instance Literal () where lit v = UnitLit
+instance Literal String where lit v = StringLit v
+
+infixr ==>
+(==>) = TypeFunc

@@ -223,7 +223,7 @@ variable = do
 
 makeType name = if Char.isLower $ List.head name then TVar $ TV name else TypeIdent (Name name)
 
-typeTerm = ((\t -> TypeApply (TypeIdent "Array") [t]) <$> brackets typeExpr)
+typeTerm = (TypeArray <$> brackets typeExpr)
        <|> parens typeExpr
        <|> (makeType <$> identifier)
 
@@ -253,11 +253,11 @@ function = do
     meta <- getMeta
     name <- identifier
     args <- parens (commaSep arg)
-    tpe <- option typeAny typeAscription
+    tpe <- option TypeAny typeAscription
     reservedOp "="
     body <- expr
     let meta' = meta {
-        _exprType = foldr (TypeFunc . const typeAny) tpe args, -- We need this for dynamic mode code generation
+        _exprType = foldr (TypeFunc . const TypeAny) tpe args, -- We need this for dynamic mode code generation
         _annots = fromMaybe [] annots
     }
     return (Function meta' (Name name) tpe args body)
@@ -281,7 +281,7 @@ extern = do
 arg :: Parser Arg
 arg = do
     name <- identifier
-    tpe <- option typeAny typeAscription
+    tpe <- option TypeAny typeAscription
     return (Arg (Name name) tpe)
 
 argsApply = parens (commaSep expr)
@@ -303,7 +303,7 @@ letins = do
     meta <- getMeta
     defs <- commaSep $ do
         var <- identifier
-        option typeAny typeAscription
+        option TypeAny typeAscription
         reservedOp "="
         val <- expr
         return (Name var, val)
@@ -318,15 +318,15 @@ closure = braces cls
             letin <- blockStmts
             meta <- getMeta
             let (lambdas, _) = foldr (\arg (body, tpe) ->
-                        let lambdaType = TypeFunc typeAny tpe in
-                        (Lam (meta `withType` lambdaType) arg body, lambdaType)) (letin, typeAny) args
+                        let lambdaType = TypeFunc TypeAny tpe in
+                        (Lam (meta `withType` lambdaType) arg body, lambdaType)) (letin, TypeAny) args
             return lambdas
 
 data LetVal = Named Name Expr | Stmt Expr
 
 valdef f = do
     ident <- identifier
-    option typeAny typeAscription
+    option TypeAny typeAscription
     reservedOp "="
     e <- expr
     return (f (Name ident) e)
@@ -335,7 +335,7 @@ vardef f = do
     reserved "var"
     meta <- getMeta
     ident <- identifier
-    option typeAny typeAscription
+    option TypeAny typeAscription
     reservedOp "="
     e <- expr
     let refExpr = Apply meta (Ident meta "Ref") [e]

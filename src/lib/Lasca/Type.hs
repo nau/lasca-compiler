@@ -80,16 +80,15 @@ typeName tpe = case tpe of
 
 infixr `TypeFunc`
 
-pattern TypeInt   = TypeIdent "Int"
-pattern TypeFloat = TypeIdent "Float"
-pattern TypeBool  = TypeIdent "Bool"
-
-typeAny = TypeIdent "Any"
-typeString = TypeIdent "String"
-typeUnit = TypeIdent "Unit"
-typeArray t = TypeApply (TypeIdent "Array") [t]
-typeArrayInt = typeArray TypeInt
-typeRef a = TypeApply (TypeIdent "Ref") [a]
+pattern TypeInt      = TypeIdent "Int"
+pattern TypeFloat    = TypeIdent "Float"
+pattern TypeBool     = TypeIdent "Bool"
+pattern TypeAny      = TypeIdent "Any"
+pattern TypeString   = TypeIdent "String"
+pattern TypeUnit     = TypeIdent "Unit"
+pattern TypeArray t  = TypeApply (TypeIdent "Array") [t]
+pattern TypeArrayInt = TypeArray TypeInt
+pattern TypeRef a    = TypeApply (TypeIdent "Ref") [a]
 
 isAny (TypeIdent "Any") = True
 isAny _ = False

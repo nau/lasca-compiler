@@ -69,7 +69,7 @@ isDataType ctx tpe = case tpe of
 isFuncType (TypeFunc _ _) = True
 isFuncType _ = False
 
-lascaPrimitiveTypes = Set.fromList [TypeInt, TypeFloat, TypeBool, typeString, typeAny, typeUnit]
+lascaPrimitiveTypes = Set.fromList [TypeInt, TypeFloat, TypeBool, TypeString, TypeAny, TypeUnit]
 lascaUnboxedTypes =  Set.fromList [TypeInt, TypeFloat]
 anyTypeVar = TVar $ TV "a"
 
