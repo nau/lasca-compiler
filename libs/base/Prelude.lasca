@@ -17,6 +17,7 @@ extern def codePointAt(s: String, index: Int): Int = "codePointAt"
 extern def concat(strings: Array String): String = "concat"
 extern def die(msg: String): a = "die"
 extern def runtimeIsConstr(constr: a, name: String): Bool = "runtimeIsConstr"
+extern def runtimeCheckTag(value: a, tag: Int): Bool = "runtimeCheckTag"
 extern def runtimeCompare(lhs: a, rhs: a): Int = "runtimeCompare"
 
 data Ref a = Ref(getRef: a)

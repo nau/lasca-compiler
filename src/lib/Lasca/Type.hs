@@ -72,6 +72,12 @@ instance Pretty Type where
         (Forall targs t) -> "∀" <> parens (hsep (punctuate comma (map pretty targs))) <+> "=>" <+> pretty t
 
 
+typeName tpe = case tpe of
+    TypeIdent n -> n
+    TypeApply t _ -> typeName t
+    Forall _ t -> typeName t
+    _ -> error $ "Should not happen. Type name can't be " ++ show tpe
+
 infixr `TypeFunc`
 
 pattern TypeInt   = TypeIdent "Int"

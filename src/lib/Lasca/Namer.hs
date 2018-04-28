@@ -98,9 +98,12 @@ processData expr@(Data meta name tvars consts) = do
     context.dataDefs %= (:) expr
     context.dataDefsNames %= Set.insert name
   where
-    processConstructors constrs = forM constrs processConstructor
+    processConstructors constrs = do
+        mapping <- foldM processConstructor Map.empty (zip constrs [0..])
+        constructorTags %= Map.insert name mapping
+        return ()
 
-    processConstructor (DataConst constrName args) = do
+    processConstructor mapping (DataConst constrName args, tag) = do
         processConstructorArguments constrName args
         if null args then globalVals %= Map.insert constrName expr
         else do let dataTypeIdent = TypeIdent name
@@ -108,7 +111,7 @@ processData expr@(Data meta name tvars consts) = do
                     m = meta `withType` tpe
                     funDef = Function meta constrName dataTypeIdent args EmptyExpr
                 globalFunctions %= Map.insert constrName funDef
-        return ()
+        return $ Map.insert constrName tag mapping
 
     processConstructorArguments constrName args = do
         let mapping = List.foldl' (\fields (arg@(Arg n t), idx)  ->

@@ -45,6 +45,10 @@ emptyMetaWithType s = emptyMeta { _exprType = s }
 
 withType meta t = meta { _exprType = t }
 
+setType expr t = Lens.set (metaLens . exprType) t expr
+
+metaType t = withType emptyMeta t
+
 data Expr
     = EmptyExpr
     | Literal Meta Lit
@@ -176,6 +180,7 @@ emptyCtx opts = Context {
     _globalVals = Map.empty,
     _dataDefs = [],
     _constructorArgs = Map.empty,
+    _constructorTags = Map.empty,
     _dataDefsNames = Set.empty,
     _dataDefsFields = Map.empty
 }
@@ -204,10 +209,13 @@ data Ctx = Context {
     _globalVals :: Map Name Expr,
     _dataDefs :: [Expr],
     _constructorArgs :: Map Name [Arg], -- data -> constructor -> fields
+    _constructorTags :: Map Name (Map Name Int), -- data -> constructor -> tag
     _dataDefsNames :: Set Name,
     _dataDefsFields :: Map Name (Map Name (Arg, Int))
 } deriving (Show, Eq)
 makeLenses ''Ctx
+
+isStaticMode ctx = mode (_lascaOpts ctx) == Static
 
 builtinFunctions :: Map Name Type
 builtinFunctions = Map.fromList [

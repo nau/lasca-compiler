@@ -35,6 +35,7 @@ import qualified Debug.Trace as Debug
 import Lasca.Codegen
 import Lasca.Type as Type
 import Lasca.Syntax as S
+import Lasca.Infer
 import qualified Lasca.Options as Opts
 
 data DesugarPhaseState = DesugarPhaseState {
@@ -363,37 +364,71 @@ desugarPhase ctx exprs = let
     desugarExpr expr = do
         let desugarFunc = desugarAndOr . desugarAssignment . desugarUnaryMinus
         let expr1 = desugarFunc expr
-        expr2 <- genMatch ctx expr1
+        return expr1
+
+patmatPhase ctx exprs = let
+    (desugared, st) = runState (transform desugarExpr exprs) emptyDesugarPhaseState
+    syn = _syntacticAst st
+  in syn ++ desugared
+
+  where
+    desugarExpr expr = do
+        expr2 <- genMatch ctx expr
         return expr2
 
 
 --genMatch :: Ctx -> Expr -> Expr
 genMatch ctx m@(Match meta expr []) = error $ "Should be at least on case in match expression: " ++ show m
-genMatch ctx (Match meta expr cases) = do
+genMatch ctx m@(Match meta expr cases) = do
     matchName <- freshName "$match"
-    let body = foldr (\(Case p e) acc -> genPattern ctx (Ident (expr ^. metaLens) matchName) p e acc
-                      ) genFail cases
-    return $ Let meta matchName expr body
+    let resultType = meta ^. exprType
+    let exprType = typeOf expr
+    let body = foldr (\(Case p e) acc -> genPattern ctx exprType resultType (Ident (expr ^. metaLens) matchName) p e acc
+                      ) (genFail ctx resultType) cases
+    let res = Let (withType meta resultType) matchName expr body
+--    Debug.traceM $ printf "getMatch rewrite:\n%s\n============= becomes =========\n%s" (show m) (show res)
+    return $ res
 genMatch ctx expr = return expr
 
-genFail = Apply emptyMeta (Ident emptyMeta (NS "Prelude" "die")) [Literal emptyMeta $ StringLit "Match error!"]
+genFail ctx resultType = do
+    let die = Ident (metaType (TypeFunc typeString resultType)) (NS "Prelude" "die")
+    let expr = Apply (metaType resultType) die [Literal (metaType typeString) $ StringLit "Match error!"]
+    expr
 
-genPattern ctx lhs WildcardPattern rhs = const rhs
-genPattern ctx lhs (VarPattern name) rhs = const (Let emptyMeta name lhs rhs)
-genPattern ctx lhs (LitPattern literal) rhs =
-    If emptyMeta (Apply emptyMeta (Ident emptyMeta "==") [lhs, Literal emptyMeta literal]) rhs
-genPattern ctx lhs (ConstrPattern name args) rhs = cond
-  where
-    cond fail = If emptyMeta constrCheck (checkArgs name fail) fail
-    constrCheck = Apply emptyMeta (Ident emptyMeta (NS "Prelude" "runtimeIsConstr"))
-                      [lhs, Literal emptyMeta $ StringLit (show name)]
-    constrMap = ctx ^. constructorArgs
-    checkArgs nm fail =  case Map.lookup nm constrMap of
-        Nothing -> fail
-        Just constrArgs | length args == length constrArgs -> do
-            let argParam = zip args constrArgs
-            foldr (\(a, Arg n _) acc ->
-                    genPattern ctx (Select emptyMeta lhs (Ident emptyMeta n)) a acc fail
-                ) rhs argParam
-        Just constrArgs -> error $ printf "Constructor %s has %d parameters, but %d given"
-            (show nm) (length constrArgs) (length args) -- TODO box this error
+genPattern ctx exprType resultType lhs ptrn rhs = case ptrn of
+    WildcardPattern -> const rhs
+    VarPattern name -> const (Let (metaType resultType) name lhs rhs)
+    LitPattern literal -> do
+      let eqFun = Ident (metaType $ TypeFunc exprType (TypeFunc exprType TypeBool)) "=="
+      let applyEq = Apply (metaType TypeBool) eqFun [lhs, Literal (metaType exprType) literal]
+      If (metaType resultType) applyEq rhs
+    ConstrPattern name args -> cond
+      where
+        cond fail = If (metaType resultType) constrCheck (checkArgs name fail) fail
+
+        ctorTag tpe ctorName = do
+            let tpName = typeName tpe
+                ctors = fromMaybe (error "ctorTag") $ Map.lookup tpName $ ctx ^. constructorTags
+                tag = fromMaybe (error "ctorTag") $ Map.lookup ctorName ctors
+            tag
+
+        constrCheck = if isStaticMode ctx
+            then do
+                let tag = ctorTag exprType name
+                    checkTag = Ident (metaType $ TypeFunc exprType (TypeFunc TypeInt TypeBool)) (NS "Prelude" "runtimeCheckTag")
+                Apply (metaType TypeBool) checkTag [lhs, Literal (metaType TypeInt) (IntLit tag)]
+            else do
+                let isConstr = Ident (metaType $ TypeFunc exprType (TypeFunc typeString TypeBool)) (NS "Prelude" "runtimeIsConstr")
+                    ctorName = Literal (metaType typeString) $ StringLit (show name)
+                Apply (metaType TypeBool) isConstr [lhs, ctorName]
+        constrMap = ctx ^. constructorArgs
+        checkArgs nm fail =  case Map.lookup nm constrMap of
+            Nothing -> fail
+            Just constrArgs | length args == length constrArgs -> do
+                let argParam = zip args constrArgs
+                foldr (\(a, Arg n t) acc -> do
+                        let select = Select (metaType t) lhs (Ident (metaType $ TypeFunc exprType t) n)
+                        genPattern ctx t resultType select a acc fail
+                    ) rhs argParam
+            Just constrArgs -> error $ printf "Constructor %s has %d parameters, but %d given"
+                (show nm) (length constrArgs) (length args) -- TODO box this error

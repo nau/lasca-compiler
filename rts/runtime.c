@@ -352,6 +352,11 @@ Box* runtimeIsConstr(Box* value, Box* constrName) {
     return &FALSE_SINGLETON;
 }
 
+Box* runtimeCheckTag(Box* value, int64_t tag) {
+    DataValue* dv = value->value.ptr;
+    return (dv->tag == tag) ? &TRUE_SINGLETON : &FALSE_SINGLETON;
+}
+
 /* =================== Arrays ================= */
 
 
@@ -443,7 +448,7 @@ const Box* __attribute__ ((pure)) toString(const Box* value) {
         return toString(dataValue->values[0]);
     } else if (!strcmp(type->name, "Unknown")) {
         String *name = (String *) value->value.ptr;
-        printf("AAAA!!! Undefined identifier %s\n", name->bytes);
+        printf("AAAA!!! Undefined identifier in toString %s\n", name->bytes);
         exit(1);
     } else {
         if (isUserType(value)) {

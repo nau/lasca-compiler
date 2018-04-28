@@ -185,7 +185,9 @@ cgenApplyBinOp ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) = do
     let rhsType = S.typeOf rhs
     let returnType = S.typeOf this
 --    Debug.traceM $ printf "Doing binop %s with type %s" (show this) (show $ S.typeOf op)
-    let (TypeFunc realLhsType (TypeFunc realRhsType _)) = S.typeOf op
+    let (realLhsType, realRhsType) = case S.typeOf op of
+                TypeFunc realLhsType (TypeFunc realRhsType _) -> (realLhsType, realRhsType)
+                _ -> error ("cgenApplyBinOp: Should not happen: " ++ show this ++ show (S.typeOf op))
 --    let realLhsType = TypeInt
 --    let realRhsType = TypeInt
     llhs <- resolveBoxing anyTypeVar realLhsType llhs'

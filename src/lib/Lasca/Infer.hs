@@ -7,6 +7,7 @@ module Lasca.Infer (
   normalizeType,
   typeCheck,
   inferExpr,
+  inferExprDefault,
   showTypeError,
   showPretty,
   defaultTyenv
@@ -291,15 +292,15 @@ lookupEnv (TypeEnv env) x =
         Just s  -> do t <- instantiate s
                       return (nullSubst, t)
 
-setType :: Expr -> Infer ()
-setType e = modify (\s -> s {_current = e })
+setCurrentExpr :: Expr -> Infer ()
+setCurrentExpr e = modify (\s -> s {_current = e })
 
 infer :: Ctx -> TypeEnv -> Expr -> Infer (Subst, Type)
 infer ctx env ex = case ex of
     Ident meta x -> do
         (s, t) <- lookupEnv env x
-    --    traceM $ printf "Ident %s: %s = %s" x (show t) (show s)
-        setType $ Ident (meta `withType` t) x
+--        traceM $ printf "Ident %s: %s = %s" (show x) (show t) (show s)
+        setCurrentExpr $ Ident (meta `withType` t) x
         return (s, t)
 
     Apply meta (Ident _ op) [e1, e2] | op `Map.member` ops -> do
@@ -336,14 +337,14 @@ infer ctx env ex = case ex of
             let subApplyType = substitute subst applyType
             let subExprType = substitute subst exprType
 --            Debug.traceM $ printf "%s === %s, subst %s" (show subExprType) (show subApplyType) (show subst)
-            setType $ Apply (meta `withType` subApplyType) expr1 args'
+            setCurrentExpr $ Apply (meta `withType` subApplyType) expr1 args'
             return (subst, subApplyType)
 
     Let meta x e1 EmptyExpr -> do
         (s1, t1) <- infer ctx env e1
         e1' <- gets _current
 --        Debug.traceM $ printf "Let %s = %s, type %s, subst %s, env %s" (show x) (show e1) (show t1) (show s1) (show env)
-        setType $ Let (meta `withType` t1) x e1' EmptyExpr
+        setCurrentExpr $ Let (meta `withType` t1) x e1' EmptyExpr
 --        when (not $ Set.null $ ftv s1) $ error $ printf "%s: Global val %s has free type variables: !" (showPosition meta) (show x) (ftv s1)
         return (s1, t1)
 
@@ -354,7 +355,7 @@ infer ctx env ex = case ex of
             t'   = generalize env' t1
         (s2, t2) <- infer ctx (env' `extend` (name, t')) e2
         e2' <- gets _current
-        setType $ Let (meta `withType` t2) x e1' e2'
+        setCurrentExpr $ Let (meta `withType` t2) x e1' e2'
         let subst = s2 `compose` s1
     --    traceM $ printf "let %s: %s in %s = %s" x (show $ substitute subst t1) (show t2) (show subst)
         return (subst, t2)
@@ -366,7 +367,7 @@ infer ctx env ex = case ex of
             t'   = generalize env' t1
         (s2, t2) <- infer ctx (env' `extend` (x, t')) e2
         e2' <- gets _current
-        setType $ Let (meta `withType` t2) x e1' e2'
+        setCurrentExpr $ Let (meta `withType` t2) x e1' e2'
         let subst = s2 `compose` s1
     --    traceM $ printf "let %s: %s in %s = %s" x (show $ substitute subst t1) (show t2) (show subst)
         return (subst, t2)
@@ -395,7 +396,7 @@ infer ctx env ex = case ex of
         let subst = substFalse `compose` substTrue `compose` substCond
         let resultType = substitute subst tv
 
-        setType $ If (meta `withType` resultType) cond' tr' fl'
+        setCurrentExpr $ If (meta `withType` resultType) cond' tr' fl'
     --    traceM $ printf "if %s then %s else %s: %s"  (show substCond) (show substTrue) (show substFalse) (show resultType)
         return (subst, resultType)
 
@@ -407,7 +408,7 @@ infer ctx env ex = case ex of
                 (s1, t1) <- infer ctx env' e
                 e' <- gets _current
                 let resultType = substitute s1 tv `TypeFunc` t1
-                setType $ Lam (meta `withType` resultType) arg e'
+                setCurrentExpr $ Lam (meta `withType` resultType) arg e'
                 return (s1, resultType)
             _ -> do
                 let generalizedArgType = generalize env argType
@@ -415,7 +416,7 @@ infer ctx env ex = case ex of
                 (s1, t1) <- infer ctx env' e
                 e' <- gets _current
                 let resultType = substitute s1 argType `TypeFunc` t1
-                setType $ Lam (meta `withType` resultType) arg e'
+                setCurrentExpr $ Lam (meta `withType` resultType) arg e'
                 return (s1, resultType)
 
     Function meta name tpe args e ->
@@ -440,7 +441,7 @@ infer ctx env ex = case ex of
             let (s, t) = (s2 `compose` s1, substitute s2 tv1)
             e' <- gets _current
             let uncurried = foldr (\_ (Lam _ _ e) -> e) e' (nameArg : args)
-            setType $ Function (meta `withType` t) name tpe args uncurried
+            setCurrentExpr $ Function (meta `withType` t) name tpe args uncurried
 --            traceM $ printf "def %s(%s): %s, subs: %s" name (List.intercalate "," $ map show args) (show t) (show s)
             return (s, t)
 
@@ -449,14 +450,14 @@ infer ctx env ex = case ex of
     Select meta tree expr -> do
         (s, t) <- infer ctx env (Apply meta expr [tree])
         (Apply _ e' [tree']) <- gets _current
-        setType $ Select (meta `withType` t) tree' e'
+        setCurrentExpr $ Select (meta `withType` t) tree' e'
         return (s, t)
 
     Array meta exprs -> do
         tv <- fresh
         let tpe = foldr (\_ t -> tv `TypeFunc` t) (typeArray tv) exprs
         (subst, t, exprs') <- inferPrim ctx env exprs tpe
-        setType $ Array (meta `withType` t) exprs'
+        setCurrentExpr $ Array (meta `withType` t) exprs'
         return (subst, t)
 
     Match meta expr cases -> do
@@ -478,7 +479,7 @@ infer ctx env ex = case ex of
         (s2, te', exprs') <- foldM (inferCase te) (s1, tv, []) cases
         let cases' = map (\((Case pat e), e') -> Case pat e') (zip cases exprs')
   --      Debug.traceM $ printf "Matching result type %s in %s" (show te') (show s2)
-        setType $ Match (meta `withType` te') e' cases'
+        setCurrentExpr $ Match (meta `withType` te') e' cases'
         return (s2, te')
       where
         inferCase :: Type -> (Subst, Type, [Expr]) -> Case -> Infer (Subst, Type, [Expr])
@@ -516,7 +517,7 @@ infer ctx env ex = case ex of
 
     Literal meta lit -> do
         let tpe = litType lit
-        setType $ Literal (meta `withType` tpe) lit
+        setCurrentExpr $ Literal (meta `withType` tpe) lit
         return (nullSubst, tpe)
     e -> error ("Wat? " ++ show e)
 
@@ -543,6 +544,9 @@ inferPrim ctx env l t = do
 
 inferExpr :: Ctx -> TypeEnv -> Expr -> Either TypeError (Type, Expr)
 inferExpr ctx env e = runInfer e $ infer ctx env e
+
+inferExprDefault :: Ctx -> Expr -> Either TypeError (Type, Expr)
+inferExprDefault ctx expr = inferExpr ctx defaultTyenv expr
 
 inferTop :: Ctx -> TypeEnv -> [(Name, Expr)] -> Either TypeError (TypeEnv, [Expr])
 inferTop ctx env [] = Right (env, [])
