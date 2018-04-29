@@ -300,27 +300,38 @@ Type Declarations
 
   type T = Int -> Bool
 
-  data Option a = None | Some a deriving (ToString, FromString, Functor, Json)
+  type IntMap a = Map Int a
+  type IntMap = fun (a: Type) = Map Int a
+
+  foo: Pi (a: Type) = IntMap a
+
+Abstract Data Type Declarations
+-------------------------------
+
+  data Void -- empty data declaration
+
+  data Maybe a = None | Some a -- simple ADT
+
+  data Either a b = Left a | Right b deriving (ToString, FromString, Functor, Json) -- ADT with derivations
+
   data List a =
-    | Nil
-    | Cons a (List a)
-  data Age(age: Int)
-  data Person a (
-    name: String
-    age: Age
-    info: a
-  )
+    Nil
+    Cons a (List a) -- ADT
 
-  -- GADT
-  data Either a b =
-    | Left:  a -> Either a b
-    | Right: b -> Either a b
+  data Expr = Var String | App Expr Expr
+    Lam String Expr
 
+Record/Struct Declarations
+--------------------------
 
+  struct Person a =
+      name: String
+      age: Age
+      info: a
 
 Pattern Matching
 ----------------
-.. code:: scala
+.. code::
   def getOpt(opt, d) = {
     | Some x, _ => x
     | None, d   => d

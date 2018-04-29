@@ -62,6 +62,12 @@ examples:
 
 install_and_examples: lasca examples
 
+perf:
+	stack install --profile -j 8
+	time lasca examples/Map.lasca +RTS -sstderr -N4 -p -hc
+	hp2ps -c lasca.hp
+	ghc-prof-flamegraph lasca.prof
+
 release: install_and_examples
 	rm -rf dist
 	mkdir -p dist/{src,bash_completion}
