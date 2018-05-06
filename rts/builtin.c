@@ -173,6 +173,35 @@ int64_t runtimeCompare(Box* lhs, Box* rhs) {
     return result;
 }
 
+Box* arrayAppend(Box* fst, Box* snd) {
+    Array* f = unbox(ARRAY, fst);
+    Array* s = unbox(ARRAY, snd);
+    Array* array = createArray(f->length + s->length);
+    memcpy(array->data, f->data, f->length * sizeof(void*));
+    memcpy(array->data + f->length, s->data, s->length * sizeof(void*));
+    return box(ARRAY, array);
+}
+
+Box* makeArray(int64_t size, Box* init) {
+    Array* array = createArray(size);
+    for (int64_t i = 0; i < size; i++) {
+        array->data[i] = init;
+    }
+    return box(ARRAY, array);
+}
+
+Box* arrayCopy(Box* src, int64_t srcPos, Box* dest, int64_t destPos, int64_t length) {
+    Array* s = unbox(ARRAY, src);
+    Array* d = unbox(ARRAY, dest);
+    assert(srcPos >= 0);
+    assert(destPos >= 0);
+    assert(length >= 0);
+    assert(srcPos+length <= s->length);
+    assert(destPos+length <= d->length);
+    memcpy(&d->data[destPos], &s->data[srcPos], length * sizeof(void*));
+    return &UNIT_SINGLETON;
+}
+
 Box* arrayApply(Box* arrayValue, int64_t index) {
     Array* array = unbox(ARRAY, arrayValue);
     assert(array->length > index);

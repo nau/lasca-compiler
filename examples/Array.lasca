@@ -19,9 +19,24 @@ def returnArray(s) = {
     });
 }
 
+def make(length: Int, init: a): Array a = makeArray(length, init)
+
+def append(fst: Array a, snd: Array a): Array a = arrayAppend(fst, snd)
+
+def testArray() = {
+    a = makeArray(10, "a");
+    b = makeArray(10, "b");
+    println(toString(a));
+    println(toString(b));
+    println(toString(append(a, b)));
+    arrayCopy(b, 0, a, 4, 5);
+    println(toString(a));
+}
+
 
 def main() = {
     res = returnArray(3.14);
+    testArray();
     println("Hello")
 }
 
