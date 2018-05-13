@@ -33,6 +33,7 @@ typedef struct {
 typedef struct {
     const LaType* type;
     union Value {
+        int8_t byte;
         int64_t num;
         double dbl;
         void* ptr;
@@ -108,6 +109,7 @@ extern Box FALSE_SINGLETON;
 // Primitive Types
 extern const LaType* UNIT   ;
 extern const LaType* BOOL   ;
+extern const LaType* BYTE   ;
 extern const LaType* INT    ;
 extern const LaType* DOUBLE ;
 extern const LaType* STRING ;

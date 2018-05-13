@@ -19,6 +19,7 @@
 const LaType _UNKNOWN = { .name = "Unknown" };
 const LaType _UNIT    = { .name = "Unit" };
 const LaType _BOOL    = { .name = "Bool" };
+const LaType _BYTE    = { .name = "Byte" };
 const LaType _INT     = { .name = "Int" };
 const LaType _DOUBLE  = { .name = "Double" };
 const LaType _STRING  = { .name = "String" };
@@ -29,6 +30,7 @@ const LaType _PATTERN   = { .name = "Pattern" };
 const LaType* UNKNOWN = &_UNKNOWN;
 const LaType* UNIT    = &_UNIT;
 const LaType* BOOL    = &_BOOL;
+const LaType* BYTE    = &_BYTE;
 const LaType* INT     = &_INT;
 const LaType* DOUBLE  = &_DOUBLE;
 const LaType* STRING  = &_STRING;
@@ -187,7 +189,7 @@ void* die(Box* msg) {
 
 static int64_t isBuiltinType(const Box* v) {
     const LaType* t = v->type;
-    return t == UNIT || t == BOOL || t == INT || t == DOUBLE
+    return t == UNIT || t == BOOL || t == BYTE || t == INT || t == DOUBLE
       || t == STRING || t == CLOSURE || t == ARRAY/* || !strcmp(t->name, "Ref")*/;
 }
 
@@ -196,13 +198,17 @@ static int64_t isUserType(const Box* v) {
 }
 
 #define DO_OP(op) if (lhs->type == INT) { result = boxInt(lhs->value.num op rhs->value.num); } \
-                  else if (lhs->type == DOUBLE) { result = boxFloat64(lhs->value.dbl op rhs->value.dbl); } else { \
+                  else if (lhs->type == BYTE) { result = box(BYTE, (void*)(lhs->value.byte op rhs->value.byte)); } \
+                  else if (lhs->type == DOUBLE) { result = boxFloat64(lhs->value.dbl op rhs->value.dbl); } \
+                  else { \
                         printf("AAAA!!! Type mismatch! Expected Int or Double for op but got %s\n", typeIdToName(lhs->type)); exit(1); }
 
 #define DO_CMP(op) if (lhs->type == BOOL) { \
                       result = boxBool (lhs->value.num op rhs->value.num); } \
                    else if (lhs->type == INT) { \
                       result = boxBool (lhs->value.num op rhs->value.num); } \
+                   else if (lhs->type == BYTE) { \
+                      result = boxBool (lhs->value.byte op rhs->value.byte); } \
                    else if (lhs->type == DOUBLE) { \
                       result = boxBool (lhs->value.dbl op rhs->value.dbl); } \
                    else { \
@@ -433,6 +439,9 @@ const Box* __attribute__ ((pure)) toString(const Box* value) {
         return makeString(value->value.num == 0 ? "false" : "true");
     } else if (type == INT) {
         snprintf(buf, 100, "%"PRId64, value->value.num);
+        return makeString(buf);}
+    else if (type == BYTE) {
+        snprintf(buf, 100, "%"PRId8, value->value.byte);
         return makeString(buf);
     } else if (type == DOUBLE) {
         snprintf(buf, 100, "%12.9lf", value->value.dbl);
@@ -513,6 +522,14 @@ void initEnvironment(int64_t argc, char* argv[]) {
 
 Box* getArgs() {
     return ENV.argv;
+}
+
+int8_t intToByte(int64_t n) {
+    return (int8_t) n;
+}
+
+int64_t byteToInt(int8_t n) {
+    return (int64_t) n;
 }
 
 int64_t toInt(Box* s) {

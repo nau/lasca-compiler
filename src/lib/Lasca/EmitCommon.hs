@@ -60,6 +60,7 @@ import qualified Lasca.Options as Opts
 externalTypeMapping :: Type -> AST.Type
 -- FIXME currently we assume every function returns a result and can't be Unit/void
 --externalTypeMapping (TypeIdent "Unit") = T.void
+externalTypeMapping TypeByte = T.i8
 externalTypeMapping TypeInt = intType
 externalTypeMapping TypeFloat = T.double
 externalTypeMapping _ = ptrType-- Dynamic mode
@@ -174,6 +175,9 @@ stringTypePtr = constRef ptrType "_STRING"
 stringTypePtrOp = constOp $ stringTypePtr
 
 box t v = callBuiltin "box" [t, v]
+boxByte v = do
+    p <- inttoptr v
+    callBuiltin "box" [constOp $ constRef ptrType "_BYTE", p]
 boxBool v = callBuiltin "boxBool" [v] -- todo change to i1
 boxInt v = callBuiltin "boxInt" [v]
 boxFloat64 v = callBuiltin "boxFloat64" [v]
@@ -260,6 +264,8 @@ declareStdFuncs = do
     externalConst ptrType "_UNIT"
     externalConst ptrType "BOOL"
     externalConst ptrType "_BOOL"
+    externalConst ptrType "BYTE"
+    externalConst ptrType "_BYTE"
     externalConst ptrType "INT"
     externalConst ptrType "_INT"
     externalConst ptrType "DOUBLE"

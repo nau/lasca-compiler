@@ -4,6 +4,7 @@ import Text.Printf
 import Data.String
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import qualified Debug.Trace as Debug
 
 import Control.Monad.State
 import Control.Lens.Operators
@@ -28,7 +29,9 @@ genExternalFuncWrapper f@(Function meta name returnType externArgs (Literal _ (S
         largs <- forM externArgs $ \(Arg n tpe) -> do
             let argName = nameToSBS n
             EmitStatic.resolveBoxing EmitStatic.anyTypeVar tpe (localPtr argName)
-        res <- callFn (externFuncLLvmType f) externName largs
+        let retType = externalTypeMapping returnType
+--        Debug.traceM $ printf "%s genExternalFuncWrapper %s, retType %s" (show name) (show $ externFuncLLvmType f) (show retType)
+        res <- instrTyped retType $ callFnIns (externFuncLLvmType f) externName largs
         wrapped <- EmitStatic.resolveBoxing returnType EmitStatic.anyTypeVar res
         ret wrapped
 genExternalFuncWrapper other = error $ "genExternalFuncWrapper got " ++ (show other)

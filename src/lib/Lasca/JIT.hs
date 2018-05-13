@@ -70,6 +70,7 @@ nullResolver s = return (JITSymbol 0 (JITSymbolFlags False False))
 -}
 runJIT :: LascaOpts -> AST.Module -> IO ()
 runJIT opts mod = do
+--    putStrLn $ LT.unpack $ ppllvm mod
     b <- loadLibraryPermanently Nothing
     unless (not b) (error "Couldn’t load library")
     withOptimizedModule opts mod $ \context m -> do

@@ -355,10 +355,10 @@ toArgs :: [Operand] -> [(Operand, [A.ParameterAttribute])]
 toArgs = map (\x -> (x, []))
 
 
-bitcast op toTpe= instr (BitCast op toTpe [])
+bitcast op toTpe= instrTyped toTpe (BitCast op toTpe [])
 {-# INLINE bitcast #-}
 
-ptrtoint op toTpe= instr (PtrToInt op toTpe [])
+ptrtoint op toTpe= instrTyped toTpe (PtrToInt op toTpe [])
 {-# INLINE ptrtoint #-}
 
 inttoptr op = instr (IntToPtr op ptrType [])

@@ -281,6 +281,7 @@ funcPtrFromClosure closure = do
 castBoxedValue declaredType value = case declaredType of
     TypeFloat -> ptrtofp value
     TypeInt   -> ptrtoint value intType
+    TypeByte  -> ptrtoint value T.i8
     _                 -> return value
 {-# INLINE castBoxedValue #-}
 
@@ -289,6 +290,11 @@ unboxDirect expr = do
     unboxedAddr <- getelementptr boxed [constIntOp 0, constInt32Op 1]
     load unboxedAddr
 {-# INLINE unboxDirect #-}
+
+unboxByte expr = do
+    unboxed <- unboxDirect expr
+    castBoxedValue TypeByte unboxed
+
 
 unboxInt expr = do
     unboxed <- unboxDirect expr
@@ -303,8 +309,10 @@ unboxFloat64 expr = do
 resolveBoxing declaredType instantiatedType expr = do
     case (declaredType, instantiatedType) of
         _ | declaredType == instantiatedType -> return expr
+        (TypeByte, TVar _) -> boxByte expr
         (TypeInt, TVar _) -> boxInt expr
         (TypeFloat, TVar _) -> boxFloat64 expr
+        (TVar _, TypeByte) -> unboxByte expr
         (TVar _, TypeInt) -> unboxInt expr
         (TVar _, TypeFloat) -> unboxFloat64 expr
         (TVar _, TVar _) -> return expr

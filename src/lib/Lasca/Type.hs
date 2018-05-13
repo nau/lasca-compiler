@@ -80,6 +80,7 @@ typeName tpe = case tpe of
 
 infixr `TypeFunc`
 
+pattern TypeByte     = TypeIdent "Byte"
 pattern TypeInt      = TypeIdent "Int"
 pattern TypeFloat    = TypeIdent "Float"
 pattern TypeBool     = TypeIdent "Bool"
