@@ -80,6 +80,7 @@ resolveNonLocalName name meta s = do
     case name of
         Name n -> case findAllModules s name of
             [mod] -> (NS mod name)
+            mods | (s ^. currentModule) `elem` mods  -> NS (s ^. currentModule) name
             [] -> error $ printf "%s: Couldn't find name %s. Exported Names %s" (showPosition meta) (show n) (show (s^.exportedNames))
             mods -> error $ printf "%s: Ambiguous name %s found in modules %s" (showPosition meta) (show n) (show mods)
         NS mod n ->

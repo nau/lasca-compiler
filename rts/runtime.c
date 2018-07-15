@@ -475,6 +475,8 @@ const Box* __attribute__ ((pure)) toString(const Box* value) {
         return value;
     } else if (type == CLOSURE) {
         return makeString("<func>");
+    } else if (type == ARRAY) {
+        return arrayToString(value);
     } else if (type == BYTEARRAY) {
         return byteArrayToString(value);
     } else if (!strcmp(type->name, "Ref")) {
