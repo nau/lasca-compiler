@@ -2,6 +2,8 @@
     The Computer Language Benchmarks Game
     http://benchmarksgame.alioth.debian.org/
 -}
+import Array
+
 data Tree a = Empty | Node(treeLeft: Tree a, treeRight: Tree a)
 
 def make(d) =
@@ -16,7 +18,7 @@ def check(t) = match t {
 minDepth = 4
 maxDepth = {
     args = getArgs();
-    if arrayLength(args) != 2 then 21 else toInt(args[1])
+    if Array.length(args) != 2 then 21 else toInt(args[1])
 }
 stretchDepth = maxDepth + 1
 

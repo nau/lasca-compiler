@@ -45,7 +45,7 @@ parserTests = testGroup "Parser tests"
   , testCase "Character Escaping" $
       parseExpr "\"String\n\"" @?= Right (Literal emptyMeta (StringLit "String\n"))
   , testCase "String Interpolation" $
-      parseExpr "\"Hello\\t \\\\\\$${ test123 + 1 }\"" @?= Right (Apply emptyMeta (Ident emptyMeta "concat") [
+      parseExpr "\"Hello\\t \\\\\\$${ test123 + 1 }\"" @?= Right (Apply emptyMeta (Ident emptyMeta (NS "Prelude" "concat")) [
         Array emptyMeta [Literal emptyMeta $ StringLit "Hello\t \\$",
                Apply emptyMeta (Ident emptyMeta "toString") [Apply (withMetaPos 1 25) (Ident emptyMeta "+") [Ident emptyMeta "test123", Literal (withMetaPos 1 27) (IntLit 1)]]]
       ])
@@ -73,7 +73,7 @@ data Mode = Dyn | Stat | Both
 data Config = Script { name :: String, compMode :: Mode, arguments :: [T.Text] }
 
 examples = [
-    Script "Array.lasca" Both [],
+--    Script "Array.lasca" Both [],
     Script "binarytrees.lasca" Both ["10"],
     Script "Data.lasca" Both [],
     Script "dynamic.lasca" Dyn [],

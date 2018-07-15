@@ -219,12 +219,12 @@ cgenApply ctx meta expr args = do
     let isGlobal fn = (fn `Map.member` S._globalFunctions ctx) && not (fn `Map.member` symMap)
     case expr of
          -- FIXME Here are BUGZZZZ!!!! :)
-        this@(S.Ident meta (NS "Prelude" "arrayApply")) -> do
+        this@(S.Ident meta (NS "Array" "getIndex")) -> do
             let [arrayExpr, indexExpr] = args
             array <- cgen ctx arrayExpr -- should be a pointer to either boxed or unboxed array
             boxedIdx <- cgen ctx indexExpr
             idx <- unboxInt boxedIdx
---            callFn (funcType ptrType [ptrType, intType]) "arrayApply" [array, idx]
+--            callFn (funcType ptrType [ptrType, intType]) "arrayGetIndex" [array, idx]
             cgenArrayApply array idx
                     
         S.Ident _ fn | isGlobal fn -> do

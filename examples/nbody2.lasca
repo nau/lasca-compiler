@@ -1,3 +1,5 @@
+import Array
+
 Pi = 3.141592653589793
 SolarMass = 4.0 * Pi * Pi
 DaysPerYear = 365.24
@@ -64,11 +66,11 @@ def init(bodies: [Body]) = {
         if i == 0 then updatedPs else go(bodies, i - 1, updatedPs)
     };
 
-    len = arrayLength(bodies);
+    len = length(bodies);
     pxyzInit = [0.0, 0.0, 0.0];
     offsets = go(bodies, len - 1, pxyzInit);
     sun = offsetMomentum(bodies[0], offsets[0], offsets[1], offsets[2]);
-    [sun, bodies[1], bodies[2], bodies[3], bodies[4]]
+    setIndex(bodies, 0, sun);
 }
 
 def advanceInner(from, to, dt) = {

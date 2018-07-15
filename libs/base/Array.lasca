@@ -1,0 +1,33 @@
+module Array
+
+extern def makeArray(size: Int, init: a): Array a = "makeArray"
+extern def append(first: Array a, second: Array a): Array a = "arrayAppend"
+extern def copy(src: Array a, srcPos: Int, dest: Array a, destPos: Int, length: Int): Unit = "arrayCopy"
+extern def getIndex(array: Array a, i: Int): a = "arrayGetIndex"
+extern def setIndex(array: Array a, i: Int, value: a): Array a = "arraySetIndex"
+extern def length(array: Array a): Int = "arrayLength"
+extern def init(n: Int, f: Int -> a): Array a = "arrayInit"
+def range(start: Int, end: Int, step: Int): Array Int = {
+    init((end - start) / step + 1, { i -> start + i * step })
+}
+
+def testArray() = {
+    a = makeArray(10, "a");
+    b = makeArray(10, "b");
+    c = init(5, { i -> i.toString });
+    d = range(2, 8, 3);
+    setIndex(a, 2, getIndex(b, 1));
+    println(toString(a));
+    println(toString(b));
+    println(toString(c));
+    println(toString(d));
+    println(toString(append(a, b)));
+    copy(b, 0, a, 4, 5);
+    println(toString(a));
+}
+
+
+def main() = {
+    testArray();
+    println("Hello")
+}

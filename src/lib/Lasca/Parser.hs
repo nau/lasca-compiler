@@ -76,7 +76,7 @@ interpolatedString = do
   where go meta [] = Literal meta (StringLit "")
         go meta list = case foldr (go' meta) [] list of
                     [s] -> s
-                    strings -> Apply meta (Ident meta "concat") [Array meta strings]
+                    strings -> Apply meta (Ident meta (NS "Prelude" "concat")) [Array meta strings]
 
         go' meta (Left s) acc  = Literal meta (StringLit s) : acc
         go' meta (Right e) acc = Apply meta (Ident meta "toString") [e] : acc
@@ -152,7 +152,7 @@ postfixIndex = Ex.Postfix parser
   where parser = do
             meta <- getMeta
             index <- brackets expr
-            return $ \e -> Apply meta (Ident meta "arrayApply") [e, index]
+            return $ \e -> Apply meta (Ident meta (NS "Array" "getIndex")) [e, index]
 
 select = do
     reservedOp "."
@@ -338,7 +338,7 @@ vardef f = do
     option TypeAny typeAscription
     reservedOp "="
     e <- expr
-    let refExpr = Apply meta (Ident meta "Ref") [e]
+    let refExpr = Apply meta (Ident meta (NS "Prelude" "Ref")) [e]
     return (f (Name ident) refExpr)
 
 

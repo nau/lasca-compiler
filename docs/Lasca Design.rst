@@ -263,8 +263,6 @@ What type systems are for
 #. Correctness
 #. Side effects control
 
-	- why? what benefits?
-
 Our goal is to get the best from type system while not making it too complex and intrusive.
 
 Switchable gradual/static typing. Both are strong.
@@ -286,8 +284,8 @@ Implementing data Subtyping implies
 
 - variance
 - complex typer
-- protected visibility
 - least upper bound for if/case
+- no global type inference generally
 
 Consider not having subclassing at all.
 
@@ -493,7 +491,7 @@ A Critical Analysis of String APIs https://arxiv.org/pdf/1711.10713.pdf
 Fixing Faults in C and Java Source Code: Abbreviated vs. Full-word
 Identifier Names http://www2.unibas.it/gscanniello/Giuseppe_Scanniello%40unibas/Home_files/TOSEM.pdf
 Fast 64-bit integers for Scala.js http://lampwww.epfl.ch/~doeraene/presentations/jslongs-vmm2017/
-
+https://www.researchgate.net/publication/325658386_On_the_Soundness_of_Coroutines_with_Snapshots
 
 Support Standards/Specifications
 ================================

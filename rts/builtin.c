@@ -202,10 +202,29 @@ Box* arrayCopy(Box* src, int64_t srcPos, Box* dest, int64_t destPos, int64_t len
     return &UNIT_SINGLETON;
 }
 
-Box* arrayApply(Box* arrayValue, int64_t index) {
+Box* arrayGetIndex(Box* arrayValue, int64_t index) {
     Array* array = unbox(ARRAY, arrayValue);
     assert(array->length > index);
     return array->data[index];
+}
+
+Box* arraySetIndex(Box* arrayValue, int64_t index, Box* value) {
+    Array* array = unbox(ARRAY, arrayValue);
+    assert(array->length > index);
+    array->data[index] = value;
+    return arrayValue;
+}
+
+Box* arrayInit(int64_t size, Box* f) {
+    Array* array = createArray(size);
+    Closure* cl = unbox(CLOSURE, f);
+    Position pos = {0, 0};
+    for (int64_t i = 0; i < size; i++) {
+        Box* argv[1];
+        argv[0] = boxInt(i);
+        array->data[i] = runtimeApply(f, 1, argv, pos);
+    }
+    return box(ARRAY, array);
 }
 
 int64_t arrayLength(Box* arrayValue) {
