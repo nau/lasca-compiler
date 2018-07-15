@@ -25,8 +25,9 @@ const LaType _DOUBLE  = { .name = "Double" };
 const LaType _STRING  = { .name = "String" };
 const LaType _CLOSURE = { .name = "Closure" };
 const LaType _ARRAY   = { .name = "Array" };
+const LaType _BYTEARRAY     = { .name = "ByteArray" };
 const LaType _FILE_HANDLE   = { .name = "FileHandle" };
-const LaType _PATTERN   = { .name = "Pattern" };
+const LaType _PATTERN = { .name = "Pattern" };
 const LaType* UNKNOWN = &_UNKNOWN;
 const LaType* UNIT    = &_UNIT;
 const LaType* BOOL    = &_BOOL;
@@ -36,6 +37,7 @@ const LaType* DOUBLE  = &_DOUBLE;
 const LaType* STRING  = &_STRING;
 const LaType* CLOSURE = &_CLOSURE;
 const LaType* ARRAY   = &_ARRAY;
+const LaType* BYTEARRAY   = &_BYTEARRAY;
 const LaType* FILE_HANDLE   = &_FILE_HANDLE;
 const LaType* PATTERN   = &_PATTERN;
 
@@ -190,7 +192,7 @@ void* die(Box* msg) {
 static int64_t isBuiltinType(const Box* v) {
     const LaType* t = v->type;
     return t == UNIT || t == BOOL || t == BYTE || t == INT || t == DOUBLE
-      || t == STRING || t == CLOSURE || t == ARRAY/* || !strcmp(t->name, "Ref")*/;
+      || t == STRING || t == CLOSURE || t == ARRAY || t == BYTEARRAY;
 }
 
 static int64_t isUserType(const Box* v) {
@@ -427,6 +429,29 @@ Box* __attribute__ ((pure)) arrayToString(const Box* arrayValue)  {
     }
 }
 
+Box* __attribute__ ((pure)) byteArrayToString(const Box* arrayValue)  {
+    String* array = unbox(BYTEARRAY, arrayValue);
+    if (array->length == 0) {
+        return makeString("[]");
+    } else {
+        int len = 6 * array->length + 2 + 1; // max (4 + 2 (separator)) symbols per byte + [] + 0
+        String* res = gcMalloc(sizeof(String) + len);
+        strcpy(res->bytes, "[");
+        char buf[7];
+        int curPos = 1;
+        for (int i = 0; i < array->length; i++) {
+            int l = (i < array->length - 1) ?
+              snprintf(buf, 7, "%"PRId8", ", array->bytes[i]) : snprintf(buf, 5, "%"PRId8, array->bytes[i]);
+            strcpy(res->bytes + curPos, buf);
+            curPos += l;
+        }
+        strcpy(res->bytes + curPos, "]");
+        res->length = curPos + 1;
+        return box(STRING, res);
+    }
+}
+
+
 /* =============== Strings ============= */
 
 const Box* __attribute__ ((pure)) toString(const Box* value) {
@@ -450,8 +475,8 @@ const Box* __attribute__ ((pure)) toString(const Box* value) {
         return value;
     } else if (type == CLOSURE) {
         return makeString("<func>");
-    } else if (type == ARRAY) {
-        return arrayToString(value);
+    } else if (type == BYTEARRAY) {
+        return byteArrayToString(value);
     } else if (!strcmp(type->name, "Ref")) {
         DataValue* dataValue = value->value.ptr;
         return toString(dataValue->values[0]);

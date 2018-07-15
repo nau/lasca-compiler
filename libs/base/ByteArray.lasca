@@ -1,0 +1,25 @@
+module ByteArray
+
+extern def create(size: Int): ByteArray = "createByteArray"
+--extern def make(size: Int, init: Byte): ByteArray = "makeByteArray"
+extern def copy(src: ByteArray, srcPos: Int, dest: ByteArray, destPos: Int, length: Int): Unit = "byteArrayCopy"
+extern def getIndex(array: ByteArray, i: Int): Byte = "byteArrayGetIndex"
+extern def setIndex(array: ByteArray, i: Int, value: Byte): ByteArray = "byteArraySetIndex"
+extern def length(array: ByteArray): Int = "byteArrayLength"
+
+def testArray() = {
+    a = create(10);
+    b = create(10);
+    setIndex(a, 2, intToByte(2));
+    setIndex(b, 3, intToByte(3));
+    setIndex(a, 3, getIndex(b, 3));
+    copy(a, 0, b, 1, 9);  -- FIXME
+    println(toString(a));
+    println(toString(b));
+    println(toString(b.length));
+}
+
+def main() = {
+    testArray();
+    println("Hello")
+}

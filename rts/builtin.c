@@ -232,6 +232,42 @@ int64_t arrayLength(Box* arrayValue) {
     return array->length;
 }
 
+Box* createByteArray(size_t size) {
+    String* val = gcMalloc(sizeof(String) + size);
+    val->length = size;
+    return box(BYTEARRAY, val);
+}
+
+int64_t byteArrayLength(Box* value) {
+    String* array = unbox(BYTEARRAY, value);
+    return array->length;
+}
+
+int8_t byteArrayGetIndex(Box* arrayValue, int64_t index) {
+    String* array = unbox(BYTEARRAY, arrayValue);
+    assert(array->length > index);
+    return array->bytes[index];
+}
+
+Box* byteArraySetIndex(Box* arrayValue, int64_t index, int8_t value) {
+    String* array = unbox(BYTEARRAY, arrayValue);
+    assert(array->length > index);
+    array->bytes[index] = value;
+    return arrayValue;
+}
+
+Box* byteArrayCopy(Box* src, int64_t srcPos, Box* dest, int64_t destPos, int64_t length) {
+    Array* s = unbox(BYTEARRAY, src);
+    Array* d = unbox(BYTEARRAY, dest);
+    assert(srcPos >= 0);
+    assert(destPos >= 0);
+    assert(length >= 0);
+    assert(srcPos+length <= s->length);
+    assert(destPos+length <= d->length);
+    memcpy(&d->data[destPos], &s->data[srcPos], length);
+    return &UNIT_SINGLETON;
+}
+
 Box* lascaOpenFile(Box* filename, Box* mode) {
     String *fname = unbox(STRING, filename);
     String *fm = unbox(STRING, mode);

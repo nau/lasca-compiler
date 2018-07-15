@@ -6,7 +6,7 @@ Lasca Language
 
 Lasca is Scala shifted towards Haskell. 
 
-Lasca is a LLVM-based statically or dynamically typed general purpose programming language.
+Lasca is a LLVM-based statically or dynamically typed strict functional programming language.
 
 It has a 'dynamic' compilation mode, meaning instant code generation without compile time type checking/inference, 
 allowing instant compilation/execution cycle, like dynamic languages give.
@@ -26,10 +26,9 @@ Imagine
 Inspired by:
 - Scala
 - Haskell, Liquid Haskell, Linear Haskell, Idris
-- OCaml/SML/1ML
+- OCaml/SML/F#/1ML
 - Clojure (persisted data structures, HAMT/CHAMP)
 - Go (simplicity, speed, Any interface?, all-in-one compiler)
-- Rust (linear types, borrowing, method syntax)
 - Erlang (actors, immutability, simplicity, distributed)
 - Python (docstrings, doctests, syntax)
 - Julia
@@ -42,9 +41,6 @@ Inspired by:
 Ideas
 ---
 - light, non-symbol-polluted syntax (Python)
-- Uniqueness type (inplace write, no gc)
-  See Rust, Pony, Idris Unique type, Linear Haskell
-  http://lampwww.epfl.ch/~phaller/doc/capabilities-uniqueness2.pdf  
 - indentation-based
 - readability first
 - fast development cycle
@@ -139,7 +135,7 @@ Dev Cycle
 
 Type System
 ---
-- Hindley-Milner by default, System F(w) if needed
+- Hindley-Milner by default, dependent types if needed
 - traits, kind of type classes
 - Liquid types as in Liquid Haskell
 

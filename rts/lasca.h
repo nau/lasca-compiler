@@ -115,6 +115,7 @@ extern const LaType* DOUBLE ;
 extern const LaType* STRING ;
 extern const LaType* CLOSURE;
 extern const LaType* ARRAY  ;
+extern const LaType* BYTEARRAY;
 extern const LaType* FILE_HANDLE;
 extern const LaType* PATTERN;
 

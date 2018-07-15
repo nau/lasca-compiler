@@ -7,6 +7,7 @@ extern def getIndex(array: Array a, i: Int): a = "arrayGetIndex"
 extern def setIndex(array: Array a, i: Int, value: a): Array a = "arraySetIndex"
 extern def length(array: Array a): Int = "arrayLength"
 extern def init(n: Int, f: Int -> a): Array a = "arrayInit"
+
 def range(start: Int, end: Int, step: Int): Array Int = {
     init((end - start) / step + 1, { i -> start + i * step })
 }
