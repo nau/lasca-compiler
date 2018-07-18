@@ -44,6 +44,11 @@ floatingLiteral = do
     meta <- getMeta
     Literal meta <$> floatLit
 
+unitLiteral = do
+    meta <- getMeta
+    reserved "()"
+    return $ Literal meta UnitLit
+
 floatLit = FloatLit <$> signedFloat
 
 strToBool :: String -> Bool
@@ -140,11 +145,11 @@ anyOperatorParser = do
     x <- identOp
     fail $ "operator (" ++ x ++ ") is not defined"
 
-postfixApply = Ex.Postfix parser  -- FIXME shouldn't it be InfixL?
+postfixApply = Ex.Postfix parser
   where parser = do
             argss <- many argsApply
             meta <- getMeta
-            let apply e = foldl (Apply meta) e argss
+            let apply e = foldl' (Apply meta) e argss
             return apply
 
 
@@ -395,6 +400,7 @@ factor =  try floatingLiteral
       <|> try matchExpr
       <|> try closure
       <|> try function
+      <|> try unitLiteral
       <|> ifthen
       <|> block
       <|> parens expr

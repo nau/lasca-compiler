@@ -50,7 +50,7 @@ Neptune = body(
 
 Sun = body(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, SolarMass)
 
-def for(start: Int, end: Int, f: Int -> Int) = {
+def for(start: Int, end: Int, f: Int -> a) = {
     if start < end then {
         f(start);
         for(start + 1, end, f);
@@ -67,7 +67,6 @@ def offsetMomentum(bodies: [Body]) = {
         px := px.getRef + ibody.vx.getRef * m;
         py := py.getRef + ibody.vy.getRef * m;
         pz := pz.getRef + ibody.vz.getRef * m;
-        0
     });
     object = bodies[0];
     object.vx := -px.getRef / SolarMass;
@@ -97,7 +96,6 @@ def advance(bodies: [Body], dt) = {
             jbody.vx := jbody.vx.getRef + dx * imass * mag;
             jbody.vy := jbody.vy.getRef + dy * imass * mag;
             jbody.vz := jbody.vz.getRef + dz * imass * mag;
-            0
         });
     });
     for(0, 5, { i ->
@@ -105,7 +103,6 @@ def advance(bodies: [Body], dt) = {
         body.x := body.x.getRef + dt * body.vx.getRef;
         body.y := body.y.getRef + dt * body.vy.getRef;
         body.z := body.z.getRef + dt * body.vz.getRef;
-        0
     });
     bodies
 }
@@ -123,7 +120,6 @@ def energy(bodies: [Body]) = {
             dz = from.z.getRef - to.z.getRef;
             distance = sqrt(squared(dx, dy, dz));
             e := e.getRef - from.mass * to.mass / distance;
-            0
         });
     });
     e.getRef

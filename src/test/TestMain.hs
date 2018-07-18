@@ -74,6 +74,7 @@ data Config = Script { name :: String, compMode :: Mode, arguments :: [T.Text] }
 
 examples = [
 --    Script "Array.lasca" Both [],
+    Script "builtin.lasca" Both [],
     Script "binarytrees.lasca" Both ["10"],
     Script "Data.lasca" Both [],
     Script "dynamic.lasca" Dyn [],

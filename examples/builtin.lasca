@@ -1,0 +1,19 @@
+
+def testLiterals() = {
+    a = 1234567890;
+    b = -1234567890;
+    c = true;
+    d = false;
+    e = 123.456;
+    f = -123.45e-5;
+    g = intToByte(127);
+    h = intToByte(-128);
+    i = "String";
+    j = ();
+    l = [1, 2];
+    println("${a} ${b} ${c} ${d} \$${e} ${f} ${g} ${h} ${i} ${j} ${l}");
+}
+
+def main() = {
+    testLiterals();
+}
