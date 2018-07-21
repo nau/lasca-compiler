@@ -100,6 +100,20 @@ cgen ctx this@(S.Array meta exprs) = do
 cgen ctx this@(S.Select meta tree expr) = cgenSelect ctx this
 cgen ctx this@(S.Apply meta (S.Ident _ "unary-") [expr]) = cgenApplyUnOp ctx this
 cgen ctx this@(S.Apply meta (S.Ident _ fn) [lhs, rhs]) | fn `Map.member` binops = cgenApplyBinOp ctx this
+-- TODO Either extend it to other types and generalize or make builtin functions inlineable
+cgen ctx this@(S.Apply meta (S.Ident _ (NS "Bits" fn)) [lhs, rhs]) | fn `elem` ["intAnd", "intOr", "intXor", "intShiftL", "intShiftR"] = do
+    llhs <- cgen ctx lhs
+    lrhs <- cgen ctx rhs
+    a <- unboxInt llhs
+    b <-  unboxInt lrhs
+    case fn of
+        (Name "intAnd") -> instrTyped intType (I.And a b []) >>= boxInt
+        (Name "intOr")  -> instrTyped intType (I.Or a b []) >>= boxInt
+        (Name "intXor") -> instrTyped intType (I.Xor a b []) >>= boxInt
+        (Name "intShiftL") -> instrTyped intType (I.Shl False False a b []) >>= boxInt
+        (Name "intShiftR") -> instrTyped intType (I.AShr False a b []) >>= boxInt
+        _ -> error $ printf "Unsupported builtin operation %s" (show $ S.exprPosition this)
+        
 cgen ctx (S.Apply meta expr args) = cgenApply ctx meta expr args
 cgen ctx (S.Closure _ funcName enclosedVars) = do
     modState <- gets moduleState

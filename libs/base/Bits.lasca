@@ -1,0 +1,16 @@
+extern def byteAnd(a: Byte, b: Byte): Byte = "byteAnd"
+extern def byteOr(a: Byte, b: Byte): Byte = "byteOr"
+extern def byteXor(a: Byte, b: Byte): Byte = "byteXor"
+extern def byteShiftL(a: Byte, b: Byte): Byte = "byteShiftL"
+-- arithmetical shift right
+extern def byteShiftR(a: Byte, b: Byte): Byte = "byteShiftR"
+extern def byteNot(a: Byte): Byte = "byteNot"
+
+extern def intAnd(a: Int, b: Int): Int = "intAnd"
+extern def intOr(a: Int, b: Int): Int = "intOr"
+extern def intXor(a: Int, b: Int): Int = "intXor"
+extern def intShiftL(a: Int, b: Int): Int = "intShiftL"
+-- arithmetical shift right
+extern def intShiftR(a: Int, b: Int): Int = "intShiftR"
+extern def intNot(a: Int): Int = "intNot"
+extern def intPopCount(a: Int): Int = "intPopCount"

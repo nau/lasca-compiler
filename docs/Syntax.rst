@@ -216,6 +216,35 @@ Provide a limited set of redefinable operator with forced laws to satisfy.
 - ``!`` – binary operation (actors?)
 - ``?`` – binary operation
 
+I'd like to avoid postfix operators at all, and restrict a set of prefix operators to [!, -, ~].
+Also, I'd like to avoid compound operators (`+=`, `*=` etc)
+
+Operators in languages, comparison table
+
+=============================  ===============  ===============    ==========  ==========  ==========  ==========  ==========
+Operator                       Lasca            Python             Julia       Scala       Haskell     Ocaml       Go
+=============================  ===============  ===============    ==========  ==========  ==========  ==========  ==========
+Numeric                        `+` `-` `*` `/`  `+` `-` `*` `/`
+Modulus                        %                %                  mod % rem   %           mod rem     mod         %
+Exponent                                        `**`               ^           pow         ^ ^^ `**`
+Floor division                                  //                 
+                     
+Logical AND                    and              and                &&          &&          &&
+Logical OR                     or               or                 ||          ||          ||
+Logical NOT                    not              not                !           !           not
+                 
+Bitwise AND                    &                &                  &           &           .&.
+Bitwise OR                     |                |                  |           |           .|.
+Bitwise XOR                    xor              ^                  $           ^           xor
+Bitwise NOT                    ~                ~                  ~           ~           complement
+Logical shift right                             >>                 >>>         >>>
+Arithmetical shift right                        >>                 >>          >>
+Logical/arithmetic shift left                   <<                 <<          << <<<
+                 
+Equality                                        == != <>           == !=       == !=
+Relational                                      < <= > >=          < <= > >=   < <= > >=   < <= > >=   < <= > >=   < <= > >=
+=============================  ===============  ===============    ==========  ==========  ==========  ==========  ==========
+
 
 Expressions
 -----------

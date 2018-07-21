@@ -150,7 +150,7 @@ And syntactically, I find these to be important:
 
 - avoid visual noise (reduce usage of special symbols #<>~, semicolons, braces etc)
 - visually appealing (reduce ugly symbols, like !#<>~) 
-- indentation significant (much cleaner looks)
+- indentation significant (visually more appealing, at least to me)
 - allow adding operators but don't overuse them (i.g. hide the feature under a compiler flag, 
 force an operator to be a bridge to a normal function with an annotation or something)
 - support named arguments calls

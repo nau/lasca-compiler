@@ -1,3 +1,4 @@
+import Bits
 
 def testLiterals() = {
     a = 1234567890;
@@ -14,6 +15,27 @@ def testLiterals() = {
     println("${a} ${b} ${c} ${d} \$${e} ${f} ${g} ${h} ${i} ${j} ${l}");
 }
 
+def bitwiseOperations() = {
+    a = intAnd(5, 4); println(a.toString);
+    a = intAnd(5, 2); println(a.toString);
+    a = intOr(4, 1); println(a.toString);
+    a = intXor(3, 3); println(a.toString);
+    a = intShiftL(3, 3); println(a.toString);
+    a = intShiftL(1, 63); println(a.toString);
+    a = intShiftR(4611686018427387904, 62); println(a.toString);
+    a = intNot(0); println(a.toString);
+    a = intPopCount(9223372036854775807); println(a.toString);
+    a = intPopCount(-1); println(a.toString);
+
+    a = byteAnd(intToByte(5), intToByte(4)); println(a.toString);
+    a = byteAnd(intToByte(5), intToByte(2)); println(a.toString);
+    a = byteOr(intToByte(4), intToByte(1)); println(a.toString);
+    a = byteXor(intToByte(3), intToByte(3)); println(a.toString);
+    a = byteShiftL(intToByte(1), intToByte(7)); println(a.toString);
+    a = byteNot(intToByte(0)); println(a.toString);
+}
+
 def main() = {
     testLiterals();
+    bitwiseOperations();
 }

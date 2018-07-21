@@ -41,6 +41,25 @@ void * runtimePutchar(Box* ch) {
     return 0;
 }
 
+/* Bitwise stuff */
+
+int8_t byteAnd(int8_t a, int8_t b) { return a & b; }
+int8_t byteOr(int8_t a, int8_t b) { return a | b; }
+int8_t byteXor(int8_t a, int8_t b) { return a ^ b; }
+int8_t byteNot(int8_t a) { return ~a; }
+int8_t byteShiftL(int8_t a, int8_t b) { return (int8_t) (a << b); }
+int8_t byteShiftR(int8_t a, int8_t b) { return (int8_t) (a >> b); }
+
+int64_t intAnd(int64_t a, int64_t b) { return a & b; }
+int64_t intOr(int64_t a, int64_t b) { return a | b; }
+int64_t intXor(int64_t a, int64_t b) { return a ^ b; }
+int64_t intNot(int64_t a) { return ~a; }
+int64_t intShiftL(int64_t a, int64_t b) { return a << b; }
+int64_t intShiftR(int64_t a, int64_t b) { return a >> b; }
+int64_t intPopCount(int64_t a) { return __builtin_popcountll(a); }
+
+/* Strings / Unicode stuff */
+
 Box* unicodePoints(Box* string) {
     utf8proc_int32_t codepoint = 0;
     utf8proc_ssize_t readIdx = 0;
