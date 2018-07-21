@@ -99,13 +99,13 @@ transformExpr transformer expr = case expr of
             e <- go expr
             return $ Case p e
         transformer (Match meta expr1 cases1)
-    (Let meta n e body) -> do
+    (Let False meta n tpe e body) -> do
         case typeOf e of
           TypeFunc a b -> locals %= Map.insert n a
           _ -> locals %= Map.insert n TypeAny
         e' <- go e
         body' <- go body
-        transformer (Let meta n e' body')
+        transformer (Let False meta n tpe e' body')
     l@(Lam m a@(Arg n t) e) -> do
         oldOuters <- gets _outers
         oldUsedVars <- gets _usedVars
@@ -206,7 +206,7 @@ lambdaLiftPhase ctx exprs = let
                   e <- go expr
                   return $ Case p e
               return (Match meta expr1 cases1)
-          (Let meta n e body) -> do
+          (Let False meta n tpe e body) -> do
               oldRenames <- gets _renames
               case typeOf e of
                 TypeFunc a b -> locals %= Map.insert n a
@@ -215,7 +215,7 @@ lambdaLiftPhase ctx exprs = let
               e' <- go e
               body' <- go body
               renames .= oldRenames
-              return (Let meta n e' body')
+              return (Let False meta n tpe e' body')
           l@(Lam m a@(Arg n t) e) -> do
               oldOuters <- gets _outers
               oldUsedVars <- gets _usedVars
@@ -296,13 +296,13 @@ delambdafyPhase ctx exprs = let
                   e <- go expr
                   return $ Case p e
               return (Match meta expr1 cases1)
-          (Let meta n e body) -> do
+          (Let False meta n tpe e body) -> do
               case typeOf e of
                 TypeFunc a b -> locals %= Map.insert n a
                 _ -> locals %= Map.insert n TypeAny
               e' <- go e
               body' <- go body
-              return (Let meta n e' body')
+              return (Let False meta n tpe e' body')
           l@(Lam m a@(Arg n t) e) -> do
               state <- get
               let stack = state^.functionStack
@@ -385,7 +385,7 @@ genMatch ctx m@(Match meta expr cases) = do
     let exprType = typeOf expr
     let body = foldr (\(Case p e) acc -> genPattern ctx exprType resultType (Ident (expr ^. metaLens) matchName) p e acc
                       ) (genFail ctx resultType) cases
-    let res = Let (withType meta resultType) matchName expr body
+    let res = Let False (withType meta resultType) matchName TypeAny expr body
 --    Debug.traceM $ printf "getMatch rewrite:\n%s\n============= becomes =========\n%s" (show m) (show res)
     return $ res
 genMatch ctx expr = return expr
@@ -397,7 +397,7 @@ genFail ctx resultType = do
 
 genPattern ctx exprType resultType lhs ptrn rhs = case ptrn of
     WildcardPattern -> const rhs
-    VarPattern name -> const (Let (metaType resultType) name lhs rhs)
+    VarPattern name -> const (Let False (metaType resultType) name TypeAny lhs rhs)
     LitPattern literal -> do
       let eqFun = Ident (metaType $ exprType ==> exprType ==> TypeBool) "=="
       let applyEq = Apply (metaType TypeBool) eqFun [lhs, Literal (metaType exprType) literal]

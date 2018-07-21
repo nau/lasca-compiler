@@ -41,12 +41,12 @@ collectGlobals ctx exprs = do
     execState (mapM toplevel exprs) ctx
   where
     toplevel expr = case expr of
-        Let meta name expr EmptyExpr -> globalVals %= Map.insert name expr
+        Let False meta name _ expr EmptyExpr -> globalVals %= Map.insert name expr
         Function meta name tpe args body -> globalFunctions %= Map.insert name expr
         _ -> return ()
 
 codegenTop ctx cgen topExpr = case topExpr of
-    this@(Let meta name expr _) -> do
+    this@(Let False meta name _ expr _) -> do
         modify (\s -> s { _globalValsInit = _globalValsInit s ++ [(name, expr)] })
         let valType = llvmTypeOf this
     --    Debug.traceM $ printf "Cons %s: %s" (show name) (show valType)

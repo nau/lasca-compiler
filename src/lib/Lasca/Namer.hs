@@ -126,7 +126,7 @@ processData expr@(Data meta name tvars consts) = do
 processData expr = error $ printf "%s: This should not happen: %s" (show $ exprPosition expr) (show expr)
 
 collectNames exprs = forM_ exprs $ \expr -> case expr of
-    Let _ name _ EmptyExpr -> do
+    Let False _ name _ _ EmptyExpr -> do
         curMod <- gets _currentModule
         exportedNames %= Map.adjust (Set.insert name) curMod -- add this val name as current module exported name
         return ()
@@ -240,17 +240,17 @@ namerTransform expr = do
                 return (Case (resolvePattern p) expr')
             return (Match meta expr' cases1)
         -- global val
-        Let meta name e EmptyExpr -> do
+        Let False meta name tpe e EmptyExpr -> do
             e' <- go e
             curMod <- gets _currentModule
             let fqn = NS curMod name
-            return (Let meta fqn e' EmptyExpr)
-        Let meta n e body -> do
+            return (Let False meta fqn tpe e' EmptyExpr)
+        Let False meta n tpe e body -> do
             locals %= MSet.insert n
             e' <- go e
             body' <- go body
             locals %= MSet.delete n
-            return (Let meta n e' body')
+            return (Let False meta n tpe e' body')
         Lam m a@(Arg n t) e -> do
             locals %= MSet.insert n
             e' <- go e

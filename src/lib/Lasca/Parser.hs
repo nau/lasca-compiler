@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Lasca.Parser (
   parseExpr,
   parseToplevelFilename,
@@ -314,7 +315,8 @@ letins = do
         return (Name var, val)
     reserved "in"
     body <- expr
-    return $ foldr (uncurry $ Let meta) body defs
+    let folder (var, val) body = Let False meta var TypeAny val body
+    return $ foldr folder body defs
 
 closure = braces cls
   where cls = do
@@ -362,7 +364,7 @@ blockStmts = do
                               (Stmt e)    -> (init, e)
                               (Named _ _) -> (exprs, Literal emptyMeta UnitLit)
         let namedExprs = go init' 1
-        foldl' (\acc (name, e) -> Let emptyMeta name e acc) last' namedExprs
+        foldl' (\acc (name, e) -> Let False emptyMeta name TypeAny e acc) last' namedExprs
 
     go (Stmt e : exprs) idx = (Name $ '_' : show idx, e) : go exprs (idx + 1)
     go (Named id e : exprs) idx = (id, e) : go exprs idx
@@ -407,7 +409,7 @@ factor =  try floatingLiteral
 
 globalValDef = do
     meta <- getMeta
-    valdef $ (\name e -> Let meta name e EmptyExpr)
+    valdef $ (\name e -> Let False meta name TypeAny e EmptyExpr)
 
 moduleDef = do
     reserved "module"

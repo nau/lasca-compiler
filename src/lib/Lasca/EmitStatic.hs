@@ -74,7 +74,7 @@ lascaUnboxedTypes =  Set.fromList [TypeInt, TypeFloat]
 anyTypeVar = TVar $ TV "a"
 
 cgen :: Ctx -> S.Expr -> Codegen AST.Operand
-cgen ctx (S.Let meta a b c) = do
+cgen ctx (S.Let False meta a _ b c) = do
     i <- alloca $ llvmTypeOf b
     val <- cgen ctx b
     store i val

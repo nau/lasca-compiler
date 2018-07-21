@@ -213,7 +213,7 @@ updateMeta f e =
         this@Closure{} -> this
         Function meta name tpe args expr -> Function (f meta) name tpe args (updateMeta f expr)
         If meta cond tr fl -> If (f meta) (updateMeta f cond) (updateMeta f tr) (updateMeta f fl)
-        Let meta name expr body -> Let (f meta) name (updateMeta f expr) (updateMeta f body)
+        Let rec meta name tpe expr body -> Let rec (f meta) name tpe (updateMeta f expr) (updateMeta f body)
         Array meta exprs -> Array (f meta) (map (updateMeta f) exprs)
         this@Data{} -> this
         Module{} -> e
@@ -340,34 +340,35 @@ infer ctx env ex = case ex of
             setCurrentExpr $ Apply (meta `withType` subApplyType) expr1 args'
             return (subst, subApplyType)
 
-    Let meta x e1 EmptyExpr -> do
+    Let False meta x tpe e1 EmptyExpr -> do
         (s1, t1) <- infer ctx env e1
         e1' <- gets _current
 --        Debug.traceM $ printf "Let %s = %s, type %s, subst %s, env %s" (show x) (show e1) (show t1) (show s1) (show env)
-        setCurrentExpr $ Let (meta `withType` t1) x e1' EmptyExpr
+        setCurrentExpr $ Let False (meta `withType` t1) x tpe e1' EmptyExpr
 --        when (not $ Set.null $ ftv s1) $ error $ printf "%s: Global val %s has free type variables: !" (showPosition meta) (show x) (ftv s1)
         return (s1, t1)
 
-    Let meta x f@(Function _ name _ _ _) e2 -> do
+    -- FIXME use let rec
+    Let False meta x tpe f@(Function _ name _ _ _) e2 -> do
         (s1, t1) <- infer ctx env f
         e1' <- gets _current
         let env' = substitute s1 env
             t'   = generalize env' t1
         (s2, t2) <- infer ctx (env' `extend` (name, t')) e2
         e2' <- gets _current
-        setCurrentExpr $ Let (meta `withType` t2) x e1' e2'
+        setCurrentExpr $ Let False (meta `withType` t2) x tpe e1' e2'
         let subst = s2 `compose` s1
     --    traceM $ printf "let %s: %s in %s = %s" x (show $ substitute subst t1) (show t2) (show subst)
         return (subst, t2)
 
-    Let meta x e1 e2 -> do
+    Let False meta x tpe e1 e2 -> do
         (s1, t1) <- infer ctx env e1
         e1' <- gets _current
         let env' = substitute s1 env
             t'   = generalize env' t1
         (s2, t2) <- infer ctx (env' `extend` (x, t')) e2
         e2' <- gets _current
-        setCurrentExpr $ Let (meta `withType` t2) x e1' e2'
+        setCurrentExpr $ Let False (meta `withType` t2) x tpe e1' e2'
         let subst = s2 `compose` s1
     --    traceM $ printf "let %s: %s in %s = %s" x (show $ substitute subst t1) (show t2) (show subst)
         return (subst, t2)
@@ -569,7 +570,7 @@ data InferStuff = InferStuff { _names :: [(Name, Expr)] }
 makeLenses ''InferStuff
 
 collectNames exprs = forM_ exprs $ \expr -> case expr of
-    Let _ name _ EmptyExpr -> do
+    Let False _ name _ _ EmptyExpr -> do
         names %= (++ [(name, expr)])
         return ()
     Function _ name _ _ _ -> do
@@ -618,7 +619,7 @@ collectDeps expr = do
         Ident _ name | inModule name (state^.modName) -> do
 --            Debug.traceM $ printf "%s in module %s" (show name) (show (state^.modName))
             curFuncCalls %= Set.insert name
-        Let _ name e EmptyExpr -> do
+        Let False _ name _ e EmptyExpr -> do
 --            Debug.traceM $ printf "Val %s in module %s" (show name) (show (state^.modName))
             let mapping = state^.nodes
                 calls = Set.toList $ state^.curFuncCalls
@@ -704,7 +705,7 @@ traverseExpr traverser expr = case expr of
     Match meta ex cases -> do
         forM cases $ \(Case p expr) -> go expr
         traverser expr
-    (Let meta n e body) -> do
+    (Let False meta n _ e body) -> do
         go e
         go body
         traverser expr

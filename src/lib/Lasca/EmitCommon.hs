@@ -122,7 +122,7 @@ defineStringConstants expr = case expr of
     S.Apply meta tree exprs -> do
         defineStringConstants tree
         mapM_ defineStringConstants exprs
-    S.Let _ _ e body -> do
+    S.Let _ _ _ _ e body -> do
         defineStringConstants e
         defineStringConstants body
         return ()

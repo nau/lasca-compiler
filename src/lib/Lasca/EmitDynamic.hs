@@ -60,7 +60,7 @@ import Lasca.Syntax (Ctx)
 import qualified Lasca.Options as Opts
 
 cgen :: Ctx -> S.Expr -> Codegen AST.Operand
-cgen ctx (S.Let meta a b c) = do
+cgen ctx (S.Let False meta a _ b c) = do
     i <- alloca $ llvmTypeOf b
     val <- cgen ctx b
     store i val
