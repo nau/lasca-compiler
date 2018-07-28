@@ -66,13 +66,6 @@ freshName n = do
     freshId += 1
     return $ fromString (n ++ show idx)
 
-uncurryLambda expr = go expr ([], expr) where
-  go (Lam _ name e) result = let (args, body) = go e result in (name : args, body)
-  go e (args, _) = (args, e)
-
-curryLambda meta args expr = foldr (Lam meta) expr args
-
-
 --transform :: (Expr -> LLVM Expr) -> [Expr] -> LLVM [Expr]
 transform transformer exprs = sequence [transformExpr transformer expr | expr <- exprs]
 
@@ -88,7 +81,7 @@ transformExpr transformer expr = case expr of
         tree' <- go tree
         expr' <- go expr
         return $ Select meta tree' expr'
-    (If meta cond true false) -> do
+    If meta cond true false -> do
         cond' <- go cond
         true' <- go true
         false' <- go false
@@ -99,7 +92,7 @@ transformExpr transformer expr = case expr of
             e <- go expr
             return $ Case p e
         transformer (Match meta expr1 cases1)
-    (Let False meta n tpe e body) -> do
+    Let False meta n tpe e body -> do
         case typeOf e of
           TypeFunc a b -> locals %= Map.insert n a
           _ -> locals %= Map.insert n TypeAny
@@ -122,10 +115,12 @@ transformExpr transformer expr = case expr of
         e' <- go e
         args' <- mapM go args
         transformer (Apply meta e' args')
-    f@(Function meta name tpe args e1) -> do
+    f@(Let True meta name tpe lam body) -> do
+--        Debug.traceM $ printf "%s: %s >>> %s" (show name) (show $ typeOf lam) (show f)
+        let (args, e1) = uncurryLambda lam
         let funcTypeToLlvm (Arg name _) (TypeFunc a b, acc) = (b, (name, a) : acc)
-            funcTypeToLlvm arg t = error $ "AAA2" ++ show arg ++ show t
-        let funcType = typeOf f
+            funcTypeToLlvm arg t = error $ printf "AAA2 %s(%s): %s" (show f) (show arg) (show t)
+        let funcType = typeOf lam
         let argsWithTypes = reverse $ snd $ foldr funcTypeToLlvm (funcType, []) (reverse args)
         let argNames = Map.fromList argsWithTypes
         modify (\s -> s {
@@ -134,8 +129,10 @@ transformExpr transformer expr = case expr of
             _outers = Map.empty,
             _usedVars = Set.empty } )
         e' <- go e1
+        body' <- go body
         functionStack %= tail
-        transformer (Function meta name tpe args e')
+        let (lam, _) = curryLambda meta args e'
+        transformer (Let True meta name tpe lam body')
     e -> transformer e
 
   where go e = transformExpr transformer e
@@ -147,16 +144,17 @@ extractFunction meta name args expr = do
     -- lambda args are in locals. Shadow outers with same names.
     let outerVars = Set.difference (Map.keysSet $ _outers state) (Map.keysSet $ _locals state)
     let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
-    let enclosedArgs = map (\n -> (Arg n TypeAny, _outers state Map.! n)) usedOuterVars
+    let enclosedArgs = map (\n -> Arg n TypeAny) usedOuterVars
+    let enclosedArgTypes = map (\n -> _outers state Map.! n) usedOuterVars
     let (funcName', nms') = uniqueName (fromString name) nms
     let funcName = Name $ Char8.unpack funcName'
-    let asdf t = foldr (\(_, t) resultType -> t ==> resultType) t enclosedArgs
-    let meta' = (S.exprType %~ asdf) meta
-    let func = S.Function meta' funcName TypeAny (map fst enclosedArgs ++ args) expr
+    let (lam, t) = curryLambda meta (enclosedArgs ++ args) expr
+    let meta' = meta `S.withType` t
+    let func = S.Let True meta' funcName TypeAny lam EmptyExpr
     modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
 --    s <- get
 --    Debug.traceM $ printf "Generated lambda %s, outerVars = %s, usedOuterVars = %s, state = %s" (show funcName) (show outerVars) (show usedOuterVars) (show s)
-    return (Closure meta' funcName (map fst enclosedArgs))
+    return (Closure meta' funcName enclosedArgs)
 
 {-
   Only basic lambda lifting. Buggy as hell.
@@ -226,16 +224,17 @@ lambdaLiftPhase ctx exprs = let
               locals .= r
               e' <- go e
               modify (\s  -> s {_outers = oldOuters, _locals = oldLocals})
-              return (curryLambda m args e')
+              return (fst $ curryLambda m args e')
           (Apply meta e args) -> do
               e' <- go e
               args' <- mapM go args
-      --        args' <- sequence [go arg | arg <- args]
               return (Apply meta e' args')
-          f@(Function meta name tpe args e1) -> do
+          f@(Let True meta name tpe lam body) -> do
+              let (args, e1) = uncurryLambda lam
+              -- TOD rename it. it has nothing to do with llvm
               let funcTypeToLlvm (Arg name _) (TypeFunc a b, acc) = (b, (name, a) : acc)
                   funcTypeToLlvm arg t = error $ "AAA2" ++ show arg ++ show t
-              let funcType = typeOf f
+              let funcType = typeOf lam
               let argsWithTypes = reverse $ snd $ foldr funcTypeToLlvm (funcType, []) (reverse args)
               let argNames = Map.fromList argsWithTypes
               outerFuncStack <- gets _functionStack
@@ -247,10 +246,13 @@ lambdaLiftPhase ctx exprs = let
                                 _outers = Map.empty,
                                 _usedVars = Set.empty } )
                             e' <- go e1
-                            return (Function meta name tpe args e')
+                            body' <- go body
+                            let (lam, _) = curryLambda meta args e'
+                            return (Let True meta name tpe lam body')
                   _  -> do  oldOuters <- gets _outers
                             oldUsedVars <- gets _usedVars
                             oldLocals <- gets _locals
+                            oldRenames <- gets _renames
                             modify (\s -> s {
                                 _functionStack = name : (_functionStack s),
                                 _outers = Map.union (_outers s) (_locals s),
@@ -260,8 +262,9 @@ lambdaLiftPhase ctx exprs = let
                             renames %= Map.insert name (Name fullName)
                             e' <- go e1
                             r <- extractFunction meta fullName args e'
-                            modify (\s  -> s {_outers = oldOuters, _locals = oldLocals})
-                            return r
+                            body' <- go body
+                            modify (\s  -> s {_outers = oldOuters, _locals = oldLocals, _renames = oldRenames})
+                            return (Let False meta name tpe r body')
 
               functionStack %= tail
               return res
@@ -324,10 +327,11 @@ delambdafyPhase ctx exprs = let
               args' <- mapM go args
       --        args' <- sequence [go arg | arg <- args]
               return (Apply meta e' args')
-          f@(Function meta name tpe args e1) -> do
+          f@(Let True meta name tpe lam body) -> do
+              let (args, e1) = uncurryLambda lam
               let funcTypeToLlvm (Arg name _) (TypeFunc a b, acc) = (b, (name, a) : acc)
                   funcTypeToLlvm arg t = error $ "AAA2" ++ show arg ++ show t
-              let funcType = typeOf f
+              let funcType = typeOf lam
               let argsWithTypes = reverse $ snd $ foldr funcTypeToLlvm (funcType, []) (reverse args)
               let argNames = Map.fromList argsWithTypes
               modify (\s -> s {
@@ -336,8 +340,10 @@ delambdafyPhase ctx exprs = let
                   _outers = Map.empty,
                   _usedVars = Set.empty } )
               e' <- go e1
+              body' <- go body
               functionStack %= tail
-              return (Function meta name tpe args e')
+              let (lam, _) = curryLambda meta args e'
+              return (Let True meta name tpe lam body')
           e -> return e
           where go e = delambdafyExpr e
 

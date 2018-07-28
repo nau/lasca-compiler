@@ -39,6 +39,7 @@ import qualified Debug.Trace as Debug
 
 import Lasca.Syntax
 import Lasca.Type
+import Lasca.Infer
 import Lasca.Options (LascaOpts)
 
 data NamerPhaseState = NamerPhaseState {
@@ -106,11 +107,15 @@ processData expr@(Data meta name tvars consts) = do
 
     processConstructor mapping (DataConst constrName args, tag) = do
         processConstructorArguments constrName args
-        if null args then globalVals %= Map.insert constrName expr
-        else do let dataTypeIdent = TypeIdent name
-                    tpe = (foldr (\(Arg _ tpe) acc -> tpe `TypeFunc` acc) dataTypeIdent args) -- FIXME forall
-                    m = meta `withType` tpe
-                    funDef = Function meta constrName dataTypeIdent args EmptyExpr
+        case args of
+            [] -> globalVals %= Map.insert constrName expr
+            args -> do
+                let dataTypeIdent = TypeIdent name
+                    m = meta `withType` dataTypeIdent
+                    (Lam m' a b, tpe) = curryLambda m args EmptyExpr
+                    generalType = generalizeType tpe
+                    lam' = Lam (m' `withType` generalType) a b
+                    funDef = Let True meta constrName dataTypeIdent lam' EmptyExpr
                 globalFunctions %= Map.insert constrName funDef
         return $ Map.insert constrName tag mapping
 
@@ -126,13 +131,9 @@ processData expr@(Data meta name tvars consts) = do
 processData expr = error $ printf "%s: This should not happen: %s" (show $ exprPosition expr) (show expr)
 
 collectNames exprs = forM_ exprs $ \expr -> case expr of
-    Let False _ name _ _ EmptyExpr -> do
+    Let _ _ name _ _ EmptyExpr -> do
         curMod <- gets _currentModule
         exportedNames %= Map.adjust (Set.insert name) curMod -- add this val name as current module exported name
-        return ()
-    Function _ name _ _ _ -> do
-        curMod <- gets _currentModule
-        exportedNames %= Map.adjust (Set.insert name) curMod -- add this function name as current module exported name
         return ()
     dat@(Data _ typeName tvars constrs) -> do
         curMod <- gets _currentModule
@@ -260,26 +261,29 @@ namerTransform expr = do
             e' <- go e
             args' <- mapM go args
             return (Apply meta e' args')
-        Function meta name tpe args e1 -> do
+        Let True meta name tpe e1 e2 -> do
 --            Debug.traceM $ printf "Current Function %s" (show name)
+            let (args, _) = uncurryLambda e1
             let argNames = MSet.fromList (map (\(Arg n t) -> n) args)
             outerStack <- gets _callStack
             callStack %= (:) name
             case outerStack of
                 [] -> do  locals .= argNames
                           e' <- go e1
+                          body <- go e2
                           callStack %= tail
                           curMod <- gets _currentModule
                           let fqn = NS curMod name
                           locals .= MSet.empty
-                          return (Function meta fqn tpe args e')
+                          return (Let True meta fqn tpe e' body)
                 _  -> do  oldLocals <- gets _locals
                           let names = MSet.insert name argNames
                           locals %= MSet.union names
                           e' <- go e1
+                          body <- go e2
                           callStack %= tail
                           locals .= MSet.insert name oldLocals
-                          return (Function meta name tpe args e')
+                          return (Let True meta name tpe e' body)
         e -> return e
         where go e = namerTransform e
 

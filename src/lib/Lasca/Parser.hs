@@ -21,6 +21,7 @@ import           Text.Megaparsec as Megaparsec
 import qualified Text.Megaparsec.Expr   as Ex
 import Text.Megaparsec.Char
 import Text.Megaparsec.Pos
+import qualified Debug.Trace as Debug
 
 
 import           Lasca.Lexer
@@ -262,11 +263,12 @@ function = do
     tpe <- option TypeAny typeAscription
     reservedOp "="
     body <- expr
-    let meta' = meta {
-        _exprType = foldr (TypeFunc . const TypeAny) tpe args, -- We need this for dynamic mode code generation
+    let (lam, tpe) = curryLambda meta args body
+        meta' = meta {
+        _exprType = tpe, -- We need this for dynamic mode code generation
         _annots = fromMaybe [] annots
     }
-    return (Function meta' (Name name) tpe args body)
+    return (Let True meta' (Name name) tpe lam EmptyExpr)
 
 extern :: Parser Expr
 extern = do
@@ -279,10 +281,10 @@ extern = do
     reservedOp "="
     externName <- lexeme stringLit
     let body = Literal meta externName
-    let funcType = foldr (\(Arg n at) ft -> TypeFunc at ft) tpe (List.reverse args)
-    let scheme = normalizeType funcType
+    let (lam, funcType) = curryLambda meta args body
+    let scheme = generalizeType funcType
     let meta' = meta { _isExternal = True, _exprType = scheme }
-    return (Function meta' (Name name) tpe args body)
+    return (Let True meta' (Name name) tpe lam EmptyExpr)
 
 arg :: Parser Arg
 arg = do
@@ -324,9 +326,7 @@ closure = braces cls
             reservedOp "->"
             letin <- blockStmts
             meta <- getMeta
-            let (lambdas, _) = foldr (\arg (body, tpe) ->
-                        let lambdaType = TypeFunc TypeAny tpe in
-                        (Lam (meta `withType` lambdaType) arg body, lambdaType)) (letin, TypeAny) args
+            let (lambdas, _) = curryLambda meta args letin
             return lambdas
 
 data LetVal = Named Name Expr | Stmt Expr
@@ -361,10 +361,14 @@ blockStmts = do
     foldStmtsIntoOneLetExpr [] = Literal emptyMeta UnitLit
     foldStmtsIntoOneLetExpr exprs@(lst : init) = do
         let (init', last') = case lst of
-                              (Stmt e)    -> (init, e)
-                              (Named _ _) -> (exprs, Literal emptyMeta UnitLit)
+                              Stmt f@(Let True meta name tpe e EmptyExpr) -> (init, Let True meta name tpe e (Ident meta name))
+                              Stmt e    -> (init, e)
+                              Named _ _ -> (exprs, Literal emptyMeta UnitLit)
         let namedExprs = go init' 1
-        foldl' (\acc (name, e) -> Let False emptyMeta name TypeAny e acc) last' namedExprs
+        foldl' folder last' namedExprs
+
+    folder acc (_, Let True m name tpe e1 EmptyExpr) = {-Debug.trace (show m)-} Let True m name tpe e1 acc
+    folder acc (name, e) = Let False emptyMeta name TypeAny e acc
 
     go (Stmt e : exprs) idx = (Name $ '_' : show idx, e) : go exprs (idx + 1)
     go (Named id e : exprs) idx = (id, e) : go exprs idx

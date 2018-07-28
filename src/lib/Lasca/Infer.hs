@@ -4,7 +4,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Lasca.Infer (
-  normalizeType,
+  generalizeType,
   typeCheck,
   inferExpr,
   inferExprDefault,
@@ -53,10 +53,6 @@ showPretty = renderString . layoutPretty defaultLayoutOptions . pretty
 
 data InferState = InferState {_count :: Int, _current :: Expr}
 makeLenses ''InferState
-
-normalizeType tpe = case Set.toList $ ftv tpe of
-                  [] -> tpe
-                  tvars -> Forall tvars tpe
 
 type Infer = ExceptT TypeError (State InferState)
 type Subst = Map TVar Type
@@ -183,7 +179,7 @@ runInfer e m =
 closeOver :: (Subst, Type) -> Expr -> (Type, Expr)
 closeOver (sub, ty) e = do
     let e' = substituteAll sub e
-    let sc = generalize emptyTyenv (substitute sub ty)
+    let sc = generalizeWithTypeEnv emptyTyenv (substitute sub ty)
     let (normalized, mapping) = normalize sc
     let e'' = closeOverInner mapping e'
     let e''' = Lens.set (metaLens.exprType) normalized e''
@@ -211,7 +207,6 @@ updateMeta f e =
         Select meta tree expr -> Select (f meta) (updateMeta f tree) (updateMeta f expr)
         Match meta expr cases -> Match (f meta) (updateMeta f expr) (map (\(Case pat e) -> Case pat (updateMeta f e)) cases)
         this@Closure{} -> this
-        Function meta name tpe args expr -> Function (f meta) name tpe args (updateMeta f expr)
         If meta cond tr fl -> If (f meta) (updateMeta f cond) (updateMeta f tr) (updateMeta f fl)
         Let rec meta name tpe expr body -> Let rec (f meta) name tpe (updateMeta f expr) (updateMeta f body)
         Array meta exprs -> Array (f meta) (map (updateMeta f) exprs)
@@ -272,10 +267,12 @@ instantiate (Forall as t) = do
     return $ substitute s t
 instantiate t = return t
 
-generalize :: TypeEnv -> Type -> Type
-generalize env t  = case Set.toList $ ftv t `Set.difference` ftv env of
+generalizeWithTypeEnv :: TypeEnv -> Type -> Type
+generalizeWithTypeEnv env t  = case Set.toList $ ftv t `Set.difference` ftv env of
     [] -> t
     vars -> Forall vars t
+
+generalizeType tpe = generalizeWithTypeEnv emptyTyenv tpe
 
 ops = Map.fromList [
     ("and", TypeBool ==> TypeBool ==> TypeBool),
@@ -340,6 +337,7 @@ infer ctx env ex = case ex of
             setCurrentExpr $ Apply (meta `withType` subApplyType) expr1 args'
             return (subst, subApplyType)
 
+    -- toplevel val definition: Pi = 3.1415
     Let False meta x tpe e1 EmptyExpr -> do
         (s1, t1) <- infer ctx env e1
         e1' <- gets _current
@@ -348,30 +346,60 @@ infer ctx env ex = case ex of
 --        when (not $ Set.null $ ftv s1) $ error $ printf "%s: Global val %s has free type variables: !" (showPosition meta) (show x) (ftv s1)
         return (s1, t1)
 
-    -- FIXME use let rec
-    Let False meta x tpe f@(Function _ name _ _ _) e2 -> do
-        (s1, t1) <- infer ctx env f
-        e1' <- gets _current
-        let env' = substitute s1 env
-            t'   = generalize env' t1
-        (s2, t2) <- infer ctx (env' `extend` (name, t')) e2
-        e2' <- gets _current
-        setCurrentExpr $ Let False (meta `withType` t2) x tpe e1' e2'
-        let subst = s2 `compose` s1
-    --    traceM $ printf "let %s: %s in %s = %s" x (show $ substitute subst t1) (show t2) (show subst)
-        return (subst, t2)
-
+    -- inner non recursive let binding: a = 15 or l = { a -> 15 }
     Let False meta x tpe e1 e2 -> do
         (s1, t1) <- infer ctx env e1
         e1' <- gets _current
         let env' = substitute s1 env
-            t'   = generalize env' t1
+            t'   = generalizeWithTypeEnv env' t1
         (s2, t2) <- infer ctx (env' `extend` (x, t')) e2
         e2' <- gets _current
         setCurrentExpr $ Let False (meta `withType` t2) x tpe e1' e2'
         let subst = s2 `compose` s1
     --    traceM $ printf "let %s: %s in %s = %s" x (show $ substitute subst t1) (show t2) (show subst)
         return (subst, t2)
+        
+    -- Example: external def foo(a: Int, b: String): Bool = "builtin_foo"
+    -- TODO: unify body with String
+    Let True meta x tpe e1 e2 | meta^.isExternal -> do
+        let (args, _) = uncurryLambda e1
+            argToType (Arg _ t) = t
+            ts = map argToType args
+            t = generalizeType $ foldr (==>) tpe ts
+        return (nullSubst, t)
+
+    -- Example: def foo(a: Int, b: String): Bool = false
+    Let True meta name tpe e1 e2 -> do
+        -- functions are recursive, so do Fixpoint for inference
+        let nameArg = Arg name TypeAny
+        let curried = Lam meta nameArg e1
+        tv <- fresh
+        tv1 <- fresh
+        -- fixpoint
+        (s1, ttt) <- infer ctx env curried
+        let composedType = substitute s1 (ttt ==> tv1)
+--            traceM $ "composedType " ++ show composedType
+        s2 <- unify composedType ((tv ==> tv) ==> tv)
+        let (s, t) = (s2 `compose` s1, substitute s2 tv1)
+        e' <- gets _current
+        let (Lam _ _ uncurried) = e'
+
+        (subst, letType, body) <- do
+            case e2 of
+                -- toplevel def
+                EmptyExpr -> return (s, t, e2)
+                -- inner def
+                _ -> do let env' = substitute s env
+                            t'   = generalizeWithTypeEnv env' t
+                        (s2, t2) <- infer ctx (env' `extend` (name, t')) e2
+                        e2' <- gets _current
+                        return (s2 `compose` s, t2, e2')
+                
+        -- Debug.traceM $ printf "def %s :: %s" (show name) (show letType)
+        setCurrentExpr $ Let True (meta `withType` letType) name tpe uncurried body
+        let (args, _) = uncurryLambda e1
+--        traceM $ printf "def %s(%s): %s, subs: %s" (show name) (List.intercalate "," $ map show args) (show letType) (show subst)
+        return (subst, letType)
 
     If meta cond tr fl -> do
 
@@ -412,39 +440,13 @@ infer ctx env ex = case ex of
                 setCurrentExpr $ Lam (meta `withType` resultType) arg e'
                 return (s1, resultType)
             _ -> do
-                let generalizedArgType = generalize env argType
+                let generalizedArgType = generalizeWithTypeEnv env argType -- FIXME: should not generalize it here
                 let env' = env `extend` (x, argType)
                 (s1, t1) <- infer ctx env' e
                 e' <- gets _current
                 let resultType = substitute s1 argType ==> t1
                 setCurrentExpr $ Lam (meta `withType` resultType) arg e'
                 return (s1, resultType)
-
-    Function meta name tpe args e ->
-        if meta^.isExternal
-        then do
-            let argToType (Arg _ t) = t
-            let f z t = z ==> t
-            let ts = map argToType args
-            let t = normalizeType $ foldr f tpe ts
-            return (nullSubst, t)
-        else do
-            -- functions are recursive, so do Fixpoint for inference
-            let nameArg = Arg name TypeAny
-            let curried = foldr (Lam meta) e (nameArg : args)
-            tv <- fresh
-            tv1 <- fresh
-            -- fixpoint
-            (s1, ttt) <- infer ctx env curried
-            let composedType = substitute s1 (ttt ==> tv1)
---            traceM $ "composedType " ++ show composedType
-            s2 <- unify composedType ((tv ==> tv) ==> tv)
-            let (s, t) = (s2 `compose` s1, substitute s2 tv1)
-            e' <- gets _current
-            let uncurried = foldr (\_ (Lam _ _ e) -> e) e' (nameArg : args)
-            setCurrentExpr $ Function (meta `withType` t) name tpe args uncurried
---            traceM $ printf "def %s(%s): %s, subs: %s" name (List.intercalate "," $ map show args) (show t) (show s)
-            return (s, t)
 
 
     Data meta name tvars constructors -> error $ "Shouldn't happen! " ++ show meta
@@ -570,10 +572,7 @@ data InferStuff = InferStuff { _names :: [(Name, Expr)] }
 makeLenses ''InferStuff
 
 collectNames exprs = forM_ exprs $ \expr -> case expr of
-    Let False _ name _ _ EmptyExpr -> do
-        names %= (++ [(name, expr)])
-        return ()
-    Function _ name _ _ _ -> do
+    Let _ _ name _ _ EmptyExpr -> do
         names %= (++ [(name, expr)])
         return ()
     _ -> return ()
@@ -583,8 +582,8 @@ createTypeEnvironment exprs = List.foldl' folder [] exprs
     folder types (Data _ typeName tvars constrs) = do
         let genTypes :: DataConst -> [(Name, Type)]
             genTypes (DataConst name args) =
-                let tpe = normalizeType $ foldr (\(Arg _ tpe) acc -> tpe ==> acc) dataTypeIdent args
-                    accessors = map (\(Arg n tpe) -> (n, normalizeType $ TypeFunc dataTypeIdent tpe)) args
+                let tpe = generalizeType $ foldr (\(Arg _ tpe) acc -> tpe ==> acc) dataTypeIdent args
+                    accessors = map (\(Arg n tpe) -> (n, generalizeType $ TypeFunc dataTypeIdent tpe)) args
                 in (name, tpe) : accessors
         let constructorsTypes = constrs >>= genTypes
         types ++ constructorsTypes
@@ -619,7 +618,7 @@ collectDeps expr = do
         Ident _ name | inModule name (state^.modName) -> do
 --            Debug.traceM $ printf "%s in module %s" (show name) (show (state^.modName))
             curFuncCalls %= Set.insert name
-        Let False _ name _ e EmptyExpr -> do
+        Let _ _ name _ _ EmptyExpr -> do
 --            Debug.traceM $ printf "Val %s in module %s" (show name) (show (state^.modName))
             let mapping = state^.nodes
                 calls = Set.toList $ state^.curFuncCalls
@@ -634,21 +633,6 @@ collectDeps expr = do
                 nodes %= Map.alter (combine2 (Node { nodeName = call, calledBy = Set.singleton name })) call
             curFuncCalls .= Set.empty
             return ()    
-        Function _ name _ _ _ -> do
---            Debug.traceM $ printf "Function %s in module %s" (show name) (show (state^.modName))
-            let mapping = state^.nodes
-                calls = Set.toList $ state^.curFuncCalls
-                emptyNode n = Node { nodeName = n, calledBy = Set.empty }
-                combine2 new Nothing = Just new
-                combine2 new (Just old) = Just $ old { calledBy = Set.union (calledBy old) (calledBy new) }
-
-            nodes %= Map.alter (combine2 (emptyNode name)) name
-            state <- get
---            Debug.traceM $ printf "Node for %s: %s" (show name) (show (Map.lookup name (state^.nodes)))
-            forM calls $ \call ->
-                nodes %= Map.alter (combine2 (Node { nodeName = call, calledBy = Set.singleton name })) call
-            curFuncCalls .= Set.empty
-            return ()
         _ -> return ()
     return ()
 
@@ -697,7 +681,7 @@ traverseExpr traverser expr = case expr of
         go tree
         go expr
         traverser expr
-    (If meta cond true false) -> do
+    If meta cond true false -> do
         go cond
         go true
         go false
@@ -705,19 +689,16 @@ traverseExpr traverser expr = case expr of
     Match meta ex cases -> do
         forM cases $ \(Case p expr) -> go expr
         traverser expr
-    (Let False meta n _ e body) -> do
+    Let _ meta n _ e body -> do
         go e
         go body
         traverser expr
-    l@(Lam m a@(Arg n t) e) -> do
+    Lam m a@(Arg n t) e -> do
         go e
         traverser expr
-    (Apply meta e args) -> do
+    Apply meta e args -> do
         go e
         mapM go args
-        traverser expr
-    f@(Function meta name tpe args e1) -> do
-        go e1
         traverser expr
     e -> traverser e
     where go e = traverseExpr traverser e

@@ -59,7 +59,6 @@ data Expr
     | Select Meta Expr Expr
     | Match Meta Expr [Case]
     | Closure Meta Name [Arg]   -- LLVM codegen only
-    | Function Meta Name Type [Arg] Expr
     | If Meta Expr Expr Expr
     | Let Bool Meta Name Type Expr Expr -- True for recursive
     | Array Meta [Expr]
@@ -77,7 +76,6 @@ metaLens = Lens.lens (fst . getset) (snd . getset)
               Lam meta name expr -> (meta, \ m -> Lam m name expr)
               Select meta tree expr -> (meta, \ m -> Select m tree expr)
               Match meta expr cases -> (meta, \ m -> Match m expr cases)
-              Function meta name tpe args body -> (meta, \ m -> Function m name tpe args body)
               If meta cond tr fl -> (meta, \ m -> If m cond tr fl)
               Let r meta name t expr body -> (meta, \ m -> Let r m name t expr body)
               Array meta exprs -> (meta, \ m -> Array m exprs)
@@ -107,9 +105,8 @@ instance Eq Expr where
     (Select _ nl l) == (Select _ nr r) = nl == nr && l == r
     (Match _ nl l) == (Match _ nr r) = nl == nr && l == r
     (Closure _ nl l) == (Closure _ nr r) = nl == nr && l == r
-    (Function metal nl _ al l) == (Function metar nr _ ar r) = nl == nr && al == ar && l == r && (metal^.isExternal) == (metar^.isExternal)
+    (Let rl metal nl _ al l) == (Let rr metar nr _ ar r) = rl == rr && nl == nr && al == ar && l == r && (metal^.isExternal) == (metar^.isExternal)
     (If _ nl al l) == (If _ nr ar r) = nl == nr && al == ar && l == r
-    (Let rl _ nl _ al l) == (Let rr _ nr _ ar r) = rl == rr && nl == nr && al == ar && l == r
     (Array _ l) == (Array _ r) = l == r
     (Data _ nl ltvars l) == (Data _ nr rtvars r) = nl == nr && ltvars == rtvars && l == r
     Module _ ln == Module _ rn = ln == rn
@@ -143,6 +140,17 @@ class Show a => DebugPrint a where
 instance DebugPrint Arg where
     printExprWithType (Arg a t) = printf "%s: %s" (show a) (show t)
 
+uncurryLambda :: Expr -> ([Arg], Expr) -- arguments, and body of innermost lambda
+uncurryLambda expr = go expr ([], expr) where
+  go (Lam _ name e) result = let (args, body) = go e result in (name : args, body)
+  go e (args, _) = (args, e)
+
+curryLambda :: Meta -> [Arg] -> Expr -> (Expr, Type)
+curryLambda meta args expr = foldr (\arg@(Arg n t) (body, tpe) ->
+     let lambdaType = TypeFunc t tpe in
+     (Lam (meta `withType` lambdaType) arg body, lambdaType)) (expr, TypeAny) args
+
+
 instance DebugPrint Expr where
     printExprWithType expr = case expr of
         Literal _ l -> show l
@@ -152,11 +160,14 @@ instance DebugPrint Expr where
         Select _ e f -> printf "%s.%s" (printExprWithType e) (printExprWithType f)
         Match _ e cs -> printf "match %s {\n%s}\n" (printExprWithType e) (show cs)
         Closure meta f args -> printf "Closure %s(%s)" (show f) (intercalate "," $ map show args)
-        Function meta f t args b -> if _isExternal meta
-            then printf "extern def %s(%s): %s\n" (show f) (intercalate "," $ map printExprWithType args) (show t)
-            else printf "--  %s : %s\ndef %s(%s): %s = %s\n" (show f) (show meta) (show f) (intercalate "," $ map printExprWithType args) (show t) (printExprWithType b)
+        Let False meta n t e b -> printf "%s = %s;\n%s: %s" (show n) (printExprWithType e) (printExprWithType b) (show meta)
+        Let True meta f t lam _ | _isExternal meta -> do
+            let (args, _) = uncurryLambda lam
+            printf "extern def %s(%s): %s\n" (show f) (intercalate "," $ map printExprWithType args) (show t)
+        Let True meta f t lam next -> do
+            let (args, b) = uncurryLambda lam
+            printf "--  %s : %s\ndef %s(%s): %s = %s;\n%s" (show f) (show meta) (show f) (intercalate "," $ map printExprWithType args) (show t) (printExprWithType b) (printExprWithType next)
         If meta c t f -> printf "if %s then {\n%s \n} else {\n%s\n}: %s" (printExprWithType c) (printExprWithType t) (printExprWithType f) (show meta)
-        Let rec meta n t e b -> printf "%s = %s;\n%s: %s" (show n) (printExprWithType e) (printExprWithType b) (show meta)
         Array _ es -> printf "[%s]" (intercalate "," $ map printExprWithType es)
         Data _ n tvars cs -> printf "data %s %s = %s\n" (show n) (show tvars) (intercalate "\n| " $ map show cs)
         Module meta name -> printf "module %s" (show name)

@@ -15,13 +15,15 @@ import Lasca.EmitCommon
 import qualified Lasca.EmitStatic as EmitStatic
 import Lasca.Syntax
 
-genExternalFuncWrapper f@(Function meta name returnType externArgs (Literal _ (StringLit externName))) = do
+genExternalFuncWrapper f@(Let True meta name returnType lam _) = do
     modState <- get
     let codeGenResult = codeGen modState
         blocks = createBlocks codeGenResult
         retType = typeMapping returnType
+
     define retType (nameToSBS name) (toSig externArgs) blocks
   where
+    (externArgs, Literal _ (StringLit externName)) = uncurryLambda lam
     codeGen modState = execCodegen [] modState $ do
         entry <- addBlock entryBlockName
         setBlock entry
@@ -42,7 +44,7 @@ collectGlobals ctx exprs = do
   where
     toplevel expr = case expr of
         Let False meta name _ expr EmptyExpr -> globalVals %= Map.insert name expr
-        Function meta name tpe args body -> globalFunctions %= Map.insert name expr
+        Let True meta name _ lam EmptyExpr -> globalFunctions %= Map.insert name expr
         _ -> return ()
 
 codegenTop ctx cgen topExpr = case topExpr of
@@ -52,7 +54,7 @@ codegenTop ctx cgen topExpr = case topExpr of
     --    Debug.traceM $ printf "Cons %s: %s" (show name) (show valType)
         defineGlobal (nameToSBS name) valType (Just $ defaultValueForType valType)
 
-    f@(Function meta name tpe args body) ->
+    f@(Let True meta name tpe lam _) -> do
         if meta ^. isExternal then do
             let (Literal _ (StringLit externName)) = body
             external (externalTypeMapping tpe) (fromString externName) (externArgsToSig args) False []
@@ -65,7 +67,9 @@ codegenTop ctx cgen topExpr = case topExpr of
             let retType = mappedReturnType args funcType
             define retType (nameToSBS name) largs blocks
       where
-        funcType = typeOf f
+        (args, body) = uncurryLambda lam
+        
+        funcType = typeOf lam
         largs = map (\(n, t) -> (nameToSBS n, t)) argsWithTypes
 
         funcTypeToLlvm (Arg name _) (TypeFunc a b, acc) = (b, (name, typeMapping a) : acc)

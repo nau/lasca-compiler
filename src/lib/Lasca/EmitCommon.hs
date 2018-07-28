@@ -70,10 +70,14 @@ externArgsToSig = map (\(S.Arg name tpe) -> (fromString (show name), externalTyp
 
 externArgsToLlvmTypes args = map snd (externArgsToSig args)
 
-externFuncLLvmType (S.Function _ _ tpe args _) = funcType (externalTypeMapping tpe) (externArgsToLlvmTypes args)
+externFuncLLvmType (S.Let True _ _ tpe lam _) = do
+    let (args, _) = S.uncurryLambda lam
+    funcType (externalTypeMapping tpe) (externArgsToLlvmTypes args)
 externFuncLLvmType e = error ("externFuncLLvmType should only be called on Function, but called on" ++ show e)
 
-funcLLvmType (S.Function _ _ tpe args _) = funcType (ptrType) (map (const ptrType) args)
+funcLLvmType (S.Let True _ _ tpe lam _) = do
+    let (args, _) = S.uncurryLambda lam
+    funcType ptrType (map (const ptrType) args)
 funcLLvmType e = error ("funcLLvmType should only be called on Function, but called on" ++ show e)
 
 staticArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
@@ -130,9 +134,8 @@ defineStringConstants expr = case expr of
          defineStringConstants e
          mapM_ (\(S.Case p e) -> defineStringConstants e) cases
          return ()
-    S.Lam{} -> error $ printf "defineStringConstants should be called after lambda lift! %s" (show expr)
-    S.Function meta name retType args expr -> do
-        defineStringConstants expr
+    S.Lam _ _ e -> do
+        defineStringConstants e
         return ()
     S.Module{} -> return ()
     S.Import{} -> return ()
@@ -340,7 +343,8 @@ genFunctionMap fns = do
                 addConstr n args = if null args then [] else [(n, n, (constrFuncType args), length args)]
                 m = foldl (\acc (S.DataConst n args) -> addConstr n args ++ acc) [] consts
             in m ++ s
-        go s f@(S.Function meta name tpe args body) = do
+        go s f@(S.Let True meta name tpe lam _) = do
+            let (args, _) = S.uncurryLambda lam
             (name, name, (funcLLvmType f), length args) : s
         go s _ = s
 
