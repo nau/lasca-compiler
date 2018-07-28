@@ -23,7 +23,8 @@ library
                         containers,
                         multiset,
                         prettyprinter >=1.1,
-                        megaparsec >= 6.0.0,
+                        -- fixed Lexer.float parsing or integer values
+                        megaparsec >= 6.4.0,
                         scientific,
                         lens >= 4.15,
                         llvm-hs >= 5.0.0,

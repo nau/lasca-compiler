@@ -30,7 +30,7 @@ integer       = lexeme L.decimal
 stringLiteral :: Parser String
 stringLiteral = char '"' >> manyTill L.charLiteral (char '"')
 
-float         = lexeme float2
+float         = lexeme L.float
 signedInteger = L.signed sc integer
 signedFloat   = L.signed sc float
 parens = between (symbol "(") (symbol ")")
@@ -66,24 +66,3 @@ opChar = oneOf ("!$%&*+./<=>?@\\^|-~" :: String)
 
 operator :: Parser String
 operator = lexeme $ some opChar
-
-scientific2 :: (MonadParsec e s m, Token s ~ Char) => m Scientific
-scientific2 = label "floating point number" (read <$> f)
-    where f = (++) <$> some digitChar <*> (fraction <|> fExp)
-
-float2 :: (MonadParsec e s m, Token s ~ Char) => m Double
-float2 = toRealFloat <$> scientific2
-
-fraction :: (MonadParsec e s m, Token s ~ Char) => m String
-fraction = do
-    void (char '.')
-    d <- some digitChar
-    e <- option ("" :: String) fExp
-    return ('.' : d ++ e)
-    
-fExp :: (MonadParsec e s m, Token s ~ Char) => m String
-fExp = do
-    expChar <- char' 'e'
-    signStr <- option "" (pure <$> choice (char <$> ("+-" :: String)))
-    d       <- some digitChar
-    return (expChar : signStr ++ d)
