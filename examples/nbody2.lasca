@@ -13,7 +13,7 @@ Jupiter = Body(
      1.66007664274403694e-03 * DaysPerYear,    -- vx
      7.69901118419740425e-03 * DaysPerYear,    -- vy
     -6.90460016972063023e-05 * DaysPerYear,    -- vz
-     9.54791938424326609e-04 * SolarMass       -- mass
+     9.54791938424326609e-04 * SolarMass,      -- mass
 )
 
 Saturn = Body(
@@ -23,7 +23,7 @@ Saturn = Body(
     -2.76742510726862411e-03 * DaysPerYear,
      4.99852801234917238e-03 * DaysPerYear,
      2.30417297573763929e-05 * DaysPerYear,
-     2.85885980666130812e-04 * SolarMass
+     2.85885980666130812e-04 * SolarMass,
 )
 
 Uranus = Body(
@@ -33,7 +33,7 @@ Uranus = Body(
      2.96460137564761618e-03 * DaysPerYear,
      2.37847173959480950e-03 * DaysPerYear,
     -2.96589568540237556e-05 * DaysPerYear,
-     4.36624404335156298e-05 * SolarMass
+     4.36624404335156298e-05 * SolarMass,
 )
 
 Neptune = Body(
@@ -43,7 +43,7 @@ Neptune = Body(
      2.68067772490389322e-03 * DaysPerYear,
      1.62824170038242295e-03 * DaysPerYear,
     -9.51592254519715870e-05 * DaysPerYear,
-     5.15138902046611451e-05 * SolarMass
+     5.15138902046611451e-05 * SolarMass,
 )
 
 Sun = Body(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, SolarMass)
@@ -61,7 +61,7 @@ def init(bodies: [Body]) = {
         updatedPs = [
             pxyz[0] + body.vx * body.mass,
             pxyz[1] + body.vy * body.mass,
-            pxyz[2] + body.vz * body.mass
+            pxyz[2] + body.vz * body.mass,
         ];
         if i == 0 then updatedPs else go(bodies, i - 1, updatedPs)
     };
@@ -92,7 +92,7 @@ def advanceInner(from, to, dt) = {
     toVz   = to.vz   + dz * fromMassMag;
     [
       Body(from.x, from.y, from.z, fromVx, fromVy, fromVz, fromMass),
-      Body(to.x, to.y, to.z, toVx, toVy, toVz, toMass)
+      Body(to.x, to.y, to.z, toVx, toVy, toVz, toMass),
     ]
 }
 
@@ -101,7 +101,7 @@ def updateIdx(bodies: [Body], i, j, from: Body, to: Body) = [
     if i == 1 then from else if j == 1 then to else bodies[1],
     if i == 2 then from else if j == 2 then to else bodies[2],
     if i == 3 then from else if j == 3 then to else bodies[3],
-    if i == 4 then from else if j == 4 then to else bodies[4]
+    if i == 4 then from else if j == 4 then to else bodies[4],
 ]
 
 def update(body: Body, dt: Float) = Body(
@@ -129,7 +129,7 @@ def advance(bodies: [Body], dt) = {
       update(bodies1[1], dt),
       update(bodies1[2], dt),
       update(bodies1[3], dt),
-      update(bodies1[4], dt)
+      update(bodies1[4], dt),
     ]
 }
 

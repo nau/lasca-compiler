@@ -71,7 +71,7 @@ boolLit = BoolLit . strToBool <$> (true <|> false)
 
 arrayLit = do
     meta <- getMeta
-    Array meta <$> brackets (commaSep expr)
+    Array meta <$> brackets (trailCommaSep expr)
 
 stringLit = StringLit <$> stringLiteral
 
@@ -259,7 +259,7 @@ function = do
     reserved "def"
     meta <- getMeta
     name <- identifier
-    args <- parens (commaSep arg)
+    args <- parens (trailCommaSep arg)
     tpe <- option TypeAny typeAscription
     reservedOp "="
     body <- expr
@@ -276,7 +276,7 @@ extern = do
     meta <- getMeta
     reserved "def"
     name <- identifier
-    args <- parens $ commaSep arg
+    args <- parens $ trailCommaSep arg
     tpe <- typeAscription
     reservedOp "="
     externName <- lexeme stringLit
@@ -292,7 +292,7 @@ arg = do
     tpe <- option TypeAny typeAscription
     return (Arg (Name name) tpe)
 
-argsApply = parens (commaSep expr)
+argsApply = parens (trailCommaSep expr)
 
 ifthen :: Parser Expr
 ifthen = do
@@ -392,7 +392,7 @@ dataDef = do
 
 dataConstructor = do
     name <- identifier
-    args <- option [] $ parens (arg `sepEndBy` comma)
+    args <- option [] $ parens (trailCommaSep arg)
     return (DataConst (Name name) args)
 
 factor :: Parser Expr -- TODO remove unneeded try's, reorder

@@ -11,7 +11,7 @@ Jupiter = [
      1.66007664274403694e-03 * DaysPerYear,    -- vx
      7.69901118419740425e-03 * DaysPerYear,    -- vy
     -6.90460016972063023e-05 * DaysPerYear,    -- vz
-     9.54791938424326609e-04 * SolarMass       -- mass
+     9.54791938424326609e-04 * SolarMass,      -- mass
 ]
 
 Saturn = [
@@ -21,7 +21,7 @@ Saturn = [
     -2.76742510726862411e-03 * DaysPerYear,
      4.99852801234917238e-03 * DaysPerYear,
      2.30417297573763929e-05 * DaysPerYear,
-     2.85885980666130812e-04 * SolarMass
+     2.85885980666130812e-04 * SolarMass,
 ]
 
 Uranus = [
@@ -31,7 +31,7 @@ Uranus = [
      2.96460137564761618e-03 * DaysPerYear,
      2.37847173959480950e-03 * DaysPerYear,
     -2.96589568540237556e-05 * DaysPerYear,
-     4.36624404335156298e-05 * SolarMass
+     4.36624404335156298e-05 * SolarMass,
 ]
 
 Neptune = [
@@ -41,7 +41,7 @@ Neptune = [
      2.68067772490389322e-03 * DaysPerYear,
      1.62824170038242295e-03 * DaysPerYear,
     -9.51592254519715870e-05 * DaysPerYear,
-     5.15138902046611451e-05 * SolarMass
+     5.15138902046611451e-05 * SolarMass,
 ]
 
 Sun = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, SolarMass]
@@ -52,7 +52,7 @@ def offsetMomentum(object: [Float], px, py, pz) = {
     vz = -pz / SolarMass;
     [ object[0], object[1], object[2],
       vx, vy, vz,
-      object[6]
+      object[6],
     ]
 }
 
@@ -62,7 +62,7 @@ def init(bodies: [[Float]]) = {
         updatedPs = [
             pxyz[0] + body[3] * body[6],
             pxyz[1] + body[4] * body[6],
-            pxyz[2] + body[5] * body[6]
+            pxyz[2] + body[5] * body[6],
         ];
         if i == 0 then updatedPs else go(bodies, i - 1, updatedPs);
     };
@@ -94,7 +94,7 @@ def advance(bodies: [[Float]], dt) = {
         toVz   = to[5]   + dz * fromMassMag;
         [
           [from[0], from[1], from[2], fromVx, fromVy, fromVz, fromMass],
-          [to[0], to[1], to[2], toVx, toVy, toVz, toMass]
+          [to[0], to[1], to[2], toVx, toVy, toVz, toMass],
         ]
     };
 
@@ -147,7 +147,7 @@ def advance(bodies: [[Float]], dt) = {
       [jupiter[0] + dt * jupiterVx, jupiter[1] + dt * jupiterVy, jupiter[2] + dt * jupiterVz, jupiterVx, jupiterVy, jupiterVz, jupiter[6]],
       [saturn[0] + dt * saturnVx,  saturn[1] + dt * saturnVy,  saturn[2] + dt * saturnVz,  saturnVx,  saturnVy,  saturnVz, saturn[6]],
       [uranus[0] + dt * uranusVx,  uranus[1] + dt * uranusVy,  uranus[2] + dt * uranusVz,  uranusVx,  uranusVy,  uranusVz, uranus[6]],
-      [neptune[0] + dt * neptuneVx, neptune[1] + dt * neptuneVy, neptune[2] + dt * neptuneVz,  neptuneVx,  neptuneVy,  neptuneVz, neptune[6]]
+      [neptune[0] + dt * neptuneVx, neptune[1] + dt * neptuneVy, neptune[2] + dt * neptuneVz,  neptuneVx,  neptuneVy,  neptuneVz, neptune[6]],
     ]
 
 }

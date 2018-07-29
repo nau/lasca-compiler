@@ -39,6 +39,7 @@ braces  = between (symbol "{") (symbol "}")
 comma = symbol ","
 semi = symbol ";"
 commaSep p  = p `sepBy` comma
+trailCommaSep p  = p `sepEndBy` comma
 semiSep  p  = p `sepBy` semi
 
 reserved :: String -> Parser ()
