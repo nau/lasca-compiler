@@ -49,7 +49,6 @@ data NamerPhaseState = NamerPhaseState {
     _exportedNames :: Map Name (Set Name),
     _exportedTypes :: Map Name (Set Name),
     _locals :: MSet.MultiSet Name,
-    _callStack :: [Name],
     _context :: Ctx
 } deriving (Show)
 makeLenses ''NamerPhaseState
@@ -61,7 +60,6 @@ emptyNamerPhaseState opts = NamerPhaseState {
     _exportedNames = Map.empty,
     _exportedTypes = Map.empty,
     _locals = MSet.empty,
-    _callStack = [],
     _context = emptyCtx opts
 }
 
@@ -261,29 +259,19 @@ namerTransform expr = do
             e' <- go e
             args' <- mapM go args
             return (Apply meta e' args')
+        Let True meta name tpe e1 EmptyExpr -> do
+--            Debug.traceM $ printf "Current Function %s" (show name)
+            e' <- go e1
+            curMod <- gets _currentModule
+            let fqn = NS curMod name
+            return (Let True meta fqn tpe e' EmptyExpr)
         Let True meta name tpe e1 e2 -> do
 --            Debug.traceM $ printf "Current Function %s" (show name)
-            let (args, _) = uncurryLambda e1
-            let argNames = MSet.fromList (map (\(Arg n t) -> n) args)
-            outerStack <- gets _callStack
-            callStack %= (:) name
-            case outerStack of
-                [] -> do  locals .= argNames
-                          e' <- go e1
-                          body <- go e2
-                          callStack %= tail
-                          curMod <- gets _currentModule
-                          let fqn = NS curMod name
-                          locals .= MSet.empty
-                          return (Let True meta fqn tpe e' body)
-                _  -> do  oldLocals <- gets _locals
-                          let names = MSet.insert name argNames
-                          locals %= MSet.union names
-                          e' <- go e1
-                          body <- go e2
-                          callStack %= tail
-                          locals .= MSet.insert name oldLocals
-                          return (Let True meta name tpe e' body)
+            locals %= MSet.insert name
+            e' <- go e1
+            body <- go e2
+            locals %= MSet.delete name
+            return (Let True meta name tpe e' body)
         e -> return e
         where go e = namerTransform e
 
