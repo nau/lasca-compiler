@@ -29,7 +29,7 @@ lasca: rts
 	stack install
 
 test:
-	stack test --fast -j 8
+	stack test -j 8
 
 examples:
 	lasca -O2 -e --mode static  examples/Array.lasca $(TEST_RTS)
@@ -60,25 +60,22 @@ examples:
 	lasca -O2 -e --mode static  examples/ski.lasca $(TEST_RTS)
 #	lasca -O2 -e examples/typed.lasca $(TEST_RTS)
 
-install_and_examples: lasca examples
-
 perf:
 	stack install --profile -j 8
 	time lasca examples/Map.lasca +RTS -sstderr -N4 -p -hc
 	hp2ps -c lasca.hp
 	ghc-prof-flamegraph lasca.prof
 
-release: install_and_examples
+release: lasca test
 	rm -rf dist
 	mkdir -p dist/{src,bash_completion}
-	cp .stack-work/dist/x86_64-osx/Cabal-2.0.0.2/build/lasca/lasca dist
-	cp liblascart.so dist
-#	find examples -name *.lasca -exec cp \{} dist/src \;
-	cp examples/Prelude.lasca dist/src
+	cp .stack-work/dist/x86_64-osx/Cabal-2.0.1.0/build/lasca/lasca dist
+	cp liblascart.a dist
+	cp libs/base/*.lasca dist/src
 #	lasca --bash-completion-script lasca > dist/$(brew --prefix)/etc/bash_completion.d/lasca
 	lasca --bash-completion-script lasca > dist/bash_completion/lasca
-	(cd dist; tar -czf ../lasca-0.0.1.tar.gz .)
-	SUM="$(shell shasum -a 256 lasca-0.0.1.tar.gz | awk '{ print $$1 }')"
+	(cd dist; tar -czf ../lasca-0.1.0.tar.gz .)
+	SUM="$(shell shasum -a 256 lasca-0.1.0.tar.gz | awk '{ print $$1 }')"
 #	echo $(SUM)
 #	sed -E -e 's/sha256 "[a-zA-Z0-9]+"/sha256 $(SUM)/' ../homebrew-lasca/lasca-compiler.rb
 

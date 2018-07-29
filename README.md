@@ -9,8 +9,10 @@ Lasca is Scala shifted towards Haskell.
 Lasca is a LLVM-based statically or dynamically typed strict functional programming language.
 
 It has a 'dynamic' compilation mode, meaning instant code generation without compile time type checking/inference, 
-allowing instant compilation/execution cycle, like dynamic languages give.
-It's planned to have a full type inference, parametric polymorphism, and sort of type classes.
+allowing instant compilation/execution cycle, and more freedom dynamic languages give.
+
+It has a full type inference, parametric polymorphism, GC, algebraic data types, pattern matching,
+and type classes are coming soon.
  
 Imagine
 - Scala with fast compilation/start time, optional dynamic typing, and without null
@@ -178,9 +180,9 @@ Install on Mac OS using Homebrew
 
     brew install nau/lasca/lasca-compiler
     
-Setup LASCA_HOME environment variable. Add this to your .bash_profile    
+Setup LASCAPATH environment variable. Add this to your .bash_profile
     
-    export LASCA_HOME=$(brew --prefix lasca-compiler)
+    export LASCAPATH="$(brew --prefix lasca-compiler)/src"
     
 Try it!
 
@@ -193,13 +195,11 @@ Build on Mac OS
 ===============
 You need LLVM 5.0 installed, and latest Haskell Stack.
 
-    brew install llvm-hs/llvm/llvm-5.0 
-    
-    brew install boehmgc
+    brew install cmake llvm-hs/llvm/llvm-5.0 boehmgc pcre2
 
     brew install haskell-stack
     
-You need to build Lasca Runtime System library liblascart.so
+You need to build Lasca Runtime System library liblascart.a
 
     make rts
     
@@ -239,7 +239,7 @@ Do this instead:
     
     sudo apt install llvm-5.0-dev libgc-dev zlib1g-dev cmake
     stack build -j 8
-    export LASCAPATH=${lasca-compiler-dir}/examples
+    export LASCAPATH=${lasca-compiler-dir}
     stack test   
             
     
