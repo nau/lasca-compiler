@@ -31,6 +31,9 @@ lasca: rts
 test:
 	stack test -j 8
 
+fasttest:
+	stack test -j 8 --fast
+
 examples:
 	lasca -O2 -e --mode static  examples/Array.lasca $(TEST_RTS)
 	lasca -O2 -e --mode dynamic examples/Array.lasca $(TEST_RTS)

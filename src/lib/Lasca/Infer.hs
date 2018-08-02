@@ -30,6 +30,8 @@ import Data.Foldable (foldr)
 import Data.Maybe
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Debug.Trace as Debug
@@ -159,14 +161,17 @@ bind a t
 occursCheck ::  Substitutable a => TVar -> a -> Bool
 occursCheck a t = a `Set.member` ftv t
 
-letters :: [String]
-letters = [1..] >>= flip replicateM ['a'..'z']
+letters :: [Text]
+letters = do
+    i <- [1..]
+    s <- flip replicateM ['a'..'z'] i
+    return $ T.pack s
 
 fresh :: Infer Type
 fresh = do
     s <- get
     count += 1
-    return $ TVar $ TV (show $ _count s)
+    return $ TVar $ TV (T.pack $ show $ _count s)
 
 runInfer :: Expr -> Infer (Subst, Type) -> Either TypeError (Type, Expr)
 runInfer e m =

@@ -4,6 +4,8 @@ module Lasca.Codegen where
 
 import Data.Word
 import Data.String
+import Data.Text (Text)
+import qualified Data.Text as T
 import Data.List
 import Data.Function
 import Data.Set (Set)
@@ -163,7 +165,7 @@ data CodegenState
     , count        :: Word                     -- Count of unnamed instructions
     , names        :: Names                    -- Name Supply
     , moduleState  :: ModuleState
-    , generatedStrings :: [String]
+    , generatedStrings :: [Text]
     } deriving Show
 
 data BlockState
@@ -340,6 +342,8 @@ constByte b = constOp (C.Int 8 b)
 constBool b = C.Int 1 (if b then 1 else 0)
 constTrue = constOp (constBool True)
 constFalse = constOp (constBool False)
+
+constRef :: AST.Type -> SBS.ShortByteString -> C.Constant
 constRef tpe name = let ptr = C.GlobalReference (T.ptr tpe) (AST.Name name) in C.BitCast ptr ptrType
 
 fptoptr fp = do
@@ -420,10 +424,12 @@ ret val = terminator $ Do $ Ret (Just val) []
 getelementptr addr indices = instr $ GetElementPtr False addr indices []
 {-# INLINE getelementptr #-}
 
-globalStringRef :: String -> C.Constant
-globalStringRef name = C.GlobalReference (T.ptr $ stringStructType (length name + 1)) (AST.Name (getStringLitName name))
-
-globalStringRefAsPtr name = C.BitCast (globalStringRef name) ptrType
+globalStringRefAsPtr :: Text -> C.Constant
+globalStringRefAsPtr name = constRef tpe literalName
+  where
+    literalName = getStringLitName name
+    (_, len) = createString name
+    tpe = stringStructType len
 
 one = constOp $ C.Float (F.Double 1.0)
 zero = constOp $ C.Float (F.Double 0.0)
@@ -431,31 +437,30 @@ false = zero
 true = one
 
 toSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
-toSig = map (\(S.Arg name tpe) -> (fromString (show name), ptrType))
+toSig = map (\(S.Arg name tpe) -> (LT.nameToSBS name, ptrType))
 
-getStringLitName :: String -> SBS.ShortByteString
+getStringLitName :: Text -> SBS.ShortByteString
 getStringLitName s = name
   where
-    name = fromString $ take 15 s ++ "." ++ show hash
-    hash = hash32 s
+    name = LT.textToSBS $ T.append (T.take 15 s) (T.pack ('.' : show hash))
+    hash = hash32 (T.unpack s)
 
 createStruct args = C.Struct Nothing False args
 
-createCharString s = (C.Array T.i8 bytes, len)
+-- return Array of zero terminated bytes, and len of bytes including '\0'
+createCString :: Text -> (C.Constant, Int)
+createCString s = (C.Array T.i8 bytes, len)
   where
-    bytestring = UTF8.fromString s
+    bytestring = Encoding.encodeUtf8 s
     constByte b = C.Int 8 (toInteger b)
     bytes = map constByte (ByteString.unpack bytestring ++ [fromInteger 0])
     len = ByteString.length bytestring + 1
 
-createString s = (createStruct [constInt (len - 1), C.Array T.i8 bytes], len)
+createString s = (createStruct [constInt (len - 1), array], len)
   where
-    bytestring = UTF8.fromString s
-    constByte b = C.Int 8 (toInteger b)
-    bytes = map constByte (ByteString.unpack bytestring ++ [fromInteger 0])
-    len = ByteString.length bytestring + 1
+    (array, len) = createCString s
 
-defineStringLit :: String -> LLVM ()
+defineStringLit :: Text -> LLVM ()
 defineStringLit s = defineConst (getStringLitName s) (stringStructType len) string
   where (string, len) = createString s
 

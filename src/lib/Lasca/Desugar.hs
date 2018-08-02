@@ -11,9 +11,9 @@ import Data.String
 import qualified Data.ByteString.Char8 as Char8
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Short as SBS
-import qualified Data.Text
+import Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.ByteString
-import qualified Data.Text.Encoding
 import Data.Digest.Murmur32
 import Data.Maybe
 import qualified Data.List as List
@@ -146,8 +146,8 @@ extractFunction meta name args expr = do
     let usedOuterVars = Set.toList (Set.intersection outerVars (_usedVars state))
     let enclosedArgs = map (\n -> Arg n TypeAny) usedOuterVars
     let enclosedArgTypes = map (\n -> _outers state Map.! n) usedOuterVars
-    let (funcName', nms') = uniqueName (fromString name) nms
-    let funcName = Name $ Char8.unpack funcName'
+    let (funcName', nms') = uniqueName (nameToBS name) nms
+    let funcName = Name $ Encoding.decodeUtf8 funcName'
     let (lam, t) = curryLambda meta (enclosedArgs ++ args) expr
     let meta' = meta `S.withType` t
     let func = S.Let True meta' funcName TypeAny lam EmptyExpr
@@ -258,8 +258,8 @@ lambdaLiftPhase ctx exprs = let
                                 _outers = Map.union (_outers s) (_locals s),
                                 _locals = argNames } )
                             stack <- gets _functionStack
-                            let fullName = List.intercalate "_" (map show . reverse $ stack)
-                            renames %= Map.insert name (Name fullName)
+                            let fullName = Name $ T.intercalate "_" (map nameToText . reverse $ stack)
+                            renames %= Map.insert name fullName
                             e' <- go e1
                             r <- extractFunction meta fullName args e'
                             body' <- go body
@@ -317,7 +317,7 @@ delambdafyPhase ctx exprs = let
               let r = foldr (\(Arg n t) -> Map.insert n TypeAny) Map.empty args
               locals .= r
               e' <- go e
-              let fullName = List.intercalate "_" (map show . reverse $ Name "lambda" : stack)
+              let fullName = Name $ T.intercalate "_" (map nameToText . reverse $ Name "lambda" : stack)
               res <- extractFunction m fullName args e'
               modify (\s  -> s {_outers = oldOuters, _locals = oldLocals})
 
@@ -425,7 +425,7 @@ genPattern ctx exprType resultType lhs ptrn rhs = case ptrn of
                 Apply (metaType TypeBool) checkTag [lhs, Literal (metaType TypeInt) (IntLit tag)]
             else do
                 let isConstr = Ident (metaType $ exprType ==> TypeString ==> TypeBool) (NS "Prelude" "runtimeIsConstr")
-                    ctorName = Literal (metaType TypeString) $ StringLit (show name)
+                    ctorName = Literal (metaType TypeString) $ StringLit (nameToText name)
                 Apply (metaType TypeBool) isConstr [lhs, ctorName]
         constrMap = ctx ^. constructorArgs
         checkArgs nm fail =  case Map.lookup nm constrMap of

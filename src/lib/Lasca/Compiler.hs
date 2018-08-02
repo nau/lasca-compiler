@@ -19,6 +19,9 @@ import Control.Monad
 import Control.Monad.Trans
 import Data.Maybe
 import Text.Printf
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import qualified Data.ByteString.Char8 as Char8
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Short as SBS
@@ -49,7 +52,7 @@ parsePhase opts filename = do
     exists <- doesFileExist filename
     if exists then do
         absoluteFilePath <- canonicalizePath filename
-        file <- readFile absoluteFilePath
+        file <- TIO.readFile absoluteFilePath
         case parseToplevelFilename absoluteFilePath file of
           Left err -> die $ Megaparsec.parseErrorPretty err
           Right exprs -> do
@@ -65,11 +68,11 @@ parsePhase opts filename = do
 
 fixModuleAndImportPrelude filename exprs = case exprs of
     (mod@(Module _ name): exprs) -> do
-        when (takeBaseName filename /= (last $ nameToList name)) $
+        when (takeBaseName filename /= (T.unpack $ last $ nameToList name)) $
           die $ printf "Wrong module name in file %s. Module name should match file name, but was %s)" (filename) (show name)
         return $ mod : insertImportPrelude name exprs
     _ -> do
-        let name = Name $ takeBaseName filename
+        let name = Name $ T.pack $ takeBaseName filename
         let mod = Module emptyMeta name
         return $ mod : insertImportPrelude name exprs
 
@@ -91,7 +94,7 @@ findModulePath searchPaths name = do
         Just file -> return file
         Nothing -> error $ printf "Couldn't find module %s. Search path: %s" (show name) (show $ intercalate "," searchPaths)
   where
-    path (Name n) = n
+    path (Name n) = T.unpack n
     path (NS prefix n) = path prefix </> path n
 
 parseModule searchPaths name = loadImport searchPaths Set.empty [] name
@@ -112,7 +115,7 @@ loadImport searchPaths imported importPath name = do
     then return (imported, [])
     else do
         absoluteFilePath <- findModulePath searchPaths name
-        file <- readFile absoluteFilePath
+        file <- TIO.readFile absoluteFilePath
         case parseToplevelFilename absoluteFilePath file of
           Left err -> die $ Megaparsec.parseErrorPretty err
           Right exprs -> do

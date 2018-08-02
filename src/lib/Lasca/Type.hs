@@ -2,19 +2,26 @@ module Lasca.Type where
 
 import Data.List
 import Data.String
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as Encoding
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Short as SBS
 import Data.Text.Prettyprint.Doc
 
-data Name = Name String | NS Name Name deriving (Eq, Ord)
+data Name = Name Text | NS Name Name deriving (Eq, Ord)
 
 instance IsString Name where
-    fromString = Name
+    fromString = Name . T.pack
 
 instance Show Name where
     show n = case n of
-        Name s -> s
+        Name s -> T.unpack s
         NS prefix n -> show prefix ++ "_" ++ show n
+
+nameToText n = case n of
+    Name n -> n
+    NS prefix n -> T.append (nameToText prefix) (T.cons '_' (nameToText n))
 
 qualify mod name = if mod == defaultModuleQName then name else NS mod name
 
@@ -22,11 +29,14 @@ qnameToString n = show n
 
 qname = Name
 
+textToSBS :: Text -> SBS.ShortByteString
+textToSBS = SBS.toShort . Encoding.encodeUtf8
+
 nameToSBS :: Name -> SBS.ShortByteString
-nameToSBS = fromString . show
+nameToSBS = textToSBS . nameToText
 
 nameToBS :: Name -> BS.ByteString
-nameToBS = fromString . show
+nameToBS = Encoding.encodeUtf8 . nameToText
 
 nameToList (Name n) = [n]
 nameToList (NS prefix n) = nameToList prefix ++ nameToList n
@@ -34,11 +44,11 @@ nameToList (NS prefix n) = nameToList prefix ++ nameToList n
 defaultModuleName = "Main"
 defaultModuleQName = Name defaultModuleName
 
-newtype TVar = TV String
+newtype TVar = TV Text
   deriving (Eq, Ord)
 
 instance Show TVar where
-  show (TV s) = s
+  show (TV s) = T.unpack s
 
 data Type
   = TVar TVar
@@ -49,7 +59,7 @@ data Type
   deriving (Eq, Ord)
 
 instance Show Type where
-  show (TVar (TV n)) = n
+  show (TVar (TV n)) = T.unpack n
   show (TypeIdent s) = show s
   show (TypeFunc l r) = "(" ++ show l ++ " -> " ++ show r ++ ")"
   show (TypeApply t args) = "(" ++ show t ++ foldl (\acc a -> acc ++ " " ++ show a) "" args ++ ")"

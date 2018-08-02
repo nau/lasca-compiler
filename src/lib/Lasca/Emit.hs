@@ -2,6 +2,9 @@ module Lasca.Emit (codegenTop, collectGlobals) where
 
 import Text.Printf
 import Data.String
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as Encoding
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Debug.Trace as Debug
@@ -33,7 +36,7 @@ genExternalFuncWrapper f@(Let True meta name returnType lam _) = do
             EmitStatic.resolveBoxing EmitStatic.anyTypeVar tpe (localPtr argName)
         let retType = externalTypeMapping returnType
 --        Debug.traceM $ printf "%s genExternalFuncWrapper %s, retType %s" (show name) (show $ externFuncLLvmType f) (show retType)
-        res <- instrTyped retType $ callFnIns (externFuncLLvmType f) externName largs
+        res <- instrTyped retType $ callFnIns (externFuncLLvmType f) (T.unpack externName) largs
         wrapped <- EmitStatic.resolveBoxing returnType EmitStatic.anyTypeVar res
         ret wrapped
 genExternalFuncWrapper other = error $ "genExternalFuncWrapper got " ++ (show other)
@@ -57,7 +60,7 @@ codegenTop ctx cgen topExpr = case topExpr of
     f@(Let True meta name tpe lam _) -> do
         if meta ^. isExternal then do
             let (Literal _ (StringLit externName)) = body
-            external (externalTypeMapping tpe) (fromString externName) (externArgsToSig args) False []
+            external (externalTypeMapping tpe) (textToSBS externName) (externArgsToSig args) False []
             genExternalFuncWrapper f
         else do
             modState <- get

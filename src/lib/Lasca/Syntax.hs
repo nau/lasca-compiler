@@ -5,6 +5,8 @@ module Lasca.Syntax where
 --import           Data.Text
 import           Data.List
 import           Text.Printf
+import Data.Text (Text)
+import qualified Data.Text as T
 import qualified Text.Megaparsec as Megaparsec
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
@@ -26,7 +28,7 @@ data Meta = Meta {
     pos :: Position,
     _exprType :: Type,
     _isExternal :: Bool,
-    _annots :: [String]
+    _annots :: [Text]
 } deriving (Eq, Ord)
 makeLenses ''Meta
 
@@ -201,7 +203,7 @@ data Lit = IntLit Int
     | FloatLit Double
     | BoolLit Bool
     | UnitLit
-    | StringLit String
+    | StringLit Text
     deriving (Eq, Ord)
 
 instance Show Lit where
@@ -209,7 +211,7 @@ instance Show Lit where
     show (FloatLit f) = show f
     show (BoolLit b) = show b
     show  UnitLit = "()"
-    show (StringLit s) = "\"" ++ s ++ "\""
+    show (StringLit s) = "\"" ++ T.unpack s ++ "\""
 
 
 data Arg = Arg Name Type deriving (Eq, Ord, Show)
@@ -256,7 +258,7 @@ instance Literal Int where lit v = IntLit v
 instance Literal Double where lit v = FloatLit v
 instance Literal Bool where lit v = BoolLit v
 instance Literal () where lit v = UnitLit
-instance Literal String where lit v = StringLit v
+instance Literal Text where lit v = StringLit v
 
 infixr ==>
 (==>) = TypeFunc

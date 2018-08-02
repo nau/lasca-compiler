@@ -11,8 +11,9 @@ import System.FilePath
 import System.FilePath.Glob
 import qualified Text.Megaparsec as Megaparsec
 import Shelly (shelly, run)
---import qualified Data.ByteString.Lazy.Char8 as BS
-import Data.Text as T
+
+import Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Data.Text.Encoding as E
 import qualified Data.ByteString as BS
@@ -138,9 +139,9 @@ parseAndInferExpr str = let
   in infered
 
 parseAndInferFile fname = do
-    p <- Prelude.readFile "libs/base/Prelude.lasca"
+    p <- TIO.readFile "libs/base/Prelude.lasca"
     let preludeExprs = fromRight $ parseToplevel p
-    file <- Prelude.readFile fname
+    file <- TIO.readFile fname
     case parseToplevel file of
         Left err -> error $ Megaparsec.parseErrorPretty err
         Right ex -> do

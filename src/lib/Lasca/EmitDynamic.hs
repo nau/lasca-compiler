@@ -76,7 +76,7 @@ cgen ctx (S.Ident meta name) = do
           load x
       Nothing | name `Map.member` S._globalFunctions ctx -> boxClosure name mapping []
               | name `Map.member` S._globalVals ctx -> load (global ptrType (nameToSBS name))
-              | otherwise -> boxError (show name)
+              | otherwise -> boxError (nameToText name)
 cgen ctx (S.Literal meta l) = do
 --  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)
     boxLit l meta

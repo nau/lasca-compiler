@@ -3,13 +3,15 @@
 module Lasca.Lexer where
 
 import Data.Void
+import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Scientific
 import Text.Megaparsec
 import Control.Monad (void)
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 
-type Parser = Parsec Void String
+type Parser = Parsec Void Text
 
 ops = ["+","*","-","/",";", "==", ":=", "=",",",".","<",">","|",":"]
 keywords = ["module", "import", "data", "def", "extern", "if", "then", "else", "in", "let", "true", "false", "match", "do", "lazy", "var"]
@@ -27,8 +29,11 @@ symbol = L.symbol sc
 
 integer       = lexeme L.decimal
 
-stringLiteral :: Parser String
-stringLiteral = char '"' >> manyTill L.charLiteral (char '"')
+stringLiteral :: Parser Text
+stringLiteral = do
+    char '"'
+    l <- manyTill L.charLiteral (char '"')
+    return $ T.pack l
 
 float         = lexeme L.float
 signedInteger = L.signed sc integer
@@ -42,28 +47,30 @@ commaSep p  = p `sepBy` comma
 trailCommaSep p  = p `sepEndBy` comma
 semiSep  p  = p `sepBy` semi
 
-reserved :: String -> Parser ()
+reserved :: Text -> Parser ()
 reserved w = string w *> notFollowedBy identChar *> sc
 
-reservedOp :: String -> Parser ()
+reservedOp :: Text -> Parser ()
 reservedOp w = string w *> notFollowedBy opChar *> sc
 
 identOp = lexeme $ some opChar
 
 upperIdentifier = (lexeme . try) (p)
   where
-      p       = (:) <$> upperChar <*> many alphaNumChar
+      p       = (\c cs -> T.cons c (T.pack cs)) <$> upperChar <*> many alphaNumChar
 
-identifier :: Parser String
+identifier :: Parser Text
 identifier = (lexeme . try) (p >>= check)
   where
     p       = (:) <$> letterChar <*> many alphaNumChar
     check x = if x `elem` keywords
                 then fail $ "keyword " ++ show x ++ " cannot be an identifier"
-                else return x
+                else return $ T.pack x
 
 opChar :: Parser Char
 opChar = oneOf ("!$%&*+./<=>?@\\^|-~" :: String)
 
-operator :: Parser String
-operator = lexeme $ some opChar
+operator :: Parser Text
+operator = do
+    op <- some opChar
+    lexeme $ return $ T.pack op

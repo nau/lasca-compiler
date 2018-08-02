@@ -17,6 +17,8 @@ import Data.Set (Set)
 import qualified Data.Set as Set
 import           Data.Foldable
 import qualified Data.Scientific as Sci
+import Data.Text (Text)
+import qualified Data.Text as T
 import           Text.Megaparsec as Megaparsec
 import qualified Text.Megaparsec.Expr   as Ex
 import Text.Megaparsec.Char
@@ -89,12 +91,12 @@ interpolatedString = do
         go' meta (Right e) acc = Apply meta (Ident meta "toString") [e] : acc
 
 
-pTemplate :: Parser [Either String Expr] -- Left = text, Right = variable
+pTemplate :: Parser [Either Text Expr] -- Left = text, Right = variable
 pTemplate = char '\"' *> manyTill piece (char '\"')
   where
     -- piece of text or interpolated variable
     piece =
-        (Left <$> some ch) <|>
+        (Left . T.pack <$> some ch) <|>
         (Right <$> var)
 
     -- interpolated variable
@@ -121,31 +123,32 @@ pTemplate = char '\"' *> manyTill piece (char '\"')
 
     pVar = expr
 
-binop = Ex.InfixL parser
+{-binop = Ex.InfixL parser
   where parser = do
             meta <- getMeta
-            (\op lhs rhs -> Apply meta (Ident meta op) [lhs, rhs]) <$> anyOperatorParser
+            (\op lhs rhs -> Apply meta (Ident meta (Name op)) [lhs, rhs]) <$> anyOperatorParser
 
 unop = Ex.Prefix parser
   where parser = do
             meta <- getMeta
-            (\op expr -> Apply meta (Ident meta (Name $ "unary" ++ op)) [expr]) <$> anyOperatorParser
+            (\op expr -> Apply meta (Ident meta (Name $ T.append "unary" op)) [expr]) <$> anyOperatorParser-}
 
 unary s = Ex.Prefix parser
   where parser = do
             meta <- getMeta
             reservedOp s
-            return (\expr -> Apply meta (Ident meta (Name $ "unary" ++ s)) [expr])
+            return (\expr -> Apply meta (Ident meta (Name $ T.append "unary" s)) [expr])
 
 binary s = Ex.InfixL parser
   where parser = do
             meta <- getMeta
             reservedOp s >> return (\lhs rhs -> Apply meta (Ident meta (Name s)) [lhs, rhs])
 
+{-anyOperatorParser :: Parser Text
 anyOperatorParser = do
     traverse_ (notFollowedBy . reservedOp) ops
     x <- identOp
-    fail $ "operator (" ++ x ++ ") is not defined"
+    fail $ "operator (" ++ x ++ ") is not defined"-}
 
 postfixApply = Ex.Postfix parser
   where parser = do
@@ -218,7 +221,7 @@ binops = [
           [binary ":="]
          ]
 
-operatorTable = binops ++ [[unop], [binop]]
+operatorTable = binops -- ++ [[unop], [binop]]
 
 expr :: Parser Expr
 expr =  Ex.makeExprParser factor operatorTable
@@ -228,7 +231,7 @@ variable = do
     meta <- getMeta
     Ident meta . Name <$> identifier
 
-makeType name = if Char.isLower $ List.head name then TVar $ TV name else TypeIdent (Name name)
+makeType name = if Char.isLower $ T.head name then TVar $ TV name else TypeIdent (Name name)
 
 typeTerm = (TypeArray <$> brackets typeExpr)
        <|> parens typeExpr
@@ -370,7 +373,7 @@ blockStmts = do
     folder acc (_, Let True m name tpe e1 EmptyExpr) = {-Debug.trace (show m)-} Let True m name tpe e1 acc
     folder acc (name, e) = Let False emptyMeta name TypeAny e acc
 
-    go (Stmt e : exprs) idx = (Name $ '_' : show idx, e) : go exprs (idx + 1)
+    go (Stmt e : exprs) idx = (Name $ T.pack $ '_' : show idx, e) : go exprs (idx + 1) -- TODO make Name with number
     go (Named id e : exprs) idx = (id, e) : go exprs idx
     go [] _ = []
 
