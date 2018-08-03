@@ -80,6 +80,7 @@ install:
  - cmake ..
  - make
  - sudo make install
+ - cd $TRAVIS_BUILD_DIR
 
 
 script:
