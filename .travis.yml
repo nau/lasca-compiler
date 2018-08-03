@@ -36,7 +36,6 @@ addons:
     packages:
       - libgc-dev
       - libffi-dev
-      - libpcre2-dev
       - gcc-5
       - g++-5
     sources:
@@ -73,6 +72,12 @@ install:
  - llvm-config --version
  - $GCC --version
  - $GXX --version
+ - curl https://ftp.pcre.org/pub/pcre/pcre2-10.31.tar.gz | tar -xzf -
+ - cd pcre2-10.31
+ - mkdir -p build && cd build
+ - cmake ..
+ - make && make install
+
 
 script:
 # Build the package, its tests, and its docs and run the tests
