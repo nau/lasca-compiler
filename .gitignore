@@ -14,6 +14,10 @@ cabal.sandbox.config
 *.pdf
 *.prof
 *.o
+*.a
+*.out
+*.aux
+*.hp
 .DS_Store
 Thumbs.db
 
