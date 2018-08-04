@@ -2,6 +2,8 @@
 .stack*
 .cabal*
 .liquid/
+build/
+out/
 dist
 *.iml
 target/

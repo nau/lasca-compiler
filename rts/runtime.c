@@ -200,7 +200,7 @@ static int64_t isUserType(const Box* v) {
 }
 
 #define DO_OP(op) if (lhs->type == INT) { result = boxInt(lhs->value.num op rhs->value.num); } \
-                  else if (lhs->type == BYTE) { result = box(BYTE, (void*)(lhs->value.byte op rhs->value.byte)); } \
+                  else if (lhs->type == BYTE) { result = box(BYTE, (void*)(size_t)(lhs->value.byte op rhs->value.byte)); } \
                   else if (lhs->type == DOUBLE) { result = boxFloat64(lhs->value.dbl op rhs->value.dbl); } \
                   else { \
                         printf("AAAA!!! Type mismatch! Expected Int or Double for op but got %s\n", typeIdToName(lhs->type)); exit(1); }

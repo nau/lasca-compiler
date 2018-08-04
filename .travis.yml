@@ -77,7 +77,7 @@ install:
  - curl https://ftp.pcre.org/pub/pcre/pcre2-10.31.tar.gz | tar -xzf - -C $HOME
  - cd $HOME/pcre2-10.31
  - mkdir -p build && cd build
- - cmake ..
+ - cmake -DCMAKE_POSITION_INDEPENDENT_CODE=ON ..
  - make
  - sudo make install
  - cd $TRAVIS_BUILD_DIR

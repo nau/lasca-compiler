@@ -101,13 +101,13 @@ int64_t codePointAt(Box* string, int64_t index) {
     utf8proc_ssize_t readIdx = 0;
     size_t idx = 0;
     if (index < 0) {
-        printf("Index is out of range %zd\n", index);
+        printf("Index is out of range %"PRId64"\n", index);
         exit(1);
     }
     for (; idx <= index; idx++) {
         readIdx += utf8proc_iterate((const utf8proc_uint8_t *) str->bytes + readIdx, -1, &codepoint);
         if (codepoint == 0) {
-            printf("Index is out of range %zd\n", index);
+            printf("Index is out of range %"PRId64"\n", index);
             exit(1);
         }
         else if (codepoint == -1) {
