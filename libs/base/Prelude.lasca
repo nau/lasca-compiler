@@ -1,8 +1,6 @@
 module Prelude
 
-extern def putchard(x: Float): Unit = "putchard"
-extern def putInt(d: Int): Unit = "putInt"
-extern def runtimePutchar(d: Int): Unit = "runtimePutchar"
+extern def print(s: String): Unit = "print"
 extern def println(s: String): Unit = "println"
 extern def toString(a: a): String = "toString"
 extern def sqrt(a: Float): Float = "sqrt"

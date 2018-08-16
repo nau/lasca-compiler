@@ -225,10 +225,7 @@ def main() = {
     numIterations = toInt(args[1]);
     bodies = [Sun, Jupiter, Saturn, Uranus, Neptune];
     initedBodies = init(bodies);
-    putchard(energy(initedBodies));
-    --  println(toString(initedBodies));
-    --  println(toString(energy(initedBodies)));
+    println(toString(energy(initedBodies)));
     advanced = calculate(numIterations, initedBodies);
-    putchard(energy(advanced));
-    --  println(toString(energy(advanced)));
+    println(toString(energy(advanced)));
 }

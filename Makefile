@@ -15,7 +15,7 @@ bench:
 	time lasca -O2 -e examples/gen.lasca
 
 rts:
-	mkdir -p build && cd build && cmake .. && make && cp rts/liblascart.a .. && cp rts/liblascart.a $(LASCAPATH)
+	mkdir -p build && cd build && cmake .. && make && cp rts/liblascartStatic.a .. && cp rts/liblascartStatic.a $(LASCAPATH)
 
 relink: rts
 	rm -rf .stack-work/dist/x86_64-osx/Cabal-2.0.1.0/build/Lasca/lasca
@@ -61,7 +61,6 @@ examples:
 	lasca -O2 -e --mode static  examples/Map.lasca $(TEST_RTS)
 	lasca -O2 -e --mode dynamic examples/Map.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  examples/ski.lasca $(TEST_RTS)
-#	lasca -O2 -e examples/typed.lasca $(TEST_RTS)
 
 perf:
 	stack install --profile -j 8

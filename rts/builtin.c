@@ -21,26 +21,6 @@ String* unsafeString(Box* b) {
     return b->value.ptr;
 }
 
-
-void* putInt(int64_t c) {
-    printf("%"PRId64"\n", c);
-    fflush(stdout);
-    return 0;
-}
-
-void* putchard(double X) {
-    printf("%12.9lf\n", X);
-    fflush(stdout);
-    return 0;
-}
-
-void * runtimePutchar(Box* ch) {
-    char c = (char) unboxInt(ch);
-    putchar(c);
-    fflush(stdout);
-    return 0;
-}
-
 /* Bitwise stuff */
 
 int8_t byteAnd(int8_t a, int8_t b) { return a & b; }
@@ -175,6 +155,11 @@ Box* nextGrapheme(Box* string, int64_t byteOffset, int64_t prevCodePoint, int64_
     return makeString;
 }*/
 
+Box* print(const Box* val) {
+    String * str = unbox(STRING, val);
+    printf("%s", str->bytes);
+    return &UNIT_SINGLETON;
+}
 
 Box* println(const Box* val) {
 //    printf("println: %p %p\n", STRING, val->type);
