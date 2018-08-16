@@ -23,6 +23,18 @@ def range(start: Int, end: Int, step: Int): Array Int = {
     init((end - start) / step + 1, { i -> start + i * step })
 }
 
+def transformGo(array, f, i) = {
+    len = length(array);
+    if i < len then {
+        setIndex(array, i, f(i, getIndex(array, i)));
+        transformGo(array, f, i + 1)
+    } else ()
+}
+
+def transform(array: Array a, f: Int -> a -> a): Array a = {
+    transformGo(array, f, 0)
+}
+
 def testArray() = {
     a = makeArray(10, "a");
     b = makeArray(10, "b");

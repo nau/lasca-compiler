@@ -1,0 +1,17 @@
+84
+868
+84
+101
+225
+115
+116
+117
+868
+[84, 101, 225, 115, 116, 117, 868]
+117
+length in codepoints = 7, length in bytes = 9, length in graphemes = 6
+15
+toLower T = t teástuͤ
+toUpper å = Å TEÁSTUͤ
+toTitle å = Å TEÁSTUͤ
+compare -1 0 1 -1 0 1

@@ -1,8 +1,12 @@
 import Array
 -- length of UTF-8 encoded byte string
-extern def bytesLength(s: String): Int = "bytesLength"
-extern def graphemesLength(s: String): Int = "graphemesLength"
+extern def bytesCount(s: String): Int = "bytesLength"
+extern def graphemeCount(s: String): Int = "graphemesLength"
 extern def chr(codePoint: Int): String = "codePointToString"
+extern def fromCharArray(chars: Array Int): String = "codePointsToString"
+extern def charToLower(codePoint: Int): Int = "utf8proc_tolower"
+extern def charToUpper(codePoint: Int): Int = "utf8proc_toupper"
+extern def charToTitle(codePoint: Int): Int = "utf8proc_totitle"
 extern def iterate(s: String, f: Int -> Bool): Unit = "codepointsIterate"
 
 def foreach(s: String, f: Int -> a): Unit = iterate(s, { char -> f(char); true })
@@ -31,12 +35,54 @@ def foldl(s: String, zero: a, f: a -> Int -> a): a = {
     acc.getRef
 }
 
-def codepointsLength(s: String): Int = foldl(s, 0, { len, c -> len + 1})
+def codePointCount(s: String): Int = foldl(s, 0, { len, c -> len + 1})
 
-def length(s) = codepointsLength(s)
+def compareLength(s: String, length: Int): Int = {
+    var i = 0;
+    var result = 0;
+    iterate(s, { char -> 
+        i := i.getRef + 1;
+        i.getRef <= length
+    });
+    runtimeCompare(i.getRef, length);
+}
 
-def unicodePoints(s: String): Array Int = {
-    array = makeArray(s.codepointsLength, 0);
+def length(s) = codePointCount(s)
+
+def codePoints(s: String): Array Int = {
+    array = makeArray(s.codePointCount, 0);
     foldl(s, 0, { idx, char -> setIndex(array, idx, char); idx + 1 });
     array;
+}
+
+def map(s: String, f: Int -> Int): String = {
+    array = s.codePoints;
+    transform(array, { i, cp -> f(cp) });
+    fromCharArray(array);
+}
+
+def toLower(s: String): String = if compareLength(s, 1) == 0 then chr(charToLower(ord(s))) else map(s, charToLower)
+
+def toUpper(s: String): String = if compareLength(s, 1) == 0 then chr(charToUpper(ord(s))) else map(s, charToUpper)
+
+def toTitle(s: String): String = if compareLength(s, 1) == 0 then chr(charToTitle(ord(s))) else map(s, charToTitle)
+
+def main() = {
+    empty = "";
+    test = "Teástuͤ";
+    println(toString(codePointAt(test, 0)));
+    println(toString(codePointAt(test, 6)));
+    String.foreach(test, { cp -> println(cp.toString) });
+    println(toString(codePoints(test)));
+    symbol = "uͤ";
+    println(toString(symbol.ord));
+    println("length in codepoints = ${codePointCount(test)}, length in bytes = ${bytesCount(test)}, length in graphemes = ${graphemeCount(test)}");
+    res = foldl("12345", 0, { acc, c -> acc + toInt(chr(c)); });
+    println(res.toString);
+    upperT = "T";
+    lowerA = "å";
+    println("toLower T = ${chr(charToLower(ord(upperT)))} ${toLower(test)}");
+    println("toUpper å = ${chr(charToUpper(ord(lowerA)))} ${toUpper(test)}");
+    println("toTitle å = ${chr(charToTitle(ord(lowerA)))} ${toTitle(test)}");
+    println("compare ${compareLength(empty, 1)} ${compareLength(empty, 0)} ${compareLength(empty, -1)} ${compareLength(test, 10)} ${compareLength(test, 7)} ${compareLength(test, 0)}");
 }

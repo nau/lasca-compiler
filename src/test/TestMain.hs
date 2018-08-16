@@ -90,8 +90,10 @@ data Mode = Dyn | Stat | Both
 data Config = Script { name :: String, compMode :: Mode, arguments :: [T.Text] }
 
 examples = [
-    Script "Array.lasca" Both [],
     Script "builtin.lasca" Both [],
+    Script "Array.lasca" Both [],
+    Script "String.lasca" Both [],
+    Script "List.lasca" Both [],
     Script "binarytrees.lasca" Both ["10"],
     Script "Data.lasca" Both [],
     Script "dynamic.lasca" Dyn [],
@@ -99,16 +101,14 @@ examples = [
     Script "factorial.lasca" Both ["15"],
     Script "hello.lasca" Both [],
     Script "lambda.lasca" Both [],
-    Script "List.lasca" Both [],
     Script "Map.lasca" Both [],
-    Script "nbody.lasca" Both ["50000"],
-    Script "nbody2.lasca" Both ["50000"],
-    Script "nbody3.lasca" Both ["50000"],
     Script "Option.lasca" Both [],
     Script "regex.lasca" Both [],
-    Script "strings.lasca" Both [],
     Script "queen.lasca" Both [],
-    Script "ski.lasca" Both []
+    Script "ski.lasca" Both [],
+    Script "nbody.lasca" Both ["50000"],
+    Script "nbody2.lasca" Both ["50000"],
+    Script "nbody3.lasca" Both ["50000"]
   ]
 
 prependPath path script = script { name = path </> (name script) }
@@ -116,7 +116,7 @@ withMode s m = s { compMode = m }
 
 mkGoldenTests s@(Script path mode args) = do
     let testName = takeBaseName path
-    let goldenPath = "src" </> "test" </> "golden" </> (replaceExtension path ".golden")
+    let goldenPath = "src" </> "test" </> "golden" </> replaceExtension path ".golden"
     let example = prependPath "examples" s
     let base = prependPath "libs/base" s
     e <- doesFileExist ("examples" </> path)

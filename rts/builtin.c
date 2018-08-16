@@ -95,9 +95,21 @@ Box* codePointToString(int64_t codePoint) {
     utf8proc_uint8_t buf[5];
     utf8proc_ssize_t idx = utf8proc_encode_char(cp, buf);
     buf[idx] = 0; // \0 termination
-    // printf("codePointToString: %td %s", idx, buf);
     return makeString((char *) buf);
 }
+
+Box* codePointsToString(Box* array) {
+    Array* arr = unbox(ARRAY, array);
+    utf8proc_ssize_t len = 4 * arr->length; // potentially each codepoint is encoded as 4 bytes utf8.
+    String* string = gcMalloc(sizeof(String) + len + 1);
+    utf8proc_ssize_t offset = 0;
+    for (size_t i = 0; i < arr->length; i++) {
+        offset += utf8proc_encode_char(arr->data[i]->value.num, (utf8proc_uint8_t *) &string->bytes[offset]);
+    }
+    string->bytes[offset] = 0;
+    string->length = offset;
+    return box(STRING, string);
+ }
 
 /*// FIXME fix types when Int32/UInt32 types are added
 Box* nextGrapheme(Box* string, int64_t byteOffset, int64_t prevCodePoint, int64_t segmentationState) {

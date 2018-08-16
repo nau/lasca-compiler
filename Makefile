@@ -35,8 +35,16 @@ fasttest:
 	stack test -j 8 --fast
 
 examples:
-	lasca -O2 -e --mode static  examples/Array.lasca $(TEST_RTS)
-	lasca -O2 -e --mode dynamic examples/Array.lasca $(TEST_RTS)
+	lasca -O2 -e --mode static  libs/base/Array.lasca $(TEST_RTS)
+	lasca -O2 -e --mode dynamic libs/base/Array.lasca $(TEST_RTS)
+	lasca -O2 -e --mode static  libs/base/List.lasca $(TEST_RTS)
+	lasca -O2 -e --mode dynamic libs/base/List.lasca $(TEST_RTS)
+	lasca -O2 -e --mode static  libs/base/Option.lasca $(TEST_RTS)
+	lasca -O2 -e --mode dynamic libs/base/Option.lasca $(TEST_RTS)
+	lasca -O2 -e --mode static  libs/base/String.lasca $(TEST_RTS)
+	lasca -O2 -e --mode dynamic libs/base/String.lasca $(TEST_RTS)
+	lasca -O2 -e --mode static  examples/Map.lasca $(TEST_RTS)
+	lasca -O2 -e --mode dynamic examples/Map.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  examples/Data.lasca $(TEST_RTS)
 	lasca -O2 -e --mode dynamic examples/Data.lasca $(TEST_RTS)
 	lasca -O2 -e --mode dynamic examples/dynamic.lasca $(TEST_RTS)
@@ -46,8 +54,6 @@ examples:
 	lasca -O2 -e --mode static  examples/hello.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  examples/lambda.lasca $(TEST_RTS)
 	lasca -O2 -e --mode dynamic examples/lambda.lasca $(TEST_RTS)
-	lasca -O2 -e --mode static  examples/List.lasca $(TEST_RTS)
-	lasca -O2 -e --mode dynamic examples/List.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  examples/nbody.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e --mode dynamic examples/nbody.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e --mode static  examples/nbody2.lasca $(TEST_RTS) -- 50000
@@ -56,10 +62,6 @@ examples:
 	lasca -O2 -e --mode dynamic examples/nbody3.lasca $(TEST_RTS) -- 50000
 	lasca -O2 -e --mode static  examples/binarytrees.lasca $(TEST_RTS) -- 10
 	lasca -O2 -e --mode dynamic examples/binarytrees.lasca $(TEST_RTS) -- 10
-	lasca -O2 -e --mode static  libs/base/Option.lasca $(TEST_RTS)
-	lasca -O2 -e --mode dynamic libs/base/Option.lasca $(TEST_RTS)
-	lasca -O2 -e --mode static  examples/Map.lasca $(TEST_RTS)
-	lasca -O2 -e --mode dynamic examples/Map.lasca $(TEST_RTS)
 	lasca -O2 -e --mode static  examples/ski.lasca $(TEST_RTS)
 
 perf:
