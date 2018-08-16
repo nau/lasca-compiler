@@ -1,0 +1,16 @@
+import List
+import Array
+
+words = Cons("GOD", Cons("SAVE", Cons("THE", Cons("QUEEN", Nil))))
+
+def permute(acc, words) = match words {
+    Cons(w, ws) -> {
+        chars = w.unicodePoints;
+        foreach(chars, { c -> 
+            ch = c.codePointToString;
+            permute([acc, ch].concat, ws);
+        });
+    }
+    Nil -> println(acc)
+}
+def main() = permute("", words)

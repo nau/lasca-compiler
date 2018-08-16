@@ -59,6 +59,7 @@ library
                         Lasca.Parser
                         Lasca.Syntax
                         Lasca.Type
+                        Lasca.Modules
 executable lasca
   other-extensions:     GADTs
   build-depends:        base >=4.9,
@@ -73,10 +74,10 @@ executable lasca
                         -fPIC
                         -rdynamic
   if os(darwin)
-    extra-libraries:    lascart
+    extra-libraries:    lascartStatic
     ghc-options:        -fwhole-archive-hs-libs 
   else
-    ghc-options:        -optl-Wl,--whole-archive -optl-Wl,liblascart.a -optl-Wl,--no-whole-archive
+    ghc-options:        -optl-Wl,--whole-archive -optl-Wl,lascartStatic.a -optl-Wl,--no-whole-archive
   hs-source-dirs:       src/lasca
   main-is:              Main.hs
 
@@ -88,6 +89,7 @@ test-suite lasca-test
   build-depends:       base >=4.9,
                        lasca,
                        text,
+                       directory,
                        bytestring,
                        shelly,
                        utf8-string,
@@ -101,7 +103,12 @@ test-suite lasca-test
                        tasty-golden,
                        tasty-program
   ghc-options:         -threaded -rtsopts
-  Extra-libraries:     lascart
+  if os(darwin)
+    extra-libraries:    lascartStatic
+    ghc-options:        -fwhole-archive-hs-libs 
+  else
+    ghc-options:        -optl-Wl,--whole-archive -optl-Wl,lascartStatic.a -optl-Wl,--no-whole-archive
+  Extra-libraries:      gc, pthread, pcre2-8
   Extra-lib-dirs:      .
   default-language:    Haskell2010
 --executable gencode

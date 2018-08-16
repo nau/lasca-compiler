@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ExtendedDefaultRules #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
 import Test.Tasty
 import Test.Tasty.SmallCheck as SC
@@ -9,6 +10,7 @@ import Test.Tasty.Golden as G
 import Test.Tasty.Program
 import System.FilePath
 import System.FilePath.Glob
+import System.Directory
 import qualified Text.Megaparsec as Megaparsec
 import Shelly (shelly, run)
 
@@ -24,6 +26,7 @@ import Lasca.Syntax
 import Lasca.Infer
 import Lasca.Type
 import Lasca.Options
+import Lasca.Modules
 
 import Data.List
 import Data.Ord
@@ -34,9 +37,22 @@ default (T.Text)
 main :: IO ()
 main = do
   goldens <- foldMap mkGoldenTests examples
-  defaultMain (testGroup "Tests" ([parserTests, typerTests] ++ goldens ++ compileTests))
+  defaultMain (testGroup "Tests" ([parserTests, modulesTests, typerTests] ++ goldens ++ compileTests))
+
+modul n is = LascaModule { imports = is, moduleExprs = [], modName = n }
+
+prelude = modul "Prelude" []
+arr = modul "Array" [prelude]
+opt = modul "Option" [prelude]
+lst = modul "List" [opt, prelude]
+test1 = modul "Test1" [test2]
+test2 = modul "Test2" []
+queen = modul "Queen" [arr, lst, test1, test2]
 
 fromRight (Right a) = a
+
+modulesTests = testGroup "Module dependency tests"
+  [ testCase "Linearize includes" $ linearizeIncludes queen @?= [prelude, test2, arr, opt, test1, lst, queen] ]
 
 parserTests = testGroup "Parser tests"
   [ testCase "Parse true" $
@@ -74,7 +90,7 @@ data Mode = Dyn | Stat | Both
 data Config = Script { name :: String, compMode :: Mode, arguments :: [T.Text] }
 
 examples = [
---    Script "Array.lasca" Both [],
+    Script "Array.lasca" Both [],
     Script "builtin.lasca" Both [],
     Script "binarytrees.lasca" Both ["10"],
     Script "Data.lasca" Both [],
@@ -88,9 +104,10 @@ examples = [
     Script "nbody.lasca" Both ["50000"],
     Script "nbody2.lasca" Both ["50000"],
     Script "nbody3.lasca" Both ["50000"],
---    Script "Option.lasca" Both [],
+    Script "Option.lasca" Both [],
     Script "regex.lasca" Both [],
     Script "strings.lasca" Both [],
+    Script "queen.lasca" Both [],
     Script "ski.lasca" Both []
   ]
 
@@ -100,7 +117,10 @@ withMode s m = s { compMode = m }
 mkGoldenTests s@(Script path mode args) = do
     let testName = takeBaseName path
     let goldenPath = "src" </> "test" </> "golden" </> (replaceExtension path ".golden")
-    let script = prependPath "examples" s
+    let example = prependPath "examples" s
+    let base = prependPath "libs/base" s
+    e <- doesFileExist ("examples" </> path)
+    let script = if e then example else base
     let tests = case mode of
           Both -> [ goldenVsString testName goldenPath (action (script `withMode` Stat)),
                     goldenVsString testName goldenPath (action (script `withMode` Dyn))]

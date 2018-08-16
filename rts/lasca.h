@@ -120,6 +120,7 @@ extern const LaType* FILE_HANDLE;
 extern const LaType* PATTERN;
 
 void *gcMalloc(size_t s);
+Box* __attribute__ ((pure)) makeString(char * str);
 Box *box(const LaType* type_id, void *value);
 Box * __attribute__ ((pure)) boxInt(int64_t i);
 void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti);

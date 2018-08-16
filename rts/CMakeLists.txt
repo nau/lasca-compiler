@@ -1,7 +1,7 @@
 add_library(objlib OBJECT runtime.c builtin.c lasca.h utf8proc/utf8proc.c utf8proc/utf8proc.h)
 add_library (lascart SHARED $<TARGET_OBJECTS:objlib>)
 add_library (lascartStatic  $<TARGET_OBJECTS:objlib>)
-set_target_properties(lascartStatic PROPERTIES OUTPUT_NAME lascart)
+# set_target_properties(lascartStatic PROPERTIES OUTPUT_NAME lascart)
 set(CMAKE_SHARED_LIBRARY_SUFFIX ".so")
 
 find_path(FFI_INCLUDE_PATH ffi.h PATHS ${FFI_INCLUDE_DIR})
@@ -37,3 +37,4 @@ target_link_libraries(lascart m ${GC_LIBRARY} ${FFI_LIBRARY} ${PCRE2_LIBRARY})
 target_link_libraries(lascartStatic m ${GC_LIBRARY} ${FFI_LIBRARY} ${PCRE2_LIBRARY})
 
 install(TARGETS lascart LIBRARY DESTINATION lib)
+install(TARGETS lascartStatic LIBRARY ARCHIVE DESTINATION lib)

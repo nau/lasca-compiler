@@ -138,6 +138,17 @@ int64_t graphemesLength(Box* string) {
     return length;
 }
 
+// FIXME make it int32_t
+Box* codePointToString(int64_t codePoint) {
+    utf8proc_int32_t cp = (utf8proc_int32_t) codePoint; // TODO remove cast
+    assert(utf8proc_codepoint_valid(cp));
+    utf8proc_uint8_t buf[5];
+    utf8proc_ssize_t idx = utf8proc_encode_char(cp, buf);
+    buf[idx] = 0; // \0 termination
+    // printf("codePointToString: %td %s", idx, buf);
+    return makeString((char *) buf);
+}
+
 /*// FIXME fix types when Int32/UInt32 types are added
 Box* nextGrapheme(Box* string, int64_t byteOffset, int64_t prevCodePoint, int64_t segmentationState) {
     String * str = unbox(STRING, string);

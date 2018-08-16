@@ -1,6 +1,5 @@
 module Lasca.Compiler where
 
-import Lasca.Parser
 import Lasca.Namer
 import Lasca.Desugar
 import Lasca.Codegen
@@ -13,38 +12,26 @@ import Lasca.Infer
 import Lasca.Type
 import Lasca.Syntax
 import Lasca.Options
+import Lasca.Modules
 
 
 import Control.Monad
-import Control.Monad.Trans
 import Data.Maybe
 import Text.Printf
-import Data.Text (Text)
 import qualified Data.Text as T
-import qualified Data.Text.IO as TIO
 import qualified Data.ByteString.Char8 as Char8
-import qualified Data.ByteString as BS
-import qualified Data.ByteString.Short as SBS
 
-import System.IO
 import System.Info
 import System.Environment
 import System.Exit
 import System.Process
 import System.Directory
 import System.FilePath
-import System.Console.Haskeline
 import Data.List
-import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import Data.Set (Set)
-import qualified Data.Set as Set
 import Debug.Trace as Debug
-import qualified Text.Megaparsec as Megaparsec
 import Control.Applicative
-import Control.Lens.TH
 
-import qualified LLVM.AST as AST
 import qualified LLVM.Module as LLVM
 import qualified LLVM.Target as LLVM
 
@@ -52,82 +39,16 @@ parsePhase opts filename = do
     exists <- doesFileExist filename
     if exists then do
         absoluteFilePath <- canonicalizePath filename
-        file <- TIO.readFile absoluteFilePath
-        case parseToplevelFilename absoluteFilePath file of
-          Left err -> die $ Megaparsec.parseErrorPretty err
-          Right exprs -> do
-              exprs1 <- fixModuleAndImportPrelude filename exprs
-              searchPaths <- moduleSearchPaths
-              (imported, ex) <- loadImports searchPaths Set.empty [] exprs1
-    --          Debug.traceM $ printf "AAA %s\n%s" (show  exprs1) (show ex)
-              when (verboseMode opts) $ putStrLn ("Parsed OK, imported " ++ show imported)
-              when (printAst opts) $ mapM_ print ex
-              when (verboseMode opts) $ putStrLn ("Compiler mode is " ++ (show $ mode opts))
-              return ex
+        searchPaths <- moduleSearchPaths
+        (imported, mainModule) <- loadModule searchPaths Map.empty [] absoluteFilePath (Name $ T.pack filename)
+        let linearized = linearizeIncludes mainModule
+        let ex = foldr (\m exprs -> moduleExprs m ++ exprs) [] linearized
+--          Debug.traceM $ printf "AAA %s\n%s" (show  exprs1) (show ex)
+        when (verboseMode opts) $ putStrLn $ printf "Parsed OK, imported %s, linearized: %s" (show imported) (show linearized)
+        when (printAst opts) $ mapM_ print ex
+        when (verboseMode opts) $ putStrLn ("Compiler mode is " ++ show (mode opts))
+        return ex
     else error $ printf "Couldn't open file %s" (show filename)
-
-fixModuleAndImportPrelude filename exprs = case exprs of
-    (mod@(Module _ name): exprs) -> do
-        when (takeBaseName filename /= (T.unpack $ last $ nameToList name)) $
-          die $ printf "Wrong module name in file %s. Module name should match file name, but was %s)" (filename) (show name)
-        return $ mod : insertImportPrelude name exprs
-    _ -> do
-        let name = Name $ T.pack $ takeBaseName filename
-        let mod = Module emptyMeta name
-        return $ mod : insertImportPrelude name exprs
-
-insertImportPrelude name exprs = if name == Name "Prelude" then exprs else Import emptyMeta "Prelude" : exprs
-
-moduleSearchPaths = do
-    dir <- getCurrentDirectory
-    lascaPathEnv <- lookupEnv "LASCAPATH"
-    let lascaPaths = splitSearchPath $ fromMaybe "" lascaPathEnv
-    absPaths <- mapM canonicalizePath lascaPaths
-    existingPaths <- filterM doesDirectoryExist absPaths
-    -- TODO add XDB paths
-    return $ nub $ dir : existingPaths
-
-findModulePath searchPaths name = do
-    let relPath = (path name) <.> "lasca"
-    result <- findFile searchPaths relPath
-    case result of
-        Just file -> return file
-        Nothing -> error $ printf "Couldn't find module %s. Search path: %s" (show name) (show $ intercalate "," searchPaths)
-  where
-    path (Name n) = T.unpack n
-    path (NS prefix n) = path prefix </> path n
-
-parseModule searchPaths name = loadImport searchPaths Set.empty [] name
-
-loadImports :: [FilePath] -> Set Name -> [Name] -> [Expr] -> IO (Set Name, [Expr])
-loadImports searchPaths imported importPath exprs = do
-    let imports = getImports exprs
---    Debug.traceM $ printf "loadImports2 %s %s %s" (show imported) (show importPath) (show $ imports)
-    foldM (\(imported, exprs) name -> do
-        (newImported, newExprs) <- loadImport searchPaths imported importPath name
-        return $ (Set.union imported newImported, newExprs ++ exprs)
-        ) (imported, exprs) imports
-
-loadImport searchPaths imported importPath name = do
---    Debug.traceM $ printf "loadImport %s %s %s" (show imported) (show importPath) (show name)
-    when (name `elem` importPath) $ die (printf "Circular dependency in %s -> %s" (show importPath) (show name))
-    if name `Set.member` imported
-    then return (imported, [])
-    else do
-        absoluteFilePath <- findModulePath searchPaths name
-        file <- TIO.readFile absoluteFilePath
-        case parseToplevelFilename absoluteFilePath file of
-          Left err -> die $ Megaparsec.parseErrorPretty err
-          Right exprs -> do
-              exprs1 <- fixModuleAndImportPrelude absoluteFilePath exprs
-              (newImported, importedExprs) <- loadImports searchPaths imported (name : importPath) exprs1
-              return $ (Set.insert name newImported, importedExprs)
-
-getImports exprs =
-    foldl' (\imports expr -> case expr of
-              Import _ name -> name : imports
-              _ -> imports
-           ) [] exprs
 
 runPhases opts filename = do
     exprs <- parsePhase opts filename
@@ -159,7 +80,7 @@ typerPhase opts ctx filename exprs = do
         Left e -> do
             dir <- getCurrentDirectory
             let source = dir </> filename
-            die $ (source ++ ":" ++ showTypeError e)
+            die (source ++ ":" ++ showTypeError e)
 
 codegenPhase context filename exprs mainFunctionName = do
     let opts = _lascaOpts context
@@ -188,11 +109,11 @@ findCCompiler = do
     return $ ccEnv <|> cl5 <|> clang <|> gcc
 
 compileExecutable opts fname mod = do
-    withOptimizedModule opts mod $ (\context m -> do
+    withOptimizedModule opts mod $ \context m -> do
         ll <- LLVM.moduleLLVMAssembly m
         let asm = Char8.unpack ll
         writeFile (fname ++ ".ll") asm
-        LLVM.withHostTargetMachine $ \tm -> LLVM.writeObjectToFile tm (LLVM.File (fname ++ ".o")) m)
+        LLVM.withHostTargetMachine $ \tm -> LLVM.writeObjectToFile tm (LLVM.File (fname ++ ".o")) m
     let outputPath = case outputFile opts of
           [] -> dropExtension fname
           path -> path
@@ -204,8 +125,8 @@ compileExecutable opts fname mod = do
     let lascaPath = fromMaybe "." absLascaPathEnv
     let cc = fromMaybe (error "Did find C compiler. Install Clang or GCC, or define CC environment variable") result
         libLascaLink = if os == "darwin"
-                       then ["-rdynamic", "-llascart"]
-                       else ["-rdynamic", "-Wl,--whole-archive", "-llascart" , "-Wl,--no-whole-archive"]
+                       then ["-rdynamic", "-llascartStatic"]
+                       else ["-rdynamic", "-Wl,--whole-archive", "-llascartStatic" , "-Wl,--no-whole-archive"]
         libDirs = ["-L" ++ lascaPath]
         links = ["-lgc", "-lffi", "-lm", "-lpcre2-8"]
     let args = optimizationOpts ++ libDirs ++ [ "-g"] ++ libLascaLink ++ links ++ [ "-o", outputPath, fname ++ ".o"]
@@ -213,6 +134,7 @@ compileExecutable opts fname mod = do
     callProcess cc args
     return ()
 
+runLasca :: LascaOpts -> IO ()
 runLasca opts = do
     if null (lascaFiles opts)
     then die ("need file") -- TODO show help
@@ -220,6 +142,7 @@ runLasca opts = do
         let file = head (lascaFiles opts)
         processMainFile opts file
 
+main :: IO ()
 main = do
     opts <- parseOptions
     runLasca opts
