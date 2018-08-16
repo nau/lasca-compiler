@@ -1,27 +1,14 @@
-
-data CodepointIterator = CodepointIterator(str: String, index: Ref Int, strlen: Int)
-
-def codePoints(s) = CodepointIterator(s, Ref(0), codepointsLength(s))
-
-def done(iter: CodepointIterator) = iter.index.getRef == iter.strlen
-def next(iter: CodepointIterator) = {
-    idx = iter.index.getRef;
-    iter.index := idx + 1;
-    codePointAt(iter.str, idx);
-}
-
-def foreach(s: String, f: Int -> a): Unit = {
-    iter = codePoints(s);
-    foreachGo(iter, f);
---    ()
-}
-
-def foreachGo(iter, f) = if iter.done then {} else {
-    f(next(iter));
-    foreachGo(iter, f)
-}
+import String
 
 def main() = {
-    foreach("Teástuͤ", { cp -> println(cp.toString) });
-    println(toString(codepointsLength("uͤ")));
+    test = "Teástuͤ";
+    println(toString(codePointAt(test, 0)));
+    println(toString(codePointAt(test, 6)));
+    String.foreach(test, { cp -> println(cp.toString) });
+    println(toString(unicodePoints(test)));
+    symbol = "uͤ";
+    println(toString(symbol.ord));
+    println("length in codepoints = ${codepointsLength(test)}, length in bytes = ${bytesLength(test)}, length in graphemes = ${graphemesLength(test)}");
+    res = foldl("12345", 0, { acc, c -> acc + toInt(chr(c)); });
+    println(res.toString)
 }

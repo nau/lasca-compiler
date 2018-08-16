@@ -1,13 +1,12 @@
 import List
-import Array
+import String
 
 words = Cons("GOD", Cons("SAVE", Cons("THE", Cons("QUEEN", Nil))))
 
 def permute(acc, words) = match words {
     Cons(w, ws) -> {
-        chars = w.unicodePoints;
-        foreach(chars, { c -> 
-            ch = c.codePointToString;
+        String.foreach(w, { c -> 
+            ch = chr(c);
             permute([acc, ch].concat, ws);
         });
     }

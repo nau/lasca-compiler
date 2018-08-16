@@ -1,8 +1,13 @@
 84
+868
+84
 101
 225
 115
 116
 117
 868
-2
+[84, 101, 225, 115, 116, 117, 868]
+117
+length in codepoints = 7, length in bytes = 9, length in graphemes = 6
+15

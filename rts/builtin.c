@@ -40,62 +40,32 @@ int64_t intPopCount(int64_t a) { return __builtin_popcountll(a); }
 
 /* Strings / Unicode stuff */
 
-Box* unicodePoints(Box* string) {
-    utf8proc_int32_t codepoint = 0;
-    utf8proc_ssize_t readIdx = 0;
-    size_t idx = 0;
+int64_t bytesLength(Box* string) {
     String * str = unbox(STRING, string);
-    Array* result = createArray(str->length);
-    for (;; idx++) {
-        readIdx += utf8proc_iterate((const utf8proc_uint8_t *) str->bytes + readIdx, -1, &codepoint);
-        if (codepoint == 0) break;
-        else if (codepoint == -1) {
-            printf("Invalid UTF-8 near position %zd\n", readIdx);
-            exit(1);
-        }
-        result->data[idx] = boxInt(codepoint);
-    }
-    result->length = idx;
-    return box(ARRAY, result);
+    return str->length;
 }
 
-int64_t codepointsLength(Box* string) {
+Box* codepointsIterate(Box* string, Box* f) {
     String * str = unbox(STRING, string);
-    utf8proc_int32_t codepoint = 0;
+    bool cont = true;
+    utf8proc_int32_t codepoint = -1;
     utf8proc_ssize_t offset = 0;
     size_t length = 0;
-    for (;; length++) {
+    Position pos = {0, 0};
+    while (cont) {
         offset += utf8proc_iterate((const utf8proc_uint8_t *) str->bytes + offset, -1, &codepoint);
-        if (codepoint == 0) return length;
-        else if (codepoint == -1) {
+        if (codepoint == -1) {
             printf("Invalid UTF-8 near position %zd\n", offset);
             exit(1);
+        } if (codepoint == 0) {
+            return &UNIT_SINGLETON;
+        } else {
+            Box* cp = boxInt(codepoint);
+            Box* res = runtimeApply(f, 1, &cp, pos);
+            cont = unbox(BOOL, res);
         }
     }
-    return length;
-}
-
-int64_t codePointAt(Box* string, int64_t index) {
-    String * str = unbox(STRING, string);
-    utf8proc_int32_t codepoint = 0;
-    utf8proc_ssize_t readIdx = 0;
-    size_t idx = 0;
-    if (index < 0) {
-        printf("Index is out of range %"PRId64"\n", index);
-        exit(1);
-    }
-    for (; idx <= index; idx++) {
-        readIdx += utf8proc_iterate((const utf8proc_uint8_t *) str->bytes + readIdx, -1, &codepoint);
-        if (codepoint == 0) {
-            printf("Index is out of range %"PRId64"\n", index);
-            exit(1);
-        }
-        else if (codepoint == -1) {
-            printf("Invalid UTF-8 near position %zd\n", readIdx);
-            exit(1);
-        }
-    }
-    return codepoint;
+    return &UNIT_SINGLETON;
 }
 
 int64_t graphemesLength(Box* string) {

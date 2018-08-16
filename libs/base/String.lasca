@@ -1,0 +1,42 @@
+import Array
+-- length of UTF-8 encoded byte string
+extern def bytesLength(s: String): Int = "bytesLength"
+extern def graphemesLength(s: String): Int = "graphemesLength"
+extern def chr(codePoint: Int): String = "codePointToString"
+extern def iterate(s: String, f: Int -> Bool): Unit = "codepointsIterate"
+
+def foreach(s: String, f: Int -> a): Unit = iterate(s, { char -> f(char); true })
+
+def codePointAt(s: String, index: Int): Int = {
+    var i = 0;
+    var result = -1;
+    iterate(s, { char -> 
+        if i.getRef < index then {
+            i := i.getRef + 1;
+            true;
+        }
+        else {
+            result := char;
+            false;
+        }
+    });
+    if result.getRef == -1 then die("Index is out of range: ${index}") else result.getRef;
+}
+
+def ord(s: String) = codePointAt(s, 0)
+
+def foldl(s: String, zero: a, f: a -> Int -> a): a = {
+    var acc = zero;
+    iterate(s, { char -> acc := f(acc.getRef, char); true });
+    acc.getRef
+}
+
+def codepointsLength(s: String): Int = foldl(s, 0, { len, c -> len + 1})
+
+def length(s) = codepointsLength(s)
+
+def unicodePoints(s: String): Array Int = {
+    array = makeArray(s.codepointsLength, 0);
+    foldl(s, 0, { idx, char -> setIndex(array, idx, char); idx + 1 });
+    array;
+}
