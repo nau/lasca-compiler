@@ -348,21 +348,21 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
     return boxError(&UNIMPLEMENTED_SELECT);
 }
 
-Box* runtimeIsConstr(Box* value, Box* constrName) {
+int64_t runtimeIsConstr(Box* value, Box* constrName) {
     if (isUserType(value)) {
         String* name = unbox(STRING, constrName);
         Data* data = findDataType(value->type);
         DataValue* dv = value->value.ptr;
         String* realConstrName = data->constructors[dv->tag]->name;
         if (strncmp(realConstrName->bytes, name->bytes, fmin(realConstrName->length, name->length)) == 0)
-            return &TRUE_SINGLETON;
+            return true;
     }
-    return &FALSE_SINGLETON;
+    return false;
 }
 
-Box* runtimeCheckTag(Box* value, int64_t tag) {
+int64_t runtimeCheckTag(Box* value, int64_t tag) {
     DataValue* dv = value->value.ptr;
-    return (dv->tag == tag) ? &TRUE_SINGLETON : &FALSE_SINGLETON;
+    return dv->tag == tag;
 }
 
 /* =================== Arrays ================= */

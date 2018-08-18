@@ -62,10 +62,12 @@ import qualified Lasca.Options as Opts
 externalTypeMapping :: Type -> AST.Type
 -- FIXME currently we assume every function returns a result and can't be Unit/void
 --externalTypeMapping (TypeIdent "Unit") = T.void
-externalTypeMapping TypeByte = T.i8
-externalTypeMapping TypeInt = intType
-externalTypeMapping TypeFloat = T.double
-externalTypeMapping _ = ptrType-- Dynamic mode
+externalTypeMapping tpe = case tpe of
+    TypeByte  -> T.i8
+    TypeBool  -> intType
+    TypeInt   -> intType
+    TypeFloat -> T.double
+    _         -> ptrType -- Dynamic mode
 
 externArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
 externArgsToSig = map (\(S.Arg name tpe) -> ((nameToSBS name), externalTypeMapping tpe))

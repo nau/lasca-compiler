@@ -309,6 +309,10 @@ unboxByte expr = do
     unboxed <- unboxDirect expr
     castBoxedValue TypeByte unboxed
 
+unboxBool expr = do
+    unboxed <- unboxDirect expr
+    castBoxedValue TypeInt unboxed
+
 
 unboxInt expr = do
     unboxed <- unboxDirect expr
@@ -320,13 +324,15 @@ unboxFloat64 expr = do
     castBoxedValue TypeFloat unboxed
 {-# INLINE unboxFloat64 #-}
 
-resolveBoxing declaredType instantiatedType expr = do
+resolveBoxing declaredType instantiatedType expr =
     case (declaredType, instantiatedType) of
         _ | declaredType == instantiatedType -> return expr
         (TypeByte, TVar _) -> boxByte expr
+        (TypeBool, TVar _) -> boxBool expr
         (TypeInt, TVar _) -> boxInt expr
         (TypeFloat, TVar _) -> boxFloat64 expr
         (TVar _, TypeByte) -> unboxByte expr
+        (TVar _, TypeBool) -> unboxBool expr
         (TVar _, TypeInt) -> unboxInt expr
         (TVar _, TypeFloat) -> unboxFloat64 expr
         (TVar _, TVar _) -> return expr

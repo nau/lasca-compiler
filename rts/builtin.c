@@ -356,7 +356,7 @@ Box* lascaCompileRegex(Box* ptrn) {
     return boxedRe;
 }
 
-Box* lascaMatchRegex(Box* ptrn, Box* string) {
+int64_t lascaMatchRegex(Box* ptrn, Box* string) {
     pcre2_code *re = unbox(PATTERN, ptrn);
     String* subject = unbox(STRING, string);
     pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, NULL);
@@ -376,9 +376,9 @@ Box* lascaMatchRegex(Box* ptrn, Box* string) {
             case PCRE2_ERROR_NOMATCH: /* printf("No match\n") */; break;
             default: printf("Matching error %d\n", rc); break;
         }
-        return &FALSE_SINGLETON;
+        return false;
     }
-    else return &TRUE_SINGLETON;
+    else return true;
 }
 
 Box* lascaRegexReplace(Box* ptrn, Box* string, Box* replace) {
