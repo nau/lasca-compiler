@@ -5,6 +5,8 @@ B = A
 
 A = foo()
 
+globalString = "I'm the Stig"
+
 def foo() = bar() + baz()
 
 def bar() = 1

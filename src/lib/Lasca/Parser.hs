@@ -79,7 +79,7 @@ stringLit = StringLit <$> stringLiteral
 
 interpolatedString :: Parser Expr
 interpolatedString = do
-    list <- pTemplate
+    list <- lexeme pTemplate
     meta <- getMeta
     return $ go meta list
   where go meta [] = Literal meta (StringLit "")
