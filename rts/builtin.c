@@ -340,7 +340,7 @@ Box* lascaCompileRegex(Box* ptrn) {
     pcre2_config(PCRE2_CONFIG_JIT, &isJit);
     pcre2_config(PCRE2_CONFIG_UNICODE, &unicode);
     (void)pcre2_pattern_info(re, PCRE2_INFO_ALLOPTIONS, &option_bits);
-    printf("lascaCompileRegex: jit is %d, unicode: %d opts: %x, err: %d, off: %zu, pat: %s\n", isJit, unicode, option_bits, errornumber, erroroffset, pattern);
+    // printf("lascaCompileRegex: jit is %d, unicode: %d opts: %x, err: %d, off: %zu, pat: %s\n", isJit, unicode, option_bits, errornumber, erroroffset, pattern);
     
 
     /* Compilation failed: print the error message and exit. */
@@ -373,7 +373,7 @@ Box* lascaMatchRegex(Box* ptrn, Box* string) {
     pcre2_match_data_free(match_data);   /* Release memory used for the match */
     if (rc < 0) {
         switch(rc) {
-            case PCRE2_ERROR_NOMATCH: printf("No match\n"); break;
+            case PCRE2_ERROR_NOMATCH: /* printf("No match\n") */; break;
             default: printf("Matching error %d\n", rc); break;
         }
         return &FALSE_SINGLETON;
@@ -395,8 +395,8 @@ Box* lascaRegexReplace(Box* ptrn, Box* string, Box* replace) {
                 (PCRE2_SPTR) subst->bytes, subst->length, (PCRE2_UCHAR *) val->bytes, &outlengthptr);
 
     if (rc == PCRE2_ERROR_NOMEMORY) {
-        printf("lascaRegexReplace::PCRE2_ERROR_NOMEMORY asked %zu but needed %zu for subst: %s\n",
-                len, outlengthptr, subst->bytes);
+        // printf("lascaRegexReplace::PCRE2_ERROR_NOMEMORY asked %zu but needed %zu for subst: %s\n",
+                // len, outlengthptr, subst->bytes);
         // outlengthptr should contain required length in code units, bytes here,
         // including space for trailing zero, see https://www.pcre.org/current/doc/html/pcre2api.html#SEC36
         val = gcMalloc(sizeof(String) + outlengthptr);

@@ -14,4 +14,8 @@ length in codepoints = 7, length in bytes = 9, length in graphemes = 6
 toLower T = t teástuͤ
 toUpper å = Å TEÁSTUͤ
 toTitle å = Å TEÁSTUͤ
+capitalize  Å Teástuͤ Aßdƒ
 compare -1 0 1 -1 0 1
+replace TeástT
+Teástuͤ startsWith T: true, endsWith uͤ: true
+Teástuͤ startsWith uͤ: false, endsWith T: false
