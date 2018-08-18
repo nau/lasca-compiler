@@ -19,3 +19,6 @@ compare -1 0 1 -1 0 1
 replace TeástT
 Teástuͤ startsWith T: true, endsWith uͤ: true
 Teástuͤ startsWith uͤ: false, endsWith T: false
+Code point 123 is valid Unicode Scalar: true
+Surrogate code point 55296 is valid Unicode Scalar: false
+Code point 1114112 is valid Unicode Scalar: false

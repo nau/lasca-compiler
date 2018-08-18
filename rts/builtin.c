@@ -45,7 +45,7 @@ int64_t bytesLength(Box* string) {
     return str->length;
 }
 
-Box* codepointsIterate(Box* string, Box* f) {
+Box* codePointsIterate(Box* string, Box* f) {
     String * str = unbox(STRING, string);
     bool cont = true;
     utf8proc_int32_t codepoint = -1;

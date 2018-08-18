@@ -13,7 +13,13 @@ extern def fromCharArray(chars: Array Int): String = "codePointsToString"
 extern def charToLower(codePoint: Int): Int = "utf8proc_tolower"
 extern def charToUpper(codePoint: Int): Int = "utf8proc_toupper"
 extern def charToTitle(codePoint: Int): Int = "utf8proc_totitle"
-extern def iterate(s: String, f: Int -> Bool): Unit = "codepointsIterate"
+{-
+    http://unicode.org/glossary/#unicode_scalar_value 
+    Any Unicode code point except high-surrogate and low-surrogate code points. 
+    In other words, the ranges of integers 0 to D7FF16 and E00016 to 10FFFF16 inclusive.
+-}
+extern def isValidUnicodeScalar(codePoint: Int): Bool = "utf8proc_codepoint_valid"
+extern def iterate(s: String, f: Int -> Bool): Unit = "codePointsIterate"
 
 {- 
     Regular Expression stuff. Lasca uses PCRE2 library internally.
@@ -132,4 +138,7 @@ def main() = {
     println("replace ${replace(test, symbol, upperT)}");
     println("${test} startsWith ${upperT}: ${startsWith(test, upperT)}, endsWith ${symbol}: ${endsWith(test, symbol)}");
     println("${test} startsWith ${symbol}: ${startsWith(test, symbol)}, endsWith ${upperT}: ${endsWith(test, upperT)}");
+    println("Code point 123 is valid Unicode Scalar: ${isValidUnicodeScalar(123)}");
+    println("Surrogate code point 55296 is valid Unicode Scalar: ${isValidUnicodeScalar(55296)}");
+    println("Code point 1114112 is valid Unicode Scalar: ${isValidUnicodeScalar(1114112)}");
 }
