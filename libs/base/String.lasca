@@ -2,24 +2,20 @@ import Array
 
 {-
     Strings are UTF-8 encoded.
-    `Char` means Unicode Code Point.
+    `Char` and `Code Point` mean valid Unicode scalar values, i.e. 0-0xd7ff, 0xe000-0x10ffff
+    http://unicode.org/glossary/#unicode_scalar_value 
 -}
 
 -- length of UTF-8 encoded byte string
 extern def bytesCount(s: String): Int = "bytesLength"
-extern def graphemeCount(s: String): Int = "graphemesLength"
 extern def chr(codePoint: Int): String = "codePointToString"
 extern def fromCharArray(chars: Array Int): String = "codePointsToString"
 extern def charToLower(codePoint: Int): Int = "utf8proc_tolower"
 extern def charToUpper(codePoint: Int): Int = "utf8proc_toupper"
 extern def charToTitle(codePoint: Int): Int = "utf8proc_totitle"
-{-
-    http://unicode.org/glossary/#unicode_scalar_value 
-    Any Unicode code point except high-surrogate and low-surrogate code points. 
-    In other words, the ranges of integers 0 to D7FF16 and E00016 to 10FFFF16 inclusive.
--}
 extern def isValidUnicodeScalar(codePoint: Int): Bool = "utf8proc_codepoint_valid"
 extern def iterate(s: String, f: Int -> Bool): Unit = "codePointsIterate"
+extern def graphemeIterate(s: String, f: String -> Bool): Unit = "graphemesIterate"
 
 {- 
     Regular Expression stuff. Lasca uses PCRE2 library internally.
@@ -74,6 +70,15 @@ def foldl(s: String, zero: a, f: a -> Int -> a): a = {
 }
 
 def codePointCount(s: String): Int = foldl(s, 0, { len, c -> len + 1})
+
+def graphemeCount(s: String): Int = {
+    var count = 0;
+    graphemeIterate(s, { g -> 
+        count := count.getRef + 1; 
+        true
+    });
+    count.getRef
+}
 
 def compareLength(s: String, length: Int): Int = {
     var i = 0;

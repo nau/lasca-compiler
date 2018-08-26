@@ -68,24 +68,43 @@ Box* codePointsIterate(Box* string, Box* f) {
     return &UNIT_SINGLETON;
 }
 
-int64_t graphemesLength(Box* string) {
+Box* graphemesIterate(Box* string, Box* f) {
     String * str = unbox(STRING, string);
+    bool cont = true;
     utf8proc_int32_t prev = 0x00ad; // soft hyphen (grapheme break always allowed after this)
-    utf8proc_int32_t codepoint = 0;
+    utf8proc_int32_t codepoint = -1;
     utf8proc_int32_t state = 0;
     utf8proc_ssize_t offset = 0;
     size_t length = 0;
-    while (offset < str->length) {
+    utf8proc_int32_t cluster[65];
+    Position pos = {0, 0};
+    while (cont) {
+        // FIXME
+        if (length >= 64) {
+            printf("Unsupported grapheme cluster length >= 64 codepoints at %zd\n", offset);
+            exit(1);
+        }
         offset += utf8proc_iterate((const utf8proc_uint8_t *) str->bytes + offset, -1, &codepoint);
-        if (codepoint == 0) return length;
+        if (codepoint == 0) return &UNIT_SINGLETON;
         else if (codepoint == -1) {
             printf("Invalid UTF-8 near position %zd\n", offset);
             exit(1);
+        } else {
+            cluster[length] = codepoint;
+            bool brk = utf8proc_grapheme_break_stateful(prev, codepoint, &state);
+            length += 1;
+            prev = codepoint;
+
+            if (brk) {
+                cluster[length + 1] = 0;
+                Box* s = makeString((char *) cluster);
+                Box* res = runtimeApply(f, 1, &s, pos);
+                cont = unbox(BOOL, res);
+                length = 0;
+            }
         }
-        length += utf8proc_grapheme_break_stateful(prev, codepoint, &state);
-        prev = codepoint;
     }
-    return length;
+    return &UNIT_SINGLETON;
 }
 
 // FIXME make it int32_t
@@ -110,32 +129,6 @@ Box* codePointsToString(Box* array) {
     string->length = offset;
     return box(STRING, string);
  }
-
-/*// FIXME fix types when Int32/UInt32 types are added
-Box* nextGrapheme(Box* string, int64_t byteOffset, int64_t prevCodePoint, int64_t segmentationState) {
-    String * str = unbox(STRING, string);
-    utf8proc_int32_t codepoint = 0;
-    utf8proc_int32_t prev = (utf8proc_int32_t) prevCodePoint;
-    utf8proc_int32_t state = (utf8proc_int32_t) segmentationState;
-    utf8proc_ssize_t offset = (utf8proc_ssize_t) byteOffset;
-    size_t length = 0;
-    utf8proc_int32_t cluster[64];
-    while (offset < str->length && !utf8proc_grapheme_break_stateful(prev, codepoint, &state)) {
-        if (length >= 64) {
-            printf("Unsupported grapheme cluster length >= 64 codepoints at %zd\n", offset);
-            exit(1);
-        }
-        offset += utf8proc_iterate((const utf8proc_uint8_t *) str->bytes + offset, -1, &codepoint);
-        if (codepoint == -1) {
-            printf("Invalid UTF-8 near position %zd\n", offset);
-            exit(1);
-        }
-        cluster[length] = codepoint;
-        length += 1;
-        prev = codepoint;
-    }
-    return makeString;
-}*/
 
 Box* print(const Box* val) {
     String * str = unbox(STRING, val);
