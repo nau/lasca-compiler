@@ -16,6 +16,72 @@ extern def charToTitle(codePoint: Int): Int = "utf8proc_totitle"
 extern def isValidUnicodeScalar(codePoint: Int): Bool = "utf8proc_codepoint_valid"
 extern def iterate(s: String, f: Int -> Bool): Unit = "codePointsIterate"
 extern def graphemeIterate(s: String, f: String -> Bool): Unit = "graphemesIterate"
+extern def utf8procCategory(c: Int): Int = "utf8proc_category"
+
+data GeneralCategory
+        = UppercaseLetter       -- ^ Lu: Letter, Uppercase
+        | LowercaseLetter       -- ^ Ll: Letter, Lowercase
+        | TitlecaseLetter       -- ^ Lt: Letter, Titlecase
+        | ModifierLetter        -- ^ Lm: Letter, Modifier
+        | OtherLetter           -- ^ Lo: Letter, Other
+        | NonSpacingMark        -- ^ Mn: Mark, Non-Spacing
+        | SpacingCombiningMark  -- ^ Mc: Mark, Spacing Combining
+        | EnclosingMark         -- ^ Me: Mark, Enclosing
+        | DecimalNumber         -- ^ Nd: Number, Decimal
+        | LetterNumber          -- ^ Nl: Number, Letter
+        | OtherNumber           -- ^ No: Number, Other
+        | ConnectorPunctuation  -- ^ Pc: Punctuation, Connector
+        | DashPunctuation       -- ^ Pd: Punctuation, Dash
+        | OpenPunctuation       -- ^ Ps: Punctuation, Open
+        | ClosePunctuation      -- ^ Pe: Punctuation, Close
+        | InitialQuote          -- ^ Pi: Punctuation, Initial quote
+        | FinalQuote            -- ^ Pf: Punctuation, Final quote
+        | OtherPunctuation      -- ^ Po: Punctuation, Other
+        | MathSymbol            -- ^ Sm: Symbol, Math
+        | CurrencySymbol        -- ^ Sc: Symbol, Currency
+        | ModifierSymbol        -- ^ Sk: Symbol, Modifier
+        | OtherSymbol           -- ^ So: Symbol, Other
+        | Space                 -- ^ Zs: Separator, Space
+        | LineSeparator         -- ^ Zl: Separator, Line
+        | ParagraphSeparator    -- ^ Zp: Separator, Paragraph
+        | Control               -- ^ Cc: Other, Control
+        | Format                -- ^ Cf: Other, Format
+        | Surrogate             -- ^ Cs: Other, Surrogate
+        | PrivateUse            -- ^ Co: Other, Private Use
+        | NotAssigned           -- ^ Cn: Other, Not Assigned
+
+def generalCategory(char: Int): GeneralCategory = match utf8procCategory(char) {
+    0  -> NotAssigned
+    1  -> UppercaseLetter
+    2  -> LowercaseLetter
+    3  -> TitlecaseLetter
+    4  -> ModifierLetter
+    5  -> OtherLetter
+    6  -> NonSpacingMark
+    7  -> SpacingCombiningMark
+    8  -> EnclosingMark
+    9  -> DecimalNumber
+    10 -> LetterNumber
+    11 -> OtherNumber
+    12 -> ConnectorPunctuation
+    13 -> DashPunctuation
+    14 -> OpenPunctuation
+    15 -> ClosePunctuation
+    16 -> InitialQuote
+    17 -> FinalQuote
+    18 -> OtherPunctuation
+    19 -> MathSymbol
+    20 -> CurrencySymbol
+    21 -> ModifierSymbol
+    22 -> OtherSymbol
+    23 -> Space
+    24 -> LineSeparator
+    25 -> ParagraphSeparator
+    26 -> Control
+    27 -> Format
+    28 -> Surrogate
+    29 -> PrivateUse
+}
 
 {- 
     Regular Expression stuff. Lasca uses PCRE2 library internally.
@@ -120,6 +186,11 @@ def capitalize(s: String): String = match compareLength(s, 1) {
     }
 }
 
+def isDigit(char: Int) = (char - 48) <= 9
+def isLetter(char: Int) = let cat = utf8procCategory(char) in 1 <= cat and cat <= 5 -- Letters
+def isNumeric(char: Int) = let cat = utf8procCategory(char) in 9 <= cat and cat <= 11 -- Numbers
+def isSpace(char: Int) = char == 32 or 9 <= char and char <= 13 or char == 133 or 160 <= char and runtimeCompare(generalCategory(char), Space) == 0
+
 def main() = {
     empty = "";
     test = "Teástuͤ";
@@ -135,9 +206,9 @@ def main() = {
     println("length in codepoints = ${codePointCount(test)}, length in bytes = ${bytesCount(test)}, length in graphemes = ${graphemeCount(test)}");
     res = foldl("12345", 0, { acc, c -> acc + toInt(chr(c)); });
     println(res.toString);
-    println("toLower T = ${chr(charToLower(ord(upperT)))} ${toLower(test)}");
-    println("toUpper å = ${chr(charToUpper(ord(lowerA)))} ${toUpper(test)}");
-    println("toTitle å = ${chr(charToTitle(ord(lowerA)))} ${toTitle(test)}");
+    println("toLower T = ${chr(charToLower(upperT.ord))} ${toLower(test)}");
+    println("toUpper å = ${chr(charToUpper(lowerA.ord))} ${toUpper(test)}");
+    println("toTitle å = ${chr(charToTitle(lowerA.ord))} ${toTitle(test)}");
     println("capitalize ${capitalize(empty)} ${capitalize(lowerA)} ${capitalize(test)} ${capitalize(asdf)}");
     println("compare ${compareLength(empty, 1)} ${compareLength(empty, 0)} ${compareLength(empty, -1)} ${compareLength(test, 10)} ${compareLength(test, 7)} ${compareLength(test, 0)}");
     println("replace ${replace(test, symbol, upperT)}");
@@ -146,4 +217,11 @@ def main() = {
     println("Code point 123 is valid Unicode Scalar: ${isValidUnicodeScalar(123)}");
     println("Surrogate code point 55296 is valid Unicode Scalar: ${isValidUnicodeScalar(55296)}");
     println("Code point 1114112 is valid Unicode Scalar: ${isValidUnicodeScalar(1114112)}");
+    println("0 is digit: ${isDigit("0".ord)}, 9 is digit: ${isDigit("9".ord)}, 'a' is digit: ${isDigit("a".ord)}");
+    gc = { s -> generalCategory(ord(s)) };
+    println("${gc("1")} ${gc("a")} ${gc("A")} ${gc(" ")} ${gc("≈")} ${gc("€")}");
+    println("å is letter ${isLetter("å".ord)}, 1 is letter ${isLetter("1".ord)}");
+    println("å is numeric ${isNumeric("å".ord)}, 1 is numeric ${isNumeric("1".ord)}, ¾ is numeric ${isNumeric("¾".ord)}");
+    sp = { s -> isSpace(s.ord) };
+    println("' ' is space ${sp(" ")}, '\\t' is space ${sp("\t")}, '\\r' is space ${sp("\r")}, '\\n' is space ${sp("\n")}, 'U+0085' is space ${isSpace(133)}");
 }

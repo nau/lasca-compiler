@@ -22,3 +22,8 @@ Teástuͤ startsWith uͤ: false, endsWith T: false
 Code point 123 is valid Unicode Scalar: true
 Surrogate code point 55296 is valid Unicode Scalar: false
 Code point 1114112 is valid Unicode Scalar: false
+0 is digit: true, 9 is digit: true, 'a' is digit: false
+String_DecimalNumber String_LowercaseLetter String_UppercaseLetter String_Space String_MathSymbol String_CurrencySymbol
+å is letter true, 1 is letter false
+å is numeric false, 1 is numeric true, ¾ is numeric true
+' ' is space true, '\t' is space true, '\r' is space true, '\n' is space true, 'U+0085' is space true
