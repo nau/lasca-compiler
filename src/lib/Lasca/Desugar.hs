@@ -352,13 +352,14 @@ desugarAssignment expr = case expr of
     _ -> expr
 
 desugarUnaryMinus expr = case expr of
-    Apply _ (Ident _ ("unary-")) [Literal meta (IntLit v)] -> Literal meta (IntLit (-v))
-    Apply _ (Ident _ ("unary-")) [Literal meta (FloatLit v)] -> Literal meta (FloatLit (-v))
+    Apply _ (Ident _ "unary-") [Literal meta (IntLit v)] -> Literal meta (IntLit (-v))
+    Apply _ (Ident _ "unary-") [Literal meta (FloatLit v)] -> Literal meta (FloatLit (-v))
     e -> e
 
 desugarAndOr expr = case expr of
     Apply meta (Ident _ "or")  [lhs, rhs] -> If meta lhs (Literal emptyMeta (BoolLit True)) rhs
     Apply meta (Ident _ "and") [lhs, rhs] -> If meta lhs rhs (Literal emptyMeta (BoolLit False))
+    Apply meta (Ident _ "unarynot") [rhs] -> If meta rhs (Literal emptyMeta (BoolLit False)) (Literal emptyMeta (BoolLit True))
     e -> e
 
 desugarPhase ctx exprs = let

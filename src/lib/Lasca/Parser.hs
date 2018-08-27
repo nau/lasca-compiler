@@ -213,6 +213,7 @@ binops = [
           [postfixIndex, Ex.InfixL select],
           [postfixApply],
           [unary "-"],
+          [unary "not"],
           [binary "*", binary "/" ],
           [binary "+", binary "-" ],
           [binary "<=", binary ">=", binary "<", binary ">", binary "==" , binary "!="],

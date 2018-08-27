@@ -234,17 +234,20 @@ isStaticMode ctx = mode (_lascaOpts ctx) == Static
 builtinFunctions :: Map Name Type
 builtinFunctions = Map.fromList [
     ("unary-", Forall [a] (ta ==> ta)),
-    (":=", Forall [a] (TypeRef ta ==> ta ==> TypeRef ta)),
-    ("+",  Forall [a] (ta ==> ta ==> ta)),
-    ("-",  Forall [a] (ta ==> ta ==> ta)),
-    ("*",  Forall [a] (ta ==> ta ==> ta)),
-    ("/",  Forall [a] (ta ==> ta ==> ta)),
-    ("==", Forall [a] (ta ==> ta ==> TypeBool)),
-    ("!=", Forall [a] (ta ==> ta ==> TypeBool)),
-    ("<",  Forall [a] (ta ==> ta ==> TypeBool)),
-    ("<=", Forall [a] (ta ==> ta ==> TypeBool)),
-    (">",  Forall [a] (ta ==> ta ==> TypeBool)),
-    (">=", Forall [a] (ta ==> ta ==> TypeBool))
+    (":=",  Forall [a] (TypeRef ta ==> ta ==> TypeRef ta)),
+    ("+",   Forall [a] (ta ==> ta ==> ta)),
+    ("-",   Forall [a] (ta ==> ta ==> ta)),
+    ("*",   Forall [a] (ta ==> ta ==> ta)),
+    ("/",   Forall [a] (ta ==> ta ==> ta)),
+    ("==",  Forall [a] (ta ==> ta ==> TypeBool)),
+    ("!=",  Forall [a] (ta ==> ta ==> TypeBool)),
+    ("<",   Forall [a] (ta ==> ta ==> TypeBool)),
+    ("<=",  Forall [a] (ta ==> ta ==> TypeBool)),
+    (">",   Forall [a] (ta ==> ta ==> TypeBool)),
+    (">=",  Forall [a] (ta ==> ta ==> TypeBool)),
+    ("and", TypeBool ==> TypeBool ==> TypeBool),
+    ("or",  TypeBool ==> TypeBool ==> TypeBool),
+    ("unarynot", TypeBool ==> TypeBool)
   ]
   where a = TV "a"
         ta = TVar a

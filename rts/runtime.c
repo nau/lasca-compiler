@@ -184,11 +184,6 @@ Box* updateRef(Box* ref, Box* value) {
     return oldValue;
 }
 
-void* die(Box* msg) {
-    println(msg);
-    exit(1);
-}
-
 static int64_t isBuiltinType(const Box* v) {
     const LaType* t = v->type;
     return t == UNIT || t == BOOL || t == BYTE || t == INT || t == DOUBLE

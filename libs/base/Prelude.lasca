@@ -7,7 +7,12 @@ extern def sqrt(a: Float): Float = "sqrt"
 extern def getArgs(): Array String = "getArgs"
 extern def toInt(s: String): Int = "toInt"
 extern def concat(strings: Array String): String = "concat"
-extern def die(msg: String): a = "die"
+extern def exit(code: Int): a = "exit"
+def die(msg: String): a = {
+    println(msg);
+    exit(1);
+}
+def undefined() = die("undefined")
 extern def runtimeIsConstr(constr: a, name: String): Bool = "runtimeIsConstr"
 extern def runtimeCheckTag(value: a, tag: Int): Bool = "runtimeCheckTag"
 extern def runtimeCompare(lhs: a, rhs: a): Int = "runtimeCompare"

@@ -35,7 +35,15 @@ def bitwiseOperations() = {
     a = byteNot(intToByte(0)); println(a.toString);
 }
 
+def logicalOperations() = {
+    a = true and false; println(a.toString);
+    a = true or false; println(a.toString);
+    a = not false; println(a.toString);
+    a = not false and false or true; println(a.toString);
+}
+
 def main() = {
     testLiterals();
     bitwiseOperations();
+    logicalOperations();
 }
