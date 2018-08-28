@@ -144,16 +144,16 @@ Box* println(const Box* val) {
 }
 
 int64_t runtimeCompare(Box* lhs, Box* rhs) {
-    if (lhs->type != rhs->type) {
+    if (!eqTypes(lhs->type, rhs->type)) {
         printf("AAAA!!! runtimeCompare: Type mismatch! lhs = %s, rhs = %s\n", typeIdToName(lhs->type), typeIdToName(rhs->type));
         exit(1);
     }
     int64_t result = 0;
-    if (lhs->type == BOOL || lhs->type == INT || lhs->type == DOUBLE) {
+    if (eqTypes(lhs->type, BOOL) || eqTypes(lhs->type, INT) || eqTypes(lhs->type, DOUBLE)) {
         result = // FIXME it's wrong for double
                 lhs->value.num < rhs->value.num ? -1 :
                 lhs->value.num == rhs->value.num ? 0 : 1;
-    } else if (lhs->type == STRING) {
+    } else if (eqTypes(lhs->type, STRING)) {
         result = strcmp(unsafeString(lhs)->bytes, unsafeString(rhs)->bytes); // TODO do proper unicode stuff
     } else {
         printf("AAAA!!! runtimeCompare is not defined for type %s\n", typeIdToName(lhs->type));

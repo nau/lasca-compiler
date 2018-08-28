@@ -119,6 +119,7 @@ extern const LaType* BYTEARRAY;
 extern const LaType* FILE_HANDLE;
 extern const LaType* PATTERN;
 
+bool eqTypes(const LaType* lhs, const LaType* rhs);
 void *gcMalloc(size_t s);
 Box* __attribute__ ((pure)) makeString(char * str);
 Box *box(const LaType* type_id, void *value);

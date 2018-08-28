@@ -25,6 +25,7 @@ const LaType _DOUBLE  = { .name = "Double" };
 const LaType _STRING  = { .name = "String" };
 const LaType _CLOSURE = { .name = "Closure" };
 const LaType _ARRAY   = { .name = "Array" };
+const LaType _REF     = { .name = "Ref" };
 const LaType _BYTEARRAY     = { .name = "ByteArray" };
 const LaType _FILE_HANDLE   = { .name = "FileHandle" };
 const LaType _PATTERN = { .name = "Pattern" };
@@ -37,6 +38,7 @@ const LaType* DOUBLE  = &_DOUBLE;
 const LaType* STRING  = &_STRING;
 const LaType* CLOSURE = &_CLOSURE;
 const LaType* ARRAY   = &_ARRAY;
+const LaType* REF   = &_REF;
 const LaType* BYTEARRAY   = &_BYTEARRAY;
 const LaType* FILE_HANDLE   = &_FILE_HANDLE;
 const LaType* PATTERN   = &_PATTERN;
@@ -66,6 +68,9 @@ Box  DOUBLE_ZERO = {
 Environment ENV;
 Runtime* RUNTIME;
 
+bool eqTypes(const LaType* lhs, const LaType* rhs) {
+    return lhs == rhs || strcmp(lhs->name, rhs->name) == 0;
+}
 
 void *gcMalloc(size_t s) {
     return GC_malloc(s);
@@ -142,9 +147,9 @@ void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti) {
        TODO/FIXME: think how to make it better, now it's O(typename_length), show be O(1)
        Likely, not an issue anyway.
     */
-    if (ti->type == expected || strcmp(ti->type->name, expected->name) == 0) {
+    if (eqTypes(ti->type, expected)) {
         return ti->value.ptr;
-    } else if (ti->type == UNKNOWN) {
+    } else if (eqTypes(ti->type, UNKNOWN)) {
         String *name = (String *) ti->value.ptr;
         printf("AAAA!!! Undefined identifier %s\n", name->bytes);
         exit(1);
@@ -156,7 +161,7 @@ void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti) {
 
 int64_t __attribute__ ((pure)) unboxInt(const Box* ti) {
   //  printf("unbox(%d, %d) ", ti->type, (int64_t) ti->value);
-    if (ti->type == INT) {
+    if (eqTypes(ti->type, INT)) {
         return ti->value.num;
     } else {
         printf("AAAA!!! Expected %s but got %s\n", typeIdToName(INT), typeIdToName(ti->type));
@@ -166,7 +171,7 @@ int64_t __attribute__ ((pure)) unboxInt(const Box* ti) {
 
 double __attribute__ ((pure)) unboxFloat64(Box* ti) {
   //  printf("unbox(%d, %d) ", ti->type, (int64_t) ti->value);
-    if (ti->type == DOUBLE) {
+    if (eqTypes(ti->type, DOUBLE)) {
         return ti->value.dbl;
     } else {
         printf("AAAA!!! Expected %s but got %s\n", typeIdToName(DOUBLE), typeIdToName(ti->type));
@@ -177,7 +182,7 @@ double __attribute__ ((pure)) unboxFloat64(Box* ti) {
 /* ==================== Runtime Ops ============== */
 
 Box* updateRef(Box* ref, Box* value) {
-    assert(!strcmp(ref->type->name, "Ref"));
+    assert(eqTypes(ref->type, REF));
     DataValue* dataValue = ref->value.ptr;
     Box* oldValue = dataValue->values[0];
     dataValue->values[0] = value;
@@ -186,34 +191,34 @@ Box* updateRef(Box* ref, Box* value) {
 
 static int64_t isBuiltinType(const Box* v) {
     const LaType* t = v->type;
-    return t == UNIT || t == BOOL || t == BYTE || t == INT || t == DOUBLE
-      || t == STRING || t == CLOSURE || t == ARRAY || t == BYTEARRAY;
+    return eqTypes(t, UNIT) || eqTypes(t, BOOL) || eqTypes(t, BYTE) || eqTypes(t, INT) || eqTypes(t, DOUBLE)
+      || eqTypes(t, STRING) || eqTypes(t, CLOSURE) || eqTypes(t, ARRAY) || eqTypes(t, BYTEARRAY);
 }
 
 static int64_t isUserType(const Box* v) {
     return !isBuiltinType(v);
 }
 
-#define DO_OP(op) if (lhs->type == INT) { result = boxInt(lhs->value.num op rhs->value.num); } \
-                  else if (lhs->type == BYTE) { result = box(BYTE, (void*)(size_t)(lhs->value.byte op rhs->value.byte)); } \
-                  else if (lhs->type == DOUBLE) { result = boxFloat64(lhs->value.dbl op rhs->value.dbl); } \
+#define DO_OP(op) if (eqTypes(lhs->type, INT)) { result = boxInt(lhs->value.num op rhs->value.num); } \
+                  else if (eqTypes(lhs->type, BYTE)) { result = box(BYTE, (void*)(size_t)(lhs->value.byte op rhs->value.byte)); } \
+                  else if (eqTypes(lhs->type, DOUBLE)) { result = boxFloat64(lhs->value.dbl op rhs->value.dbl); } \
                   else { \
                         printf("AAAA!!! Type mismatch! Expected Int or Double for op but got %s\n", typeIdToName(lhs->type)); exit(1); }
 
-#define DO_CMP(op) if (lhs->type == BOOL) { \
+#define DO_CMP(op) if (eqTypes(lhs->type, BOOL)) { \
                       result = boxBool (lhs->value.num op rhs->value.num); } \
-                   else if (lhs->type == INT) { \
+                   else if (eqTypes(lhs->type, INT)) { \
                       result = boxBool (lhs->value.num op rhs->value.num); } \
-                   else if (lhs->type == BYTE) { \
+                   else if (eqTypes(lhs->type, BYTE)) { \
                       result = boxBool (lhs->value.byte op rhs->value.byte); } \
-                   else if (lhs->type == DOUBLE) { \
+                   else if (eqTypes(lhs->type, DOUBLE)) { \
                       result = boxBool (lhs->value.dbl op rhs->value.dbl); } \
                    else { \
                       printf("AAAA!!! Type mismatch! Expected Bool, Int or Double but got %s\n", typeIdToName(lhs->type)); exit(1); \
                    }
 
 Box* __attribute__ ((pure)) runtimeBinOp(int64_t code, Box* lhs, Box* rhs) {
-    if (lhs->type != rhs->type) {
+    if (!eqTypes(lhs->type, rhs->type)) {
         printf("AAAA!!! Type mismatch! lhs = %s, rhs = %s\n", typeIdToName(lhs->type), typeIdToName(rhs->type));
         exit(1);
     }
@@ -241,9 +246,9 @@ Box* __attribute__ ((pure)) runtimeUnaryOp(int64_t code, Box* expr) {
     Box* result = NULL;
     switch (code) {
         case 1:
-            if (expr->type == INT) {
+            if (eqTypes(expr->type, INT)) {
                 result = boxInt(-expr->value.num);
-            } else if (expr->type == DOUBLE) {
+            } else if (eqTypes(expr->type, DOUBLE)) {
                 result = boxFloat64(-expr->value.dbl);
             } else {
                 printf("AAAA!!! Type mismatch! Expected Int or Double for op but got %s\n", typeIdToName(expr->type));
@@ -296,7 +301,7 @@ Box* runtimeApply(Box* val, int64_t argc, Box* argv[], Position pos) {
 Data* findDataType(const LaType* type) {
     Types* types = RUNTIME->types;
     for (int i = 0; i < types->size; i++) {
-        if (types->data[i]->type == type) return types->data[i];
+        if (eqTypes(types->data[i]->type, type)) return types->data[i];
     }
     printf("AAAA! Couldn't find type %s", type->name);
     exit(1);
@@ -310,7 +315,7 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
 
         DataValue* dataValue = tree->value.ptr;
         // if rhs is not a local ident, nor a function, try to find this field in lhs data structure
-        if (ident->type == UNKNOWN) {
+        if (eqTypes(ident->type, UNKNOWN)) {
             String* name = ident->value.ptr; // should be identifier name
 //            printf("Ident name %s\n", name->bytes);
             Data* data = findDataType(tree->type); // find struct in global array of structs
@@ -328,13 +333,13 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
                 }
             }
             printf("Couldn't find field %s at line: %"PRId64"\n", name->bytes, pos.line);
-        } else if (ident->type == CLOSURE) {
+        } else if (eqTypes(ident->type, CLOSURE)) {
               // FIXME fix for closure?  check arity?
               Closure* f = unbox(CLOSURE, ident);
               assert(fs->functions[f->funcIdx].arity == 1);
               return runtimeApply(ident, 1, &tree, pos);
         }
-    } else if (ident->type == CLOSURE) {
+    } else if (eqTypes(ident->type, CLOSURE)) {
         // FIXME fix for closure?  check arity?
         Closure* f = unbox(CLOSURE, ident);
         assert(fs->functions[f->funcIdx].arity == 1);
@@ -453,31 +458,31 @@ const Box* __attribute__ ((pure)) toString(const Box* value) {
     char buf[100]; // 100 chars is enough for all (c)
 
     const LaType* type = value->type;
-    if (type == UNIT) {
+    if (eqTypes(type, UNIT)) {
         return UNIT_STRING;
-    } else if (type == BOOL) {
+    } else if (eqTypes(type, BOOL)) {
         return makeString(value->value.num == 0 ? "false" : "true");
-    } else if (type == INT) {
+    } else if (eqTypes(type, INT)) {
         snprintf(buf, 100, "%"PRId64, value->value.num);
         return makeString(buf);}
-    else if (type == BYTE) {
+    else if (eqTypes(type, BYTE)) {
         snprintf(buf, 100, "%"PRId8, value->value.byte);
         return makeString(buf);
-    } else if (type == DOUBLE) {
+    } else if (eqTypes(type, DOUBLE)) {
         snprintf(buf, 100, "%12.9lf", value->value.dbl);
         return makeString(buf);
-    } else if (type == STRING) {
+    } else if (eqTypes(type, STRING)) {
         return value;
-    } else if (type == CLOSURE) {
+    } else if (eqTypes(type, CLOSURE)) {
         return makeString("<func>");
-    } else if (type == ARRAY) {
+    } else if (eqTypes(type, ARRAY)) {
         return arrayToString(value);
-    } else if (type == BYTEARRAY) {
+    } else if (eqTypes(type, BYTEARRAY)) {
         return byteArrayToString(value);
-    } else if (!strcmp(type->name, "Ref")) {
+    } else if (eqTypes(type, REF)) {
         DataValue* dataValue = value->value.ptr;
         return toString(dataValue->values[0]);
-    } else if (!strcmp(type->name, "Unknown")) {
+    } else if (eqTypes(type, UNKNOWN)) {
         String *name = (String *) value->value.ptr;
         printf("AAAA!!! Undefined identifier in toString %s\n", name->bytes);
         exit(1);
