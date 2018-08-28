@@ -1,5 +1,9 @@
 module Prelude
 
+extern def libcErrno(): Int = "libcErrno"
+extern def libcError(error: Int): String = "libcError"
+extern def libcCurError(): String = "libcCurError"
+
 extern def print(s: String): Unit = "print"
 extern def println(s: String): Unit = "println"
 extern def toString(a: a): String = "toString"
@@ -8,11 +12,7 @@ extern def getArgs(): Array String = "getArgs"
 extern def toInt(s: String): Int = "toInt"
 extern def concat(strings: Array String): String = "concat"
 extern def exit(code: Int): a = "exit"
-def die(msg: String): a = {
-    println(msg);
-    exit(1);
-}
-def undefined() = die("undefined")
+
 extern def runtimeIsConstr(constr: a, name: String): Bool = "runtimeIsConstr"
 extern def runtimeCheckTag(value: a, tag: Int): Bool = "runtimeCheckTag"
 extern def runtimeCompare(lhs: a, rhs: a): Int = "runtimeCompare"
@@ -29,3 +29,24 @@ extern def readFile(filename: String): String = "lascaReadFile"
 extern def writeFile(filename: String, string: String): Unit = "lascaWriteFile"
 
 extern def updateRef(ref: Ref a, value: a): Ref a = "updateRef"
+
+extern def getCwd(): String = "lascaGetCwd"
+extern def chdir(path: String): Option String = "lascaChdir"
+extern def getEnv(name: String): Option String = "getEnv"
+extern def lascaSetEnv(name: String, value: String, replace: Bool): Int = "setEnv"
+extern def lascaUnsetEnv(name: String): Int = "unsetEnv"
+
+def die(msg: String): a = {
+    println(msg);
+    exit(1);
+}
+
+def undefined() = die("undefined")
+
+def setEnv(name: String, value: String, replace: Bool): Unit = {
+    if lascaSetEnv(name, value, replace) == -1 then die("setEnv: ${libcCurError()}") else ()
+}
+
+def unsetEnv(name: String): Unit = {
+    if lascaUnsetEnv(name) == -1 then die("unsetEnv: ${libcCurError()}") else ()
+}

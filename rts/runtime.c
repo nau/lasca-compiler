@@ -29,6 +29,7 @@ const LaType _REF     = { .name = "Ref" };
 const LaType _BYTEARRAY     = { .name = "ByteArray" };
 const LaType _FILE_HANDLE   = { .name = "FileHandle" };
 const LaType _PATTERN = { .name = "Pattern" };
+const LaType _OPTION = { .name = "Option" };
 const LaType* UNKNOWN = &_UNKNOWN;
 const LaType* UNIT    = &_UNIT;
 const LaType* BOOL    = &_BOOL;
@@ -42,6 +43,7 @@ const LaType* REF   = &_REF;
 const LaType* BYTEARRAY   = &_BYTEARRAY;
 const LaType* FILE_HANDLE   = &_FILE_HANDLE;
 const LaType* PATTERN   = &_PATTERN;
+const LaType* OPTION   = &_OPTION;
 
 Box TRUE_SINGLETON = {
     .type = &_BOOL,
@@ -65,11 +67,28 @@ Box  DOUBLE_ZERO = {
     .type = &_DOUBLE,
     .value.dbl = 0.0
 };
+
+DataValue _NONE = {
+    .tag = 0,
+    .values = {}
+};
+Box NONE = {
+    .type = &_OPTION,
+    .value.ptr = &_NONE
+};
 Environment ENV;
 Runtime* RUNTIME;
 
 bool eqTypes(const LaType* lhs, const LaType* rhs) {
     return lhs == rhs || strcmp(lhs->name, rhs->name) == 0;
+}
+
+Box* some(Box* value) {
+    assert(value != NULL);
+    DataValue* dv = gcMalloc(sizeof(DataValue) + sizeof(Box*));
+    dv->tag = 1;
+    dv->values[0] = value;
+    return box(OPTION, dv);
 }
 
 void *gcMalloc(size_t s) {
@@ -155,26 +174,6 @@ void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti) {
         exit(1);
     } else {
         printf("AAAA!!! Expected %s but got %s %p != %p\n", typeIdToName(expected), typeIdToName(ti->type), expected, ti->type);
-        exit(1);
-    }
-}
-
-int64_t __attribute__ ((pure)) unboxInt(const Box* ti) {
-  //  printf("unbox(%d, %d) ", ti->type, (int64_t) ti->value);
-    if (eqTypes(ti->type, INT)) {
-        return ti->value.num;
-    } else {
-        printf("AAAA!!! Expected %s but got %s\n", typeIdToName(INT), typeIdToName(ti->type));
-        exit(1);
-    }
-}
-
-double __attribute__ ((pure)) unboxFloat64(Box* ti) {
-  //  printf("unbox(%d, %d) ", ti->type, (int64_t) ti->value);
-    if (eqTypes(ti->type, DOUBLE)) {
-        return ti->value.dbl;
-    } else {
-        printf("AAAA!!! Expected %s but got %s\n", typeIdToName(DOUBLE), typeIdToName(ti->type));
         exit(1);
     }
 }
@@ -584,8 +583,12 @@ void initLascaRuntime(Runtime* runtime) {
         INT_ARRAY[i].type = INT;
         INT_ARRAY[i].value.num = i;
     }
-    if (runtime->verbose)
+    if (runtime->verbose) {
         printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %"PRId64
                ", # structs = %"PRId64", utf8proc version %s\n",
           RUNTIME->functions->size, RUNTIME->types->size, utf8proc_version());
+        for (int i = 0; i < RUNTIME->types->size; i++) {
+            printf("Type %s\n", RUNTIME->types->data[i]->type->name);
+        }
+    }
 }

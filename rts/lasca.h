@@ -106,6 +106,7 @@ typedef struct {
 extern Box UNIT_SINGLETON;
 extern Box TRUE_SINGLETON;
 extern Box FALSE_SINGLETON;
+extern Box NONE;
 // Primitive Types
 extern const LaType* UNIT   ;
 extern const LaType* BOOL   ;
@@ -118,6 +119,7 @@ extern const LaType* ARRAY  ;
 extern const LaType* BYTEARRAY;
 extern const LaType* FILE_HANDLE;
 extern const LaType* PATTERN;
+extern const LaType* OPTION;
 
 bool eqTypes(const LaType* lhs, const LaType* rhs);
 void *gcMalloc(size_t s);
@@ -125,12 +127,12 @@ Box* __attribute__ ((pure)) makeString(char * str);
 Box *box(const LaType* type_id, void *value);
 Box * __attribute__ ((pure)) boxInt(int64_t i);
 void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti);
-int64_t __attribute__ ((pure)) unboxInt(const Box* ti);
 Box* runtimeApply(Box* val, int64_t argc, Box* argv[], Position pos);
 const Box* toString(const Box* value);
 Box* println(const Box* val);
 Box* boxArray(size_t size, ...);
 Array* createArray(size_t size);
 const char * __attribute__ ((const)) typeIdToName(const LaType* typeId);
+Box* some(Box* value);
 
 #endif

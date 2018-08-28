@@ -10,11 +10,25 @@
 #include <string.h>
 #include <math.h>
 #include <gc.h>
+#include <sys/types.h> /* for pid_t */
 #include <sys/stat.h>
+#include <sys/wait.h> /* for wait */
 #include <utf8proc.h>
 #include <pcre2.h>
 
 #include "lasca.h"
+
+int64_t libcErrno() {
+    return errno;
+}
+
+Box* libcError(int64_t error) {
+    return makeString(strerror(error));
+}
+
+Box* libcCurError() {
+    return makeString(strerror(errno));
+}
 
 /* ================== IO ================== */
 String* unsafeString(Box* b) {
@@ -405,4 +419,42 @@ Box* lascaRegexReplace(Box* ptrn, Box* string, Box* replace) {
         exit(1);
     }
     return box(STRING, val);
+}
+
+/* OS/POSIX functions */
+
+Box* lascaGetCwd() {
+    char* dir = getcwd(NULL, 0);
+    if (dir == NULL) {
+        printf("lascaGetCwd error: %s\n", strerror(errno));
+        exit(1);
+    }
+    return makeString(dir);
+}
+
+Box* lascaChdir(Box* path) {
+    String* dir = unbox(STRING, path);
+    int res = chdir(dir->bytes);
+    if (res == -1) {
+        return some(libcCurError());
+    }
+    return &NONE;
+}
+
+Box* getEnv(Box* name) {
+    String* nm = unbox(STRING, name);
+    char* res = getenv(nm->bytes);
+    if (res == NULL) return &NONE;
+    return some(makeString(res));
+}
+
+int64_t setEnv(Box* name, Box* value, int64_t replace) {
+    String* nm = unbox(STRING, name);
+    String* v = unbox(STRING, value);
+    return setenv(nm->bytes, v->bytes, replace);
+    }
+
+int64_t unsetEnv(Box* name) {
+    String* nm = unbox(STRING, name);
+    return unsetenv(nm->bytes);
 }
