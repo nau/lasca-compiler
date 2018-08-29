@@ -1,5 +1,4 @@
 #define __STDC_FORMAT_MACROS
-#define PCRE2_CODE_UNIT_WIDTH 8
 #include <inttypes.h>
 #include <assert.h>
 #include <errno.h>
@@ -14,26 +13,23 @@
 #include <sys/stat.h>
 #include <sys/wait.h> /* for wait */
 #include <utf8proc.h>
+#include "lasca.h"
 #include <pcre2.h>
 
-#include "lasca.h"
 
 int64_t libcErrno() {
     return errno;
 }
 
-Box* libcError(int64_t error) {
+String* libcError(int64_t error) {
     return makeString(strerror(error));
 }
 
-Box* libcCurError() {
+String* libcCurError() {
     return makeString(strerror(errno));
 }
 
 /* ================== IO ================== */
-String* unsafeString(Box* b) {
-    return b->value.ptr;
-}
 
 /* Bitwise stuff */
 
@@ -74,9 +70,9 @@ Box* codePointsIterate(Box* string, Box* f) {
         } if (codepoint == 0) {
             return &UNIT_SINGLETON;
         } else {
-            Box* cp = boxInt(codepoint);
+            Box* cp = (Box*) boxInt(codepoint);
             Box* res = runtimeApply(f, 1, &cp, pos);
-            cont = unbox(BOOL, res);
+            cont = asBool(unbox(BOOL, res))->num;
         }
     }
     return &UNIT_SINGLETON;
@@ -111,9 +107,9 @@ Box* graphemesIterate(Box* string, Box* f) {
 
             if (brk) {
                 cluster[length + 1] = 0;
-                Box* s = makeString((char *) cluster);
+                Box* s = (Box*) makeString((char *) cluster);
                 Box* res = runtimeApply(f, 1, &s, pos);
-                cont = unbox(BOOL, res);
+                cont = asBool(unbox(BOOL, res))->num;
                 length = 0;
             }
         }
@@ -122,7 +118,7 @@ Box* graphemesIterate(Box* string, Box* f) {
 }
 
 // FIXME make it int32_t
-Box* codePointToString(int64_t codePoint) {
+String* codePointToString(int64_t codePoint) {
     utf8proc_int32_t cp = (utf8proc_int32_t) codePoint; // TODO remove cast
     assert(utf8proc_codepoint_valid(cp));
     utf8proc_uint8_t buf[5];
@@ -137,8 +133,9 @@ Box* codePointsToString(Box* array) {
     String* string = gcMalloc(sizeof(String) + len + 1);
     utf8proc_ssize_t offset = 0;
     for (size_t i = 0; i < arr->length; i++) {
-        offset += utf8proc_encode_char(arr->data[i]->value.num, (utf8proc_uint8_t *) &string->bytes[offset]);
+        offset += utf8proc_encode_char(asInt(arr->data[i])->num, (utf8proc_uint8_t *) &string->bytes[offset]);
     }
+    string->type = STRING;
     string->bytes[offset] = 0;
     string->length = offset;
     return box(STRING, string);
@@ -163,12 +160,16 @@ int64_t runtimeCompare(Box* lhs, Box* rhs) {
         exit(1);
     }
     int64_t result = 0;
-    if (eqTypes(lhs->type, BOOL) || eqTypes(lhs->type, INT) || eqTypes(lhs->type, DOUBLE)) {
-        result = // FIXME it's wrong for double
-                lhs->value.num < rhs->value.num ? -1 :
-                lhs->value.num == rhs->value.num ? 0 : 1;
+    if (eqTypes(lhs->type, BOOL) || eqTypes(lhs->type, INT)) {
+        result =
+                asInt(lhs)->num < asInt(rhs)->num ? -1 :
+                asInt(lhs)->num == asInt(rhs)->num ? 0 : 1;
+    } else if (eqTypes(lhs->type, FLOAT64)) {
+        result =
+                asFloat(lhs)->dbl < asFloat(rhs)->dbl ? -1 :
+                asFloat(lhs)->dbl == asFloat(rhs)->dbl ? 0 : 1;
     } else if (eqTypes(lhs->type, STRING)) {
-        result = strcmp(unsafeString(lhs)->bytes, unsafeString(rhs)->bytes); // TODO do proper unicode stuff
+        result = strcmp(asString(lhs)->bytes, asString(rhs)->bytes); // TODO do proper unicode stuff
     } else {
         printf("AAAA!!! runtimeCompare is not defined for type %s\n", typeIdToName(lhs->type));
         exit(1);
@@ -225,7 +226,7 @@ Box* arrayInit(int64_t size, Box* f) {
     Position pos = {0, 0};
     for (int64_t i = 0; i < size; i++) {
         Box* argv[1];
-        argv[0] = boxInt(i);
+        argv[0] = (Box*) boxInt(i);
         array->data[i] = runtimeApply(f, 1, argv, pos);
     }
     return box(ARRAY, array);
@@ -321,13 +322,12 @@ Box* lascaWriteFile(Box* filename, Box* string) {
     return &UNIT_SINGLETON;
 }
 
-void finalizePcre2Code(Box* pattern, void* unused) {
+void finalizePcre2Code(Pattern* pattern, void* unused) {
 //    printf("finalizePcre2Code\n");
-    pcre2_code *re = pattern->value.ptr;
-    pcre2_code_free(re);
+    pcre2_code_free(pattern->re);
 }
 
-Box* lascaCompileRegex(Box* ptrn) {
+Pattern* lascaCompileRegex(Box* ptrn) {
     String* string = unbox(STRING, ptrn);
     PCRE2_SPTR pattern = (PCRE2_SPTR) string->bytes;
     int errornumber = 0;
@@ -358,13 +358,15 @@ Box* lascaCompileRegex(Box* ptrn) {
         printf("PCRE2 compilation failed at offset %d: %s\n", (int)erroroffset, buffer);
         exit(1);
     }
-    Box* boxedRe = box(PATTERN, re);
+    Pattern* boxedRe = gcMalloc(sizeof(Pattern));
+    boxedRe->type = PATTERN;
+    boxedRe->re = re;
     GC_register_finalizer(boxedRe, (GC_finalization_proc)finalizePcre2Code, 0, 0, 0);
     return boxedRe;
 }
 
 int64_t lascaMatchRegex(Box* ptrn, Box* string) {
-    pcre2_code *re = unbox(PATTERN, ptrn);
+    pcre2_code *re = ((Pattern*) unbox(PATTERN, ptrn))->re;
     String* subject = unbox(STRING, string);
     pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, NULL);
 
@@ -389,7 +391,7 @@ int64_t lascaMatchRegex(Box* ptrn, Box* string) {
 }
 
 Box* lascaRegexReplace(Box* ptrn, Box* string, Box* replace) {
-    pcre2_code *re = unbox(PATTERN, ptrn);
+    pcre2_code *re = ((Pattern*) unbox(PATTERN, ptrn))->re;
     String* subject = unbox(STRING, string);
     String* subst = unbox(STRING, replace);
     
@@ -410,6 +412,7 @@ Box* lascaRegexReplace(Box* ptrn, Box* string, Box* replace) {
         rc = pcre2_substitute(re, (PCRE2_SPTR) subject->bytes, subject->length, 0, options, 0, 0,
                 (PCRE2_SPTR) subst->bytes, subst->length, (PCRE2_UCHAR *) val->bytes, &outlengthptr);
     }
+    val->type = STRING;
     val->length = outlengthptr;
 
     if (rc < 0) {
@@ -423,7 +426,7 @@ Box* lascaRegexReplace(Box* ptrn, Box* string, Box* replace) {
 
 /* OS/POSIX functions */
 
-Box* lascaGetCwd() {
+String* lascaGetCwd() {
     char* dir = getcwd(NULL, 0);
     if (dir == NULL) {
         printf("lascaGetCwd error: %s\n", strerror(errno));
@@ -432,20 +435,20 @@ Box* lascaGetCwd() {
     return makeString(dir);
 }
 
-Box* lascaChdir(Box* path) {
+Option* lascaChdir(Box* path) {
     String* dir = unbox(STRING, path);
     int res = chdir(dir->bytes);
     if (res == -1) {
-        return some(libcCurError());
+        return some((Box*) libcCurError());
     }
     return &NONE;
 }
 
-Box* getEnv(Box* name) {
+Option* getEnv(Box* name) {
     String* nm = unbox(STRING, name);
     char* res = getenv(nm->bytes);
     if (res == NULL) return &NONE;
-    return some(makeString(res));
+    return some((Box*) makeString(res));
 }
 
 int64_t setEnv(Box* name, Box* value, int64_t replace) {

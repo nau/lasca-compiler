@@ -424,6 +424,17 @@ ret val = terminator $ Do $ Ret (Just val) []
 getelementptr addr indices = instr $ GetElementPtr False addr indices []
 {-# INLINE getelementptr #-}
 
+
+unitTypePtrOp = constOp $ constRef ptrType "_UNIT"
+boolTypePtrOp = constOp $ constRef ptrType "_BOOL"
+intTypePtrOp = constOp $ constRef ptrType  "_INT"
+doubleTypePtrOp = constOp $ constRef ptrType "_FLOAT64"
+closureTypePtrOp = constOp $ constRef ptrType "_CLOSURE"
+arrayTypePtrOp = constOp $ constRef ptrType "_ARRAY"
+
+stringTypePtr = constRef ptrType "_STRING"
+stringTypePtrOp = constOp $ stringTypePtr
+
 globalStringRefAsPtr :: Text -> C.Constant
 globalStringRefAsPtr name = constRef tpe literalName
   where
@@ -456,7 +467,7 @@ createCString s = (C.Array T.i8 bytes, len)
     bytes = map constByte (ByteString.unpack bytestring ++ [fromInteger 0])
     len = ByteString.length bytestring + 1
 
-createString s = (createStruct [constInt (len - 1), array], len)
+createString s = (createStruct [stringTypePtr, constInt (len - 1), array], len)
   where
     (array, len) = createCString s
 
@@ -467,19 +478,24 @@ defineStringLit s = defineConst (getStringLitName s) (stringStructType len) stri
 --            Lasca Runtime Data Representation Types
 funcType retTy args = T.FunctionType retTy args False
 
-stringStructType len = T.StructureType False [intType, T.ArrayType (fromIntegral len) T.i8]
+stringStructType len = T.StructureType False [ptrType, intType, T.ArrayType (fromIntegral len) T.i8]
 
 laTypeStructType = T.StructureType False [ptrType]
 
 boxStructOfType boxedType = T.StructureType False [ptrType, boxedType]
 
-boxStructType = boxStructOfType ptrType
+boxedIntType = boxStructOfType intType
+boxedBoolType = boxStructOfType intType
+boxedByteType = boxStructOfType T.i8
+boxedFloatType = boxStructOfType T.double
 
-arrayStructType elemType = T.StructureType False [intType, T.ArrayType 0 elemType]
+dataValueStructType len = T.StructureType False [ptrType, intType, T.ArrayType (fromIntegral len) ptrType] -- DataValue: {LaType*, tag, values: []}
+
+arrayStructType elemType = T.StructureType False [ptrType, intType, T.ArrayType 0 elemType]
 
 positionStructType = T.StructureType False [intType, intType]
 
-closureStructType = T.StructureType False [intType, intType, ptrType]
+closureStructType = T.StructureType False [ptrType, intType, intType, ptrType] -- Closure {LaType*, funcIdx, arc, argv}
 
 functionStructType = T.StructureType False [ptrType, ptrType, intType]
 

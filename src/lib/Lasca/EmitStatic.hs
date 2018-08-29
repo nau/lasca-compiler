@@ -70,7 +70,6 @@ isFuncType (TypeFunc _ _) = True
 isFuncType _ = False
 
 lascaPrimitiveTypes = Set.fromList [TypeInt, TypeFloat, TypeBool, TypeString, TypeAny, TypeUnit]
-lascaUnboxedTypes =  Set.fromList [TypeInt, TypeFloat]
 anyTypeVar = TVar $ TV "a"
 
 cgen :: Ctx -> S.Expr -> Codegen AST.Operand
@@ -130,8 +129,7 @@ cgenIfStatic ctx meta cond tr fl = do
     let test = do
             cond <- cgen ctx cond
             -- unbox Bool
-            voidPtrCond <- unboxDirect cond
-            bool <- ptrtoint voidPtrCond T.i1
+            bool <- unboxBool cond
             instr (I.ICmp IP.EQ bool constTrue [])
     cgenIf resultType test (cgen ctx tr) (cgen ctx fl)
 
@@ -153,25 +151,17 @@ cgenSelect ctx this@(S.Select meta tree expr) = do
     --            Debug.traceM $ printf "fieldsWithIndex %s" (show fieldsWithIndex)
            let (S.Arg n declaredFieldType, idx) = fromMaybe (error $ printf "No such field %s in %s" (show fieldName) (show tpeName)) (Map.lookup fieldName fieldsWithIndex)
            let len = length fieldsWithIndex
-           let arrayType = T.ArrayType (fromIntegral len) ptrType
-           let tpe = T.StructureType False [intType, arrayType] -- DataValue: {tag, values: []}
-
-           boxedTree <- bitcast tree (T.ptr boxStructType)
-
-           unboxedAddr <- getelementptr boxedTree [constIntOp 0, constInt32Op 1]
-           unboxed <- load unboxedAddr
-
-           dataStruct <- bitcast unboxed (T.ptr tpe)
-           array <- getelementptr dataStruct [constIntOp 0, constInt32Op 1]
+           dataStruct <- bitcast tree (T.ptr (dataValueStructType len))
+           array <- getelementptr dataStruct [constIntOp 0, constInt32Op 2]
            valueAddr <- getelementptr array [constIntOp 0, constIntOp idx]
-           value <- load valueAddr
+           load valueAddr
     --            traceM $ printf "AAAA %s: %s" (show array) (show value)
     --            resultValue <- castBoxedValue declaredFieldType value
     --            Debug.traceM $ printf "Selecting %s: %s" (show tree) (show resultValue)
     --            return $ constFloatOp 1234.5
     --            resolveBoxing declaredFieldType expectedReturnType resultValue
     --            return resultValue
-           return value
+        --    return value
        (S.Ident _ name) | isFuncType identType -> do
     --      traceM $ printf "Method call %s: %s" name (show identType)
            cgen ctx (S.Apply meta expr [tree])
@@ -264,11 +254,9 @@ cgenApply ctx meta expr args = do
             callBuiltin "runtimeApply" [e, argc, sargs, constOp pos]
 
 cgenArrayApply array idx = do
-    boxedArrayPtr <- bitcast array (T.ptr $ boxStructOfType (T.ptr $ arrayStructType ptrType)) -- Box(type, &Array(len, &data[])
-    arrayStructAddr <- getelementptr boxedArrayPtr [constIntOp 0, constInt32Op 1]
-    arrayStructPtr <- load arrayStructAddr
+    arrayStructPtr <- bitcast array (T.ptr $ arrayStructType ptrType) -- &Array(type, len, &data[])
     -- TODO check idx is in bounds, eliminatable
-    ptr <- getelementptr arrayStructPtr [constIntOp 0, constInt32Op 1, idx]
+    ptr <- getelementptr arrayStructPtr [constIntOp 0, constInt32Op 2, idx]
     load ptr
 
 -------------------------------------------------------------------------------
@@ -280,7 +268,7 @@ funcPtrFromClosure closure = do
     let mapping = functions modState
     let len = Map.size mapping
     closureTyped <- bitcast closure (T.ptr closureStructType)
-    idxPtr <- getelementptr closureTyped [constIntOp 0, constInt32Op 0]
+    idxPtr <- getelementptr closureTyped [constIntOp 0, constInt32Op 1]
     idx <- instrTyped intType $ I.Load False idxPtr Nothing 0 []
 --    callFn "putInt" [idx]
     let fst = functionsStructType (fromIntegral len)
@@ -291,38 +279,6 @@ funcPtrFromClosure closure = do
 --     Functions[idx].funcPtr
     fnPtr <- getelementptr fnsAddr [constIntOp 0, constInt32Op 1, idx, constInt32Op 1]
     load fnPtr
-
-castBoxedValue declaredType value = case declaredType of
-    TypeFloat -> ptrtofp value
-    TypeInt   -> ptrtoint value intType
-    TypeByte  -> ptrtoint value T.i8
-    _                 -> return value
-{-# INLINE castBoxedValue #-}
-
-unboxDirect expr = do
-    boxed <- bitcast expr (T.ptr boxStructType)
-    unboxedAddr <- getelementptr boxed [constIntOp 0, constInt32Op 1]
-    load unboxedAddr
-{-# INLINE unboxDirect #-}
-
-unboxByte expr = do
-    unboxed <- unboxDirect expr
-    castBoxedValue TypeByte unboxed
-
-unboxBool expr = do
-    unboxed <- unboxDirect expr
-    castBoxedValue TypeInt unboxed
-
-
-unboxInt expr = do
-    unboxed <- unboxDirect expr
-    castBoxedValue TypeInt unboxed
-{-# INLINE unboxInt #-}
-
-unboxFloat64 expr = do
-    unboxed <- unboxDirect expr
-    castBoxedValue TypeFloat unboxed
-{-# INLINE unboxFloat64 #-}
 
 resolveBoxing declaredType instantiatedType expr =
     case (declaredType, instantiatedType) of

@@ -171,33 +171,46 @@ gcMallocType tpe = do
     casted <- bitcast ptr (T.ptr tpe)
     return (ptr, casted)
 
-unitTypePtrOp = constOp $ constRef ptrType "_UNIT"
-boolTypePtrOp = constOp $ constRef ptrType "_BOOL"
-intTypePtrOp = constOp $ constRef ptrType  "_INT"
-doubleTypePtrOp = constOp $ constRef ptrType "_DOUBLE"
-closureTypePtrOp = constOp $ constRef ptrType "_CLOSURE"
-arrayTypePtrOp = constOp $ constRef ptrType "_ARRAY"
+castBoxedValue declaredType value = case declaredType of
+    TypeFloat -> ptrtofp value
+    TypeInt   -> ptrtoint value intType
+    TypeByte  -> ptrtoint value T.i8
+    _                 -> return value
+{-# INLINE castBoxedValue #-}    
 
-stringTypePtr = constRef ptrType "_STRING"
-stringTypePtrOp = constOp $ stringTypePtr
+-- takes second field of boxed Int, Byte, Bool, Float, i.e. its value
+unboxDirect expr boxedType = do
+    boxed <- bitcast expr (T.ptr boxedType)
+    unboxedAddr <- getelementptr boxed [constIntOp 0, constInt32Op 1]
+    load unboxedAddr
+{-# INLINE unboxDirect #-}
 
-box t v = callBuiltin "box" [t, v]
-boxByte v = do
-    p <- inttoptr v
-    callBuiltin "box" [constOp $ constRef ptrType "_BYTE", p]
+unboxByte expr = unboxDirect expr boxedByteType
+
+unboxBool expr = unboxDirect expr boxedBoolType
+
+unboxInt expr = unboxDirect expr boxedIntType
+{-# INLINE unboxInt #-}
+
+unboxFloat64 expr = unboxDirect expr boxedFloatType
+{-# INLINE unboxFloat64 #-}
+
+boxByte v = callBuiltin "boxByte" [v]
 boxBool v = callBuiltin "boxBool" [v] -- todo change to i1
 boxInt v = callBuiltin "boxInt" [v]
 boxFloat64 v = callBuiltin "boxFloat64" [v]
 unbox t v = callBuiltin "unbox" [t, v]
+unboxBoolDynamically v = do
+    unbox boolTypePtrOp v -- checks types
+    unboxBool v
+
 
 
 boxLit (S.BoolLit b) meta = boxBool (constIntOp (boolToInt b))
 boxLit (S.IntLit  n) meta = boxInt (constIntOp n)
 boxLit (S.FloatLit  n) meta = boxFloat64 (constFloatOp n)
 boxLit S.UnitLit meta = return $ constOp $ constRef ptrType "UNIT_SINGLETON"
-boxLit (S.StringLit s) meta = do
-    let ref = constOp . globalStringRefAsPtr $ s
-    box stringTypePtrOp ref
+boxLit (S.StringLit s) meta = return $ constOp $ globalStringRefAsPtr s
 
 createPosition S.NoPosition = createStruct [constInt 0, constInt 0] -- Postion (0, 0) means No Position. Why not.
 createPosition S.Position{S.sourceLine, S.sourceColumn} = createStruct [constInt sourceLine, constInt sourceColumn]
@@ -242,9 +255,9 @@ builtinFuncs = do
   Map.fromList $
     [ external T.void  "initLascaRuntime" [("runtime", ptrType)] False []
     , external ptrType "gcMalloc" [("size", intType)] False []
-    , external ptrType "box" [("t", ptrType), ("ptr", ptrType)] False [FA.GroupID 0]
     , external ptrType "unbox" [("t", ptrType), ("ptr", ptrType)] False [FA.GroupID 0]
     , external ptrType "boxError" [("n", ptrType)] False [FA.GroupID 0]
+    , external ptrType "boxByte" [("d", intType)] False [FA.GroupID 0]
     , external ptrType "boxInt" [("d", intType)] False [FA.GroupID 0]
     , external ptrType "boxBool" [("d", intType)] False [FA.GroupID 0]
     , external ptrType "boxClosure" [("id", intType), ("argc", intType), ("argv", ptrType)] False []
@@ -268,7 +281,7 @@ declareStdFuncs = do
     externalConst ptrType "INT"
     externalConst ptrType "_INT"
     externalConst ptrType "DOUBLE"
-    externalConst ptrType "_DOUBLE"
+    externalConst ptrType "_FLOAT64"
     externalConst ptrType "CLOSURE"
     externalConst ptrType "_CLOSURE"
     externalConst ptrType "ARRAY"
@@ -398,12 +411,9 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
             if null args
             then do
                 let singletonName = show name ++ ".Singleton"
-                let dataValue = createStruct [constInt tag, C.Array ptrType []]
-                defineConst (fromString singletonName) dataValueStructType dataValue
-
-                let boxed = createStruct [typePtr, constRef dataValueStructType (fromString singletonName)]
-                defineConst (fromString $ singletonName ++ ".Boxed") boxStructType boxed
-                let ptrRef = constRef boxStructType (fromString $ singletonName ++ ".Boxed")
+                let dataValue = createStruct [typePtr, constInt tag, C.Array ptrType []]
+                defineConst (fromString singletonName) (dataValueStructType len) dataValue
+                let ptrRef = constRef (dataValueStructType len) (fromString singletonName)
                 defineStringLit txtName
                 defineConst sbsName ptrType ptrRef
             else do
@@ -419,8 +429,6 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
 
           where
             len = length args
-            arrayType = T.ArrayType (fromIntegral len) ptrType
-            dataValueStructType = T.StructureType False [intType, arrayType] -- DataValue: {tag, values: []}
             fargs = argsToSig args
             fieldsArray = C.Array ptrType fields
             fields = map (\(S.Arg n _) -> globalStringRefAsPtr (nameToText n)) args
@@ -428,18 +436,17 @@ genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
             codeGen typePtr modState = execCodegen [] modState $ do
                 entry <- addBlock entryBlockName
                 setBlock entry
-                (ptr, structPtr) <- gcMallocType dataValueStructType
-                tagAddr <- getelementptr structPtr [constIntOp 0, constInt32Op 0] -- [dereference, 1st field] {tag, [arg1, arg2 ...]}
+                (ptr, structPtr) <- gcMallocType (dataValueStructType len)
+                typeAddr <- getelementptr structPtr [constIntOp 0, constInt32Op 0] -- [dereference, 1st field: type] {LaType*, tag, [arg1, arg2 ...]}
+                store typeAddr (constOp typePtr)
+                tagAddr <- getelementptr structPtr [constIntOp 0, constInt32Op 1] -- [dereference, 2nd field: tag] {LaType*, tag, [arg1, arg2 ...]}
                 store tagAddr (constIntOp tag)
                 let argsWithId = zip args [0..]
                 forM_ argsWithId $ \(arg, i) -> do
-                    p <- getelementptr structPtr [constIntOp 0, constInt32Op 1, constIntOp i] -- [dereference, 2nd field, ith element] {tag, [arg1, arg2 ...]}
+                    p <- getelementptr structPtr [constIntOp 0, constInt32Op 2, constIntOp i] -- [dereference, 3rd field, ith element] {LaType*, tag, [arg1, arg2 ...]}
                     ref <- argToPtr arg
                     store p ref
-                -- remove boxing after removing runtimeIsConstr from genPattern, do a proper tag check instead
-                boxed <- box (constOp typePtr) ptr
-                ret boxed
-        --        ret ptr
+                ret ptr
 
 codegenStartFunc ctx cgen mainName = do
     modState <- get

@@ -13,7 +13,7 @@
 
 #include "lasca.h"
 
-#define STR(s) {.length = sizeof(s) - 1, .bytes = s}
+#define STR(s) {.type = &_STRING, .length = sizeof(s) - 1, .bytes = s}
 
 // Primitive Types
 const LaType _UNKNOWN = { .name = "Unknown" };
@@ -21,7 +21,7 @@ const LaType _UNIT    = { .name = "Unit" };
 const LaType _BOOL    = { .name = "Bool" };
 const LaType _BYTE    = { .name = "Byte" };
 const LaType _INT     = { .name = "Int" };
-const LaType _DOUBLE  = { .name = "Double" };
+const LaType _FLOAT64 = { .name = "Float" };
 const LaType _STRING  = { .name = "String" };
 const LaType _CLOSURE = { .name = "Closure" };
 const LaType _ARRAY   = { .name = "Array" };
@@ -29,52 +29,48 @@ const LaType _REF     = { .name = "Ref" };
 const LaType _BYTEARRAY     = { .name = "ByteArray" };
 const LaType _FILE_HANDLE   = { .name = "FileHandle" };
 const LaType _PATTERN = { .name = "Pattern" };
-const LaType _OPTION = { .name = "Option" };
+const LaType _OPTION =  { .name = "Option" };
 const LaType* UNKNOWN = &_UNKNOWN;
 const LaType* UNIT    = &_UNIT;
 const LaType* BOOL    = &_BOOL;
 const LaType* BYTE    = &_BYTE;
 const LaType* INT     = &_INT;
-const LaType* DOUBLE  = &_DOUBLE;
+const LaType* FLOAT64 = &_FLOAT64;
 const LaType* STRING  = &_STRING;
 const LaType* CLOSURE = &_CLOSURE;
 const LaType* ARRAY   = &_ARRAY;
-const LaType* REF   = &_REF;
+const LaType* REF     = &_REF;
 const LaType* BYTEARRAY   = &_BYTEARRAY;
-const LaType* FILE_HANDLE   = &_FILE_HANDLE;
-const LaType* PATTERN   = &_PATTERN;
-const LaType* OPTION   = &_OPTION;
+const LaType* FILE_HANDLE = &_FILE_HANDLE;
+const LaType* PATTERN = &_PATTERN;
+const LaType* OPTION  = &_OPTION;
 
-Box TRUE_SINGLETON = {
+Bool TRUE_SINGLETON = {
     .type = &_BOOL,
-    .value.num = 1
+    .num = 1
 };
-Box FALSE_SINGLETON = {
+
+Bool FALSE_SINGLETON = {
     .type = &_BOOL,
-    .value.num = 0
+    .num = 0
 };
-Box UNIT_SINGLETON = {
+
+Unit UNIT_SINGLETON = {
     .type = &_UNIT
 };
 String EMPTY_STRING = STR("\00");
-Box EMPTY_STRING_BOX = {
-    .type = &_STRING,
-    .value.ptr = &EMPTY_STRING
-};
-Box * UNIT_STRING;
-Box  INT_ARRAY[100];
-Box  DOUBLE_ZERO = {
-    .type = &_DOUBLE,
-    .value.dbl = 0.0
+String* UNIT_STRING;
+Byte BYTE_ARRAY[256];
+Int INT_ARRAY[100];
+Float64 FLOAT64_ZERO = {
+    .type = &_FLOAT64,
+    .dbl = 0.0
 };
 
-DataValue _NONE = {
+DataValue NONE = {
+    .type = &_OPTION,
     .tag = 0,
     .values = {}
-};
-Box NONE = {
-    .type = &_OPTION,
-    .value.ptr = &_NONE
 };
 Environment ENV;
 Runtime* RUNTIME;
@@ -83,12 +79,13 @@ bool eqTypes(const LaType* lhs, const LaType* rhs) {
     return lhs == rhs || strcmp(lhs->name, rhs->name) == 0;
 }
 
-Box* some(Box* value) {
+Option* some(Box* value) {
     assert(value != NULL);
     DataValue* dv = gcMalloc(sizeof(DataValue) + sizeof(Box*));
+    dv->type = OPTION;
     dv->tag = 1;
     dv->values[0] = value;
-    return box(OPTION, dv);
+    return dv;
 }
 
 void *gcMalloc(size_t s) {
@@ -111,54 +108,61 @@ const char * __attribute__ ((const)) typeIdToName(const LaType* typeId) {
 /* =============== Boxing ================== */
 
 Box *box(const LaType* type_id, void *value) {
-    Box* ti = gcMalloc(sizeof(Box));
+    Box* ti = (Box*) value;
     ti->type = type_id;
-    ti->value.ptr = value;
     return ti;
 }
 
-Box * __attribute__ ((pure)) boxBool(int64_t i) {
+Bool* __attribute__ ((pure)) boxBool(int64_t i) {
     switch (i) {
         case 0: return &FALSE_SINGLETON; break;
         default: return &TRUE_SINGLETON; break;
     }
 }
 
-Box * __attribute__ ((pure)) boxError(String *name) {
-    return box(UNKNOWN, name);
+Unknown* __attribute__ ((pure)) boxError(String *name) {
+    Unknown* value = gcMalloc(sizeof(Unknown));
+    value->type = UNKNOWN;
+    value->error = name;
+    return value;
 }
 
-Box * __attribute__ ((pure)) boxInt(int64_t i) {
+Byte* __attribute__ ((pure)) boxByte(int8_t i) {
+    return &BYTE_ARRAY[i + 128];
+}
+
+Int* boxInt(int64_t i) {
     if (i >= 0 && i < 100) return &INT_ARRAY[i];
     else {
-        Box* ti = gcMallocAtomic(sizeof(Box));
+        Int* ti = gcMallocAtomic(sizeof(Int));
         ti->type = INT;
-        ti->value.num = i;
+        ti->num = i;
         return ti;
     }
 }
 
-Box * __attribute__ ((pure)) boxFloat64(double i) {
-    if (i == 0.0) return &DOUBLE_ZERO;
-    Box* ti = gcMallocAtomic(sizeof(Box));
-    ti->type = DOUBLE;
-    ti->value.dbl = i;
+Float64* __attribute__ ((pure)) boxFloat64(double i) {
+    if (i == 0.0) return &FLOAT64_ZERO;
+    Float64* ti = gcMallocAtomic(sizeof(Float64));
+    ti->type = FLOAT64;
+    ti->dbl = i;
     return ti;
 }
 
-Box * boxClosure(int64_t idx, int64_t argc, Box** args) {
+Closure* boxClosure(int64_t idx, int64_t argc, Box** args) {
     Closure* cl = gcMalloc(sizeof(Closure));
   //  printf("boxClosure(%d, %d, %p)\n", idx, argc, args);
   //  fflush(stdout);
+    cl->type = CLOSURE;
     cl->funcIdx = idx;
     cl->argc = argc;
     cl->argv = args;
   //  printf("Enclose %d, argc = %d, args[0].type = %d, args[1].type = %d\n", idx, argc, args[0]->type, args[1]->type);
   //  fflush(stdout);
-    return box(CLOSURE, cl);
+    return cl;
 }
 
-void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti) {
+void * unbox(const LaType* expected, const Box* ti) {
   //  printf("unbox(%d, %d) ", ti->type, (int64_t) ti->value);
     /* In most cases we can use pointer comparison,
        but when we use Lasca defined type in C code, we also define a LaType
@@ -167,9 +171,9 @@ void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti) {
        Likely, not an issue anyway.
     */
     if (eqTypes(ti->type, expected)) {
-        return ti->value.ptr;
+        return (void*) ti;
     } else if (eqTypes(ti->type, UNKNOWN)) {
-        String *name = (String *) ti->value.ptr;
+        String *name = ((Unknown *) ti)->error;
         printf("AAAA!!! Undefined identifier %s\n", name->bytes);
         exit(1);
     } else {
@@ -180,17 +184,16 @@ void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti) {
 
 /* ==================== Runtime Ops ============== */
 
-Box* updateRef(Box* ref, Box* value) {
+Box* updateRef(DataValue* ref, Box* value) {
     assert(eqTypes(ref->type, REF));
-    DataValue* dataValue = ref->value.ptr;
-    Box* oldValue = dataValue->values[0];
-    dataValue->values[0] = value;
+    Box* oldValue = ref->values[0];
+    ref->values[0] = value;
     return oldValue;
 }
 
 static int64_t isBuiltinType(const Box* v) {
     const LaType* t = v->type;
-    return eqTypes(t, UNIT) || eqTypes(t, BOOL) || eqTypes(t, BYTE) || eqTypes(t, INT) || eqTypes(t, DOUBLE)
+    return eqTypes(t, UNIT) || eqTypes(t, BOOL) || eqTypes(t, BYTE) || eqTypes(t, INT) || eqTypes(t, FLOAT64)
       || eqTypes(t, STRING) || eqTypes(t, CLOSURE) || eqTypes(t, ARRAY) || eqTypes(t, BYTEARRAY);
 }
 
@@ -198,22 +201,22 @@ static int64_t isUserType(const Box* v) {
     return !isBuiltinType(v);
 }
 
-#define DO_OP(op) if (eqTypes(lhs->type, INT)) { result = boxInt(lhs->value.num op rhs->value.num); } \
-                  else if (eqTypes(lhs->type, BYTE)) { result = box(BYTE, (void*)(size_t)(lhs->value.byte op rhs->value.byte)); } \
-                  else if (eqTypes(lhs->type, DOUBLE)) { result = boxFloat64(lhs->value.dbl op rhs->value.dbl); } \
+#define DO_OP(op) if (eqTypes(lhs->type, INT)) { result = (Box*) boxInt(asInt(lhs)->num op asInt(rhs)->num); } \
+                  else if (eqTypes(lhs->type, BYTE)) { result = (Box*) boxByte(asByte(lhs)->byte op asByte(rhs)->byte); } \
+                  else if (eqTypes(lhs->type, FLOAT64)) { result = (Box*) boxFloat64(asFloat(lhs)->dbl op asFloat(rhs)->dbl); } \
                   else { \
-                        printf("AAAA!!! Type mismatch! Expected Int or Double for op but got %s\n", typeIdToName(lhs->type)); exit(1); }
+                        printf("AAAA!!! Type mismatch! Expected Int or Float for op but got %s\n", typeIdToName(lhs->type)); exit(1); }
 
 #define DO_CMP(op) if (eqTypes(lhs->type, BOOL)) { \
-                      result = boxBool (lhs->value.num op rhs->value.num); } \
+                      result = (Box*) boxBool (asBool(lhs)->num op asBool(rhs)->num); } \
                    else if (eqTypes(lhs->type, INT)) { \
-                      result = boxBool (lhs->value.num op rhs->value.num); } \
+                      result = (Box*) boxBool (asInt(lhs)->num op asInt(rhs)->num); } \
                    else if (eqTypes(lhs->type, BYTE)) { \
-                      result = boxBool (lhs->value.byte op rhs->value.byte); } \
-                   else if (eqTypes(lhs->type, DOUBLE)) { \
-                      result = boxBool (lhs->value.dbl op rhs->value.dbl); } \
+                      result = (Box*) boxBool (asByte(lhs)->byte op asByte(rhs)->byte); } \
+                   else if (eqTypes(lhs->type, FLOAT64)) { \
+                      result = (Box*) boxBool (asFloat(lhs)->dbl op asFloat(rhs)->dbl); } \
                    else { \
-                      printf("AAAA!!! Type mismatch! Expected Bool, Int or Double but got %s\n", typeIdToName(lhs->type)); exit(1); \
+                      printf("AAAA!!! Type mismatch! Expected Bool, Int or Float but got %s\n", typeIdToName(lhs->type)); exit(1); \
                    }
 
 Box* __attribute__ ((pure)) runtimeBinOp(int64_t code, Box* lhs, Box* rhs) {
@@ -246,11 +249,11 @@ Box* __attribute__ ((pure)) runtimeUnaryOp(int64_t code, Box* expr) {
     switch (code) {
         case 1:
             if (eqTypes(expr->type, INT)) {
-                result = boxInt(-expr->value.num);
-            } else if (eqTypes(expr->type, DOUBLE)) {
-                result = boxFloat64(-expr->value.dbl);
+                result = (Box*) boxInt(-asInt(expr)->num);
+            } else if (eqTypes(expr->type, FLOAT64)) {
+                result = (Box*) boxFloat64(-asFloat(expr)->dbl);
             } else {
-                printf("AAAA!!! Type mismatch! Expected Int or Double for op but got %s\n", typeIdToName(expr->type));
+                printf("AAAA!!! Type mismatch! Expected Int or Float for op but got %s\n", typeIdToName(expr->type));
                 exit(1);
             }
             break;
@@ -312,10 +315,10 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
 //    printf("isUserType %s %p %p\n", tree->type->name, tree->type, &_UNKNOWN);
     if (isUserType(tree)) {
 
-        DataValue* dataValue = tree->value.ptr;
+        DataValue* dataValue = asDataValue(tree);
         // if rhs is not a local ident, nor a function, try to find this field in lhs data structure
         if (eqTypes(ident->type, UNKNOWN)) {
-            String* name = ident->value.ptr; // should be identifier name
+            String* name = ((Unknown*)ident)->error; // should be identifier name
 //            printf("Ident name %s\n", name->bytes);
             Data* data = findDataType(tree->type); // find struct in global array of structs
 //            printf("Found data type %s %s, tag %"PRId64"\n", data->name->bytes, tree->type->name, dataValue->tag);
@@ -334,24 +337,24 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
             printf("Couldn't find field %s at line: %"PRId64"\n", name->bytes, pos.line);
         } else if (eqTypes(ident->type, CLOSURE)) {
               // FIXME fix for closure?  check arity?
-              Closure* f = unbox(CLOSURE, ident);
+              Closure* f = asClosure(ident);
               assert(fs->functions[f->funcIdx].arity == 1);
               return runtimeApply(ident, 1, &tree, pos);
         }
     } else if (eqTypes(ident->type, CLOSURE)) {
         // FIXME fix for closure?  check arity?
-        Closure* f = unbox(CLOSURE, ident);
+        Closure* f = asClosure(ident);
         assert(fs->functions[f->funcIdx].arity == 1);
         return runtimeApply(ident, 1, &tree, pos);
     }
-    return boxError(&UNIMPLEMENTED_SELECT);
+    return (Box*) boxError(&UNIMPLEMENTED_SELECT);
 }
 
 int64_t runtimeIsConstr(Box* value, Box* constrName) {
     if (isUserType(value)) {
         String* name = unbox(STRING, constrName);
         Data* data = findDataType(value->type);
-        DataValue* dv = value->value.ptr;
+        DataValue* dv = asDataValue(value);
         String* realConstrName = data->constructors[dv->tag]->name;
         if (strncmp(realConstrName->bytes, name->bytes, fmin(realConstrName->length, name->length)) == 0)
             return true;
@@ -360,7 +363,7 @@ int64_t runtimeIsConstr(Box* value, Box* constrName) {
 }
 
 int64_t runtimeCheckTag(Box* value, int64_t tag) {
-    DataValue* dv = value->value.ptr;
+    DataValue* dv = asDataValue(value);
     return dv->tag == tag;
 }
 
@@ -369,6 +372,7 @@ int64_t runtimeCheckTag(Box* value, int64_t tag) {
 
 Array* createArray(size_t size) {
     Array * array = gcMalloc(sizeof(Array) + sizeof(Box*) * size);
+    array->type = ARRAY;
     array->length = size;
     return array;
 }
@@ -385,15 +389,16 @@ Box* boxArray(size_t size, ...) {
     return box(ARRAY, array);
 }
 
-Box* __attribute__ ((pure)) makeString(char * str) {
+String* __attribute__ ((pure)) makeString(char * str) {
     size_t len = strlen(str);
     String* val = gcMalloc(sizeof(String) + len + 1);  // null terminated
+    val->type = STRING;
     val->length = len;
     strncpy(val->bytes, str, len);
-    return box(STRING, val);
+    return val;
 }
 
-Box* joinValues(int size, Box* values[], char* start, char* end) {
+String* joinValues(int size, Box* values[], char* start, char* end) {
     String* strings[size];
     int startLen = strlen(start);
     int endLen = strlen(end);
@@ -401,7 +406,7 @@ Box* joinValues(int size, Box* values[], char* start, char* end) {
 
     for (int i = 0; i < size; i++) {
         Box* elem = values[i];
-        String* value = unbox(STRING, toString(elem));
+        String* value = toString(elem);
         resultSize += value->length;
         strings[i] = value;
     }
@@ -414,12 +419,12 @@ Box* joinValues(int size, Box* values[], char* start, char* end) {
         if (i + 1 < size) strcat(result, ", ");
     }
     strcat(result, end);
-    Box* string = makeString(result);
+    String* string = makeString(result);
     free(result);
     return string;
 }
 
-Box* __attribute__ ((pure)) arrayToString(const Box* arrayValue)  {
+String* __attribute__ ((pure)) arrayToString(const Box* arrayValue)  {
     Array* array = unbox(ARRAY, arrayValue);
     if (array->length == 0) {
         return makeString("[]");
@@ -428,13 +433,14 @@ Box* __attribute__ ((pure)) arrayToString(const Box* arrayValue)  {
     }
 }
 
-Box* __attribute__ ((pure)) byteArrayToString(const Box* arrayValue)  {
+String* __attribute__ ((pure)) byteArrayToString(const Box* arrayValue)  {
     String* array = unbox(BYTEARRAY, arrayValue);
     if (array->length == 0) {
         return makeString("[]");
     } else {
         int len = 6 * array->length + 2 + 1; // max (4 + 2 (separator)) symbols per byte + [] + 0
         String* res = gcMalloc(sizeof(String) + len);
+        res->type = STRING;
         strcpy(res->bytes, "[");
         char buf[7];
         int curPos = 1;
@@ -446,32 +452,32 @@ Box* __attribute__ ((pure)) byteArrayToString(const Box* arrayValue)  {
         }
         strcpy(res->bytes + curPos, "]");
         res->length = curPos + 1;
-        return box(STRING, res);
+        return res;
     }
 }
 
 
 /* =============== Strings ============= */
 
-const Box* __attribute__ ((pure)) toString(const Box* value) {
+String* __attribute__ ((pure)) toString(const Box* value) {
     char buf[100]; // 100 chars is enough for all (c)
 
     const LaType* type = value->type;
     if (eqTypes(type, UNIT)) {
         return UNIT_STRING;
     } else if (eqTypes(type, BOOL)) {
-        return makeString(value->value.num == 0 ? "false" : "true");
+        return makeString(asBool(value)->num == 0 ? "false" : "true");
     } else if (eqTypes(type, INT)) {
-        snprintf(buf, 100, "%"PRId64, value->value.num);
+        snprintf(buf, 100, "%"PRId64, asInt(value)->num);
         return makeString(buf);}
     else if (eqTypes(type, BYTE)) {
-        snprintf(buf, 100, "%"PRId8, value->value.byte);
+        snprintf(buf, 100, "%"PRId8, asByte(value)->byte);
         return makeString(buf);
-    } else if (eqTypes(type, DOUBLE)) {
-        snprintf(buf, 100, "%12.9lf", value->value.dbl);
+    } else if (eqTypes(type, FLOAT64)) {
+        snprintf(buf, 100, "%12.9lf", asFloat(value)->dbl);
         return makeString(buf);
     } else if (eqTypes(type, STRING)) {
-        return value;
+        return asString(value);
     } else if (eqTypes(type, CLOSURE)) {
         return makeString("<func>");
     } else if (eqTypes(type, ARRAY)) {
@@ -479,15 +485,15 @@ const Box* __attribute__ ((pure)) toString(const Box* value) {
     } else if (eqTypes(type, BYTEARRAY)) {
         return byteArrayToString(value);
     } else if (eqTypes(type, REF)) {
-        DataValue* dataValue = value->value.ptr;
+        DataValue* dataValue = asDataValue(value);
         return toString(dataValue->values[0]);
     } else if (eqTypes(type, UNKNOWN)) {
-        String *name = (String *) value->value.ptr;
+        String *name = ((Unknown *) value)->error;
         printf("AAAA!!! Undefined identifier in toString %s\n", name->bytes);
         exit(1);
     } else {
         if (isUserType(value)) {
-            DataValue* dataValue = value->value.ptr;
+            DataValue* dataValue = asDataValue(value);
             Data* metaData = findDataType(type);
             Struct* constr = metaData->constructors[dataValue->tag];
             int64_t startlen = constr->name->length + 2; // ending 0 and possibly "(" if constructor has parameters
@@ -504,9 +510,9 @@ const Box* __attribute__ ((pure)) toString(const Box* value) {
     }
 }
 
-Box* concat(Box* arrayString) {
+String* concat(Box* arrayString) {
     Array* array = unbox(ARRAY, arrayString);
-    Box* result = &EMPTY_STRING_BOX;
+    String* result = &EMPTY_STRING;
     if (array->length > 0) {
         int64_t len = 0;
         for (int64_t i = 0; i < array->length; i++) {
@@ -514,6 +520,7 @@ Box* concat(Box* arrayString) {
             len += s->length;
         }
         String* val = gcMalloc(sizeof(String) + len + 1); // +1 for null-termination
+        val->type = STRING;
         // val->length is 0, because gcMalloc allocates zero-initialized memory
         // it's also zero terminated, because gcMalloc allocates zero-initialized memory
         for (int64_t i = 0; i < array->length; i++) {
@@ -521,7 +528,7 @@ Box* concat(Box* arrayString) {
             memcpy(&val->bytes[val->length], s->bytes, s->length);
             val->length += s->length;
         }
-        result = box(STRING, val);
+        result = val;
     }
     return result;
 }
@@ -540,7 +547,7 @@ void initEnvironment(int64_t argc, char* argv[]) {
     ENV.argc = argc;
     Array* array = createArray(argc);
     for (int64_t i = 0; i < argc; i++) {
-        Box* s = makeString(argv[i]);
+        Box* s = (Box *) makeString(argv[i]);
         array->data[i] = s;
     }
     ENV.argv = box(ARRAY, array);
@@ -579,9 +586,13 @@ void initLascaRuntime(Runtime* runtime) {
     GC_expand_hp(4*1024*1024);
     RUNTIME = runtime;
     UNIT_STRING = makeString("()");
+    for (int i = 0; i < 256; i++) {
+        BYTE_ARRAY[i].type = BYTE;
+        BYTE_ARRAY[i].byte = i - 128;
+    }
     for (int i = 0; i < 100; i++) {
         INT_ARRAY[i].type = INT;
-        INT_ARRAY[i].value.num = i;
+        INT_ARRAY[i].num = i;
     }
     if (runtime->verbose) {
         printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %"PRId64

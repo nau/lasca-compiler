@@ -1,5 +1,7 @@
 #ifndef LASCA_H
 #define LASCA_H
+#define PCRE2_CODE_UNIT_WIDTH 8
+#include <pcre2.h>
 
 // Operators
 static const int64_t ADD = 10;
@@ -22,34 +24,69 @@ static const int64_t ZOR = 60;                           // x || y
 static const int64_t ZAND = 61;                          // x && y
 
 typedef struct {
-    int64_t length;
-    char bytes[];
-} String;
-
-typedef struct {
     const char* name;
 } LaType;
 
 typedef struct {
     const LaType* type;
-    union Value {
-        int8_t byte;
-        int64_t num;
-        double dbl;
-        void* ptr;
-    } value;
+    void* fields[];
 } Box;
 
+typedef Box Unit;
+
 typedef struct {
+    const LaType* type;
+    int8_t byte;
+} Byte;
+
+typedef struct {
+    const LaType* type;
+    int64_t num;
+} Int;
+
+typedef Int Bool;
+
+typedef struct {
+    const LaType* type;
+    double dbl;
+} Float64;
+
+typedef struct {
+    const LaType* type;
+    int64_t length;
+    char bytes[];
+} String;
+
+typedef struct {
+    const LaType* type;
     int64_t funcIdx;
     int64_t argc;
     Box** argv;
 } Closure;
 
 typedef struct {
+    const LaType* type;
     int64_t length;
     Box* data[];
 } Array;
+
+typedef struct {
+    const LaType* type;
+    int64_t tag;
+    Box* values[];
+} DataValue;
+
+typedef DataValue Option;
+
+typedef struct {
+    const LaType* type;
+    String* error;
+} Unknown;
+
+typedef struct {
+    const LaType* type;
+    pcre2_code *re;
+} Pattern;
 
 typedef struct {
     String* name;
@@ -94,25 +131,28 @@ typedef struct {
 } Runtime;
 
 typedef struct {
-    int64_t tag;
-    Box* values[];
-} DataValue;
-
-typedef struct {
     int64_t line;
     int64_t column;
 } Position;
 
-extern Box UNIT_SINGLETON;
-extern Box TRUE_SINGLETON;
-extern Box FALSE_SINGLETON;
-extern Box NONE;
+#define asBool(ptr) ((Bool*)ptr)
+#define asByte(ptr) ((Byte*)ptr)
+#define asInt(ptr) ((Int*)ptr)
+#define asFloat(ptr) ((Float64*)ptr)
+#define asString(ptr) ((String*)ptr)
+#define asDataValue(ptr) ((DataValue*)ptr)
+#define asClosure(ptr) ((Closure*)ptr)
+
+extern Unit UNIT_SINGLETON;
+extern Bool TRUE_SINGLETON;
+extern Bool FALSE_SINGLETON;
+extern DataValue NONE;
 // Primitive Types
 extern const LaType* UNIT   ;
 extern const LaType* BOOL   ;
 extern const LaType* BYTE   ;
 extern const LaType* INT    ;
-extern const LaType* DOUBLE ;
+extern const LaType* FLOAT64;
 extern const LaType* STRING ;
 extern const LaType* CLOSURE;
 extern const LaType* ARRAY  ;
@@ -123,16 +163,16 @@ extern const LaType* OPTION;
 
 bool eqTypes(const LaType* lhs, const LaType* rhs);
 void *gcMalloc(size_t s);
-Box* __attribute__ ((pure)) makeString(char * str);
+String* __attribute__ ((pure)) makeString(char * str);
 Box *box(const LaType* type_id, void *value);
-Box * __attribute__ ((pure)) boxInt(int64_t i);
-void * __attribute__ ((pure)) unbox(const LaType* expected, const Box* ti);
+Int* boxInt(int64_t i);
+void * unbox(const LaType* expected, const Box* ti);
 Box* runtimeApply(Box* val, int64_t argc, Box* argv[], Position pos);
-const Box* toString(const Box* value);
+String* toString(const Box* value);
 Box* println(const Box* val);
 Box* boxArray(size_t size, ...);
 Array* createArray(size_t size);
 const char * __attribute__ ((const)) typeIdToName(const LaType* typeId);
-Box* some(Box* value);
+DataValue* some(Box* value);
 
 #endif
