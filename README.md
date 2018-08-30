@@ -6,7 +6,7 @@ Lasca Language
 
 Lasca is Scala shifted towards Haskell.
 
-Lasca is a LLVM-based statically or dynamically typed strict functional programming language.
+Lasca is a LLVM-based statically or dynamically typed strict functional programming language. Simplified OCaml if you like.
 
 It has a 'dynamic' compilation mode, meaning instant code generation without compile time type checking/inference, allowing instant compilation/execution cycle, and more freedom dynamic languages give.
 
@@ -115,26 +115,6 @@ Compiler Modes
   Proves checked.
   Array bounds checks eliminated.
 
-Dev Cycle
----
-
-1. Prototyping
-  Dynamic mode.
-  Compiler warnings disabled.
-  Types are inferred as much as possible, compile-time type errors are ignored.
-  Whatever can be executed is executed, type errors are thrown at runtime.
-2. This should work now
-  Normal Mode.
-  Warnings are enabled.
-  IDE allows you to automatically fill type annotations, leaving '?'-holes where it's uncertain.
-  Warning if no test found for a function?
-3. The shit is done (CI mode)
-  Hardcore mode.
-  IDE suggests @pure, @total, @nothrow, IO annotations
-4. Want performance
-  Hardcore mode
-  IDE suggests places to help escape analysis etc.
-
 Type System
 ---
 
@@ -151,7 +131,7 @@ Consider [MultiCore Ocaml GC](http://kcsrk.info/multicore/gc/2017/07/06/multicor
 
 for now, use [Boehm conservative GC](http://www.hboehm.info/gc/)
 
-Syntax
+Other
 ---
 
 - indentation significant (i.e. Python, Haskell)
@@ -180,6 +160,7 @@ Syntax
 Install on Mac OS using Homebrew
 ---
 
+    brew install cmake llvm-hs/llvm/llvm-5.0 boehmgc pcre2
     brew install nau/lasca/lasca-compiler
 
 Setup LASCAPATH environment variable. Add this to your .bash_profile
@@ -191,6 +172,10 @@ Try it!
     cat "def main() = println("Hello Lasca!")" > hello.lasca
     lasca -e hello.lasca
     Hello Lasca!
+    
+Add bash completion config for lasca compiler options:
+
+    lasca --bash-completion-script lasca > $(brew --prefix)/etc/bash_completion.d/lasca    
 
 Build on Mac OS
 ---
