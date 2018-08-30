@@ -349,7 +349,7 @@ vardef f = do
     option TypeAny typeAscription
     reservedOp "="
     e <- expr
-    let refExpr = Apply meta (Ident meta (NS "Prelude" "Ref")) [e]
+    let refExpr = Apply meta (Ident meta (NS "Prelude" "Var")) [e]
     return (f (Name ident) refExpr)
 
 

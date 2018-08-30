@@ -25,7 +25,7 @@ const LaType _FLOAT64 = { .name = "Float" };
 const LaType _STRING  = { .name = "String" };
 const LaType _CLOSURE = { .name = "Closure" };
 const LaType _ARRAY   = { .name = "Array" };
-const LaType _REF     = { .name = "Ref" };
+const LaType _VAR     = { .name = "Var" };
 const LaType _BYTEARRAY     = { .name = "ByteArray" };
 const LaType _FILE_HANDLE   = { .name = "FileHandle" };
 const LaType _PATTERN = { .name = "Pattern" };
@@ -39,7 +39,7 @@ const LaType* FLOAT64 = &_FLOAT64;
 const LaType* STRING  = &_STRING;
 const LaType* CLOSURE = &_CLOSURE;
 const LaType* ARRAY   = &_ARRAY;
-const LaType* REF     = &_REF;
+const LaType* VAR     = &_VAR;
 const LaType* BYTEARRAY   = &_BYTEARRAY;
 const LaType* FILE_HANDLE = &_FILE_HANDLE;
 const LaType* PATTERN = &_PATTERN;
@@ -184,10 +184,10 @@ void * unbox(const LaType* expected, const Box* ti) {
 
 /* ==================== Runtime Ops ============== */
 
-Box* updateRef(DataValue* ref, Box* value) {
-    assert(eqTypes(ref->type, REF));
-    Box* oldValue = ref->values[0];
-    ref->values[0] = value;
+Box* writeVar(DataValue* var, Box* value) {
+    assert(eqTypes(var->type, VAR));
+    Box* oldValue = var->values[0];
+    var->values[0] = value;
     return oldValue;
 }
 
@@ -484,7 +484,7 @@ String* __attribute__ ((pure)) toString(const Box* value) {
         return arrayToString(value);
     } else if (eqTypes(type, BYTEARRAY)) {
         return byteArrayToString(value);
-    } else if (eqTypes(type, REF)) {
+    } else if (eqTypes(type, VAR)) {
         DataValue* dataValue = asDataValue(value);
         return toString(dataValue->values[0]);
     } else if (eqTypes(type, UNKNOWN)) {

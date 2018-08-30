@@ -339,7 +339,7 @@ delambdafyPhase ctx exprs = let
           where go e = delambdafyExpr e
 
 desugarAssignment expr = case expr of
-    Apply meta (Ident imeta ":=") [ref, value] -> Apply meta (Ident imeta (NS "Prelude" "updateRef")) [ref, value]
+    Apply meta (Ident imeta ":=") [var, value] -> Apply meta (Ident imeta (NS "Prelude" "writeVar")) [var, value]
     _ -> expr
 
 desugarUnaryMinus expr = case expr of

@@ -4,9 +4,9 @@ Pi = 3.141592653589793
 SolarMass = 4.0 * Pi * Pi
 DaysPerYear = 365.24
 
-data Body = Body(x: Ref Float, y: Ref Float, z: Ref Float, vx: Ref Float, vy: Ref Float, vz: Ref Float, mass: Float)
+data Body = Body(x: Var Float, y: Var Float, z: Var Float, vx: Var Float, vy: Var Float, vz: Var Float, mass: Float)
 
-def body(x, y, z, vx, vy, vz, mass) = Body(Ref(x), Ref(y), Ref(z), Ref(vx), Ref(vy), Ref(vz), mass)
+def body(x, y, z, vx, vy, vz, mass) = Body(Var(x), Var(y), Var(z), Var(vx), Var(vy), Var(vz), mass)
 
 Jupiter = body(
      4.84143144246472090e+00,                  -- x
@@ -64,14 +64,14 @@ def offsetMomentum(bodies: [Body]) = {
     for(0, 5, { i ->
         ibody = bodies[i];
         m = ibody.mass;
-        px := px.getRef + ibody.vx.getRef * m;
-        py := py.getRef + ibody.vy.getRef * m;
-        pz := pz.getRef + ibody.vz.getRef * m;
+        px := px.readVar + ibody.vx.readVar * m;
+        py := py.readVar + ibody.vy.readVar * m;
+        pz := pz.readVar + ibody.vz.readVar * m;
     });
     object = bodies[0];
-    object.vx := -px.getRef / SolarMass;
-    object.vy := -py.getRef / SolarMass;
-    object.vz := -pz.getRef / SolarMass;
+    object.vx := -px.readVar / SolarMass;
+    object.vy := -py.readVar / SolarMass;
+    object.vz := -pz.readVar / SolarMass;
 }
 
 def squared(x: Float, y: Float, z: Float) = x * x + y * y + z * z
@@ -82,27 +82,27 @@ def advance(bodies: [Body], dt) = {
         imass = ibody.mass;
         for(i + 1, 5, { j ->
             jbody = bodies[j];
-            dx = ibody.x.getRef - jbody.x.getRef;
-            dy = ibody.y.getRef - jbody.y.getRef;
-            dz = ibody.z.getRef - jbody.z.getRef;
+            dx = ibody.x.readVar - jbody.x.readVar;
+            dy = ibody.y.readVar - jbody.y.readVar;
+            dz = ibody.z.readVar - jbody.z.readVar;
             dSquared = squared(dx, dy, dz);
             distance = sqrt(dSquared);
             mag = dt / (dSquared * distance);
             jmass = jbody.mass;
-            ibody.vx := ibody.vx.getRef - dx * jmass * mag;
-            ibody.vy := ibody.vy.getRef - dy * jmass * mag;
-            ibody.vz := ibody.vz.getRef - dz * jmass * mag;
+            ibody.vx := ibody.vx.readVar - dx * jmass * mag;
+            ibody.vy := ibody.vy.readVar - dy * jmass * mag;
+            ibody.vz := ibody.vz.readVar - dz * jmass * mag;
 
-            jbody.vx := jbody.vx.getRef + dx * imass * mag;
-            jbody.vy := jbody.vy.getRef + dy * imass * mag;
-            jbody.vz := jbody.vz.getRef + dz * imass * mag;
+            jbody.vx := jbody.vx.readVar + dx * imass * mag;
+            jbody.vy := jbody.vy.readVar + dy * imass * mag;
+            jbody.vz := jbody.vz.readVar + dz * imass * mag;
         });
     });
     for(0, 5, { i ->
         body = bodies[i];
-        body.x := body.x.getRef + dt * body.vx.getRef;
-        body.y := body.y.getRef + dt * body.vy.getRef;
-        body.z := body.z.getRef + dt * body.vz.getRef;
+        body.x := body.x.readVar + dt * body.vx.readVar;
+        body.y := body.y.readVar + dt * body.vy.readVar;
+        body.z := body.z.readVar + dt * body.vz.readVar;
     });
     bodies
 }
@@ -111,18 +111,18 @@ def energy(bodies: [Body]) = {
     var e = 0.0;
     for(0, 5, { i ->
         body = bodies[i];
-        e := e.getRef + 0.5 * body.mass * squared(body.vx.getRef, body.vy.getRef, body.vz.getRef);
+        e := e.readVar + 0.5 * body.mass * squared(body.vx.readVar, body.vy.readVar, body.vz.readVar);
         for(i + 1, 5, { j ->
             from  = bodies[i];
             to    = bodies[j];
-            dx = from.x.getRef - to.x.getRef;
-            dy = from.y.getRef - to.y.getRef;
-            dz = from.z.getRef - to.z.getRef;
+            dx = from.x.readVar - to.x.readVar;
+            dy = from.y.readVar - to.y.readVar;
+            dz = from.z.readVar - to.z.readVar;
             distance = sqrt(squared(dx, dy, dz));
-            e := e.getRef - from.mass * to.mass / distance;
+            e := e.readVar - from.mass * to.mass / distance;
         });
     });
-    e.getRef
+    e.readVar
 }
 
 def calculate(bodies: [Body], i) = if i > 0 then calculate(advance(bodies, 0.01), i - 1) else bodies

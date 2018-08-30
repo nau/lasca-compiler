@@ -99,7 +99,7 @@ pattern TypeString   = TypeIdent "String"
 pattern TypeUnit     = TypeIdent "Unit"
 pattern TypeArray t  = TypeApply (TypeIdent "Array") [t]
 pattern TypeArrayInt = TypeArray TypeInt
-pattern TypeRef a    = TypeApply (TypeIdent "Ref") [a]
+pattern TypeRef a    = TypeApply (TypeIdent "Var") [a]
 
 isAny (TypeIdent "Any") = True
 isAny _ = False

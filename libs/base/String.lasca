@@ -115,8 +115,8 @@ def codePointAt(s: String, index: Int): Int = {
     var i = 0;
     var result = -1;
     iterate(s, { char -> 
-        if i.getRef < index then {
-            i := i.getRef + 1;
+        if i.readVar < index then {
+            i := i.readVar + 1;
             true;
         }
         else {
@@ -124,15 +124,15 @@ def codePointAt(s: String, index: Int): Int = {
             false;
         }
     });
-    if result.getRef == -1 then die("Index is out of range: ${index}") else result.getRef;
+    if result.readVar == -1 then die("Index is out of range: ${index}") else result.readVar;
 }
 
 def ord(s: String) = codePointAt(s, 0)
 
 def foldl(s: String, zero: a, f: a -> Int -> a): a = {
     var acc = zero;
-    iterate(s, { char -> acc := f(acc.getRef, char); true });
-    acc.getRef
+    iterate(s, { char -> acc := f(acc.readVar, char); true });
+    acc.readVar
 }
 
 def codePointCount(s: String): Int = foldl(s, 0, { len, c -> len + 1})
@@ -140,20 +140,20 @@ def codePointCount(s: String): Int = foldl(s, 0, { len, c -> len + 1})
 def graphemeCount(s: String): Int = {
     var count = 0;
     graphemeIterate(s, { g -> 
-        count := count.getRef + 1; 
+        count := count.readVar + 1; 
         true
     });
-    count.getRef
+    count.readVar
 }
 
 def compareLength(s: String, length: Int): Int = {
     var i = 0;
     var result = 0;
     iterate(s, { char -> 
-        i := i.getRef + 1;
-        i.getRef <= length
+        i := i.readVar + 1;
+        i.readVar <= length
     });
-    runtimeCompare(i.getRef, length);
+    runtimeCompare(i.readVar, length);
 }
 
 def length(s) = codePointCount(s)

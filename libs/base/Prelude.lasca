@@ -20,7 +20,7 @@ extern def runtimeCompare(lhs: a, rhs: a): Int = "runtimeCompare"
 extern def intToByte(i: Int): Byte = "intToByte"
 extern def byteToInt(i: Byte): Int = "byteToInt"
 
-data Ref a = Ref(getRef: a)
+data Var a = Var(readVar: a)
 
 data FileHandle
 
@@ -28,7 +28,7 @@ extern def openFile(filename: String, mode: String): FileHandle = "lascaOpenFile
 extern def readFile(filename: String): String = "lascaReadFile"
 extern def writeFile(filename: String, string: String): Unit = "lascaWriteFile"
 
-extern def updateRef(ref: Ref a, value: a): Ref a = "updateRef"
+extern def writeVar(ref: Var a, value: a): Var a = "writeVar"
 
 extern def getCwd(): String = "lascaGetCwd"
 extern def chdir(path: String): Option String = "lascaChdir"
