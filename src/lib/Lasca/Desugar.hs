@@ -45,7 +45,6 @@ data DesugarPhaseState = DesugarPhaseState {
     _outers :: Map Name Type.Type,
     _usedVars :: Set Name,
     _syntacticAst :: [Expr],
-    _renames :: Map Name Name,
     _freshId :: Int
 } deriving (Show)
 makeLenses ''DesugarPhaseState
@@ -57,7 +56,6 @@ emptyDesugarPhaseState = DesugarPhaseState {
     _outers = Map.empty,
     _usedVars = Set.empty,
     _syntacticAst = [],
-    _renames = Map.empty,
     _freshId = 1
 }
 
@@ -73,7 +71,7 @@ transform transformer exprs = sequence [transformExpr transformer expr | expr <-
 transformExpr transformer expr = case expr of
     expr@(Ident _ n) -> do
         usedVars %= Set.insert n
-        return expr
+        transformer expr
     Array meta exprs -> do
         exprs' <- mapM go exprs
         return $ Array meta exprs'
@@ -137,7 +135,14 @@ transformExpr transformer expr = case expr of
 
   where go e = transformExpr transformer e
 
-extractFunction meta name args expr = do
+rename :: MonadState DesugarPhaseState m => Name -> Name -> Expr -> m Expr
+rename oldName newName expr = transformExpr transformer expr
+  where transformer expr = case expr of
+            Ident m name | name == oldName -> return $ Ident m newName
+            _ -> return expr
+
+extractFunction :: MonadState DesugarPhaseState m => Meta -> Maybe Name -> Name -> [Arg] -> Expr -> m Expr
+extractFunction meta oldName name args expr = do
     state <- get
     let nms = _modNames state
     let syntactic = _syntacticAst state
@@ -148,7 +153,10 @@ extractFunction meta name args expr = do
     let enclosedArgTypes = map (\n -> _outers state Map.! n) usedOuterVars
     let (funcName', nms') = uniqueName (nameToBS name) nms
     let funcName = Name $ Encoding.decodeUtf8 funcName'
-    let (lam, t) = curryLambda meta (enclosedArgs ++ args) expr
+    expr' <- case oldName of
+                Nothing -> return expr
+                Just old -> rename old funcName expr
+    let (lam, t) = curryLambda meta (enclosedArgs ++ args) expr'
     let meta' = meta `S.withType` t
     let func = S.Let True meta' funcName TypeAny lam EmptyExpr
     modify (\s -> s { _modNames = nms', _syntacticAst = syntactic ++ [func] })
@@ -159,20 +167,9 @@ extractFunction meta name args expr = do
 {-
   Only basic lambda lifting. Buggy as hell.
   Lifted function renaming is wrong in some cases of shadowing. FIXME
-  Only simple inner functions are lifted. FIXME
   Inner function can be self recursive.
   Inner functions can't be mutually recursive. FIXME
   Only define before use semantics.  FIXME: allow mutual recursion
-  Doesn't support passing enclosed arguments to inner recursive functions: FIXME
-  def outer() =
-      a = 1
-      def fact(n) = if n == 1 then a else n * fact(n - 1)
-      fact(2)
-  Should be rewritten as:
-  def outer_fact($a, n) = if n == 1 then $a else n * fact($a, n - 1)
-  def outer() =
-        a = 1
-        outer_fact(a, 2)
 -}
 lambdaLiftPhase ctx exprs = let
         (desugared, st) = runState (mapM lambdaLiftExpr exprs) emptyDesugarPhaseState
@@ -182,10 +179,8 @@ lambdaLiftPhase ctx exprs = let
     where
       lambdaLiftExpr expr = case expr of
           Ident meta name -> do
-              renames <- gets _renames
-              let n = Map.findWithDefault name name renames
-              usedVars %= Set.insert n
-              return $ Ident meta n
+              usedVars %= Set.insert name
+              return $ Ident meta name
           Array meta exprs -> do
               exprs' <- mapM go exprs
               return $ Array meta exprs'
@@ -205,14 +200,11 @@ lambdaLiftPhase ctx exprs = let
                   return $ Case p e
               return (Match meta expr1 cases1)
           (Let False meta n tpe e body) -> do
-              oldRenames <- gets _renames
               case typeOf e of
                 TypeFunc a b -> locals %= Map.insert n a
                 _ -> locals %= Map.insert n TypeAny
-              renames %= Map.delete n
               e' <- go e
               body' <- go body
-              renames .= oldRenames
               return (Let False meta n tpe e' body')
           l@(Lam m a@(Arg n t) e) -> do
               oldOuters <- gets _outers
@@ -252,18 +244,16 @@ lambdaLiftPhase ctx exprs = let
                   _  -> do  oldOuters <- gets _outers
                             oldUsedVars <- gets _usedVars
                             oldLocals <- gets _locals
-                            oldRenames <- gets _renames
                             modify (\s -> s {
                                 _functionStack = name : (_functionStack s),
                                 _outers = Map.union (_outers s) (_locals s),
                                 _locals = argNames } )
                             stack <- gets _functionStack
                             let fullName = Name $ T.intercalate "_" (map nameToText . reverse $ stack)
-                            renames %= Map.insert name fullName
                             e' <- go e1
-                            r <- extractFunction meta fullName args e'
+                            r <- extractFunction meta (Just name) fullName args e'
                             body' <- go body
-                            modify (\s  -> s {_outers = oldOuters, _locals = oldLocals, _renames = oldRenames})
+                            modify (\s  -> s {_outers = oldOuters, _locals = oldLocals})
                             return (Let False meta name tpe r body')
 
               functionStack %= tail
@@ -318,7 +308,7 @@ delambdafyPhase ctx exprs = let
               locals .= r
               e' <- go e
               let fullName = Name $ T.intercalate "_" (map nameToText . reverse $ Name "lambda" : stack)
-              res <- extractFunction m fullName args e'
+              res <- extractFunction m Nothing fullName args e'
               modify (\s  -> s {_outers = oldOuters, _locals = oldLocals})
 
               return res
