@@ -181,7 +181,7 @@ def capitalize(s: String): String = match compareLength(s, 1) {
     0 -> chr(charToUpper(ord(s))) -- toUpper a single code point
     _ -> {
         array = s.codePoints;
-        setIndex(array, 0, charToUpper(getIndex(array, 0)));
+        setIndex(array, 0, charToUpper(array[0]));
         fromCharArray(array);
     }
 }

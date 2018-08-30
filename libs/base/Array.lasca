@@ -11,7 +11,7 @@ extern def init(n: Int, f: Int -> a): Array a = "arrayInit"
 def foreachgo(array, f, i) = {
     len = length(array);
     if i < len then {
-        f(getIndex(array, i)); foreachgo(array, f, i + 1)
+        f(array[i]); foreachgo(array, f, i + 1)
     } else ()
 }
 
@@ -26,7 +26,7 @@ def range(start: Int, end: Int, step: Int): Array Int = {
 def transformGo(array, f, i) = {
     len = length(array);
     if i < len then {
-        setIndex(array, i, f(i, getIndex(array, i)));
+        setIndex(array, i, f(i, array[i]));
         transformGo(array, f, i + 1)
     } else ()
 }
@@ -40,7 +40,7 @@ def testArray() = {
     b = makeArray(10, "b");
     c = init(5, { i -> i.toString });
     d = range(2, 8, 3);
-    setIndex(a, 2, getIndex(b, 1));
+    setIndex(a, 2, b[1]);
     println(toString(a));
     println(toString(b));
     println(toString(c));
