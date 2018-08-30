@@ -42,8 +42,27 @@ def logicalOperations() = {
     a = not false and false or true; println(a.toString);
 }
 
+def innerFunctions() = {
+    a = 3;
+    def inner1(x) = x + a; -- check capturing outer vars
+    println("${inner1(2)}");
+
+    def inner2(x) = {
+        inner2 = 1;
+        x + 5 + inner2; -- check shadowing
+    };
+    println("${inner2(10)}");
+
+    def inner3(x) = if x == 0 then 0 else {
+        println(toString(x));
+        inner3(x - 1); -- inner recursive
+    };
+    inner3(3);
+}
+
 def main() = {
     testLiterals();
     bitwiseOperations();
     logicalOperations();
+    innerFunctions();
 }

@@ -127,8 +127,8 @@ transformExpr transformer expr = case expr of
             _outers = Map.empty,
             _usedVars = Set.empty } )
         e' <- go e1
-        body' <- go body
         functionStack %= tail
+        body' <- go body
         let (lam, _) = curryLambda meta args e'
         transformer (Let True meta name tpe lam body')
     e -> transformer e
@@ -137,9 +137,11 @@ transformExpr transformer expr = case expr of
 
 rename :: MonadState DesugarPhaseState m => Name -> Name -> Expr -> m Expr
 rename oldName newName expr = transformExpr transformer expr
-  where transformer expr = case expr of
-            Ident m name | name == oldName -> return $ Ident m newName
-            _ -> return expr
+  where transformer expr = do
+            locs <- gets _locals
+            case expr of
+                Ident m name | name == oldName && not (name `Map.member` locs) -> return $ Ident m newName
+                _ -> return expr
 
 extractFunction :: MonadState DesugarPhaseState m => Meta -> Maybe Name -> Name -> [Arg] -> Expr -> m Expr
 extractFunction meta oldName name args expr = do
@@ -166,7 +168,6 @@ extractFunction meta oldName name args expr = do
 
 {-
   Only basic lambda lifting. Buggy as hell.
-  Lifted function renaming is wrong in some cases of shadowing. FIXME
   Inner function can be self recursive.
   Inner functions can't be mutually recursive. FIXME
   Only define before use semantics.  FIXME: allow mutual recursion
@@ -231,13 +232,14 @@ lambdaLiftPhase ctx exprs = let
               let argNames = Map.fromList argsWithTypes
               outerFuncStack <- gets _functionStack
 
-              res <- case outerFuncStack of
+              case outerFuncStack of
                   [] -> do  modify (\s -> s {
                                 _functionStack = [name],
                                 _locals = argNames,
                                 _outers = Map.empty,
                                 _usedVars = Set.empty } )
                             e' <- go e1
+                            functionStack %= tail
                             body' <- go body
                             let (lam, _) = curryLambda meta args e'
                             return (Let True meta name tpe lam body')
@@ -247,17 +249,16 @@ lambdaLiftPhase ctx exprs = let
                             modify (\s -> s {
                                 _functionStack = name : (_functionStack s),
                                 _outers = Map.union (_outers s) (_locals s),
+                                _usedVars = Set.empty,
                                 _locals = argNames } )
                             stack <- gets _functionStack
                             let fullName = Name $ T.intercalate "_" (map nameToText . reverse $ stack)
                             e' <- go e1
                             r <- extractFunction meta (Just name) fullName args e'
+                            modify (\s  -> s {_outers = oldOuters, _usedVars = oldUsedVars, _locals = oldLocals})
+                            functionStack %= tail
                             body' <- go body
-                            modify (\s  -> s {_outers = oldOuters, _locals = oldLocals})
                             return (Let False meta name tpe r body')
-
-              functionStack %= tail
-              return res
           e -> return e
           where go e = lambdaLiftExpr e
 
