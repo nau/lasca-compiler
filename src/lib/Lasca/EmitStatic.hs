@@ -173,14 +173,45 @@ cgenApplyUnOp ctx this@(S.Apply meta op@(S.Ident _ "unary-") [expr]) = do
     let (TypeFunc realExprType _) = S.typeOf op
     lexpr <- resolveBoxing anyTypeVar realExprType lexpr'
     let returnType = S.typeOf this
-    res <- case S.typeOf expr of
-        TypeInt   -> sub (constIntOp 0) lexpr >>= resolveBoxing returnType anyTypeVar
-        TypeFloat -> fsub (constFloatOp 0.0) lexpr >>= resolveBoxing returnType anyTypeVar
-        t -> error ("Only TypeInt | TypeFloat supported but given " ++ show t)
---    Debug.traceM $ printf "Doing unary- %s with type %s" (show this) (show $ S.typeOf op)
-    return res
+    let tpe = S.typeOf expr
+    let minus = fromMaybe (error ("Only Byte | Int | Int16 | Int32 | Float supported but given " ++ show tpe)) (getArithOp 11 tpe)
+    let llvmType = externalTypeMapping tpe
+    let zero = case tpe of
+            TypeByte -> C.Int 8 0
+            TypeInt16 -> C.Int 16 0
+            TypeInt32 -> C.Int 32 0
+            TypeInt -> C.Int 64 0
+            TypeFloat -> C.Float (F.Double 0.0)
+            _ -> error $ printf "%s: Unexpected type in unaryOp - %s" (S.showPosition meta) (show tpe)
+    r <- instrTyped llvmType $ (constOp zero) `minus` lexpr
+    resolveBoxing returnType anyTypeVar r
 cgenApplyUnOp ctx e = error ("cgenApplyUnOp should only be called on Apply, but called on" ++ show e)
 
+getArithOp code tpe = case (code, tpe) of
+    (10, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.Add False False lhs rhs []
+    (10, TypeFloat) -> Just $ \lhs rhs -> I.FAdd I.NoFastMathFlags lhs rhs []
+    (11, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.Sub False False lhs rhs []
+    (11, TypeFloat) -> Just $ \lhs rhs -> I.FSub I.NoFastMathFlags lhs rhs []
+    (12, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.Mul False False lhs rhs []
+    (12, TypeFloat) -> Just $ \lhs rhs -> I.FMul I.NoFastMathFlags lhs rhs []
+    (13, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.SDiv True lhs rhs []
+    (13, TypeFloat) -> Just $ \lhs rhs -> I.FDiv I.NoFastMathFlags lhs rhs []
+    _ -> Nothing
+
+getCmpOp code tpe = case (code, tpe) of
+    (42, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.ICmp IPred.EQ lhs rhs []
+    (42, TypeFloat) -> Just $ \lhs rhs -> I.FCmp FP.OEQ lhs rhs []
+    (43, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.ICmp IPred.NE lhs rhs []
+    (43, TypeFloat) -> Just $ \lhs rhs -> I.FCmp FP.ONE lhs rhs []
+    (44, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.ICmp IPred.SLT lhs rhs []
+    (44, TypeFloat) -> Just $ \lhs rhs -> I.FCmp FP.OLT lhs rhs []
+    (45, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.ICmp IPred.SLE lhs rhs []
+    (45, TypeFloat) -> Just $ \lhs rhs -> I.FCmp FP.OLE lhs rhs []
+    (46, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.ICmp IPred.SGE lhs rhs []
+    (46, TypeFloat) -> Just $ \lhs rhs -> I.FCmp FP.OGE lhs rhs []
+    (47, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.ICmp IPred.SGT lhs rhs []
+    (47, TypeFloat) -> Just $ \lhs rhs -> I.FCmp FP.OGT lhs rhs []
+    _ -> Nothing
 
 cgenApplyBinOp ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) = do
     llhs' <- cgen ctx lhs
@@ -192,29 +223,22 @@ cgenApplyBinOp ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) = do
     let (realLhsType, realRhsType) = case S.typeOf op of
                 TypeFunc realLhsType (TypeFunc realRhsType _) -> (realLhsType, realRhsType)
                 _ -> error ("cgenApplyBinOp: Should not happen: " ++ show this ++ show (S.typeOf op))
---    let realLhsType = TypeInt
---    let realRhsType = TypeInt
     llhs <- resolveBoxing anyTypeVar realLhsType llhs'
     lrhs <- resolveBoxing anyTypeVar realRhsType lrhs'
     let code = fromMaybe (error ("Couldn't find binop " ++ show fn)) (Map.lookup fn binops)
 --    Debug.traceM $ printf "%s: %s <==> %s: %s, code %s" (show lhsType) (show realLhsType) (show rhsType) (show realRhsType) (show code)
-    res <- case (code, realLhsType) of
-        (10, TypeInt) -> add llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (11, TypeInt) -> sub llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (12, TypeInt) -> mul llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (13, TypeInt) -> Codegen.div llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (42, TypeInt) -> intCmpBoxed IPred.EQ llhs lrhs
-        (43, TypeInt) -> intCmpBoxed IPred.NE llhs lrhs
-        (44, TypeInt) -> intCmpBoxed IPred.SLT llhs lrhs
-        (45, TypeInt) -> intCmpBoxed IPred.SLE llhs lrhs
-        (46, TypeInt) -> intCmpBoxed IPred.SGE llhs lrhs
-        (47, TypeInt) -> intCmpBoxed IPred.SGT llhs lrhs
-        (10, TypeFloat) -> fadd llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (11, TypeFloat) -> fsub llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (12, TypeFloat) -> fmul llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (13, TypeFloat) -> fdiv llhs lrhs >>= resolveBoxing returnType anyTypeVar
-        (c, t)  -> error $ printf "%s: Unsupported binary operation %s, code %s, type %s" (show $ S.exprPosition this) (S.printExprWithType this) (show c) (show t)
-    return res
+    let llvmType = externalTypeMapping realLhsType
+    res <- case code of
+        _ | code >= 10 && code <= 13 -> do
+            let op = fromMaybe (error $ printf "cgenApplyBinOp not defined operation code %d for type %s" code (show realLhsType)) (getArithOp code realLhsType)
+            instrTyped llvmType (llhs `op` lrhs)
+        _ | code >= 42 && code <= 47 -> do
+            let llvmType = externalTypeMapping realLhsType
+            let op = fromMaybe (error $ printf "cgenApplyBinOp not defined operation code %d for type %s" code (show realLhsType)) (getCmpOp code realLhsType)
+            r <- instrTyped llvmType (llhs `op` lrhs)
+            instrTyped intType $ I.ZExt r intType []
+        c  -> error $ printf "%s: Unsupported binary operation %s, code %s, type %s" (show $ S.exprPosition this) (S.printExprWithType this) (show c) (show realLhsType)
+    resolveBoxing returnType anyTypeVar res
 cgenApplyBinOp ctx e = error ("cgenApplyBinOp should only be called on Apply, but called on" ++ show e)
 
 cgenApply ctx meta expr args = do
@@ -286,10 +310,14 @@ resolveBoxing declaredType instantiatedType expr =
         (TypeByte, TVar _) -> boxByte expr
         (TypeBool, TVar _) -> boxBool expr
         (TypeInt, TVar _) -> boxInt expr
+        (TypeInt16, TVar _) -> boxInt16 expr
+        (TypeInt32, TVar _) -> boxInt32 expr
         (TypeFloat, TVar _) -> boxFloat64 expr
         (TVar _, TypeByte) -> unboxByte expr
         (TVar _, TypeBool) -> unboxBool expr
         (TVar _, TypeInt) -> unboxInt expr
+        (TVar _, TypeInt16) -> unboxInt16 expr
+        (TVar _, TypeInt32) -> unboxInt32 expr
         (TVar _, TypeFloat) -> unboxFloat64 expr
         (TVar _, TVar _) -> return expr
         (l, r) -> do

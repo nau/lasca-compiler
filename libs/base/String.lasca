@@ -8,15 +8,15 @@ import Array
 
 -- length of UTF-8 encoded byte string
 extern def bytesCount(s: String): Int = "bytesLength"
-extern def chr(codePoint: Int): String = "codePointToString"
-extern def fromCharArray(chars: Array Int): String = "codePointsToString"
-extern def charToLower(codePoint: Int): Int = "utf8proc_tolower"
-extern def charToUpper(codePoint: Int): Int = "utf8proc_toupper"
-extern def charToTitle(codePoint: Int): Int = "utf8proc_totitle"
-extern def isValidUnicodeScalar(codePoint: Int): Bool = "utf8proc_codepoint_valid"
-extern def iterate(s: String, f: Int -> Bool): Unit = "codePointsIterate"
+extern def chr(codePoint: Int32): String = "codePointToString"
+extern def fromCharArray(chars: Array Int32): String = "codePointsToString"
+extern def charToLower(codePoint: Int32): Int32 = "utf8proc_tolower"
+extern def charToUpper(codePoint: Int32): Int32 = "utf8proc_toupper"
+extern def charToTitle(codePoint: Int32): Int32 = "utf8proc_totitle"
+extern def isValidUnicodeScalar(codePoint: Int32): Bool = "utf8proc_codepoint_valid"
+extern def iterate(s: String, f: Int32 -> Bool): Unit = "codePointsIterate"
 extern def graphemeIterate(s: String, f: String -> Bool): Unit = "graphemesIterate"
-extern def utf8procCategory(c: Int): Int = "utf8proc_category"
+extern def utf8procCategory(c: Int32): Int = "utf8proc_category"
 
 data GeneralCategory
         = UppercaseLetter       -- ^ Lu: Letter, Uppercase
@@ -50,7 +50,7 @@ data GeneralCategory
         | PrivateUse            -- ^ Co: Other, Private Use
         | NotAssigned           -- ^ Cn: Other, Not Assigned
 
-def generalCategory(char: Int): GeneralCategory = match utf8procCategory(char) {
+def generalCategory(char: Int32): GeneralCategory = match utf8procCategory(char) {
     0  -> NotAssigned
     1  -> UppercaseLetter
     2  -> LowercaseLetter
@@ -109,11 +109,11 @@ def endsWith(s: String, suffix: String): Bool = {
     matchRegex(p, s);
 }
 
-def foreach(s: String, f: Int -> a): Unit = iterate(s, { char -> f(char); true })
+def foreach(s: String, f: Int32 -> a): Unit = iterate(s, { char -> f(char); true })
 
-def codePointAt(s: String, index: Int): Int = {
+def codePointAt(s: String, index: Int): Int32 = {
     var i = 0;
-    var result = -1;
+    var result = -1.intToInt32;
     iterate(s, { char -> 
         if i.readVar < index then {
             i := i.readVar + 1;
@@ -124,12 +124,12 @@ def codePointAt(s: String, index: Int): Int = {
             false;
         }
     });
-    if result.readVar == -1 then die("Index is out of range: ${index}") else result.readVar;
+    if result.readVar == -1.intToInt32 then die("Index is out of range: ${index}") else result.readVar;
 }
 
 def ord(s: String) = codePointAt(s, 0)
 
-def foldl(s: String, zero: a, f: a -> Int -> a): a = {
+def foldl(s: String, zero: a, f: a -> Int32 -> a): a = {
     var acc = zero;
     iterate(s, { char -> acc := f(acc.readVar, char); true });
     acc.readVar
@@ -158,13 +158,13 @@ def compareLength(s: String, length: Int): Int = {
 
 def length(s) = codePointCount(s)
 
-def codePoints(s: String): Array Int = {
-    array = makeArray(s.codePointCount, 0);
+def codePoints(s: String): Array Int32 = {
+    array = makeArray(s.codePointCount, 0.intToInt32);
     foldl(s, 0, { idx, char -> setIndex(array, idx, char); idx + 1 });
     array;
 }
 
-def map(s: String, f: Int -> Int): String = {
+def map(s: String, f: Int32 -> Int32): String = {
     array = s.codePoints;
     transform(array, { i, cp -> f(cp) });
     fromCharArray(array);
@@ -186,10 +186,13 @@ def capitalize(s: String): String = match compareLength(s, 1) {
     }
 }
 
-def isDigit(char: Int) = (char - 48) <= 9
-def isLetter(char: Int) = let cat = utf8procCategory(char) in 1 <= cat and cat <= 5 -- Letters
-def isNumeric(char: Int) = let cat = utf8procCategory(char) in 9 <= cat and cat <= 11 -- Numbers
-def isSpace(char: Int) = char == 32 or 9 <= char and char <= 13 or char == 133 or 160 <= char and runtimeCompare(generalCategory(char), Space) == 0
+def isDigit(char: Int32) = (char - 48.intToInt32) <= 9.intToInt32
+def isLetter(char: Int32) = let cat = utf8procCategory(char) in 1 <= cat and cat <= 5 -- Letters
+def isNumeric(char: Int32) = let cat = utf8procCategory(char) in 9 <= cat and cat <= 11 -- Numbers
+def isSpace(char: Int32) = char == 32.intToInt32 
+    or 9.intToInt32 <= char and char <= 13.intToInt32 
+    or char == 133.intToInt32 
+    or 160.intToInt32 <= char and runtimeCompare(generalCategory(char), Space) == 0
 
 def main() = {
     empty = "";
@@ -214,14 +217,14 @@ def main() = {
     println("replace ${replace(test, symbol, upperT)}");
     println("${test} startsWith ${upperT}: ${startsWith(test, upperT)}, endsWith ${symbol}: ${endsWith(test, symbol)}");
     println("${test} startsWith ${symbol}: ${startsWith(test, symbol)}, endsWith ${upperT}: ${endsWith(test, upperT)}");
-    println("Code point 123 is valid Unicode Scalar: ${isValidUnicodeScalar(123)}");
-    println("Surrogate code point 55296 is valid Unicode Scalar: ${isValidUnicodeScalar(55296)}");
-    println("Code point 1114112 is valid Unicode Scalar: ${isValidUnicodeScalar(1114112)}");
+    println("Code point 123 is valid Unicode Scalar: ${isValidUnicodeScalar(123.intToInt32)}");
+    println("Surrogate code point 55296 is valid Unicode Scalar: ${isValidUnicodeScalar(55296.intToInt32)}");
+    println("Code point 1114112 is valid Unicode Scalar: ${isValidUnicodeScalar(1114112.intToInt32)}");
     println("0 is digit: ${isDigit("0".ord)}, 9 is digit: ${isDigit("9".ord)}, 'a' is digit: ${isDigit("a".ord)}");
     gc = { s -> generalCategory(ord(s)) };
     println("${gc("1")} ${gc("a")} ${gc("A")} ${gc(" ")} ${gc("≈")} ${gc("€")}");
     println("å is letter ${isLetter("å".ord)}, 1 is letter ${isLetter("1".ord)}");
     println("å is numeric ${isNumeric("å".ord)}, 1 is numeric ${isNumeric("1".ord)}, ¾ is numeric ${isNumeric("¾".ord)}");
     sp = { s -> isSpace(s.ord) };
-    println("' ' is space ${sp(" ")}, '\\t' is space ${sp("\t")}, '\\r' is space ${sp("\r")}, '\\n' is space ${sp("\n")}, 'U+0085' is space ${isSpace(133)}");
+    println("' ' is space ${sp(" ")}, '\\t' is space ${sp("\t")}, '\\r' is space ${sp("\r")}, '\\n' is space ${sp("\n")}, 'U+0085' is space ${isSpace(133.intToInt32)}");
 }

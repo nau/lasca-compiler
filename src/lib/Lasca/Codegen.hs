@@ -369,20 +369,6 @@ inttoptr op = instr (IntToPtr op ptrType [])
 {-# INLINE inttoptr #-}
 
 -- Effects
-add lhs rhs = instr $ Add False False lhs rhs []
-sub lhs rhs = instr $ Sub False False lhs rhs []
-mul lhs rhs = instr $ Mul False False lhs rhs []
-div lhs rhs = instr $ SDiv True lhs rhs []
-intCmp op lhs rhs = do
-    bool <- instr $ ICmp op lhs rhs []
-    instr $ ZExt bool intType []
-intCmpBoxed op lhs rhs = do
-    res <- intCmp op lhs rhs
-    callFn (funcType ptrType [intType]) "boxBool" [res]
-fadd lhs rhs = instr $ FAdd NoFastMathFlags lhs rhs []
-fsub lhs rhs = instr $ FSub NoFastMathFlags lhs rhs []
-fmul lhs rhs = instr $ FMul NoFastMathFlags lhs rhs []
-fdiv lhs rhs = instr $ FDiv NoFastMathFlags lhs rhs []
 
 call :: Operand -> [Operand] -> Codegen Operand
 call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
@@ -485,6 +471,8 @@ laTypeStructType = T.StructureType False [ptrType]
 boxStructOfType boxedType = T.StructureType False [ptrType, boxedType]
 
 boxedIntType = boxStructOfType intType
+boxedInt16Type = boxStructOfType T.i16
+boxedInt32Type = boxStructOfType T.i32
 boxedBoolType = boxStructOfType intType
 boxedByteType = boxStructOfType T.i8
 boxedFloatType = boxStructOfType T.double

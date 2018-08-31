@@ -70,7 +70,7 @@ Box* codePointsIterate(Box* string, Box* f) {
         } if (codepoint == 0) {
             return &UNIT_SINGLETON;
         } else {
-            Box* cp = (Box*) boxInt(codepoint);
+            Box* cp = (Box*) boxInt32(codepoint);
             Box* res = runtimeApply(f, 1, &cp, pos);
             cont = asBool(unbox(BOOL, res))->num;
         }
@@ -118,11 +118,10 @@ Box* graphemesIterate(Box* string, Box* f) {
 }
 
 // FIXME make it int32_t
-String* codePointToString(int64_t codePoint) {
-    utf8proc_int32_t cp = (utf8proc_int32_t) codePoint; // TODO remove cast
-    assert(utf8proc_codepoint_valid(cp));
+String* codePointToString(int32_t codePoint) {
+    assert(utf8proc_codepoint_valid(codePoint));
     utf8proc_uint8_t buf[5];
-    utf8proc_ssize_t idx = utf8proc_encode_char(cp, buf);
+    utf8proc_ssize_t idx = utf8proc_encode_char(codePoint, buf);
     buf[idx] = 0; // \0 termination
     return makeString((char *) buf);
 }
@@ -133,7 +132,7 @@ Box* codePointsToString(Box* array) {
     String* string = gcMalloc(sizeof(String) + len + 1);
     utf8proc_ssize_t offset = 0;
     for (size_t i = 0; i < arr->length; i++) {
-        offset += utf8proc_encode_char(asInt(arr->data[i])->num, (utf8proc_uint8_t *) &string->bytes[offset]);
+        offset += utf8proc_encode_char(asInt32(arr->data[i])->num, (utf8proc_uint8_t *) &string->bytes[offset]);
     }
     string->type = STRING;
     string->bytes[offset] = 0;
@@ -164,10 +163,18 @@ int64_t runtimeCompare(Box* lhs, Box* rhs) {
         result =
                 asInt(lhs)->num < asInt(rhs)->num ? -1 :
                 asInt(lhs)->num == asInt(rhs)->num ? 0 : 1;
+    } else if (eqTypes(lhs->type, INT16)) {
+        result =
+                asInt16(lhs)->num < asInt16(rhs)->num ? -1 :
+                asInt16(lhs)->num == asInt16(rhs)->num ? 0 : 1;
+    } else if (eqTypes(lhs->type, INT32)) {
+        result =
+                asInt32(lhs)->num < asInt32(rhs)->num ? -1 :
+                asInt32(lhs)->num == asInt32(rhs)->num ? 0 : 1;                
     } else if (eqTypes(lhs->type, FLOAT64)) {
         result =
-                asFloat(lhs)->dbl < asFloat(rhs)->dbl ? -1 :
-                asFloat(lhs)->dbl == asFloat(rhs)->dbl ? 0 : 1;
+                asFloat(lhs)->num < asFloat(rhs)->num ? -1 :
+                asFloat(lhs)->num == asFloat(rhs)->num ? 0 : 1;
     } else if (eqTypes(lhs->type, STRING)) {
         result = strcmp(asString(lhs)->bytes, asString(rhs)->bytes); // TODO do proper unicode stuff
     } else {

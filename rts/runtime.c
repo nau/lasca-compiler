@@ -20,6 +20,8 @@ const LaType _UNKNOWN = { .name = "Unknown" };
 const LaType _UNIT    = { .name = "Unit" };
 const LaType _BOOL    = { .name = "Bool" };
 const LaType _BYTE    = { .name = "Byte" };
+const LaType _INT16   = { .name = "Int16" };
+const LaType _INT32   = { .name = "Int32" };
 const LaType _INT     = { .name = "Int" };
 const LaType _FLOAT64 = { .name = "Float" };
 const LaType _STRING  = { .name = "String" };
@@ -34,6 +36,8 @@ const LaType* UNKNOWN = &_UNKNOWN;
 const LaType* UNIT    = &_UNIT;
 const LaType* BOOL    = &_BOOL;
 const LaType* BYTE    = &_BYTE;
+const LaType* INT16   = &_INT16;
+const LaType* INT32   = &_INT32;
 const LaType* INT     = &_INT;
 const LaType* FLOAT64 = &_FLOAT64;
 const LaType* STRING  = &_STRING;
@@ -64,7 +68,7 @@ Byte BYTE_ARRAY[256];
 Int INT_ARRAY[100];
 Float64 FLOAT64_ZERO = {
     .type = &_FLOAT64,
-    .dbl = 0.0
+    .num = 0.0
 };
 
 DataValue NONE = {
@@ -141,11 +145,25 @@ Int* boxInt(int64_t i) {
     }
 }
 
+Int16* boxInt16(int16_t i) {
+    Int16* ti = gcMallocAtomic(sizeof(Int16));
+    ti->type = INT16;
+    ti->num = i;
+    return ti;    
+}
+
+Int32* boxInt32(int32_t i) {
+    Int32* ti = gcMallocAtomic(sizeof(Int32));
+    ti->type = INT32;
+    ti->num = i;
+    return ti;    
+}
+
 Float64* __attribute__ ((pure)) boxFloat64(double i) {
     if (i == 0.0) return &FLOAT64_ZERO;
     Float64* ti = gcMallocAtomic(sizeof(Float64));
     ti->type = FLOAT64;
-    ti->dbl = i;
+    ti->num = i;
     return ti;
 }
 
@@ -193,7 +211,8 @@ Box* writeVar(DataValue* var, Box* value) {
 
 static int64_t isBuiltinType(const Box* v) {
     const LaType* t = v->type;
-    return eqTypes(t, UNIT) || eqTypes(t, BOOL) || eqTypes(t, BYTE) || eqTypes(t, INT) || eqTypes(t, FLOAT64)
+    return eqTypes(t, UNIT) || eqTypes(t, BOOL) || eqTypes(t, BYTE) 
+      || eqTypes(t, INT) || eqTypes(t, INT16) || eqTypes(t, INT32) || eqTypes(t, FLOAT64)
       || eqTypes(t, STRING) || eqTypes(t, CLOSURE) || eqTypes(t, ARRAY) || eqTypes(t, BYTEARRAY);
 }
 
@@ -202,8 +221,10 @@ static int64_t isUserType(const Box* v) {
 }
 
 #define DO_OP(op) if (eqTypes(lhs->type, INT)) { result = (Box*) boxInt(asInt(lhs)->num op asInt(rhs)->num); } \
-                  else if (eqTypes(lhs->type, BYTE)) { result = (Box*) boxByte(asByte(lhs)->byte op asByte(rhs)->byte); } \
-                  else if (eqTypes(lhs->type, FLOAT64)) { result = (Box*) boxFloat64(asFloat(lhs)->dbl op asFloat(rhs)->dbl); } \
+                  else if (eqTypes(lhs->type, BYTE)) { result = (Box*) boxByte(asByte(lhs)->num op asByte(rhs)->num); } \
+                  else if (eqTypes(lhs->type, INT32)) { result = (Box*) boxInt32(asInt32(lhs)->num op asInt32(rhs)->num); } \
+                  else if (eqTypes(lhs->type, INT16)) { result = (Box*) boxInt16(asInt16(lhs)->num op asInt16(rhs)->num); } \
+                  else if (eqTypes(lhs->type, FLOAT64)) { result = (Box*) boxFloat64(asFloat(lhs)->num op asFloat(rhs)->num); } \
                   else { \
                         printf("AAAA!!! Type mismatch! Expected Int or Float for op but got %s\n", typeIdToName(lhs->type)); exit(1); }
 
@@ -211,10 +232,14 @@ static int64_t isUserType(const Box* v) {
                       result = (Box*) boxBool (asBool(lhs)->num op asBool(rhs)->num); } \
                    else if (eqTypes(lhs->type, INT)) { \
                       result = (Box*) boxBool (asInt(lhs)->num op asInt(rhs)->num); } \
+                   else if (eqTypes(lhs->type, INT32)) { \
+                      result = (Box*) boxBool (asInt32(lhs)->num op asInt32(rhs)->num); } \
+                   else if (eqTypes(lhs->type, INT16)) { \
+                      result = (Box*) boxBool (asInt16(lhs)->num op asInt16(rhs)->num); } \
                    else if (eqTypes(lhs->type, BYTE)) { \
-                      result = (Box*) boxBool (asByte(lhs)->byte op asByte(rhs)->byte); } \
+                      result = (Box*) boxBool (asByte(lhs)->num op asByte(rhs)->num); } \
                    else if (eqTypes(lhs->type, FLOAT64)) { \
-                      result = (Box*) boxBool (asFloat(lhs)->dbl op asFloat(rhs)->dbl); } \
+                      result = (Box*) boxBool (asFloat(lhs)->num op asFloat(rhs)->num); } \
                    else { \
                       printf("AAAA!!! Type mismatch! Expected Bool, Int or Float but got %s\n", typeIdToName(lhs->type)); exit(1); \
                    }
@@ -250,8 +275,14 @@ Box* __attribute__ ((pure)) runtimeUnaryOp(int64_t code, Box* expr) {
         case 1:
             if (eqTypes(expr->type, INT)) {
                 result = (Box*) boxInt(-asInt(expr)->num);
+            } else if (eqTypes(expr->type, BYTE)) {
+                result = (Box*) boxByte(-asByte(expr)->num);
+            } else if (eqTypes(expr->type, INT32)) {
+                result = (Box*) boxInt32(-asInt32(expr)->num);    
+            } else if (eqTypes(expr->type, INT16)) {
+                result = (Box*) boxInt16(-asInt16(expr)->num);
             } else if (eqTypes(expr->type, FLOAT64)) {
-                result = (Box*) boxFloat64(-asFloat(expr)->dbl);
+                result = (Box*) boxFloat64(-asFloat(expr)->num);
             } else {
                 printf("AAAA!!! Type mismatch! Expected Int or Float for op but got %s\n", typeIdToName(expr->type));
                 exit(1);
@@ -469,12 +500,18 @@ String* __attribute__ ((pure)) toString(const Box* value) {
         return makeString(asBool(value)->num == 0 ? "false" : "true");
     } else if (eqTypes(type, INT)) {
         snprintf(buf, 100, "%"PRId64, asInt(value)->num);
-        return makeString(buf);}
-    else if (eqTypes(type, BYTE)) {
-        snprintf(buf, 100, "%"PRId8, asByte(value)->byte);
+        return makeString(buf);
+    } else if (eqTypes(type, INT16)) {
+        snprintf(buf, 100, "%"PRId16, asInt16(value)->num);
+        return makeString(buf);
+    } else if (eqTypes(type, INT32)) {
+        snprintf(buf, 100, "%"PRId32, asInt32(value)->num);
+        return makeString(buf);
+    } else if (eqTypes(type, BYTE)) {
+        snprintf(buf, 100, "%"PRId8, asByte(value)->num);
         return makeString(buf);
     } else if (eqTypes(type, FLOAT64)) {
-        snprintf(buf, 100, "%12.9lf", asFloat(value)->dbl);
+        snprintf(buf, 100, "%12.9lf", asFloat(value)->num);
         return makeString(buf);
     } else if (eqTypes(type, STRING)) {
         return asString(value);
@@ -565,6 +602,22 @@ int64_t byteToInt(int8_t n) {
     return (int64_t) n;
 }
 
+int16_t intToInt16(int64_t n) {
+    return (int16_t) n;
+}
+
+int64_t int16ToInt(int16_t n) {
+    return (int64_t) n;
+}
+
+int32_t intToInt32(int64_t n) {
+    return (int32_t) n;
+}
+
+int64_t int32ToInt(int32_t n) {
+    return (int64_t) n;
+}
+
 int64_t toInt(Box* s) {
     String* str = unbox(STRING, s);
   //  println(s);
@@ -588,7 +641,7 @@ void initLascaRuntime(Runtime* runtime) {
     UNIT_STRING = makeString("()");
     for (int i = 0; i < 256; i++) {
         BYTE_ARRAY[i].type = BYTE;
-        BYTE_ARRAY[i].byte = i - 128;
+        BYTE_ARRAY[i].num = i - 128;
     }
     for (int i = 0; i < 100; i++) {
         INT_ARRAY[i].type = INT;

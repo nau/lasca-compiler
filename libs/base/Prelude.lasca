@@ -19,6 +19,10 @@ extern def runtimeCompare(lhs: a, rhs: a): Int = "runtimeCompare"
 
 extern def intToByte(i: Int): Byte = "intToByte"
 extern def byteToInt(i: Byte): Int = "byteToInt"
+extern def intToInt16(i: Int): Int32 = "intToInt16"
+extern def int16ToInt(i: Int16): Int = "int16ToInt"
+extern def intToInt32(i: Int): Int32 = "intToInt32"
+extern def int32ToInt(i: Int32): Int = "int32ToInt"
 
 data Var a = Var(readVar: a)
 

@@ -92,6 +92,8 @@ infixr `TypeFunc`
 
 pattern TypeByte     = TypeIdent "Byte"
 pattern TypeInt      = TypeIdent "Int"
+pattern TypeInt16    = TypeIdent "Int16"
+pattern TypeInt32    = TypeIdent "Int32"
 pattern TypeFloat    = TypeIdent "Float"
 pattern TypeBool     = TypeIdent "Bool"
 pattern TypeAny      = TypeIdent "Any"
@@ -100,6 +102,10 @@ pattern TypeUnit     = TypeIdent "Unit"
 pattern TypeArray t  = TypeApply (TypeIdent "Array") [t]
 pattern TypeArrayInt = TypeArray TypeInt
 pattern TypeRef a    = TypeApply (TypeIdent "Var") [a]
+
+isIntegralType (TypeIdent t) | t `elem` ["Byte", "Int", "Int16", "Int32"] = True
+isIntegralType _ = False
+
 
 isAny (TypeIdent "Any") = True
 isAny _ = False

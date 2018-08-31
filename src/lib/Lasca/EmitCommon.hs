@@ -66,6 +66,8 @@ externalTypeMapping tpe = case tpe of
     TypeByte  -> T.i8
     TypeBool  -> intType
     TypeInt   -> intType
+    TypeInt16 -> T.i16
+    TypeInt32 -> T.i32
     TypeFloat -> T.double
     _         -> ptrType -- Dynamic mode
 
@@ -192,12 +194,20 @@ unboxBool expr = unboxDirect expr boxedBoolType
 unboxInt expr = unboxDirect expr boxedIntType
 {-# INLINE unboxInt #-}
 
+unboxInt16 :: AST.Operand -> Codegen AST.Operand
+unboxInt16 expr = unboxDirect expr boxedInt16Type
+
+unboxInt32 :: AST.Operand -> Codegen AST.Operand
+unboxInt32 expr = unboxDirect expr boxedInt32Type
+
 unboxFloat64 expr = unboxDirect expr boxedFloatType
 {-# INLINE unboxFloat64 #-}
 
 boxByte v = callBuiltin "boxByte" [v]
 boxBool v = callBuiltin "boxBool" [v] -- todo change to i1
 boxInt v = callBuiltin "boxInt" [v]
+boxInt16 v = callBuiltin "boxInt16" [v]
+boxInt32 v = callBuiltin "boxInt32" [v]
 boxFloat64 v = callBuiltin "boxFloat64" [v]
 unbox t v = callBuiltin "unbox" [t, v]
 unboxBoolDynamically v = do
@@ -248,7 +258,14 @@ boxClosure name mapping enclosedVars = do
 boolToInt True = 1
 boolToInt False = 0
 
-
+builtinConsts = 
+    [ "UNIT_SINGLETON", "UNIT", "_UNIT"
+    , "BOOL", "_BOOL", "BYTE", "_BYTE"
+    , "INT", "_INT", "FLOAT64", "_FLOAT64"
+    , "INT16", "_INT16", "INT32", "_INT32"
+    , "CLOSURE", "_CLOSURE"
+    , "ARRAY", "_ARRAY", "BYTEARRAY", "_BYTEARRAY"
+    , "_STRING", "STRING" ]
 
 builtinFuncs = do
   let external resType name params vararg attrs = (name, (resType, params, vararg, attrs))
@@ -259,6 +276,8 @@ builtinFuncs = do
     , external ptrType "boxError" [("n", ptrType)] False [FA.GroupID 0]
     , external ptrType "boxByte" [("d", intType)] False [FA.GroupID 0]
     , external ptrType "boxInt" [("d", intType)] False [FA.GroupID 0]
+    , external ptrType "boxInt16" [("d", intType)] False [FA.GroupID 0]
+    , external ptrType "boxInt32" [("d", intType)] False [FA.GroupID 0]
     , external ptrType "boxBool" [("d", intType)] False [FA.GroupID 0]
     , external ptrType "boxClosure" [("id", intType), ("argc", intType), ("argv", ptrType)] False []
     , external ptrType "boxFloat64" [("d", T.double)] False [FA.GroupID 0]
@@ -271,22 +290,7 @@ builtinFuncs = do
     ]
 
 declareStdFuncs = do
-    externalConst ptrType "UNIT_SINGLETON"
-    externalConst ptrType "UNIT"
-    externalConst ptrType "_UNIT"
-    externalConst ptrType "BOOL"
-    externalConst ptrType "_BOOL"
-    externalConst ptrType "BYTE"
-    externalConst ptrType "_BYTE"
-    externalConst ptrType "INT"
-    externalConst ptrType "_INT"
-    externalConst ptrType "DOUBLE"
-    externalConst ptrType "_FLOAT64"
-    externalConst ptrType "CLOSURE"
-    externalConst ptrType "_CLOSURE"
-    externalConst ptrType "ARRAY"
-    externalConst ptrType "_ARRAY"
-    externalConst ptrType "_STRING"
+    forM_ builtinConsts (externalConst ptrType) -- declare constants
     forM (Map.toList builtinFuncs) $ \(name, args) -> do
         let (restype, params, vararg, attrs) = args
         external restype name params vararg attrs

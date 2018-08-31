@@ -36,7 +36,7 @@ typedef Box Unit;
 
 typedef struct {
     const LaType* type;
-    int8_t byte;
+    int8_t num;
 } Byte;
 
 typedef struct {
@@ -44,11 +44,21 @@ typedef struct {
     int64_t num;
 } Int;
 
+typedef struct {
+    const LaType* type;
+    int16_t num;
+} Int16;
+
+typedef struct {
+    const LaType* type;
+    int32_t num;
+} Int32;
+
 typedef Int Bool;
 
 typedef struct {
     const LaType* type;
-    double dbl;
+    double num;
 } Float64;
 
 typedef struct {
@@ -138,6 +148,8 @@ typedef struct {
 #define asBool(ptr) ((Bool*)ptr)
 #define asByte(ptr) ((Byte*)ptr)
 #define asInt(ptr) ((Int*)ptr)
+#define asInt16(ptr) ((Int16*)ptr)
+#define asInt32(ptr) ((Int32*)ptr)
 #define asFloat(ptr) ((Float64*)ptr)
 #define asString(ptr) ((String*)ptr)
 #define asDataValue(ptr) ((DataValue*)ptr)
@@ -151,6 +163,8 @@ extern DataValue NONE;
 extern const LaType* UNIT   ;
 extern const LaType* BOOL   ;
 extern const LaType* BYTE   ;
+extern const LaType* INT16  ;
+extern const LaType* INT32  ;
 extern const LaType* INT    ;
 extern const LaType* FLOAT64;
 extern const LaType* STRING ;
@@ -166,6 +180,8 @@ void *gcMalloc(size_t s);
 String* __attribute__ ((pure)) makeString(char * str);
 Box *box(const LaType* type_id, void *value);
 Int* boxInt(int64_t i);
+Int16* boxInt16(int16_t i);
+Int32* boxInt32(int32_t i);
 void * unbox(const LaType* expected, const Box* ti);
 Box* runtimeApply(Box* val, int64_t argc, Box* argv[], Position pos);
 String* toString(const Box* value);
