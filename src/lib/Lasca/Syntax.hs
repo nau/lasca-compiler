@@ -230,6 +230,7 @@ data Ctx = Context {
 makeLenses ''Ctx
 
 isStaticMode ctx = mode (_lascaOpts ctx) == Static
+isDynamicMode ctx = mode (_lascaOpts ctx) == Dynamic
 
 builtinFunctions :: Map Name Type
 builtinFunctions = Map.fromList [

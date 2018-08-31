@@ -71,6 +71,19 @@ externalTypeMapping tpe = case tpe of
     TypeFloat -> T.double
     _         -> ptrType -- Dynamic mode
 
+autoBoxedTypes = Set.fromList [TypeBool, TypeByte, TypeInt, TypeInt16, TypeInt32, TypeFloat]
+
+typeToLaTypeConstantName tpe = case tpe of
+    TypeBool -> "_BOOL"    
+    TypeByte -> "_BYTE"
+    TypeInt -> "_INT"
+    TypeInt16 -> "_INT16"
+    TypeInt32 -> "_INT32"
+    TypeFloat -> "_FLOAT64"
+    _ -> error $ printf "Unimplemented for type %s" (show tpe)
+
+typeToLaTypeRef tpe = constRef ptrType $ typeToLaTypeConstantName tpe
+    
 externArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
 externArgsToSig = map (\(S.Arg name tpe) -> ((nameToSBS name), externalTypeMapping tpe))
 

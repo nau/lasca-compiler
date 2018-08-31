@@ -7,6 +7,8 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as Encoding
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
+import Data.Set (Set)
+import qualified Data.Set as Set
 import qualified Debug.Trace as Debug
 
 import Control.Monad.State
@@ -18,7 +20,7 @@ import Lasca.EmitCommon
 import qualified Lasca.EmitStatic as EmitStatic
 import Lasca.Syntax
 
-genExternalFuncWrapper f@(Let True meta name returnType lam _) = do
+genExternalFuncWrapper ctx f@(Let True meta name returnType lam _) = do
     modState <- get
     let codeGenResult = codeGen modState
         blocks = createBlocks codeGenResult
@@ -33,13 +35,17 @@ genExternalFuncWrapper f@(Let True meta name returnType lam _) = do
         let argTypes = map (\(Arg n t) -> t) externArgs
         largs <- forM externArgs $ \(Arg n tpe) -> do
             let argName = nameToSBS n
+            let ref = typeToLaTypeRef tpe
+            when (isDynamicMode ctx && tpe `Set.member` autoBoxedTypes) $ do
+                r <- callBuiltin "unbox" [constOp ref, localPtr argName] -- check primitive types
+                return ()
             EmitStatic.resolveBoxing EmitStatic.anyTypeVar tpe (localPtr argName)
         let retType = externalTypeMapping returnType
 --        Debug.traceM $ printf "%s genExternalFuncWrapper %s, retType %s" (show name) (show $ externFuncLLvmType f) (show retType)
         res <- instrTyped retType $ callFnIns (externFuncLLvmType f) (T.unpack externName) largs
         wrapped <- EmitStatic.resolveBoxing returnType EmitStatic.anyTypeVar res
         ret wrapped
-genExternalFuncWrapper other = error $ "genExternalFuncWrapper got " ++ (show other)
+genExternalFuncWrapper ctx other = error $ "genExternalFuncWrapper got " ++ (show other)
 
 
 collectGlobals ctx exprs = do
@@ -61,7 +67,7 @@ codegenTop ctx cgen topExpr = case topExpr of
         if meta ^. isExternal then do
             let (Literal _ (StringLit externName)) = body
             external (externalTypeMapping tpe) (textToSBS externName) (externArgsToSig args) False []
-            genExternalFuncWrapper f
+            genExternalFuncWrapper ctx f
         else do
             modState <- get
             let codeGenResult = codeGen modState
