@@ -156,20 +156,20 @@ curryLambda meta args expr = foldr (\arg@(Arg n t) (body, tpe) ->
 instance DebugPrint Expr where
     printExprWithType expr = case expr of
         Literal _ l -> show l
-        Ident meta n -> printf "%s: %s" (show n) (show meta)
-        Apply meta f e -> printf "%s(%s): %s" (printExprWithType f) (intercalate "," $ map printExprWithType e) (show meta)
+        Ident meta n -> printf "%s" (show n)
+        Apply meta f e -> printf "%s(%s)" (printExprWithType f) (intercalate "," $ map printExprWithType e)
         Lam _ a e -> printf "{ %s -> %s }\n" (printExprWithType a) (printExprWithType e)
         Select _ e f -> printf "%s.%s" (printExprWithType e) (printExprWithType f)
         Match _ e cs -> printf "match %s {\n%s}\n" (printExprWithType e) (show cs)
         Closure meta f args -> printf "Closure %s(%s)" (show f) (intercalate "," $ map show args)
-        Let False meta n t e b -> printf "%s = %s;\n%s: %s" (show n) (printExprWithType e) (printExprWithType b) (show meta)
+        Let False meta n t e b -> printf "%s = %s;\n%s" (show n) (printExprWithType e) (printExprWithType b)
         Let True meta f t lam _ | _isExternal meta -> do
             let (args, _) = uncurryLambda lam
             printf "extern def %s(%s): %s\n" (show f) (intercalate "," $ map printExprWithType args) (show t)
         Let True meta f t lam next -> do
             let (args, b) = uncurryLambda lam
-            printf "--  %s : %s\ndef %s(%s): %s = %s;\n%s" (show f) (show meta) (show f) (intercalate "," $ map printExprWithType args) (show t) (printExprWithType b) (printExprWithType next)
-        If meta c t f -> printf "if %s then {\n%s \n} else {\n%s\n}: %s" (printExprWithType c) (printExprWithType t) (printExprWithType f) (show meta)
+            printf "def %s(%s): %s = %s;\n%s" (show f) (intercalate "," $ map printExprWithType args) (show t) (printExprWithType b) (printExprWithType next)
+        If meta c t f -> printf "if %s then {\n%s \n} else {\n%s\n}" (printExprWithType c) (printExprWithType t) (printExprWithType f)
         Array _ es -> printf "[%s]" (intercalate "," $ map printExprWithType es)
         Data _ n tvars cs -> printf "data %s %s = %s\n" (show n) (show tvars) (intercalate "\n| " $ map show cs)
         Module meta name -> printf "module %s" (show name)

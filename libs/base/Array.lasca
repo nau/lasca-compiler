@@ -8,6 +8,11 @@ extern def setIndex(array: Array a, i: Int, value: a): Array a = "arraySetIndex"
 extern def length(array: Array a): Int = "arrayLength"
 extern def init(n: Int, f: Int -> a): Array a = "arrayInit"
 
+def map(array, f) = {
+    len = length(array);
+    init(len, { idx -> f(array[idx]) });
+}
+
 def foreachgo(array, f, i) = {
     len = length(array);
     if i < len then {

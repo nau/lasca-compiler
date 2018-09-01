@@ -27,3 +27,4 @@ String_DecimalNumber String_LowercaseLetter String_UppercaseLetter String_Space 
 å is letter true, 1 is letter false
 å is numeric false, 1 is numeric true, ¾ is numeric true
 ' ' is space true, '\t' is space true, '\r' is space true, '\n' is space true, 'U+0085' is space true
+1, 2

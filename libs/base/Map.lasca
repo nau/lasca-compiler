@@ -125,6 +125,20 @@ def delete(self, k) = match self {
     }
 }
 
+def mapWithKey(self, f) = match self {
+    Tip -> Tip
+    Bin(sx, kx, x, l, r) -> let x1 = f(kx, x) in Bin(sx, kx, x1, mapWithKey(l, f), mapWithKey(r, f))
+}
+
+def foreachWithKey(self, f): Unit = match self {
+    Tip -> Tip
+    Bin(sx, kx, x, l, r) -> {
+        f(kx, x);
+        foreachWithKey(l, f);
+        foreachWithKey(r, f);
+    }
+}
+
 def test(i, m) = if i > 0 then test(i - 1, insert(m, i, i.toString)) else m
 
 def main() = {

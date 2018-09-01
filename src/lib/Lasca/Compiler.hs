@@ -60,10 +60,10 @@ runPhases opts filename = do
     typed <- if mode opts == Static
              then typerPhase opts ctx filename desugared
              else return desugared
-    when (printAst opts) $ putStrLn $ intercalate "\n" (map printExprWithType exprs)
     let desugared2 = patmatPhase ctx typed
     let desugared3 = lambdaLiftPhase ctx desugared2 -- must be after typechecking
-    let desugared4 = delambdafyPhase ctx desugared3 -- must be after typechecking
+    let !desugared4 = delambdafyPhase ctx desugared3 -- must be after typechecking
+    when (printAst opts) $ putStrLn $ intercalate "\n" (map printExprWithType desugared4)
     let mod = codegenPhase ctx filename desugared4 mainFunctionName
     if exec opts then do
         when (verboseMode opts) $ putStrLn "Running JIT"

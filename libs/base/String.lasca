@@ -186,6 +186,26 @@ def capitalize(s: String): String = match compareLength(s, 1) {
     }
 }
 
+def joinGo(i: Int, arr: [String], len: Int, separator: String, strings: [String]) = {
+    if i < len then {
+        j = 2 * i;
+        setIndex(arr, j - 1, separator);
+        setIndex(arr, j, strings[i]);
+        joinGo(i + 1, arr, len, separator, strings);
+    } else ();
+}
+
+def join(separator: String, strings: [String]): String = match Array.length(strings) {
+    0 -> ""
+    1 -> strings[0]
+    len -> {
+        arr = Array.makeArray(2 * len - 1, "");
+        setIndex(arr, 0, strings[0]);
+        joinGo(1, arr, len, separator, strings);
+        concat(arr);
+    }
+}
+
 def isDigit(char: Int32) = (char - 48.intToInt32) <= 9.intToInt32
 def isLetter(char: Int32) = let cat = utf8procCategory(char) in 1 <= cat and cat <= 5 -- Letters
 def isNumeric(char: Int32) = let cat = utf8procCategory(char) in 9 <= cat and cat <= 11 -- Numbers
@@ -227,4 +247,5 @@ def main() = {
     println("å is numeric ${isNumeric("å".ord)}, 1 is numeric ${isNumeric("1".ord)}, ¾ is numeric ${isNumeric("¾".ord)}");
     sp = { s -> isSpace(s.ord) };
     println("' ' is space ${sp(" ")}, '\\t' is space ${sp("\t")}, '\\r' is space ${sp("\r")}, '\\n' is space ${sp("\n")}, 'U+0085' is space ${isSpace(133.intToInt32)}");
+    println(String.join(", ", ["1", "2"]));
 }

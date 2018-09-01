@@ -1,0 +1,44 @@
+import Map
+import Array
+import String
+
+data JValue 
+    = JNull
+    | JNum(n: Float) 
+    | JString(s: String) 
+    | JBool(v: Bool) 
+    | JArray(v: [JValue]) 
+    | JObject(v: Map String JValue)
+
+def jsonToString(js: JValue) = match js {
+    JNum(n) -> toString(n)
+    JBool(v) -> toString(v)
+    JArray(v) -> {
+        values = Array.map(v, jsonToString);
+        toString(values);
+    }
+    JNull -> "null"
+    JString(v) -> "\"${v}\""
+    JObject(m) -> {
+        if Map.isEmpty(m) then "{}" else {
+            res = Array.makeArray(m.size, "");
+            var idx = 0;
+            Map.foreachWithKey(m, { k, v -> 
+                setIndex(res, idx.readVar, "\"${k}\": ${jsonToString(v)}");
+                idx := idx.readVar + 1;
+            });
+            s = String.join(", ", res);
+            "{ ${s} }"
+        };
+    }
+}
+
+def parseJson(str) = {
+    "asdf"
+}
+
+def main() = {
+    m = Map.insert(Map.single("message", JArray([JString(""), JNull])), "empty", JBool(true));
+    js = JArray([JNum(-3.14), JString("Pen Pineapple Apple Pen"), JObject(m), JObject(Map.empty()), JArray([])]);
+    println(jsonToString(js));
+}
