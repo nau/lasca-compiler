@@ -131,7 +131,7 @@ intType :: Type
 intType = T.i64
 
 boolType :: Type
-boolType = IntegerType 1
+boolType = intType
 
 ptrType = T.ptr T.i8
 
@@ -339,7 +339,7 @@ constFloat i = C.Float (F.Double i)
 constFloatOp = constOp . constFloat
 
 constByte b = constOp (C.Int 8 b)
-constBool b = C.Int 1 (if b then 1 else 0)
+constBool b = C.Int 64 (if b then 1 else 0)
 constTrue = constOp (constBool True)
 constFalse = constOp (constBool False)
 
