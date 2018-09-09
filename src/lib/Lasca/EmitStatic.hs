@@ -233,10 +233,9 @@ cgenApplyBinOp ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) = do
             let op = fromMaybe (error $ printf "cgenApplyBinOp not defined operation code %d for type %s" code (show realLhsType)) (getArithOp code realLhsType)
             instrTyped llvmType (llhs `op` lrhs)
         _ | code >= 42 && code <= 47 -> do
-            let llvmType = externalTypeMapping realLhsType
             let op = fromMaybe (error $ printf "cgenApplyBinOp not defined operation code %d for type %s" code (show realLhsType)) (getCmpOp code realLhsType)
             r <- instrTyped llvmType (llhs `op` lrhs)
-            instrTyped intType $ I.ZExt r intType []
+            instrTyped boolType $ I.ZExt r boolType []
         c  -> error $ printf "%s: Unsupported binary operation %s, code %s, type %s" (show $ S.exprPosition this) (S.printExprWithType this) (show c) (show realLhsType)
     resolveBoxing returnType anyTypeVar res
 cgenApplyBinOp ctx e = error ("cgenApplyBinOp should only be called on Apply, but called on" ++ show e)

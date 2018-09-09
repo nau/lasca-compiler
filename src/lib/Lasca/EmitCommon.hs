@@ -64,7 +64,7 @@ externalTypeMapping :: Type -> AST.Type
 --externalTypeMapping (TypeIdent "Unit") = T.void
 externalTypeMapping tpe = case tpe of
     TypeByte  -> T.i8
-    TypeBool  -> intType
+    TypeBool  -> boolType
     TypeInt   -> intType
     TypeInt16 -> T.i16
     TypeInt32 -> T.i32
@@ -229,7 +229,7 @@ unboxBoolDynamically v = do
 
 
 
-boxLit (S.BoolLit b) meta = boxBool (constIntOp (boolToInt b))
+boxLit (S.BoolLit b) meta = boxBool (constOp $ constByte (boolToInt b))
 boxLit (S.IntLit  n) meta = boxInt (constIntOp n)
 boxLit (S.FloatLit  n) meta = boxFloat64 (constFloatOp n)
 boxLit S.UnitLit meta = return $ constOp $ constRef ptrType "UNIT_SINGLETON"
@@ -291,7 +291,7 @@ builtinFuncs = do
     , external ptrType "boxInt" [("d", intType)] False [FA.GroupID 0]
     , external ptrType "boxInt16" [("d", T.i16)] False [FA.GroupID 0]
     , external ptrType "boxInt32" [("d", T.i32)] False [FA.GroupID 0]
-    , external ptrType "boxBool" [("d", intType)] False [FA.GroupID 0]
+    , external ptrType "boxBool" [("d", boolType)] False [FA.GroupID 0]
     , external ptrType "boxClosure" [("id", intType), ("argc", intType), ("argv", ptrType)] False []
     , external ptrType "boxFloat64" [("d", T.double)] False [FA.GroupID 0]
     , external ptrType "boxArray" [("size", intType)] True [FA.GroupID 0]

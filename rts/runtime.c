@@ -117,7 +117,7 @@ Box *box(const LaType* type_id, void *value) {
     return ti;
 }
 
-Bool* __attribute__ ((pure)) boxBool(int64_t i) {
+Bool* __attribute__ ((pure)) boxBool(int8_t i) {
     switch (i) {
         case 0: return &FALSE_SINGLETON; break;
         default: return &TRUE_SINGLETON; break;
@@ -381,7 +381,7 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
     return (Box*) boxError(&UNIMPLEMENTED_SELECT);
 }
 
-int64_t runtimeIsConstr(Box* value, Box* constrName) {
+int8_t runtimeIsConstr(Box* value, Box* constrName) {
     if (isUserType(value)) {
         String* name = unbox(STRING, constrName);
         Data* data = findDataType(value->type);
@@ -393,7 +393,7 @@ int64_t runtimeIsConstr(Box* value, Box* constrName) {
     return false;
 }
 
-int64_t runtimeCheckTag(Box* value, int64_t tag) {
+int8_t runtimeCheckTag(Box* value, int64_t tag) {
     DataValue* dv = asDataValue(value);
     return dv->tag == tag;
 }

@@ -54,7 +54,7 @@ typedef struct {
     int32_t num;
 } Int32;
 
-typedef Int Bool;
+typedef Byte Bool;
 
 typedef struct {
     const LaType* type;
@@ -137,7 +137,7 @@ typedef struct {
 typedef struct {
     Functions* functions;
     Types* types;
-    int64_t verbose;
+    int8_t verbose;
 } Runtime;
 
 typedef struct {

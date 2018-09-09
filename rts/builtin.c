@@ -159,7 +159,15 @@ int64_t runtimeCompare(Box* lhs, Box* rhs) {
         exit(1);
     }
     int64_t result = 0;
-    if (eqTypes(lhs->type, BOOL) || eqTypes(lhs->type, INT)) {
+    if (eqTypes(lhs->type, BOOL)) {
+        result =
+                asBool(lhs)->num < asBool(rhs)->num ? -1 :
+                asBool(lhs)->num == asBool(rhs)->num ? 0 : 1;
+    } else if (eqTypes(lhs->type, BYTE)) {
+        result =
+                asByte(lhs)->num < asByte(rhs)->num ? -1 :
+                asByte(lhs)->num == asByte(rhs)->num ? 0 : 1;                
+    } else if (eqTypes(lhs->type, INT)) {
         result =
                 asInt(lhs)->num < asInt(rhs)->num ? -1 :
                 asInt(lhs)->num == asInt(rhs)->num ? 0 : 1;
@@ -372,7 +380,7 @@ Pattern* lascaCompileRegex(Box* ptrn) {
     return boxedRe;
 }
 
-int64_t lascaMatchRegex(Box* ptrn, Box* string) {
+int8_t lascaMatchRegex(Box* ptrn, Box* string) {
     pcre2_code *re = ((Pattern*) unbox(PATTERN, ptrn))->re;
     String* subject = unbox(STRING, string);
     pcre2_match_data *match_data = pcre2_match_data_create_from_pattern(re, NULL);
@@ -458,11 +466,11 @@ Option* getEnv(Box* name) {
     return some((Box*) makeString(res));
 }
 
-int64_t setEnv(Box* name, Box* value, int64_t replace) {
+int64_t setEnv(Box* name, Box* value, int8_t replace) {
     String* nm = unbox(STRING, name);
     String* v = unbox(STRING, value);
     return setenv(nm->bytes, v->bytes, replace);
-    }
+}
 
 int64_t unsetEnv(Box* name) {
     String* nm = unbox(STRING, name);

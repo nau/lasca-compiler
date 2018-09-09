@@ -131,7 +131,7 @@ intType :: Type
 intType = T.i64
 
 boolType :: Type
-boolType = intType
+boolType = T.i8
 
 ptrType = T.ptr T.i8
 
@@ -327,6 +327,8 @@ constNullPtrOp = constOp constNullPtr
 
 constInt :: Int -> C.Constant
 constInt = constInt64
+constByte  b = C.Int  8 (toInteger b)
+constInt16 i = C.Int 16 (toInteger i)
 constInt32 i = C.Int 32 (toInteger i)
 constInt64 i = C.Int 64 (toInteger i)
 
@@ -338,8 +340,7 @@ constInt64Op i = constOp (C.Int 64 (toInteger i))
 constFloat i = C.Float (F.Double i)
 constFloatOp = constOp . constFloat
 
-constByte b = constOp (C.Int 8 b)
-constBool b = C.Int 64 (if b then 1 else 0)
+constBool b = C.Int 8 (if b then 1 else 0)
 constTrue = constOp (constBool True)
 constFalse = constOp (constBool False)
 
@@ -449,7 +450,6 @@ createCString :: Text -> (C.Constant, Int)
 createCString s = (C.Array T.i8 bytes, len)
   where
     bytestring = Encoding.encodeUtf8 s
-    constByte b = C.Int 8 (toInteger b)
     bytes = map constByte (ByteString.unpack bytestring ++ [fromInteger 0])
     len = ByteString.length bytestring + 1
 
@@ -473,7 +473,7 @@ boxStructOfType boxedType = T.StructureType False [ptrType, boxedType]
 boxedIntType = boxStructOfType intType
 boxedInt16Type = boxStructOfType T.i16
 boxedInt32Type = boxStructOfType T.i32
-boxedBoolType = boxStructOfType intType
+boxedBoolType = boxStructOfType boolType
 boxedByteType = boxStructOfType T.i8
 boxedFloatType = boxStructOfType T.double
 
