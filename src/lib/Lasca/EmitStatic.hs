@@ -88,7 +88,7 @@ cgen ctx (S.Ident meta name) = do
     --       Debug.trace ("Local " ++ show name)
             load x
         Nothing | name `Map.member` S._globalFunctions ctx -> boxClosure name mapping []
-                | name `Map.member` S._globalVals ctx -> load (global ptrType (nameToSBS name))
+                | name `Map.member` S._globalVals ctx -> load (globalOp ptrType (nameToSBS name))
                 | otherwise -> boxError (nameToText name)
 cgen ctx (S.Literal meta l) = do
 --  Debug.traceM $ "Generating literal " ++ show l ++ " on " ++ show (S.pos meta)
@@ -295,7 +295,7 @@ funcPtrFromClosure closure = do
     idx <- instrTyped intType $ I.Load False idxPtr Nothing 0 []
 --    callFn "putInt" [idx]
     let fst = functionsStructType (fromIntegral len)
-    let fnsAddr = (global fst (nameToSBS "Functions"))
+    let fnsAddr = (globalOp fst (nameToSBS "Functions"))
     fns <- instrTyped (T.ptr fst) $ I.Load False fnsAddr Nothing 0 []
 --    sizeAddr <- getelementptr fnsAddr [constIntOp 0, constIntOp 0]
 --    size <- instrTyped intType $ I.Load False sizeAddr Nothing 0 []

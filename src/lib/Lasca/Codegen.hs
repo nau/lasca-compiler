@@ -315,8 +315,11 @@ local tpe name = LocalReference tpe (AST.Name name)
 
 localPtr name = local ptrType name
 
-global :: Type -> SBS.ShortByteString -> Operand
-global tpe name = constOp (C.GlobalReference (T.ptr tpe) (AST.Name name))
+global :: Type -> SBS.ShortByteString -> C.Constant
+global tpe name = C.GlobalReference (T.ptr tpe) (AST.Name name)
+
+globalOp :: Type -> SBS.ShortByteString -> Operand
+globalOp tpe name = constOp $ global tpe name
 
 constOp :: C.Constant -> Operand
 constOp = ConstantOperand
@@ -345,7 +348,7 @@ constTrue = constOp (constBool True)
 constFalse = constOp (constBool False)
 
 constRef :: AST.Type -> SBS.ShortByteString -> C.Constant
-constRef tpe name = let ptr = C.GlobalReference (T.ptr tpe) (AST.Name name) in C.BitCast ptr ptrType
+constRef tpe name = let ptr = global tpe  name in C.BitCast ptr ptrType
 
 fptoptr fp = do
     int <- bitcast fp T.i64
@@ -376,9 +379,9 @@ call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
 {-# INLINE call #-}
 
 callIns fn args = Call Nothing CC.C [] (Right fn) (toArgs args) [] []
-callFnIns ftype name args = callIns (global ftype (fromString name)) args
+callFnIns ftype name args = callIns (globalOp ftype (fromString name)) args
 
-callFn ftype name args = call (global ftype (fromString name)) args
+callFn ftype name args = call (globalOp ftype (fromString name)) args
 {-# INLINE callFn #-}
 
 alloca :: Type -> Codegen Operand
@@ -412,14 +415,14 @@ getelementptr addr indices = instr $ GetElementPtr False addr indices []
 {-# INLINE getelementptr #-}
 
 
-unitTypePtrOp = constOp $ constRef ptrType "_UNIT"
-boolTypePtrOp = constOp $ constRef ptrType "_BOOL"
-intTypePtrOp = constOp $ constRef ptrType  "_INT"
-doubleTypePtrOp = constOp $ constRef ptrType "_FLOAT64"
-closureTypePtrOp = constOp $ constRef ptrType "_CLOSURE"
-arrayTypePtrOp = constOp $ constRef ptrType "_ARRAY"
+unitTypePtrOp = globalOp ptrType "Unit_LaType"
+boolTypePtrOp = globalOp ptrType "Bool_LaType"
+intTypePtrOp = globalOp ptrType  "Int_LaType"
+doubleTypePtrOp = globalOp ptrType "Float_LaType"
+closureTypePtrOp = globalOp ptrType "Closure_LaType"
+arrayTypePtrOp = globalOp ptrType "Array_LaType"
 
-stringTypePtr = constRef ptrType "_STRING"
+stringTypePtr = global ptrType "String_LaType"
 stringTypePtrOp = constOp $ stringTypePtr
 
 globalStringRefAsPtr :: Text -> C.Constant

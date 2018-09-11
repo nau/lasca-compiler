@@ -73,15 +73,15 @@ externalTypeMapping tpe = case tpe of
 
 autoBoxedTypes = Set.fromList [TypeBool, TypeByte, TypeInt, TypeInt16, TypeInt32, TypeFloat]
 
+typeToLaTypeConstantName :: Type -> SBS.ShortByteString
 typeToLaTypeConstantName tpe = case tpe of
-    TypeBool -> "_BOOL"    
-    TypeByte -> "_BYTE"
-    TypeInt -> "_INT"
-    TypeInt16 -> "_INT16"
-    TypeInt32 -> "_INT32"
-    TypeFloat -> "_FLOAT64"
-    _ -> error $ printf "Unimplemented for type %s" (show tpe)
+    TypeIdent name -> textToSBS $ nameToText name `T.append` "_LaType"
+    TypeFunc from to -> "Closure_LaType"
+    TypeApply t _ -> typeToLaTypeConstantName t
+    TVar _ -> error "typeToLaTypeConstantName on TVar"
+    Forall _ t -> typeToLaTypeConstantName t
 
+typeToLaTypeRef :: Type -> C.Constant
 typeToLaTypeRef tpe = constRef ptrType $ typeToLaTypeConstantName tpe
     
 externArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
@@ -108,11 +108,7 @@ argToPtr (S.Arg n t) = case t of
     _                 -> return $ localPtr $ nameToSBS n
 
 typeMapping :: Type -> AST.Type
-typeMapping t = case t of
---                  TypeInt -> T.i32
---                  TypeFloat -> T.double
---                  TypeIdent "Unit" -> T.void
-                  _                -> ptrType
+typeMapping t = ptrType
 
 llvmTypeOf = typeMapping . S.typeOf
 mappedReturnType args t = typeMapping $ declaredReturnType args t
@@ -185,13 +181,6 @@ gcMallocType tpe = do
     ptr <- gcMalloc size
     casted <- bitcast ptr (T.ptr tpe)
     return (ptr, casted)
-
-castBoxedValue declaredType value = case declaredType of
-    TypeFloat -> ptrtofp value
-    TypeInt   -> ptrtoint value intType
-    TypeByte  -> ptrtoint value T.i8
-    _                 -> return value
-{-# INLINE castBoxedValue #-}    
 
 -- takes second field of boxed Int, Byte, Bool, Float, i.e. its value
 unboxDirect expr boxedType = do
@@ -272,13 +261,19 @@ boolToInt True = 1
 boolToInt False = 0
 
 builtinConsts = 
-    [ "UNIT_SINGLETON", "UNIT", "_UNIT"
-    , "BOOL", "_BOOL", "BYTE", "_BYTE"
-    , "INT", "_INT", "FLOAT64", "_FLOAT64"
-    , "INT16", "_INT16", "INT32", "_INT32"
-    , "CLOSURE", "_CLOSURE"
-    , "ARRAY", "_ARRAY", "BYTEARRAY", "_BYTEARRAY"
-    , "_STRING", "STRING" ]
+    [ "UNIT_SINGLETON"
+    , typeToLaTypeConstantName TypeUnit
+    , typeToLaTypeConstantName TypeBool
+    , typeToLaTypeConstantName TypeByte
+    , typeToLaTypeConstantName TypeInt
+    , typeToLaTypeConstantName TypeInt16
+    , typeToLaTypeConstantName TypeInt32
+    , typeToLaTypeConstantName TypeFloat
+    , typeToLaTypeConstantName TypeString
+    , typeToLaTypeConstantName (TypeFunc TypeUnit TypeUnit) -- resolves to Closure type
+    , typeToLaTypeConstantName (TypeArray TypeUnit)
+    , typeToLaTypeConstantName (TypeByteArray TypeUnit)
+    ]
 
 builtinFuncs = do
   let external resType name params vararg attrs = (name, (resType, params, vararg, attrs))
@@ -315,7 +310,7 @@ callBuiltin name args = do
     let (restype, params, vararg, attrs) = builtinFuncs Map.! name
         ps = map snd params
         ftype = T.FunctionType restype ps vararg
-    call (global ftype name) args
+    call (globalOp ftype name) args
 {-# INLINE callBuiltin #-}
 
 
@@ -385,7 +380,7 @@ genTypeStruct name = do
     let sbsName = textToSBS nm
     let literalName = nm `T.append` ".Literal"
     let sbsLiteralName = textToSBS literalName
-    let typeName = nm `T.append` ".Type"
+    let typeName = nm `T.append` "_LaType"
     let sbsTypeName = textToSBS typeName
     let (charArray, len) = createCString nm
     let laTypeStruct = createStruct [constRef (T.ArrayType (fromIntegral len) T.i8) sbsLiteralName]
@@ -486,7 +481,7 @@ codegenStartFunc ctx cgen mainName = do
 
     gen (name, expr) = do
         v <- cgen ctx expr
-        store (global ptrType (fromString (show name))) v
+        store (globalOp ptrType (fromString (show name))) v
         return v
 
 cgenIf resultType cond tr fl = do

@@ -100,6 +100,7 @@ pattern TypeAny      = TypeIdent "Any"
 pattern TypeString   = TypeIdent "String"
 pattern TypeUnit     = TypeIdent "Unit"
 pattern TypeArray t  = TypeApply (TypeIdent "Array") [t]
+pattern TypeByteArray t  = TypeApply (TypeIdent "ByteArray") [t]
 pattern TypeArrayInt = TypeArray TypeInt
 pattern TypeRef a    = TypeApply (TypeIdent "Var") [a]
 

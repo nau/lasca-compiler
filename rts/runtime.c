@@ -13,61 +13,61 @@
 
 #include "lasca.h"
 
-#define STR(s) {.type = &_STRING, .length = sizeof(s) - 1, .bytes = s}
+#define STR(s) {.type = &String_LaType, .length = sizeof(s) - 1, .bytes = s}
 
 // Primitive Types
-const LaType _UNKNOWN = { .name = "Unknown" };
-const LaType _UNIT    = { .name = "Unit" };
-const LaType _BOOL    = { .name = "Bool" };
-const LaType _BYTE    = { .name = "Byte" };
-const LaType _INT16   = { .name = "Int16" };
-const LaType _INT32   = { .name = "Int32" };
-const LaType _INT     = { .name = "Int" };
-const LaType _FLOAT64 = { .name = "Float" };
-const LaType _STRING  = { .name = "String" };
-const LaType _CLOSURE = { .name = "Closure" };
-const LaType _ARRAY   = { .name = "Array" };
+const LaType Unknown_LaType = { .name = "Unknown" };
+const LaType Unit_LaType    = { .name = "Unit" };
+const LaType Bool_LaType    = { .name = "Bool" };
+const LaType Byte_LaType    = { .name = "Byte" };
+const LaType Int16_LaType   = { .name = "Int16" };
+const LaType Int32_LaType   = { .name = "Int32" };
+const LaType Int_LaType     = { .name = "Int" };
+const LaType Float_LaType   = { .name = "Float" };
+const LaType String_LaType  = { .name = "String" };
+const LaType Closure_LaType = { .name = "Closure" };
+const LaType Array_LaType   = { .name = "Array" };
+const LaType ByteArray_LaType     = { .name = "ByteArray" };
 const LaType _VAR     = { .name = "Var" };
-const LaType _BYTEARRAY     = { .name = "ByteArray" };
 const LaType _FILE_HANDLE   = { .name = "FileHandle" };
 const LaType _PATTERN = { .name = "Pattern" };
 const LaType _OPTION =  { .name = "Option" };
-const LaType* UNKNOWN = &_UNKNOWN;
-const LaType* UNIT    = &_UNIT;
-const LaType* BOOL    = &_BOOL;
-const LaType* BYTE    = &_BYTE;
-const LaType* INT16   = &_INT16;
-const LaType* INT32   = &_INT32;
-const LaType* INT     = &_INT;
-const LaType* FLOAT64 = &_FLOAT64;
-const LaType* STRING  = &_STRING;
-const LaType* CLOSURE = &_CLOSURE;
-const LaType* ARRAY   = &_ARRAY;
+const LaType* UNKNOWN = &Unknown_LaType;
+const LaType* UNIT    = &Unit_LaType;
+const LaType* BOOL    = &Bool_LaType;
+const LaType* BYTE    = &Byte_LaType;
+const LaType* INT16   = &Int16_LaType;
+const LaType* INT32   = &Int32_LaType;
+const LaType* INT     = &Int_LaType;
+const LaType* FLOAT64 = &Float_LaType;
+const LaType* STRING  = &String_LaType;
+const LaType* CLOSURE = &Closure_LaType;
+const LaType* ARRAY   = &Array_LaType;
 const LaType* VAR     = &_VAR;
-const LaType* BYTEARRAY   = &_BYTEARRAY;
+const LaType* BYTEARRAY   = &ByteArray_LaType;
 const LaType* FILE_HANDLE = &_FILE_HANDLE;
 const LaType* PATTERN = &_PATTERN;
 const LaType* OPTION  = &_OPTION;
 
 Bool TRUE_SINGLETON = {
-    .type = &_BOOL,
+    .type = &Bool_LaType,
     .num = 1
 };
 
 Bool FALSE_SINGLETON = {
-    .type = &_BOOL,
+    .type = &Bool_LaType,
     .num = 0
 };
 
 Unit UNIT_SINGLETON = {
-    .type = &_UNIT
+    .type = &Unit_LaType
 };
 String EMPTY_STRING = STR("\00");
 String* UNIT_STRING;
 Byte BYTE_ARRAY[256];
 Int INT_ARRAY[100];
 Float64 FLOAT64_ZERO = {
-    .type = &_FLOAT64,
+    .type = &Float_LaType,
     .num = 0.0
 };
 
@@ -343,7 +343,7 @@ Data* findDataType(const LaType* type) {
 Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
     Functions* fs = RUNTIME->functions;
 
-//    printf("isUserType %s %p %p\n", tree->type->name, tree->type, &_UNKNOWN);
+//    printf("isUserType %s %p %p\n", tree->type->name, tree->type, &Unknown_LaType);
     if (isUserType(tree)) {
 
         DataValue* dataValue = asDataValue(tree);
