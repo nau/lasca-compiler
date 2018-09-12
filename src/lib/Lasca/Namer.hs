@@ -54,7 +54,7 @@ data NamerPhaseState = NamerPhaseState {
 makeLenses ''NamerPhaseState
 
 emptyNamerPhaseState opts = NamerPhaseState {
-    _currentModule = Name "default", -- TODO check it
+    _currentModule = Name "default",
     _importedModules = Set.empty,
     _moduleQualifiers = Map.empty,
     _exportedNames = Map.empty,

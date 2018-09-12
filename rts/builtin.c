@@ -117,7 +117,6 @@ Box* graphemesIterate(Box* string, Box* f) {
     return &UNIT_SINGLETON;
 }
 
-// FIXME make it int32_t
 String* codePointToString(int32_t codePoint) {
     assert(utf8proc_codepoint_valid(codePoint));
     utf8proc_uint8_t buf[5];

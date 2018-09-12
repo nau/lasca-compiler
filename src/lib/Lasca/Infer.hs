@@ -231,7 +231,7 @@ normalize schema@(Forall ts body) =
     fv (TypeFunc a b) = fv a ++ fv b
     fv (TypeIdent _)   = []
     fv (TypeApply t [])       = error "Should not be TypeApply without arguments!" -- TODO use NonEmpty List?
-    fv (TypeApply t args)   = fv t ++ (args >>= fv)  -- FIXME args?
+    fv (TypeApply t args)   = fv t ++ (args >>= fv)
     fv Forall{} = error ("Forall inside forall: " ++ show schema)
 
     normtype (TypeFunc a b)  = TypeFunc  (normtype a) (normtype b)
@@ -365,7 +365,6 @@ infer ctx env ex = case ex of
         return (subst, t2)
         
     -- Example: external def foo(a: Int, b: String): Bool = "builtin_foo"
-    -- TODO: unify body with String
     Let True meta x tpe e1 e2 | meta^.isExternal -> do
         let (args, _) = uncurryLambda e1
             argToType (Arg _ t) = t
