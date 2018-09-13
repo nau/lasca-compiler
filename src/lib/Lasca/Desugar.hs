@@ -350,7 +350,7 @@ desugarUnaryMinus expr = case expr of
 desugarAndOr expr = case expr of
     Apply meta (Ident _ "or")  [lhs, rhs] -> If meta lhs (Literal emptyMeta (BoolLit True)) rhs
     Apply meta (Ident _ "and") [lhs, rhs] -> If meta lhs rhs (Literal emptyMeta (BoolLit False))
-    Apply meta (Ident _ "unarynot") [rhs] -> If meta rhs (Literal emptyMeta (BoolLit False)) (Literal emptyMeta (BoolLit True))
+    Apply meta (Ident imeta "unarynot") [rhs] -> Apply meta (Ident imeta (NS "Prelude" "unarynot")) [rhs]
     e -> e
 
 desugarPhase ctx exprs = let

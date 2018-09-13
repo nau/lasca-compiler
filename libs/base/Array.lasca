@@ -1,5 +1,6 @@
 module Array
 
+extern def unsafeCreateArray(size: Int): Array a = "createArray"
 extern def makeArray(size: Int, init: a): Array a = "makeArray"
 extern def append(first: Array a, second: Array a): Array a = "arrayAppend"
 extern def copy(src: Array a, srcPos: Int, dest: Array a, destPos: Int, length: Int): Unit = "arrayCopy"

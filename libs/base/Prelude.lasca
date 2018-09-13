@@ -40,12 +40,16 @@ extern def getEnv(name: String): Option String = "getEnv"
 extern def lascaSetEnv(name: String, value: String, replace: Bool): Int = "setEnv"
 extern def lascaUnsetEnv(name: String): Int = "unsetEnv"
 
+def unarynot(e: Bool): Bool = if e then false else true
+
 def die(msg: String): a = {
     println(msg);
     exit(1);
 }
 
 def undefined() = die("undefined")
+
+def require(req: Bool) = if req then () else die("Requirement failed")
 
 def setEnv(name: String, value: String, replace: Bool): Unit = {
     if lascaSetEnv(name, value, replace) == -1 then die("setEnv: ${libcCurError()}") else ()

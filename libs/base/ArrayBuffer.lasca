@@ -1,0 +1,147 @@
+import Array
+
+data ArrayBuffer a = ArrayBuffer(
+    array: Var (Array a), 
+    getSize: Var Int,
+)
+
+emptyArray = Array.unsafeCreateArray(0)
+initialSize = 16
+
+def size(self: ArrayBuffer a) = self.getSize.readVar
+
+def new() = make(initialSize)
+
+def make(initialCapacity: Int) = if initialCapacity == 0 
+    then ArrayBuffer(Var(emptyArray), Var(0))
+    else if initialCapacity > 0 
+    then ArrayBuffer(Var(Array.unsafeCreateArray(initialCapacity)), Var(0))
+    else die("Illegal initial capacity ${initialCapacity}, should be >= 0")
+
+def fromArray(a: Array a) = {
+    ab = make(Array.length(a));
+    appendArray(ab, a);
+}
+
+def isEmpty(self: ArrayBuffer a): Bool = self.getSize.readVar == 0
+
+def getIndex(self, idx) = (self.array.readVar)[idx]
+def setIndex(self, idx, value) = Array.setIndex(self.array.readVar, idx, value)
+
+def clear(self) = reduceToSize(self, 0)
+
+def ensureSize(self: ArrayBuffer a, n: Int): Unit = {
+    sz = Array.length(self.array.readVar);
+    var newSize = sz;
+    if n > sz then {
+        def calc(n, newSize) = if n > newSize.readVar then {
+            newSize := newSize.readVar * 2; 
+            println("${n} ${newSize.readVar}");
+            calc(n, newSize);
+        } else ();
+        calc(n, newSize);
+        newArray = Array.unsafeCreateArray(newSize.readVar);
+        Array.copy(self.array.readVar, 0, newArray, 0, self.getSize.readVar);
+        writeVar(self.array, newArray);
+    } else ()
+}
+
+def reduceToSize(self, sz: Int): Unit = {
+    require(sz <= self.size);
+    self.getSize := sz;
+  }
+
+def append(self: ArrayBuffer a, elem) = {
+    ensureSize(self, self.size + 1);
+    a = self.array.readVar;
+    Array.setIndex(a, self.getSize.readVar, elem);
+    self.getSize := self.size + 1;
+    self;
+}
+
+def prepend(self, elem) = {
+    ensureSize(self, self.size + 1);
+    a = self.array.readVar;
+    Array.copy(a, 0, a, 1, self.size);
+    Array.setIndex(a, 0, elem);
+    self.getSize := self.size + 1;
+    self
+}
+
+def appendArray(self: ArrayBuffer a, elems: Array a) = {
+    sz = Array.length(elems);
+    ensureSize(self, self.size + sz);
+    a = self.array.readVar;
+    var i = self.size;
+    Array.foreach(elems, { elem -> 
+        Array.setIndex(a, i.readVar, elem);
+        i := i.readVar + 1;
+    });
+    self.getSize := self.size + sz;
+    self;
+}
+
+def insertArray(self, n: Int, seq: Array a): Unit = {
+    if n < 0 or n > self.size 
+    then die("Index out of bounds: ${n}")
+    else {
+        len = Array.length(seq);
+        newSize = self.size + len;
+        ensureSize(self, newSize);
+        a = self.array.readVar;
+        Array.copy(a, n, a, n + len, self.size - n);
+        var i = n;
+        Array.foreach(seq, { elem -> 
+            Array.setIndex(a, i.readVar, elem);
+            i := i.readVar + 1;
+        });
+        self.getSize := newSize;
+    }
+}
+
+def prependArray(self: ArrayBuffer a, elems: Array a) = {
+    insertArray(self, 0, elems);
+    self;
+}
+
+def remove(self, n: Int, count: Int) = {
+    if count < 0 then die("removing negative number of elements: ${count}")
+    else if count == 0 then () 
+    else if n < 0 or n > self.size - count then die("at ${n} deleting ${count}")
+    else {
+        a = self.array.readVar;
+        Array.copy(a, n + count, a, n, self.size - (n + count));
+        reduceToSize(self, self.size - count);
+    }
+}
+
+def toArray(self) = {
+    a = self.array.readVar;
+    Array.init(self.size, {idx -> })
+}
+
+def main() = {
+    ab = make(3);
+    println("${ab}");
+    append(ab, 1);
+    println("${ab}");
+    append(ab, 2);
+    println("${ab}");
+    append(ab, 3);
+    prepend(ab, 0);
+    println("${ab}");
+    append(ab, 4);
+    println("${ab}");
+    ensureSize(ab, 20);
+    appendArray(ab, [5, 6, 7, 8]);
+    println("${ab}");
+    remove(ab, 1, 2);
+    println("${ab}");
+    insertArray(ab, 4, [7,7,7]);
+    prependArray(ab, [-2, -1]);
+    println("${ab}");
+    setIndex(ab, 1, 42);
+    println("Test ${ab.size} ${ab.isEmpty} ${getIndex(ab, 1)}");
+    ab.clear;
+    println("${ab}");
+}

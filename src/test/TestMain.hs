@@ -92,6 +92,7 @@ data Config = Script { name :: String, compMode :: Mode, arguments :: [T.Text] }
 examples = [
     Script "builtin.lasca" Both [],
     Script "Array.lasca" Both [],
+    Script "ArrayBuffer.lasca" Both [],
     Script "String.lasca" Both [],
     Script "List.lasca" Both [],
     Script "binarytrees.lasca" Both ["10"],

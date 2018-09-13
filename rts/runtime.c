@@ -493,6 +493,8 @@ String* __attribute__ ((pure)) byteArrayToString(const Box* arrayValue)  {
 String* __attribute__ ((pure)) toString(const Box* value) {
     char buf[100]; // 100 chars is enough for all (c)
 
+    if (value == NULL) return makeString("<NULL>");
+
     const LaType* type = value->type;
     if (eqTypes(type, UNIT)) {
         return UNIT_STRING;
