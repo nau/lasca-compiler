@@ -15,14 +15,14 @@ mkDerivation {
     base bytestring containers directory filepath haskeline lens
     llvm-hs llvm-hs-pure megaparsec mtl multiset murmur-hash
     optparse-applicative prettyprinter process scientific text
-    utf8-string libffi
+    utf8-string libffi lascart
   ];
-  executableHaskellDepends = [ base ];
+  executableHaskellDepends = [ base lascart ];
   executableSystemDepends = [ boehmgc lascart pcre2 ];
   testHaskellDepends = [
     base bytestring filepath Glob megaparsec shelly tasty tasty-golden
     tasty-hunit tasty-program tasty-quickcheck tasty-smallcheck text
-    utf8-string libffi
+    utf8-string libffi lascart
   ];
   testSystemDepends = [ lascart libffi ];
   dontStrip = true;
