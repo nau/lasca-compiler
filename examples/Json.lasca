@@ -11,13 +11,13 @@ data JValue
     | JObject(v: Map String JValue)
 
 def jsonToString(js: JValue) = match js {
+    JNull -> "null"
     JNum(n) -> toString(n)
     JBool(v) -> toString(v)
     JArray(v) -> {
         values = Array.map(v, jsonToString);
         toString(values);
     }
-    JNull -> "null"
     JString(v) -> "\"${v}\""
     JObject(m) -> {
         if Map.isEmpty(m) then "{}" else {
