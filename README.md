@@ -180,9 +180,9 @@ Add bash completion config for lasca compiler options:
 Build on Mac OS
 ---
 
-You need LLVM 5.0 installed, and latest Haskell Stack.
+You need LLVM 6.0 installed, and latest Haskell Stack.
 
-    brew install cmake llvm-hs/llvm/llvm-5.0 boehmgc pcre2
+    brew install cmake llvm-hs/llvm/llvm-6.0 boehmgc pcre2
 
     brew install haskell-stack
 

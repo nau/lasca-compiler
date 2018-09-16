@@ -5,34 +5,37 @@ FLAGS = --standalone --toc --highlight-style pygments
 #TEST_RTS = +RTS -sstderr
 TEST_RTS =
 
-build: rts 
-	stack build
+build: rts
+	stack build --extra-lib-dirs=build/rts
+
+fast: rts
+	stack build --fast -j 8 --extra-lib-dirs=build/rts
 
 install: build
-	stack install && stack test
+	stack install --extra-lib-dirs=build/rts && stack test --extra-lib-dirs=build/rts
+
+fastinstall: fast
+	stack install --fast --extra-lib-dirs=build/rts
 
 bench:
 	time lasca -O2 -e examples/gen.lasca
 
 rts:
-	mkdir -p build && cd build && cmake .. && make && cp rts/liblascartStatic.a .. && cp rts/liblascartStatic.a $(LASCAPATH)
+	mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug .. && make && cp rts/liblascartStatic.a $(LASCAPATH)
 
 relink: rts
 	rm -rf .stack-work/dist/x86_64-osx/Cabal-2.0.1.0/build/Lasca/lasca
 	rm -rf .stack-work/install
-	stack build --fast -j 8 --copy-bins
+	stack build --fast -j 8 --copy-bins --extra-lib-dirs=build/rts
 
 rusts:
 	cd rts/rust && cargo build && cp target/debug/liblascarts.dylib ../../../
-    
-lasca: rts
-	stack install
 
 test:
-	stack test -j 8
+	stack test --extra-lib-dirs=build/rts
 
 fasttest:
-	stack test -j 8 --fast
+	stack test -j 8 --fast --extra-lib-dirs=build/rts
 
 examples:
 	lasca -O2 -e --mode static  libs/base/Array.lasca $(TEST_RTS)
@@ -65,7 +68,7 @@ examples:
 	lasca -O2 -e --mode static  examples/ski.lasca $(TEST_RTS)
 
 perf:
-	stack install --profile -j 8
+	stack install --profile -j 8 --extra-lib-dirs=build/rts
 	time lasca examples/Map.lasca +RTS -sstderr -N4 -p -hc
 	hp2ps -c lasca.hp
 	ghc-prof-flamegraph lasca.prof

@@ -39,7 +39,7 @@ import Text.Printf
 import Data.Text.Prettyprint.Doc
 import Data.Text.Prettyprint.Doc.Render.String
 
-newtype TypeEnv = TypeEnv (Map Name Type) deriving (Monoid)
+newtype TypeEnv = TypeEnv (Map Name Type) deriving (Semigroup, Monoid)
 
 
 instance Pretty TypeEnv where

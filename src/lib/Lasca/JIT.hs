@@ -28,6 +28,7 @@ import           LLVM.Analysis
 import           LLVM.PassManager
 import           LLVM.Transforms
 import           LLVM.OrcJIT
+import           LLVM.OrcJIT.CompileLayer
 import           LLVM.Linking (loadLibraryPermanently, getSymbolAddressInProcess)
 import qualified LLVM.CodeGenOpt as CodeGenOpt
 import qualified LLVM.CodeModel as CodeModel
@@ -58,11 +59,8 @@ resolver compileLayer =
   SymbolResolver
     (\s -> findSymbol compileLayer s True)
     (\s ->
-       fmap
-         (\a -> JITSymbol a (JITSymbolFlags False True))
-         (getSymbolAddressInProcess s))
-nullResolver :: MangledSymbol -> IO JITSymbol
-nullResolver s = return (JITSymbol 0 (JITSymbolFlags False False))
+       fmap (\a -> Right $ JITSymbol a (JITSymbolFlags False True False True)) (getSymbolAddressInProcess s)
+    )
 
 {-
   Read https://purelyfunctional.org/posts/2018-04-02-llvm-hs-jit-external-function.html
@@ -80,7 +78,7 @@ runJIT opts mod = do
                     withModule compileLayer m
                         (resolver compileLayer) $ \moduleHandle -> do
                             mainSymbol <- mangleSymbol compileLayer "main"
-                            JITSymbol mainFn _ <- findSymbol compileLayer mainSymbol True
+                            (Right (JITSymbol mainFn _)) <- findSymbol compileLayer mainSymbol True
                             let args = lascaFiles opts
                             let len = length args
                             cargs <- mapM newCString args

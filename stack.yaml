@@ -1,1 +1,6 @@
-resolver: lts-11.17
+resolver: lts-12.9
+extra-deps:
+- multiset-0.3.4
+nix:
+    enable: false
+    shell-file: stack-shell.nix

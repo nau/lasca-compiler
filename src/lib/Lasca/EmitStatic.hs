@@ -189,13 +189,13 @@ cgenApplyUnOp ctx e = error ("cgenApplyUnOp should only be called on Apply, but 
 
 getArithOp code tpe = case (code, tpe) of
     (10, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.Add False False lhs rhs []
-    (10, TypeFloat) -> Just $ \lhs rhs -> I.FAdd I.NoFastMathFlags lhs rhs []
+    (10, TypeFloat) -> Just $ \lhs rhs -> I.FAdd I.noFastMathFlags lhs rhs []
     (11, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.Sub False False lhs rhs []
-    (11, TypeFloat) -> Just $ \lhs rhs -> I.FSub I.NoFastMathFlags lhs rhs []
+    (11, TypeFloat) -> Just $ \lhs rhs -> I.FSub I.noFastMathFlags lhs rhs []
     (12, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.Mul False False lhs rhs []
-    (12, TypeFloat) -> Just $ \lhs rhs -> I.FMul I.NoFastMathFlags lhs rhs []
+    (12, TypeFloat) -> Just $ \lhs rhs -> I.FMul I.noFastMathFlags lhs rhs []
     (13, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.SDiv True lhs rhs []
-    (13, TypeFloat) -> Just $ \lhs rhs -> I.FDiv I.NoFastMathFlags lhs rhs []
+    (13, TypeFloat) -> Just $ \lhs rhs -> I.FDiv I.noFastMathFlags lhs rhs []
     _ -> Nothing
 
 getCmpOp code tpe = case (code, tpe) of
