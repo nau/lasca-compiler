@@ -29,7 +29,9 @@ lexeme = L.lexeme sc
 
 symbol = L.symbol sc
 
-integer       = lexeme L.decimal
+integer = lexeme (try (char '0' *> char' 'x' *> L.hexadecimal)
+  <|> try (char '0' *> char' 'o' *> L.octal)
+  <|> try L.decimal)
 
 stringLiteral :: Parser Text
 stringLiteral = do

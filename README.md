@@ -160,79 +160,80 @@ Other
 Install on Mac OS using Homebrew
 ---
 
-    brew install cmake llvm-hs/llvm/llvm-5.0 boehmgc pcre2
-    brew install nau/lasca/lasca-compiler
+    $ brew install cmake llvm@6 boehmgc pcre2
+    $ brew install nau/lasca/lasca-compiler
 
 Setup LASCAPATH environment variable. Add this to your .bash_profile
 
-    export LASCAPATH="$(brew --prefix lasca-compiler)/src"
+    $ export LASCAPATH="$(brew --prefix lasca-compiler)/src"
 
 Try it!
 
-    cat "def main() = println("Hello Lasca!")" > hello.lasca
-    lasca -e hello.lasca
+    $ echo 'def main() = println("Hello Lasca!")' > hello.lasca
+    $ lasca -e hello.lasca
     Hello Lasca!
-    
+
 Add bash completion config for lasca compiler options:
 
-    lasca --bash-completion-script lasca > $(brew --prefix)/etc/bash_completion.d/lasca    
+    $ lasca --bash-completion-script lasca > $(brew --prefix)/etc/bash_completion.d/lasca    
 
 Build on Mac OS
 ---
 
 You need LLVM 6.0 installed, and latest Haskell Stack.
 
-    brew install cmake llvm-hs/llvm/llvm-6.0 boehmgc pcre2
+    $ brew install cmake llvm@6 boehmgc pcre2
 
-    brew install haskell-stack
+    $ brew install haskell-stack
 
-You need to build Lasca Runtime System library liblascart.a
+    $ stack setup
 
-    make rts
+Setup LASCAPATH environment variable. Add this to your .bash_profile
 
-Setup stack, build and install lasca compiler
+    $ export LASCAPATH="${lasca-compiler-src-dir}/libs/base"
 
-    stack setup
+Add your `~/.local/bin` directory to your `PATH`
 
-    stack install
+    $ export PATH=$PATH:~/.local/bin
 
-Add your `~/.local/bin` directory to your `$PATH`
+Build and install lasca compiler
+
+    $ make install
 
 Add bash completion config for lasca compiler options:
 
-    lasca --bash-completion-script lasca > $(brew --prefix)/etc/bash_completion.d/lasca
+    $ lasca --bash-completion-script lasca > $(brew --prefix)/etc/bash_completion.d/lasca
 
 Run hello.lasca
 
-    lasca --exec examples/hello.lasca
-
-If you want to build everything with profiling support
-uncomment -rtsopts, -prof, -fprof-auto ghc options in stack.yaml, and run
-
-    stack build --executable-profiling --library-profiling
+    $ lasca --exec examples/hello.lasca
 
 Build on Ubuntu
 ---
 
-Requirements: Haskell Stack > 1.6, Cabal > 2.0, LLVM 5, CMake
+Requirements: Haskell Stack > 1.6, Cabal > 2.0, LLVM 6, CMake
 
 Don't install Haskell Stack from apt. [It's likely to be older than 1.6 and won't be able to upgrade](https://askubuntu.com/questions/986596/how-to-upgrade-haskell-stack-on-ubuntu-16-04)
 
 Do this instead:
 
-    wget -qO- https://get.haskellstack.org/ | sh
+    $ curl -sSL https://get.haskellstack.org/ | sh
 
-    sudo apt install llvm-5.0-dev libgc-dev zlib1g-dev cmake
-    stack build -j 8
-    export LASCAPATH=${lasca-compiler-dir}
-    stack test
+    $ sudo apt install llvm-6.0-dev libgc-dev zlib1g-dev cmake
+    $ sudo add-apt-repository universe
+    $ sudo apt install libpcre2-dev
+    $ export LASCAPATH="${lasca-compiler-src-dir}/libs/base"
+    $ export PATH=$PATH:~/.local/bin
+    $ stack setup
+    $ make install
+    $ lasca -e examples/hello.lasca
 
 Current n-body run
 ---
 
-    There are several implementation of n-body problem
-    http://benchmarksgame.alioth.debian.org/u64q/nbody.html
-    Currently it's quite slow due to boxing.
+There are several implementation of n-body problem
+http://benchmarksgame.alioth.debian.org/u64q/nbody.html
+Currently it's quite slow due to boxing.
 
     $ time lasca -e -O2 examples/nbody.lasca -- 50000000
     -0.169075164
@@ -242,8 +243,8 @@ Current n-body run
     user      7m39.476s
     sys       0m38.716s
 
-    find src -name "*.hs"  | xargs cat | wc -l
+    $ find src -name "*.hs"  | xargs cat | wc -l
     3714
 
-    find src -name "*.c"  | xargs cat | wc -l
+    $ find src -name "*.c"  | xargs cat | wc -l
     681

@@ -12,7 +12,9 @@ def testLiterals() = {
     i = "String";
     j = ();
     l = [1, 2];
-    println("${a} ${b} ${c} ${d} \$${e} ${f} ${g} ${h} ${i} ${j} ${l}");
+    m = 0xDEADbeef;
+    n = -0o755;
+    println("${a} ${b} ${c} ${d} \$${e} ${f} ${g} ${h} ${i} ${j} ${l} ${m} ${n}");
 }
 
 def bitwiseOperations() = {
