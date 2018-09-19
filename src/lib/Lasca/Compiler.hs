@@ -34,6 +34,11 @@ import Control.Applicative
 
 import qualified LLVM.Module as LLVM
 import qualified LLVM.Target as LLVM
+import qualified LLVM.Relocation as Reloc
+import qualified LLVM.Target.Options as TO
+import qualified LLVM.CodeModel as CodeModel
+import qualified LLVM.CodeGenOpt as CodeGenOpt
+
 
 parsePhase opts filename = do
     exists <- doesFileExist filename
@@ -108,12 +113,23 @@ findCCompiler = do
     gcc <- findExecutable "gcc"
     return $ ccEnv <|> cl5 <|> clang <|> gcc
 
+withHostTargetMachine :: (LLVM.TargetMachine -> IO a) -> IO a
+withHostTargetMachine f = do
+    LLVM.initializeAllTargets
+    triple <- LLVM.getProcessTargetTriple
+    cpu <- LLVM.getHostCPUName
+    features <- LLVM.getHostCPUFeatures
+    (target, _) <- LLVM.lookupTarget Nothing triple
+    LLVM.withTargetOptions $ \options ->
+        LLVM.withTargetMachine target triple cpu features options Reloc.PIC CodeModel.Default CodeGenOpt.Default f
+
+
 compileExecutable opts fname mod = do
     withOptimizedModule opts mod $ \context m -> do
         ll <- LLVM.moduleLLVMAssembly m
         let asm = Char8.unpack ll
         writeFile (fname ++ ".ll") asm
-        LLVM.withHostTargetMachine $ \tm -> LLVM.writeObjectToFile tm (LLVM.File (fname ++ ".o")) m
+        withHostTargetMachine $ \tm -> LLVM.writeObjectToFile tm (LLVM.File (fname ++ ".o")) m
     let outputPath = case outputFile opts of
           [] -> dropExtension fname
           path -> path
@@ -124,13 +140,19 @@ compileExecutable opts fname mod = do
     absLascaPathEnv <- mapM canonicalizePath lascaPathEnv
     let lascaPath = fromMaybe "." absLascaPathEnv
     let cc = fromMaybe (error "Did find C compiler. Install Clang or GCC, or define CC environment variable") result
-        libLascaLink = if os == "darwin"
-                       then ["-rdynamic", "-llascartStatic"]
-                       else ["-rdynamic", "-Wl,--whole-archive", "-llascartStatic" , "-Wl,--no-whole-archive"]
+        lascartStaticLink = if os == "darwin"
+            then ["-llascartStatic"]
+            else ["-Wl,--whole-archive", "-llascartStatic" , "-Wl,--no-whole-archive"]
+        lascartDynamicLink = ["-llascart"]
+        libLascaLink = ["-rdynamic"] 
+            -- passes --export-dynamic to the linker. 
+            -- Needed for OrcJit to to able to dynamicly load generated `main` function
+            ++ lascartStaticLink
+            -- ++ lascartDynamicLink
         libDirs = ["-L" ++ lascaPath]
         links = ["-lgc", "-lffi", "-lm", "-lpcre2-8"]
-    let args = optimizationOpts ++ libDirs ++ [ "-g"] ++ libLascaLink ++ links ++ [ "-o", outputPath, fname ++ ".o"]
-    when (verboseMode opts) $ putStrLn (cc ++ " " ++ show args)
+    let args = optimizationOpts ++ libDirs ++ ["-fPIC", "-g"] ++ libLascaLink ++ links ++ [ "-o", outputPath, fname ++ ".o"]
+    when (verboseMode opts) $ putStrLn (intercalate " " $ cc : args)
     callProcess cc args
     return ()
 

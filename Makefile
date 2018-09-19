@@ -21,7 +21,7 @@ bench:
 	time lasca -O2 -e examples/gen.lasca
 
 rts:
-	mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug .. && make && cp rts/liblascartStatic.a $(LASCAPATH)
+	mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug .. && make && cp rts/liblascart* $(LASCAPATH)
 
 relink: rts
 	rm -rf .stack-work/dist/x86_64-osx/Cabal-2.0.1.0/build/Lasca/lasca

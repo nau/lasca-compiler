@@ -492,6 +492,7 @@ Fixing Faults in C and Java Source Code: Abbreviated vs. Full-word
 Identifier Names http://www2.unibas.it/gscanniello/Giuseppe_Scanniello%40unibas/Home_files/TOSEM.pdf
 Fast 64-bit integers for Scala.js http://lampwww.epfl.ch/~doeraene/presentations/jslongs-vmm2017/
 https://www.researchgate.net/publication/325658386_On_the_Soundness_of_Coroutines_with_Snapshots
+How to write shared libraries https://www.akkadia.org/drepper/dsohowto.pdf
 
 Support Standards/Specifications
 ================================
