@@ -7,7 +7,7 @@
 }@args:
 mkDerivation {
   pname = "lasca";
-  version = "0.1.0.0";
+  version = "0.0.1";
   src = ./.;
   isLibrary = true;
   isExecutable = true;
@@ -26,7 +26,7 @@ mkDerivation {
   ];
   testSystemDepends = [ lascart libffi ];
   dontStrip = true;
-  doCheck = false;
+  doCheck = true;
   preCheck = ''
     export PATH="$PATH:dist/build/lasca"
     export LASCAPATH="$out/libs/base"
