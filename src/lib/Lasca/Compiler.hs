@@ -27,6 +27,8 @@ import System.Exit
 import System.Process
 import System.Directory
 import System.FilePath
+import System.IO ( hGetContents )
+import System.IO.Error
 import Data.List
 import qualified Data.Map.Strict as Map
 import Debug.Trace as Debug
@@ -137,8 +139,8 @@ compileExecutable opts fname mod = do
     let optimizationOpts = ["-O" ++ show optLevel | optLevel > 0]
     result <- findCCompiler
     lascaPathEnv <- lookupEnv "LASCAPATH"
-    absLascaPathEnv <- mapM canonicalizePath lascaPathEnv
-    let lascaPath = fromMaybe "." absLascaPathEnv
+    let lascaPath = fromMaybe "." lascaPathEnv
+    absLascaPathEnv <- mapM canonicalizePath (splitSearchPath lascaPath)
     let cc = fromMaybe (error "Did find C compiler. Install Clang or GCC, or define CC environment variable") result
         lascartStaticLink = if os == "darwin"
             then ["-llascartStatic"]
@@ -149,12 +151,27 @@ compileExecutable opts fname mod = do
             -- Needed for OrcJit to to able to dynamicly load generated `main` function
             ++ lascartStaticLink
             -- ++ lascartDynamicLink
-        libDirs = ["-L" ++ lascaPath]
+        libDirs = fmap (\p -> "-L" ++ p) absLascaPathEnv
         links = ["-lgc", "-lffi", "-lm", "-lpcre2-8"]
     let args = optimizationOpts ++ libDirs ++ ["-fPIC", "-g"] ++ libLascaLink ++ links ++ [ "-o", outputPath, fname ++ ".o"]
-    when (verboseMode opts) $ putStrLn (intercalate " " $ cc : args)
-    callProcess cc args
-    return ()
+    let command = unwords $ cc : args
+    when (verboseMode opts) $ putStrLn command
+    (output, errCode) <- getProcessOutput command
+    -- putStrLn output
+    when (errCode /= ExitSuccess) $ die output
+    -- return ()
+
+getProcessOutput :: String -> IO (String, ExitCode)
+getProcessOutput command =
+     -- Create the process
+  do (_pIn, pOut, pErr, handle) <- runInteractiveCommand command
+     -- Wait for the process to finish and store its exit code
+     exitCode <- waitForProcess handle
+     -- Get the standard output.
+     output   <- hGetContents pOut
+     stderr   <- hGetContents pErr
+     -- return both the output and the exit code.
+     return (output ++ stderr, exitCode)
 
 runLasca :: LascaOpts -> IO ()
 runLasca opts = do
