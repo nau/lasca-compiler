@@ -228,22 +228,6 @@ static int64_t isUserType(const Box* v) {
                   else { \
                         printf("AAAA!!! Type mismatch! Expected Int or Float for op but got %s\n", typeIdToName(lhs->type)); exit(1); }
 
-#define DO_CMP(op) if (eqTypes(lhs->type, BOOL)) { \
-                      result = (Box*) boxBool (asBool(lhs)->num op asBool(rhs)->num); } \
-                   else if (eqTypes(lhs->type, INT)) { \
-                      result = (Box*) boxBool (asInt(lhs)->num op asInt(rhs)->num); } \
-                   else if (eqTypes(lhs->type, INT32)) { \
-                      result = (Box*) boxBool (asInt32(lhs)->num op asInt32(rhs)->num); } \
-                   else if (eqTypes(lhs->type, INT16)) { \
-                      result = (Box*) boxBool (asInt16(lhs)->num op asInt16(rhs)->num); } \
-                   else if (eqTypes(lhs->type, BYTE)) { \
-                      result = (Box*) boxBool (asByte(lhs)->num op asByte(rhs)->num); } \
-                   else if (eqTypes(lhs->type, FLOAT64)) { \
-                      result = (Box*) boxBool (asFloat(lhs)->num op asFloat(rhs)->num); } \
-                   else { \
-                      printf("AAAA!!! Type mismatch! Expected Bool, Int or Float but got %s\n", typeIdToName(lhs->type)); exit(1); \
-                   }
-
 Box* __attribute__ ((pure)) runtimeBinOp(int64_t code, Box* lhs, Box* rhs) {
     if (!eqTypes(lhs->type, rhs->type)) {
         printf("AAAA!!! Type mismatch! lhs = %s, rhs = %s\n", typeIdToName(lhs->type), typeIdToName(rhs->type));
@@ -256,15 +240,12 @@ Box* __attribute__ ((pure)) runtimeBinOp(int64_t code, Box* lhs, Box* rhs) {
     else if (code == SUB) { DO_OP(-); }
     else if (code == MUL) {DO_OP(*);}
     else if (code == DIV) {DO_OP(/);}
-    else if (code == EQ) {DO_CMP(==);}
-    else if (code == NE) {DO_CMP(!=);}
-    else if (code == LT) {DO_CMP(<);}
-    else if (code == LE) {DO_CMP(<=);}
-    else if (code == GE) {DO_CMP(>=);}
-    else if (code == GT) {DO_CMP(>);}
-    else { 
-	      printf("AAAA!!! Unsupported binary operation %"PRId64, code);
-        exit(1);
+    else {
+        int res = runtimeCompare(lhs, rhs);
+        bool b = (code == EQ && res == 0) || (code == NE && res != 0) ||
+                 (code == LT && res == -1) || (code == LE && res != 1) ||
+                 (code == GE && res != -1) || (code == GT && res == 1);
+        result = (Box*) boxBool(b);                 
     }
     return result;
 }
@@ -420,7 +401,7 @@ Box* boxArray(size_t size, ...) {
     return box(ARRAY, array);
 }
 
-String* __attribute__ ((pure)) makeString(char * str) {
+String* __attribute__ ((pure)) makeString(const char * str) {
     size_t len = strlen(str);
     String* val = gcMalloc(sizeof(String) + len + 1);  // null terminated
     val->type = STRING;
@@ -464,6 +445,10 @@ String* __attribute__ ((pure)) arrayToString(const Box* arrayValue)  {
     }
 }
 
+String* typeOf(Box* value) {
+    return makeString(value->type->name);
+}
+
 String* __attribute__ ((pure)) byteArrayToString(const Box* arrayValue)  {
     String* array = unbox(BYTEARRAY, arrayValue);
     if (array->length == 0) {
@@ -485,6 +470,14 @@ String* __attribute__ ((pure)) byteArrayToString(const Box* arrayValue)  {
         res->length = curPos + 1;
         return res;
     }
+}
+
+bool isNull(Box* value) {
+    return value == NULL;
+}
+
+Box* unsafeNull() {
+    return NULL;
 }
 
 

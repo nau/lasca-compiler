@@ -199,17 +199,17 @@ getArithOp code tpe = case (code, tpe) of
     _ -> Nothing
 
 getCmpOp code tpe = case (code, tpe) of
-    (42, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.ICmp IPred.EQ lhs rhs []
+    (42, _) | isIntegralType tpe || tpe == TypeBool -> Just $ \lhs rhs -> I.ICmp IPred.EQ lhs rhs []
     (42, TypeFloat) -> Just $ \lhs rhs -> I.FCmp FP.OEQ lhs rhs []
-    (43, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.ICmp IPred.NE lhs rhs []
+    (43, _) | isIntegralType tpe || tpe == TypeBool -> Just $ \lhs rhs -> I.ICmp IPred.NE lhs rhs []
     (43, TypeFloat) -> Just $ \lhs rhs -> I.FCmp FP.ONE lhs rhs []
-    (44, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.ICmp IPred.SLT lhs rhs []
+    (44, _) | isIntegralType tpe || tpe == TypeBool -> Just $ \lhs rhs -> I.ICmp IPred.SLT lhs rhs []
     (44, TypeFloat) -> Just $ \lhs rhs -> I.FCmp FP.OLT lhs rhs []
-    (45, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.ICmp IPred.SLE lhs rhs []
+    (45, _) | isIntegralType tpe || tpe == TypeBool -> Just $ \lhs rhs -> I.ICmp IPred.SLE lhs rhs []
     (45, TypeFloat) -> Just $ \lhs rhs -> I.FCmp FP.OLE lhs rhs []
-    (46, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.ICmp IPred.SGE lhs rhs []
+    (46, _) | isIntegralType tpe || tpe == TypeBool -> Just $ \lhs rhs -> I.ICmp IPred.SGE lhs rhs []
     (46, TypeFloat) -> Just $ \lhs rhs -> I.FCmp FP.OGE lhs rhs []
-    (47, _) | isIntegralType tpe -> Just $ \lhs rhs -> I.ICmp IPred.SGT lhs rhs []
+    (47, _) | isIntegralType tpe || tpe == TypeBool -> Just $ \lhs rhs -> I.ICmp IPred.SGT lhs rhs []
     (47, TypeFloat) -> Just $ \lhs rhs -> I.FCmp FP.OGT lhs rhs []
     _ -> Nothing
 
@@ -228,16 +228,19 @@ cgenApplyBinOp ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) = do
     let code = fromMaybe (error ("Couldn't find binop " ++ show fn)) (Map.lookup fn binops)
 --    Debug.traceM $ printf "%s: %s <==> %s: %s, code %s" (show lhsType) (show realLhsType) (show rhsType) (show realRhsType) (show code)
     let llvmType = externalTypeMapping realLhsType
-    res <- case code of
-        _ | code >= 10 && code <= 13 -> do
-            let op = fromMaybe (error $ printf "cgenApplyBinOp not defined operation code %d for type %s" code (show realLhsType)) (getArithOp code realLhsType)
-            instrTyped llvmType (llhs `op` lrhs)
-        _ | code >= 42 && code <= 47 -> do
-            let op = fromMaybe (error $ printf "cgenApplyBinOp not defined operation code %d for type %s" code (show realLhsType)) (getCmpOp code realLhsType)
-            r <- instrTyped llvmType (llhs `op` lrhs)
-            instrTyped boolType $ I.ZExt r boolType []
-        c  -> error $ printf "%s: Unsupported binary operation %s, code %s, type %s" (show $ S.exprPosition this) (S.printExprWithType this) (show c) (show realLhsType)
-    resolveBoxing returnType anyTypeVar res
+    if isPrimitiveType realLhsType 
+    then do
+        res <- case code of
+            _ | code >= 10 && code <= 13 -> do
+                let op = fromMaybe (error $ printf "cgenApplyBinOp not defined operation code %d for type %s" code (show realLhsType)) (getArithOp code realLhsType)
+                instrTyped llvmType (llhs `op` lrhs)
+            _ | code >= 42 && code <= 47 -> do
+                let op = fromMaybe (error $ printf "cgenApplyBinOp not defined operation code %d for type %s" code (show realLhsType)) (getCmpOp code realLhsType)
+                r <- instrTyped llvmType (llhs `op` lrhs)
+                instrTyped boolType $ I.ZExt r boolType []
+            c  -> error $ printf "%s: Unsupported binary operation %s, code %s, type %s" (show $ S.exprPosition this) (S.printExprWithType this) (show c) (show realLhsType)
+        resolveBoxing returnType anyTypeVar res
+    else callBuiltin "runtimeBinOp" [constIntOp code, llhs', lrhs']
 cgenApplyBinOp ctx e = error ("cgenApplyBinOp should only be called on Apply, but called on" ++ show e)
 
 cgenApply ctx meta expr args = do

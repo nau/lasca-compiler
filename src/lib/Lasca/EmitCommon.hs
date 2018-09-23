@@ -71,6 +71,8 @@ externalTypeMapping tpe = case tpe of
 
 autoBoxedTypes = Set.fromList [TypeBool, TypeByte, TypeInt, TypeInt16, TypeInt32, TypeFloat]
 
+isPrimitiveType tpe = tpe `Set.member` autoBoxedTypes
+
 typeToLaTypeConstantName :: Type -> SBS.ShortByteString
 typeToLaTypeConstantName tpe = case tpe of
     TypeIdent name -> textToSBS $ nameToText name `T.append` "_LaType"

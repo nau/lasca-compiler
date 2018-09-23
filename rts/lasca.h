@@ -177,12 +177,13 @@ extern const LaType* OPTION;
 
 bool eqTypes(const LaType* lhs, const LaType* rhs);
 void *gcMalloc(size_t s);
-String* __attribute__ ((pure)) makeString(char * str);
+String* __attribute__ ((pure)) makeString(const char * str);
 Box *box(const LaType* type_id, void *value);
 Int* boxInt(int64_t i);
 Int16* boxInt16(int16_t i);
 Int32* boxInt32(int32_t i);
 void * unbox(const LaType* expected, const Box* ti);
+int64_t runtimeCompare(Box* lhs, Box* rhs);
 Box* runtimeApply(Box* val, int64_t argc, Box* argv[], Position pos);
 String* toString(const Box* value);
 Box* println(const Box* val);
