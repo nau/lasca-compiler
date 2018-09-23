@@ -199,7 +199,7 @@ wildcardPattern = do
     reservedOp "_"
     return WildcardPattern
 
-litPattern = LitPattern <$> (boolLit <|> stringLit <|> try floatLit <|> integerLit)
+litPattern = LitPattern <$> lexeme (boolLit <|> stringLit <|> try floatLit <|> integerLit)
 
 qi = do
          i <- identifier

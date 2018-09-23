@@ -1,4 +1,5 @@
 import Bits
+import Option
 
 def testLiterals() = {
     a = 1234567890;
@@ -44,6 +45,32 @@ def logicalOperations() = {
     a = not false and false or true; println(a.toString);
 }
 
+def patternMatching() = {
+    a = match 1 {
+        0 -> false
+        1 -> true
+        _ -> false
+    }; println(a.toString);
+    a = match a {
+        true -> 1
+        false -> 0
+    }; println(a.toString);
+    a = match 3.14 {
+        3.14 -> 1
+        _ -> 0
+    }; println(a.toString);
+    a = match "String" {
+        "" -> "empty"
+        "String but not this" -> "wrong string"
+        "String" -> "Correct String"
+    }; println(a);
+    a = match Some(1) {
+        None -> 0
+        Some(0) -> 666
+        Some(1) -> 777
+    }; println(a.toString);
+}
+
 def innerFunctions() = {
     a = 3;
     def inner1(x) = x + a; -- check capturing outer vars
@@ -66,5 +93,6 @@ def main() = {
     testLiterals();
     bitwiseOperations();
     logicalOperations();
+    patternMatching();
     innerFunctions();
 }
