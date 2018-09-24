@@ -6,8 +6,10 @@ import Data.Void
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Scientific
+import Data.Char
+import qualified Data.List.NonEmpty as NonEmpty
 import Text.Megaparsec
-import Control.Monad (void)
+import Control.Monad (void, when)
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 
@@ -64,12 +66,18 @@ upperIdentifier = (lexeme . try) (p)
       p       = (\c cs -> T.cons c (T.pack cs)) <$> upperChar <*> many alphaNumChar
 
 identifier :: Parser Text
-identifier = (lexeme . try) (p >>= check)
-  where
-    p       = (:) <$> letterChar <*> many alphaNumChar
-    check x = if x `elem` keywords
-                then fail $ "keyword " ++ show x ++ " cannot be an identifier"
-                else return $ T.pack x
+identifier = lexeme $ try $ do
+    ident <- identifierOrReserved
+    when (ident `elem` keywords) $ unexpected . Label . NonEmpty.fromList $ "reserved " ++ ident
+    when (ident == "_") $ unexpected . Label . NonEmpty.fromList $ "wildcard"
+    return $ T.pack ident
+
+
+identifierOrReserved = lexeme $ try $ do
+  c <- satisfy isAlpha <|> char '_'
+  cs <- many (satisfy isAlphaNum <|> char '_')
+  return $ c : cs
+
 
 opChar :: Parser Char
 opChar = oneOf ("!$%&*+./<=>?@\\^|-~" :: String)

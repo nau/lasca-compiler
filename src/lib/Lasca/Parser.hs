@@ -55,27 +55,24 @@ unitLiteral = do
 
 floatLit = FloatLit <$> signedFloat
 
-strToBool :: String -> Bool
-strToBool "true" = True
-strToBool _      = False
-
 boolLiteral :: Parser Expr
 boolLiteral = do
     meta <- getMeta
     Literal meta <$> boolLit
 
 boolLit :: Parser Lit
-boolLit = BoolLit . strToBool <$> (true <|> false)
+boolLit = BoolLit <$> (true <|> false)
   where
-    true = reserved "true" >> return "true"
-    false = reserved "false" >> return "false"
+    true = reserved "true" >> return True
+    false = reserved "false" >> return False
 
 
 arrayLit = do
     meta <- getMeta
     Array meta <$> brackets (trailCommaSep expr)
 
-stringLit = StringLit <$> stringLiteral
+stringLit :: Parser Lit
+stringLit = StringLit <$> lexeme stringLiteral
 
 interpolatedString :: Parser Expr
 interpolatedString = do
@@ -199,7 +196,7 @@ wildcardPattern = do
     reservedOp "_"
     return WildcardPattern
 
-litPattern = LitPattern <$> lexeme (boolLit <|> stringLit <|> try floatLit <|> integerLit)
+litPattern = LitPattern <$> (boolLit <|> stringLit <|> try floatLit <|> integerLit)
 
 qi = do
          i <- identifier
@@ -283,7 +280,7 @@ extern = do
     args <- parens $ trailCommaSep arg
     tpe <- typeAscription
     reservedOp "="
-    externName <- lexeme stringLit
+    externName <- stringLit
     let body = Literal meta externName
     let (lam, funcType) = curryLambda meta args body
     let scheme = generalizeType funcType

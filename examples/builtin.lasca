@@ -90,6 +90,7 @@ def innerFunctions() = {
 }
 
 def main() = {
+    __I_D_E_N_T_123_ = true;
     testLiterals();
     bitwiseOperations();
     logicalOperations();
