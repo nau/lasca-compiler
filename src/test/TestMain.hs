@@ -27,6 +27,7 @@ import Lasca.Infer
 import Lasca.Type
 import Lasca.Options
 import Lasca.Modules
+import TestTH
 
 import Data.List
 import Data.Ord
@@ -37,7 +38,7 @@ default (T.Text)
 main :: IO ()
 main = do
   goldens <- foldMap mkGoldenTests examples
-  defaultMain (testGroup "Tests" ([parserTests, modulesTests, typerTests] ++ goldens ++ compileTests))
+  defaultMain (testGroup "Tests" ([parserTests, parserTests2,  modulesTests, typerTests] ++ goldens ++ compileTests))
 
 modul n is = LascaModule { imports = is, moduleExprs = [], modName = n }
 
@@ -53,6 +54,40 @@ fromRight (Right a) = a
 
 modulesTests = testGroup "Module dependency tests"
   [ testCase "Linearize includes" $ linearizeIncludes queen @?= [prelude, test2, arr, opt, test1, lst, queen] ]
+
+parseOK s expected = testCase s $ case parseToplevel (T.pack s) of
+    Right e -> assertEqual "" expected e
+    Left  e -> assertFailure $ (show expected) ++ " but got " ++ Megaparsec.parseErrorPretty e
+
+parseError s expected = testCase ("Error on " ++ s) $ case parseToplevel (T.pack s) of
+    Right e -> assertFailure $ expected ++ " but got " ++ show e
+    Left  e -> assertEqual "" expected $ Megaparsec.parseErrorTextPretty e
+
+defaultModule = Module (withMetaPos 1 1) "<stdin>"
+
+parseTypeOK s t = testCase s (parseType (T.pack s) @?= Right t)
+
+parserTests2 = testGroup "Parser tests" [
+      testCase "empty" $ parseToplevel "" @?= Right []
+    , $(parseOkMatch "module Test_1 . Test2 ; "
+        [p| [Module _ (NS (Name "Test_1") (Name "Test2")) ] |])
+    , $(parseOkMatch "import Test_1.Test2 ; import Test3"
+        [p| [Import _ (NS (Name "Test_1") (Name "Test2")), Import _ "Test3" ] |])
+    , parseError "module Test module Another"
+        "unexpected 'm'\nexpecting end of input or import statement\n"
+    , parseError "import  Asdf. "
+        "unexpected '.'\nexpecting end of input, import statement, or top-level declaration\n"
+    , parseError "import ._$#@ "
+        "unexpected '.'\nexpecting qualified identifier (like My.Qualified.Name or SomeName)\n"
+    , $(parseOkMatch "data Void" [p| [Data _ "Void" _ _] |])
+    , $(parseOkMatch "data Bool= |True|False" [p| [Data _ "Bool" [] [DataConst "True" [], DataConst "False" []]] |])
+    , $(parseOkMatch "data User = U(n: String, f)" [p| [Data _ "User" [] [DataConst "U" _]] |])
+    , parseError "data lower" "unexpected 'l'\nexpecting uppercase identifier\n"
+    , parseError "data UppER=lower" "unexpected 'l'\nexpecting '|' or uppercase identifier\n"
+    , parseTypeOK "String" (TypeIdent "String")
+    , parseTypeOK "[Int]" (TypeApply (TypeIdent "Array") [TypeIdent "Int"])
+    , parseTypeOK "(a -> B) -> C" (TypeFunc (TypeFunc (TVar $ TV "a") (TypeIdent "B")) (TypeIdent "C"))
+    ]
 
 parserTests = testGroup "Parser tests"
   [ testCase "Parse true" $

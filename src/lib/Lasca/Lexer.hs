@@ -16,7 +16,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
 type Parser = Parsec Void Text
 
 ops = ["+","*","-","/",";", "==", ":=", "=",",",".","<",">","|",":"]
-keywords = ["module", "import", "data", "def", "extern", 
+keywords = ["module", "import", "data", "def", "extern",
   "if", "then", "else", "in", "let", "true", "false", "match", "do", "lazy", "var", "and", "not", "or"
   ]
 
@@ -61,22 +61,23 @@ reservedOp w = string w *> notFollowedBy opChar *> sc
 
 identOp = lexeme $ some opChar
 
-upperIdentifier = (lexeme . try) (p)
-  where
-      p       = (\c cs -> T.cons c (T.pack cs)) <$> upperChar <*> many alphaNumChar
+upperIdentifier = lexeme $ try (do
+    c <- upperChar
+    T.cons c <$> idrest
+    <?> "uppercase identifier")
 
 identifier :: Parser Text
 identifier = lexeme $ try $ do
     ident <- identifierOrReserved
-    when (ident `elem` keywords) $ unexpected . Label . NonEmpty.fromList $ "reserved " ++ ident
+    when (ident `elem` keywords) $ unexpected . Label . NonEmpty.fromList $ "reserved " ++ (T.unpack ident)
     when (ident == "_") $ unexpected . Label . NonEmpty.fromList $ "wildcard"
-    return $ T.pack ident
+    return ident
 
+idrest = takeWhileP Nothing (\ch -> isAlphaNum ch || ch == '_' || ch == '$')
 
 identifierOrReserved = lexeme $ try $ do
-  c <- satisfy isAlpha <|> char '_'
-  cs <- many (satisfy isAlphaNum <|> char '_')
-  return $ c : cs
+    c <- satisfy (\ch -> isAlpha ch || ch == '_' || ch == '$')
+    T.cons c <$> idrest
 
 
 opChar :: Parser Char

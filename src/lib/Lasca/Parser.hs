@@ -1,6 +1,7 @@
 {-# LANGUAGE LambdaCase #-}
 module Lasca.Parser (
   parseExpr,
+  parseType,
   parseToplevelFilename,
   parseToplevel
 ) where
@@ -10,6 +11,7 @@ import Control.Monad.State
 import qualified Data.Char as Char
 import           Data.List as List
 import           Data.Maybe
+import           Data.Void
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.List.NonEmpty
@@ -70,6 +72,7 @@ boolLit = BoolLit <$> (true <|> false)
 arrayLit = do
     meta <- getMeta
     Array meta <$> brackets (trailCommaSep expr)
+    <?> "array literal (like [1, 2])"
 
 stringLit :: Parser Lit
 stringLit = StringLit <$> lexeme stringLiteral
@@ -79,6 +82,7 @@ interpolatedString = do
     list <- lexeme pTemplate
     meta <- getMeta
     return $ go meta list
+    <?> "interpolated string literal"
   where go meta [] = Literal meta (StringLit "")
         go meta list = case foldr (go' meta) [] list of
                     [s] -> s
@@ -89,7 +93,7 @@ interpolatedString = do
 
 
 pTemplate :: Parser [Either Text Expr] -- Left = text, Right = variable
-pTemplate = char '\"' *> manyTill piece (char '\"')
+pTemplate = char '\"' *> manyTill piece (char '\"') <?> "interpolated string"
   where
     -- piece of text or interpolated variable
     piece =
@@ -97,7 +101,7 @@ pTemplate = char '\"' *> manyTill piece (char '\"')
         (Right <$> var)
 
     -- interpolated variable
-    var = string "${" *> between sc (char '}') pVar
+    var = string "${" *> between sc (char '}') pVar <?> "interpolator"
 
     -- normal character, plain or escaped
     ch = noneOf escapable <|> ppp
@@ -112,9 +116,9 @@ pTemplate = char '\"' *> manyTill piece (char '\"')
     mapping = Map.union escapableMap escapesMap
 
     escapable = ['"', '\\', '$']
-    
+
     escapableMap = Map.fromList $ List.zip escapable escapable
-    
+
     escapesMap = Map.fromList [('n', '\n'), ('t', '\t'), ('r', '\r'), ('b', '\b'), ('0', '\0')] -- TODO complete it
     escapes = escapable ++ Map.keys escapesMap
 
@@ -172,6 +176,7 @@ matchExpr = do
     ex <- expr
     cs <- bracedCases
     return $ Match meta ex cs
+    <?> "match expression"
 
 bracedCases = braces $ some acase
 
@@ -333,11 +338,17 @@ closure = braces cls
 data LetVal = Named Name Expr | Stmt Expr
 
 valdef f = do
-    ident <- identifier
-    option TypeAny typeAscription
-    reservedOp "="
+    try $ lookAhead valdefPrefix -- if expression starts with 'ident =' then we consume it and expect a valid value binding,
+    i <- valdefPrefix            -- otherwise, alternate to unnamedStmt
     e <- expr
-    return (f (Name ident) e)
+    return (f (Name i) e)
+    <?> "name binding (e.g. four = 2 + 2)"
+  where
+    valdefPrefix = do
+        ident <- identifier
+        option TypeAny typeAscription
+        reservedOp "="
+        return ident
 
 vardef f = do
     reserved "var"
@@ -355,7 +366,7 @@ unnamedStmt = do
     return (Stmt e)
 
 blockStmts = do
-    exprs <- (try (vardef Named) <|> try (valdef Named) <|> unnamedStmt) `sepEndBy` semi
+    exprs <- (vardef Named <|> (valdef Named) <|> unnamedStmt) `sepEndBy` semi
     let letin = foldStmtsIntoOneLetExpr (List.reverse exprs)
     return letin
   where
@@ -388,29 +399,31 @@ dataDef = do
     constructors <- option [] $ do
         reservedOp "="
         optional $ reservedOp "|"
-        dataConstructor `sepBy` reservedOp "|"
+        dataConstructor `sepBy1` reservedOp "|"
     return (Data meta (Name typeName) (List.map TV tvars) constructors)
+    <?> "data definition"
 
 dataConstructor = do
-    name <- identifier
+    name <- upperIdentifier
     args <- option [] $ parens (trailCommaSep arg)
     return (DataConst (Name name) args)
 
 factor :: Parser Expr -- TODO remove unneeded try's, reorder
 factor =  try floatingLiteral
-      <|> try boolLiteral
-      <|> try letins
-      <|> try arrayLit
-      <|> try interpolatedString
-      <|> try integerLiteral
-      <|> try variable
-      <|> try matchExpr
+      <|> integerLiteral
+      <|> boolLiteral
+      <|> letins
+      <|> arrayLit
+      <|> interpolatedString
+      <|> variable
+      <|> matchExpr
       <|> try closure
-      <|> try function
+      <|> function
       <|> try unitLiteral
       <|> ifthen
       <|> block
       <|> parens expr
+      <?> "expression"
 
 globalValDef = do
     meta <- getMeta
@@ -419,34 +432,47 @@ globalValDef = do
 moduleDef = do
     reserved "module"
     meta <- getMeta
-    name <- qualIdent
+    name <- qualIdent <?> "qualified identifier (like My.Qualified.Name or SomeName)"
+    hidden $ optional semi
     return $ Module meta name
+    <?> "module declaration"
 
 importDef = do
     reserved "import"
     meta <- getMeta
-    name <- qualIdent
+    name <- qualIdent <?> "qualified identifier (like My.Qualified.Name or SomeName)"
+    hidden $ optional semi
     return $ Import meta name
+    <?> "import statement"
 
 annotations = some $ do
     reservedOp "@"
     identifier
 
 defn :: Parser Expr
-defn =  try moduleDef
-    <|> try importDef
-    <|> try extern
-    <|> try function
-    <|> try dataDef
+defn = extern
+    <|> function
+    <|> dataDef
     <|> globalValDef
+    <?> "top-level declaration"
 
 contents p = between sc eof p
 
 toplevel :: Parser [Expr]
-toplevel = many $ defn
+toplevel = do
+    meta <- getMeta
+    mod <- optional moduleDef
+    imports <- many importDef
+    defs <- many defn
+    return (maybeToList mod ++ imports ++ defs)
 
-parseExpr s = parse (contents expr) "<stdin>" s
+parseWith :: Parser a -> Text ->Either (Megaparsec.ParseError Char Void) a
+parseWith parser s = parse (contents parser) "<stdin>" s
+
+parseExpr = parseWith expr
 
 parseToplevelFilename fileName s = parse (contents toplevel) fileName s
 
 parseToplevel s = parseToplevelFilename "<stdin>" s
+
+parseType = parseWith typeExpr

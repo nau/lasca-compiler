@@ -2,12 +2,16 @@
 .stack*
 .cabal*
 .liquid/
+.vscode/*
+result
+.history/
 build/
 out/
 dist
 *.iml
 target/
 cabal.sandbox.config
+hello
 *.dll
 *.dylib
 *.so

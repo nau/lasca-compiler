@@ -149,14 +149,14 @@ Int16* boxInt16(int16_t i) {
     Int16* ti = gcMallocAtomic(sizeof(Int16));
     ti->type = INT16;
     ti->num = i;
-    return ti;    
+    return ti;
 }
 
 Int32* boxInt32(int32_t i) {
     Int32* ti = gcMallocAtomic(sizeof(Int32));
     ti->type = INT32;
     ti->num = i;
-    return ti;    
+    return ti;
 }
 
 Float64* __attribute__ ((pure)) boxFloat64(double i) {
@@ -211,7 +211,7 @@ Box* writeVar(DataValue* var, Box* value) {
 
 static int64_t isBuiltinType(const Box* v) {
     const LaType* t = v->type;
-    return eqTypes(t, UNIT) || eqTypes(t, BOOL) || eqTypes(t, BYTE) 
+    return eqTypes(t, UNIT) || eqTypes(t, BOOL) || eqTypes(t, BYTE)
       || eqTypes(t, INT) || eqTypes(t, INT16) || eqTypes(t, INT32) || eqTypes(t, FLOAT64)
       || eqTypes(t, STRING) || eqTypes(t, CLOSURE) || eqTypes(t, ARRAY) || eqTypes(t, BYTEARRAY);
 }
@@ -236,7 +236,7 @@ Box* __attribute__ ((pure)) runtimeBinOp(int64_t code, Box* lhs, Box* rhs) {
 
     Box* result = NULL;
 
-    if (code == ADD) { DO_OP(+); } 
+    if (code == ADD) { DO_OP(+); }
     else if (code == SUB) { DO_OP(-); }
     else if (code == MUL) {DO_OP(*);}
     else if (code == DIV) {DO_OP(/);}
@@ -245,7 +245,7 @@ Box* __attribute__ ((pure)) runtimeBinOp(int64_t code, Box* lhs, Box* rhs) {
         bool b = (code == EQ && res == 0) || (code == NE && res != 0) ||
                  (code == LT && res == -1) || (code == LE && res != 1) ||
                  (code == GE && res != -1) || (code == GT && res == 1);
-        result = (Box*) boxBool(b);                 
+        result = (Box*) boxBool(b);
     }
     return result;
 }
@@ -259,7 +259,7 @@ Box* __attribute__ ((pure)) runtimeUnaryOp(int64_t code, Box* expr) {
             } else if (eqTypes(expr->type, BYTE)) {
                 result = (Box*) boxByte(-asByte(expr)->num);
             } else if (eqTypes(expr->type, INT32)) {
-                result = (Box*) boxInt32(-asInt32(expr)->num);    
+                result = (Box*) boxInt32(-asInt32(expr)->num);
             } else if (eqTypes(expr->type, INT16)) {
                 result = (Box*) boxInt16(-asInt16(expr)->num);
             } else if (eqTypes(expr->type, FLOAT64)) {
@@ -643,7 +643,7 @@ void initLascaRuntime(Runtime* runtime) {
         INT_ARRAY[i].num = i;
     }
     if (runtime->verbose) {
-        printf("Init Lasca 0.0.0.1 runtime. Enjoy :)\n# funcs = %"PRId64
+        printf("Init Lasca 0.0.1 runtime. Enjoy :)\n# funcs = %"PRId64
                ", # structs = %"PRId64", utf8proc version %s\n",
           RUNTIME->functions->size, RUNTIME->types->size, utf8proc_version());
         for (int i = 0; i < RUNTIME->types->size; i++) {
