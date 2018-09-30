@@ -6,7 +6,7 @@ Lasca Language
 
 Lasca is Scala shifted towards Haskell.
 
-Lasca is a LLVM-based statically or dynamically typed strict functional programming language. Simplified OCaml if you like.
+Lasca is a LLVM-based statically or dynamically typed strict functional programming language. Simplified OCaml if you will.
 
 It has a 'dynamic' compilation mode, meaning instant code generation without compile time type checking/inference, allowing instant compilation/execution cycle, and more freedom dynamic languages give.
 
@@ -31,13 +31,13 @@ Inspired by:
 - Haskell, Liquid Haskell, Linear Haskell, Idris
 - OCaml/SML/F#/1ML
 - Clojure (persisted data structures, HAMT/CHAMP)
-- Go (simplicity, speed, Any interface?, all-in-one compiler)
-- Erlang (actors, immutability, simplicity, distributed)
+- Go (CSP)
+- Erlang (actors, immutability, minimalism)
 - Python (docstrings, doctests, syntax)
 - Julia
 - Swift
 - Nim
-- Pony (ref caps, behaviours, actors)
+- Pony
 - [Koka](https://github.com/koka-lang/koka) (algebraic effects)
 
 Ideas
@@ -56,6 +56,7 @@ Ideas
 - prefer things done one way
 - LLVM backend
 - JavaScript/WebAssembly backend (native or via LLVM/emscripten)
+- GraalVM backend?
 - no OOP and data subclassing/inheritance?
 - syntactic sugar is ok
 - no null
@@ -80,21 +81,59 @@ Ideas
 Example
 ---
 
-Current implementation has braces and semicolons, but it's planned to change into something like this:
+Current implementation uses braces and semicolons, but I consider adding indentation-based syntax, or semicolon inference.
 
-```scala
-    Sun = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, SolarMass]
+```haskell
+-- Algebraic data type a la Haskell
+data JValue
+    = JNull
+    | JNum(n: Float)
+    | JString(s: String)
+    | JBool(v: Bool)
+    | JArray(v: [JValue])
+    | JObject(v: Map String JValue)
 
-    -- global type inference, type ascriptions allowed, types are unified. Here, `i` is Int, return type inferred is [[Float]]
-    def go(bodies: [[Float]], i, pxyz: [Float]) =  
-        body = bodies[i] -- body is an immutable val by default
-        updatedPs = [
-            pxyz[0] + body[3] * body[6],
-            pxyz[1] + body[4] * body[6],
-            pxyz[2] + body[5] * body[6], -- optional commas allowed
-        ]
-        if i == 0 then updatedPs else go(bodies, i - 1, updatedPs) -- function returns result of last expression
+-- function argument type annotations are optional, compiler infers those
+def jsonToString(js: JValue) = match js {
+    JNull -> "null"
+    JNum(n) -> toString(n)
+    JBool(v) -> toString(v)
+    JArray(v) -> {
+        values = Array.map(v, jsonToString);
+        toString(values);
+    }
+    JString(v) -> "\"${v}\""
+    JObject(m) -> {
+        if Map.isEmpty(m) then "{}" else {
+            res = Array.makeArray(m.size, "");
+            var idx = 0;
+            Map.foreachWithKey(m, { k, v ->
+                setIndex(res, idx.readVar, "\"${k}\": ${jsonToString(v)}");
+                idx := idx.readVar + 1;
+            });
+            s = String.join(", ", res);
+            "{ ${s} }"
+        };
+    }
+}
 ```
+
+What Works Right Now
+---
+
+- JIT and AOT compilation and execution (via LLVM OrcJIT)
+  - lasca -e hello.lasca to execute
+  - lasca hello.lasca to create a binary
+- type inference
+- dynamic typing mode (```lasca -e --mode dynamic hello.lasca```)
+- ADTs, inner functions, out of order function definitions
+- pattern matching
+- calling external C functions
+- string interpolation, UTF8 encoded immutable strings
+- builtin types: `String`, `Bool`, `Int`, `Byte`, `Int16`, `Int32`, `Float`, `Array`, `ByteArray`, `Var`, `FileHandle`
+- implemented `List`, `Option`, `Either`, `Map`, `ArrayBuffer`
+- regular expressions with [PCRE-2](https://www.pcre.org/)
+- overloaded `+` `-` `*` `/` operators
 
 Package System
 ---
@@ -141,72 +180,73 @@ Other
 - easy C interoperability
 - no exceptions (Go/Rust panic style errors)
 - don't overuse `'~!@#$%^&* symbols
-- fast compilation
 - default immutability
-- string interpolation: "$ident = ${expression}"
+- string interpolation: "${ident} = ${expression}"
 - multiline strings
 - Uniform Function Call Syntax (Rust, D).
   For example, any function can be a method for its first argument:
-    def toString(s: String)
+
+```scala
+    def toString(s: String) = ...
     "Hello".toString
     def plus(l: Num, r: Num)
     1.plus(2)
-    Benefits: 'traditional' syntax, dot-completion, more 'flat', less LISP
+```
+
 - uniform select principle. Use (.) for record field selection, func calls, package name resolution etc
 - UTF-8 strings
 - Haskell-like application for type functions: Option Int, Either Int String, etc
-- Option TypeName as TypeName? sugar (considered)
 
 Install on Mac OS using Homebrew
 ---
 
-    $ brew install cmake llvm@6 boehmgc pcre2
-    $ brew install nau/lasca/lasca-compiler
+    brew install cmake llvm@6 boehmgc pcre2
+    brew install nau/lasca/lasca-compiler
 
 Setup LASCAPATH environment variable. Add this to your .bash_profile
 
-    $ export LASCAPATH="$(brew --prefix lasca-compiler)/src"
+    export LASCAPATH="$(brew --prefix lasca-compiler)/src"
 
 Try it!
 
-    $ echo 'def main() = println("Hello Lasca!")' > hello.lasca
-    $ lasca -e hello.lasca
-    Hello Lasca!
+    echo 'def main() = println("Hello Lasca!")' > hello.lasca
+    lasca -e hello.lasca
+    > Hello Lasca!
 
 Add bash completion config for lasca compiler options:
 
-    $ lasca --bash-completion-script lasca > $(brew --prefix)/etc/bash_completion.d/lasca    
+    lasca --bash-completion-script lasca > $(brew --prefix)/etc/bash_completion.d/lasca
 
 Build on Mac OS
 ---
 
 You need LLVM 6.0 installed, and latest Haskell Stack.
 
-    $ brew install cmake llvm@6 boehmgc pcre2
+    brew install cmake llvm@6 boehmgc pcre2
 
-    $ brew install haskell-stack
+    brew install haskell-stack
 
-    $ stack setup
+    stack setup
 
 Setup LASCAPATH environment variable. Add this to your .bash_profile
 
-    $ export LASCAPATH="${lasca-compiler-src-dir}/libs/base"
+    export LASCAPATH="${lasca-compiler-src-dir}/libs/base"
 
 Add your `~/.local/bin` directory to your `PATH`
 
-    $ export PATH=$PATH:~/.local/bin
+    export PATH=$PATH:~/.local/bin
 
 Build and install lasca compiler
 
-    $ make install
+    make install
 
 Add bash completion config for lasca compiler options:
 
-    $ lasca --bash-completion-script lasca > $(brew --prefix)/etc/bash_completion.d/lasca
+    lasca --bash-completion-script lasca > $(brew --prefix)/etc/bash_completion.d/lasca
 
 Run hello.lasca
 
-    $ lasca --exec examples/hello.lasca
+    lasca --exec examples/hello.lasca
 
 Build on Ubuntu
 ---
@@ -217,22 +257,22 @@ Don't install Haskell Stack from apt. [It's likely to be older than 1.6 and won'
 
 Do this instead:
 
-    $ curl -sSL https://get.haskellstack.org/ | sh
+    curl -sSL https://get.haskellstack.org/ | sh
 
-    $ sudo apt install llvm-6.0-dev libgc-dev zlib1g-dev cmake
-    $ sudo add-apt-repository universe
-    $ sudo apt install libpcre2-dev
-    $ export LASCAPATH="${lasca-compiler-src-dir}/libs/base"
-    $ export PATH=$PATH:~/.local/bin
-    $ stack setup
-    $ make install
-    $ lasca -e examples/hello.lasca
+    sudo apt install llvm-6.0-dev libgc-dev zlib1g-dev cmake
+    sudo add-apt-repository universe
+    sudo apt install libpcre2-dev
+    export LASCAPATH="${lasca-compiler-src-dir}/libs/base"
+    export PATH=$PATH:~/.local/bin
+    stack setup
+    make install
+    lasca -e examples/hello.lasca
 
 Current n-body run
 ---
 
-There are several implementation of n-body problem
-http://benchmarksgame.alioth.debian.org/u64q/nbody.html
+There are several implementation of [n-body problem](
+http://benchmarksgame.alioth.debian.org/u64q/nbody.html)
 Currently it's quite slow due to boxing.
 
     $ time lasca -e -O2 examples/nbody.lasca -- 50000000
@@ -243,8 +283,8 @@ Currently it's quite slow due to boxing.
     user      7m39.476s
     sys       0m38.716s
 
-    $ find src -name "*.hs"  | xargs cat | wc -l
-    3714
+    find src -name "*.hs"  | xargs cat | wc -l
+    4738
 
-    $ find src -name "*.c"  | xargs cat | wc -l
-    681
+    cat rts/runtime.c rts/builtin.c rts/lasca.h | wc -l
+    1324
