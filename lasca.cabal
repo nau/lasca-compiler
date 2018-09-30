@@ -95,15 +95,13 @@ test-suite lasca-test
                        megaparsec >= 6.0.0,
                        Glob,
                        filepath,
-                       template-haskell,
                        tasty,
                        tasty-hunit,
                        tasty-smallcheck,
                        tasty-quickcheck,
                        tasty-golden,
                        tasty-program
-  other-modules:       TestTH
-  ghc-options:         -threaded -rtsopts
+  ghc-options:         -threaded -rtsopts -fPIC
   if os(darwin)
     extra-libraries:    lascartStatic
     ghc-options:        -fwhole-archive-hs-libs

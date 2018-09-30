@@ -11,6 +11,7 @@ import Test.Tasty.Program
 import System.FilePath
 import System.FilePath.Glob
 import System.Directory
+import Control.Exception as X
 import qualified Text.Megaparsec as Megaparsec
 import Shelly (shelly, run)
 
@@ -27,7 +28,6 @@ import Lasca.Infer
 import Lasca.Type
 import Lasca.Options
 import Lasca.Modules
-import TestTH
 
 import Data.List
 import Data.Ord
@@ -63,25 +63,34 @@ parseError s expected = testCase ("Error on " ++ s) $ case parseToplevel (T.pack
     Right e -> assertFailure $ expected ++ " but got " ++ show e
     Left  e -> assertEqual "" expected $ Megaparsec.parseErrorTextPretty e
 
+parseOkMatch s f = testCase s $ case parseToplevel (T.pack s) of
+    Right p -> X.catch (f p) $ printErr (show p)
+    Left  e  -> assertFailure $ Megaparsec.parseErrorPretty e
+
+printErr :: String -> SomeException -> IO ()
+printErr got e =  case fromException e of
+    Just (PatternMatchFail s) -> assertFailure (s ++ "got " ++ got)
+    nothing -> return ()
+
 defaultModule = Module (withMetaPos 1 1) "<stdin>"
 
 parseTypeOK s t = testCase s (parseType (T.pack s) @?= Right t)
 
 parserTests2 = testGroup "Parser tests" [
       testCase "empty" $ parseToplevel "" @?= Right []
-    , $(parseOkMatch "module Test_1 . Test2 ; "
-        [p| [Module _ (NS (Name "Test_1") (Name "Test2")) ] |])
-    , $(parseOkMatch "import Test_1.Test2 ; import Test3"
-        [p| [Import _ (NS (Name "Test_1") (Name "Test2")), Import _ "Test3" ] |])
+    , parseOkMatch "module Test_1 . Test2 ; "
+        (\ [Module _ (NS (Name "Test_1") (Name "Test2")) ] -> return ())
+    , parseOkMatch "import Test_1.Test2 ; import Test3"
+        (\ [Import _ (NS (Name "Test_1") (Name "Test2")), Import _ "Test3" ]  -> return ())
     , parseError "module Test module Another"
         "unexpected 'm'\nexpecting end of input or import statement\n"
     , parseError "import  Asdf. "
         "unexpected '.'\nexpecting end of input, import statement, or top-level declaration\n"
     , parseError "import ._$#@ "
         "unexpected '.'\nexpecting qualified identifier (like My.Qualified.Name or SomeName)\n"
-    , $(parseOkMatch "data Void" [p| [Data _ "Void" _ _] |])
-    , $(parseOkMatch "data Bool= |True|False" [p| [Data _ "Bool" [] [DataConst "True" [], DataConst "False" []]] |])
-    , $(parseOkMatch "data User = U(n: String, f)" [p| [Data _ "User" [] [DataConst "U" _]] |])
+    , parseOkMatch "data Void" (\ [Data _ "Void" _ _] -> return ())
+    , parseOkMatch "data Bool= |True|False" (\ [Data _ "Bool" [] [DataConst "True" [], DataConst "False" []]] -> return ())
+    , parseOkMatch "data User = U(n: String, f)" (\ [Data _ "User" [] [DataConst "U" _]] -> return ())
     , parseError "data lower" "unexpected 'l'\nexpecting uppercase identifier\n"
     , parseError "data UppER=lower" "unexpected 'l'\nexpecting '|' or uppercase identifier\n"
     , parseTypeOK "String" (TypeIdent "String")
