@@ -138,7 +138,7 @@ cgenApply ctx meta expr args = do
             let f = S._globalFunctions ctx Map.! fn
 --            Debug.traceM $ printf "Calling %s" fn
             largs <- forM args $ \arg -> cgen ctx arg
-            callFn (funcLLvmType f) (show fn) largs
+            call (funcLLvmType f) (nameToSBS fn) largs
 
         expr -> do
             modState <- gets moduleState

@@ -112,7 +112,7 @@ cgen ctx this@(S.Apply meta (S.Ident _ (NS "Bits" fn)) [lhs, rhs]) | fn `elem` [
         (Name "intShiftL") -> instrTyped intType (I.Shl False False a b []) >>= boxInt
         (Name "intShiftR") -> instrTyped intType (I.AShr False a b []) >>= boxInt
         _ -> error $ printf "Unsupported builtin operation %s" (show $ S.exprPosition this)
-        
+
 cgen ctx (S.Apply meta expr args) = cgenApply ctx meta expr args
 cgen ctx (S.Closure _ funcName enclosedVars) = do
     modState <- gets moduleState
@@ -228,7 +228,7 @@ cgenApplyBinOp ctx this@(S.Apply meta op@(S.Ident _ fn) [lhs, rhs]) = do
     let code = fromMaybe (error ("Couldn't find binop " ++ show fn)) (Map.lookup fn binops)
 --    Debug.traceM $ printf "%s: %s <==> %s: %s, code %s" (show lhsType) (show realLhsType) (show rhsType) (show realRhsType) (show code)
     let llvmType = externalTypeMapping realLhsType
-    if isPrimitiveType realLhsType 
+    if isPrimitiveType realLhsType
     then do
         res <- case code of
             _ | code >= 10 && code <= 13 -> do
@@ -256,12 +256,12 @@ cgenApply ctx meta expr args = do
             idx <- unboxInt boxedIdx
 --            callFn (funcType ptrType [ptrType, intType]) "arrayGetIndex" [array, idx]
             cgenArrayApply array idx
-                    
+
         S.Ident _ fn | isGlobal fn -> do
 --            Debug.traceM $ printf "Calling %s" fn
             let f = S._globalFunctions ctx Map.! fn
             largs <- forM args $ \arg -> cgen ctx arg
-            callFn (funcLLvmType f) (show fn) largs
+            call (funcLLvmType f) (nameToSBS fn) largs
         expr -> do
             -- closures
             modState <- gets moduleState

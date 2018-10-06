@@ -103,7 +103,7 @@ codegenPhase context filename exprs mainFunctionName = do
         forM_ exprs $ \expr -> do
             defineStringConstants expr
             codegenTop ctx cgen expr
-        codegenStartFunc ctx cgen (show mainFunctionName)
+        codegenStartFunc ctx cgen mainFunctionName
 
 processMainFile :: LascaOpts -> String -> IO ()
 processMainFile opts filename = runPhases opts filename
@@ -146,8 +146,8 @@ compileExecutable opts fname mod = do
             then ["-llascartStatic"]
             else ["-Wl,--whole-archive", "-llascartStatic" , "-Wl,--no-whole-archive"]
         lascartDynamicLink = ["-llascart"]
-        libLascaLink = ["-rdynamic"] 
-            -- passes --export-dynamic to the linker. 
+        libLascaLink = ["-rdynamic"]
+            -- passes --export-dynamic to the linker.
             -- Needed for OrcJit to to able to dynamicly load generated `main` function
             ++ lascartStaticLink
             -- ++ lascartDynamicLink

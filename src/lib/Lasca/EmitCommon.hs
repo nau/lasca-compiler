@@ -311,7 +311,7 @@ callBuiltin name args = do
     let (restype, params, vararg, attrs) = builtinFuncs Map.! name
         ps = map snd params
         ftype = T.FunctionType restype ps vararg
-    call ftype (globalOp ftype name) args
+    call ftype name args
 {-# INLINE callBuiltin #-}
 
 
@@ -471,7 +471,7 @@ codegenStartFunc ctx cgen mainName = do
         instrDo $ callFnIns (funcType T.void [ptrType]) "initLascaRuntime" [constOp $ constRef runtimeStructType "Runtime"]
         instrDo $ callFnIns (funcType T.void [intType, ptrType]) "initEnvironment" [local intType "argc", localPtr "argv"]
         initGlobals
-        callFn (funcType ptrType []) mainName []
+        call (funcType ptrType []) (nameToSBS mainName) []
         terminator $ I.Do $ I.Ret Nothing []
         return ()
 

@@ -378,20 +378,26 @@ inttoptr op = instr (IntToPtr op ptrType [])
 
 -- Effects
 
-call :: Type -> Operand -> [Operand] -> Codegen Operand
-call ftype fn args = instr $ callIns ftype fn args
+callOperand :: Type -> Operand -> [Operand] -> Codegen Operand
+callOperand ftype fn args = do
+    let retty = resultType ftype
+    instrTyped retty $ callIns ftype fn args
+{-# INLINE callOperand #-}
+
+call :: Type -> SBS.ShortByteString -> [Operand] -> Codegen Operand
+call ftype fname args = callOperand ftype (globalOp ftype fname) args
 {-# INLINE call #-}
 
 callIns ftype fn args = do
     let (FunctionType retty argumentTypes vararg) = ftype
     let argAttrs = fmap paramAttributesForType argumentTypes
     {-- TODO: fix for varags with signext/zeroext types: i8, i16.
-        Having those types as arguments to vararg function still requires
-        us to generate signext/zeroext attributes,
-        but we don't have this information at this point.
-        E.g. calling boxArray(2, intToByte(12)) may require this call instruction (if we generate unboxed values):
-            call i8* @boxArray(i64 2, i8 signext 12)
-    -}
+    Having those types as arguments to vararg function still requires
+    us to generate signext/zeroext attributes,
+    but we don't have this information at this point.
+    E.g. calling boxArray(2, intToByte(12)) may require this call instruction (if we generate unboxed values):
+        call i8* @boxArray(i64 2, i8 signext 12)
+        -}
     let argsWithParams = if vararg then toArgs args else zip args argAttrs
     Call {
         tailCallKind = Nothing,
@@ -402,11 +408,10 @@ callIns ftype fn args = do
         functionAttributes = [],
         metadata = []
     }
+{-# INLINE callIns #-}
 
 callFnIns ftype name args = callIns ftype (globalOp ftype (fromString name)) args
-
-callFn ftype name args = call ftype (globalOp ftype (fromString name)) args
-{-# INLINE callFn #-}
+{-# INLINE callFnIns #-}
 
 alloca :: Type -> Codegen Operand
 alloca ty = instr $ Alloca ty Nothing 0 []

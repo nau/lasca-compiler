@@ -42,7 +42,7 @@ genExternalFuncWrapper ctx f@(Let True meta name returnType lam _) = do
             EmitStatic.resolveBoxing EmitStatic.anyTypeVar tpe (localPtr argName)
         let retType = externalTypeMapping returnType
 --        Debug.traceM $ printf "%s genExternalFuncWrapper %s, retType %s" (show name) (show $ externFuncLLvmType f) (show retType)
-        res <- instrTyped retType $ callFnIns (externFuncLLvmType f) (T.unpack externName) largs
+        res <- call (externFuncLLvmType f) (textToSBS externName) largs
         wrapped <- EmitStatic.resolveBoxing returnType EmitStatic.anyTypeVar res
         ret wrapped
 genExternalFuncWrapper ctx other = error $ "genExternalFuncWrapper got " ++ (show other)
@@ -77,7 +77,7 @@ codegenTop ctx cgen topExpr = case topExpr of
             define retType (nameToSBS name) largs blocks
       where
         (args, body) = uncurryLambda lam
-        
+
         funcType = typeOf lam
         largs = map (\(n, t) -> (nameToSBS n, t)) argsWithTypes
 
