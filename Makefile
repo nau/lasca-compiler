@@ -4,6 +4,7 @@ FLAGS = --standalone --toc --highlight-style pygments
 
 #TEST_RTS = +RTS -sstderr
 TEST_RTS =
+LASCA_VERSION="0.0.1"
 
 build: rts
 	stack build --extra-lib-dirs=build/rts
@@ -21,7 +22,7 @@ bench:
 	time lasca -O2 -e examples/gen.lasca
 
 rts:
-	mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Debug .. && make && cp rts/liblascart* $(LASCAPATH)
+	mkdir -p build && cd build && cmake -DCMAKE_BUILD_TYPE=Release .. && make && cp rts/liblascart* $(LASCAPATH)
 
 relink: rts
 	rm -rf .stack-work/dist/x86_64-osx/Cabal-2.0.1.0/build/Lasca/lasca
@@ -73,20 +74,8 @@ perf:
 	hp2ps -c lasca.hp
 	ghc-prof-flamegraph lasca.prof
 
-release: lasca test
-	rm -rf dist
-	mkdir -p dist/{src,bash_completion}
-	cp .stack-work/dist/x86_64-osx/Cabal-2.0.1.0/build/lasca/lasca dist
-	cp liblascart.a dist
-	cp libs/base/*.lasca dist/src
-#	lasca --bash-completion-script lasca > dist/$(brew --prefix)/etc/bash_completion.d/lasca
-	lasca --bash-completion-script lasca > dist/bash_completion/lasca
-	(cd dist; tar -czf ../lasca-0.1.0.tar.gz .)
-	SUM="$(shell shasum -a 256 lasca-0.1.0.tar.gz | awk '{ print $$1 }')"
-#	echo $(SUM)
-#	sed -E -e 's/sha256 "[a-zA-Z0-9]+"/sha256 $(SUM)/' ../homebrew-lasca/lasca-compiler.rb
-
-
+release: build
+	./make-release.sh ${LASCA_VERSION}
 designpdf:
 	rst2pdf -b 1 docs/Lasca\ Design.rst
 
