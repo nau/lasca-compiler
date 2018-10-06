@@ -2,34 +2,34 @@ import Map
 import Array
 import String
 
-data JValue 
+data JValue
     = JNull
-    | JNum(n: Float) 
-    | JString(s: String) 
-    | JBool(v: Bool) 
-    | JArray(v: [JValue]) 
+    | JNum(n: Float)
+    | JString(s: String)
+    | JBool(v: Bool)
+    | JArray(v: [JValue])
     | JObject(v: Map String JValue)
 
 def jsonToString(js: JValue) = match js {
-    JNull -> "null"
-    JNum(n) -> toString(n)
-    JBool(v) -> toString(v)
-    JArray(v) -> {
-        values = Array.map(v, jsonToString);
-        toString(values);
-    }
-    JString(v) -> "\"${v}\""
-    JObject(m) -> {
+    JObject(m) ->
         if Map.isEmpty(m) then "{}" else {
+            println(toString(m));
             res = Array.makeArray(m.size, "");
             var idx = 0;
-            Map.foreachWithKey(m, { k, v -> 
+            Map.foreachWithKey(m, { k, v ->
                 setIndex(res, idx.readVar, "\"${k}\": ${jsonToString(v)}");
                 idx := idx.readVar + 1;
             });
             s = String.join(", ", res);
             "{ ${s} }"
-        };
+        }
+    JNull -> "null"
+    JNum(n) -> toString(n)
+    JBool(v) -> toString(v)
+    JString(v) -> "\"${v}\""
+    JArray(v) -> {
+        values = Array.map(v, jsonToString);
+        toString(values);
     }
 }
 
