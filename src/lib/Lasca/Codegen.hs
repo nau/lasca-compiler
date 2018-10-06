@@ -100,15 +100,19 @@ defineGlobal name tpe body = defineGlobalVar name tpe body False
 
 defineConst name tpe body = defineGlobalVar name tpe (Just body) True
 
-defineFunction retty label link argtys blocks vararg funcAttrs = addDefn $
-    GlobalDefinition $ functionDefaults {
-      name        = Name label
-    , linkage     = link
-    , LLVM.AST.Global.functionAttributes = map Left funcAttrs
-    , parameters  = ([Parameter ty (Name nm) [] | (nm, ty) <- argtys], vararg)
-    , returnType  = retty
-    , basicBlocks = blocks
-    }
+defineFunction retty label link argtys blocks vararg funcAttrs = do
+    let retAttrs = paramAttributesForType retty
+    addDefn $
+        GlobalDefinition $ functionDefaults {
+        name        = Name label
+        , linkage     = link
+        , LLVM.AST.Global.functionAttributes = map Left funcAttrs
+        , parameters  = ([Parameter ty (Name nm) (paramAttributesForType ty) | (nm, ty) <- argtys], vararg)
+        , LLVM.AST.Global.returnAttributes = retAttrs
+        , returnType  = retty
+        , basicBlocks = blocks
+        }
+paramAttributesForType ty = if ty == T.i1 || ty == T.i8 || ty == T.i16 then [A.SignExt] else []
 
 --define ::  Type -> SBS.ShortByteString -> [(SBS.ShortByteString, Type)] -> [BasicBlock] -> LLVM ()
 define retty label argtys body = defineFunction retty label Linkage.External argtys body False []
@@ -374,14 +378,34 @@ inttoptr op = instr (IntToPtr op ptrType [])
 
 -- Effects
 
-call :: Operand -> [Operand] -> Codegen Operand
-call fn args = instr $ Call Nothing CC.C [] (Right fn) (toArgs args) [] []
+call :: Type -> Operand -> [Operand] -> Codegen Operand
+call ftype fn args = instr $ callIns ftype fn args
 {-# INLINE call #-}
 
-callIns fn args = Call Nothing CC.C [] (Right fn) (toArgs args) [] []
-callFnIns ftype name args = callIns (globalOp ftype (fromString name)) args
+callIns ftype fn args = do
+    let (FunctionType retty argumentTypes vararg) = ftype
+    let argAttrs = fmap paramAttributesForType argumentTypes
+    {-- TODO: fix for varags with signext/zeroext types: i8, i16.
+        Having those types as arguments to vararg function still requires
+        us to generate signext/zeroext attributes,
+        but we don't have this information at this point.
+        E.g. calling boxArray(2, intToByte(12)) may require this call instruction (if we generate unboxed values):
+            call i8* @boxArray(i64 2, i8 signext 12)
+    -}
+    let argsWithParams = if vararg then toArgs args else zip args argAttrs
+    Call {
+        tailCallKind = Nothing,
+        callingConvention = CC.C,
+        returnAttributes = paramAttributesForType retty,
+        function = Right fn,
+        arguments = argsWithParams,
+        functionAttributes = [],
+        metadata = []
+    }
 
-callFn ftype name args = call (globalOp ftype (fromString name)) args
+callFnIns ftype name args = callIns ftype (globalOp ftype (fromString name)) args
+
+callFn ftype name args = call ftype (globalOp ftype (fromString name)) args
 {-# INLINE callFn #-}
 
 alloca :: Type -> Codegen Operand

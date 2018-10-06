@@ -83,7 +83,7 @@ typeToLaTypeConstantName tpe = case tpe of
 
 typeToLaTypeRef :: Type -> C.Constant
 typeToLaTypeRef tpe = constRef ptrType $ typeToLaTypeConstantName tpe
-    
+
 externArgsToSig :: [S.Arg] -> [(SBS.ShortByteString, AST.Type)]
 externArgsToSig = map (\(S.Arg name tpe) -> ((nameToSBS name), externalTypeMapping tpe))
 
@@ -261,7 +261,7 @@ boxClosure name mapping enclosedVars = do
 boolToInt True = 1
 boolToInt False = 0
 
-builtinConsts = 
+builtinConsts =
     [ "UNIT_SINGLETON"
     , typeToLaTypeConstantName TypeUnit
     , typeToLaTypeConstantName TypeBool
@@ -311,7 +311,7 @@ callBuiltin name args = do
     let (restype, params, vararg, attrs) = builtinFuncs Map.! name
         ps = map snd params
         ftype = T.FunctionType restype ps vararg
-    call (globalOp ftype name) args
+    call ftype (globalOp ftype name) args
 {-# INLINE callBuiltin #-}
 
 
@@ -388,7 +388,7 @@ genTypeStruct name = do
     defineConst sbsLiteralName (T.ArrayType (fromIntegral len) T.i8) charArray
     defineConst sbsTypeName laTypeStructType laTypeStruct
     return $ constRef laTypeStructType sbsTypeName
-    
+
 --genData :: Ctx -> [S.Expr] -> ([S.Arg] -> [(SBS.ShortByteString, AST.Type)]) -> LLVM ([C.Constant])
 genData ctx defs argsToSig argToPtr = sequence [genDataStruct d | d <- defs]
   where genDataStruct dd@(S.Data meta name tvars constrs) = do
