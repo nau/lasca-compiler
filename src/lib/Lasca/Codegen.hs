@@ -467,7 +467,7 @@ defineStringLit s = defineConst (getStringLitName s) (stringStructType len) stri
 --            Lasca Runtime Data Representation Types
 funcType retTy args = T.FunctionType retTy args False
 
-stringStructType len = T.StructureType False [ptrType, intType, T.ArrayType (fromIntegral len) T.i8]
+stringStructType len = T.StructureType False [T.ptr ptrType, intType, T.ArrayType (fromIntegral len) T.i8]
 
 laTypeStructType = T.StructureType False [ptrType]
 

@@ -213,7 +213,8 @@ boxInt32 v = callBuiltin "boxInt32" [v]
 boxFloat64 v = callBuiltin "boxFloat64" [v]
 unbox t v = callBuiltin "unbox" [t, v]
 unboxBoolDynamically v = do
-    unbox boolTypePtrOp v -- checks types
+    let ref = typeToLaTypeRef TypeBool
+    unbox (constOp ref) v -- checks types
     unboxBool v
 
 
