@@ -7,6 +7,8 @@ module Lasca.Options (
 
 import Options.Applicative
 import Data.Semigroup ((<>))
+import Data.Version
+import Paths_lasca (version)
 
 data TypingMode = Static | Dynamic deriving (Eq)
 instance Show TypingMode where
@@ -85,5 +87,6 @@ lascaOptsParser = LascaOpts
 parseOptions = execParser opts
   where opts = info (helper <*> lascaOptsParser)
                 ( fullDesc
-               <> progDesc "Lasca Compiler 0.1"
-               <> header "Lasca Compiler 0.1" )
+               <> progDesc ("Lasca Compiler version " ++ v)
+               <> header ("Lasca Compiler v" ++ v))
+        v = showVersion version

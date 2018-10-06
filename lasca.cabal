@@ -43,6 +43,7 @@ library
                         -fPIC
 
   hs-source-dirs:       src/lib
+  other-modules:        Paths_lasca
   exposed-modules:
                         Lasca.Compiler
                         Lasca.Options
