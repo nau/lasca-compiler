@@ -142,9 +142,7 @@ compileExecutable opts fname mod = do
     let lascaPath = fromMaybe "." lascaPathEnv
     absLascaPathEnv <- mapM canonicalizePath (splitSearchPath lascaPath)
     let cc = fromMaybe (error "Did find C compiler. Install Clang or GCC, or define CC environment variable") result
-        lascartStaticLink = if os == "darwin"
-            then ["-llascartStatic"]
-            else ["-Wl,--whole-archive", "-llascartStatic" , "-Wl,--no-whole-archive"]
+        lascartStaticLink  = ["-llascartStatic"]
         lascartDynamicLink = ["-llascart"]
         libLascaLink = ["-rdynamic"]
             -- passes --export-dynamic to the linker.
@@ -153,7 +151,8 @@ compileExecutable opts fname mod = do
             -- ++ lascartDynamicLink
         libDirs = fmap (\p -> "-L" ++ p) absLascaPathEnv
         links = ["-lgc", "-lffi", "-lm", "-lpcre2-8"]
-    let args = optimizationOpts ++ libDirs ++ ["-fPIC", "-g"] ++ libLascaLink ++ links ++ [ "-o", outputPath, fname ++ ".o"]
+    -- object files must be specified before libraries for successful static linking
+    let args = optimizationOpts ++ [ "-o", outputPath, fname ++ ".o"] ++ libDirs ++ ["-fPIC", "-g"] ++ libLascaLink ++ links
     let command = unwords $ cc : args
     when (verboseMode opts) $ putStrLn command
     (output, errCode) <- getProcessOutput command
