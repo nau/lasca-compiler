@@ -4,7 +4,7 @@ FLAGS = --standalone --toc --highlight-style pygments
 
 #TEST_RTS = +RTS -sstderr
 TEST_RTS =
-LASCA_VERSION="0.0.1"
+LASCA_VERSION="0.0.2"
 
 build: rts
 	stack build --extra-lib-dirs=build/rts

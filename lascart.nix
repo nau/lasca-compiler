@@ -1,7 +1,7 @@
 {stdenv, cmake, libffi, boehmgc, pcre2, pkgconfig, zlib}:
 stdenv.mkDerivation rec {
     name = "lascart-${version}";
-    version = "0.0.1";
+    version = "0.0.2";
     src = ./rts;
     nativeBuildInputs = [ pkgconfig cmake ];
     buildInputs = [ pcre2 boehmgc zlib libffi ];

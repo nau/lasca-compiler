@@ -643,7 +643,7 @@ void initLascaRuntime(Runtime* runtime) {
         INT_ARRAY[i].num = i;
     }
     if (runtime->verbose) {
-        printf("Init Lasca 0.0.1 runtime. Enjoy :)\n# funcs = %"PRId64
+        printf("Init Lasca 0.0.2 runtime. Enjoy :)\n# funcs = %"PRId64
                ", # structs = %"PRId64", utf8proc version %s\n",
           RUNTIME->functions->size, RUNTIME->types->size, utf8proc_version());
         for (int i = 0; i < RUNTIME->types->size; i++) {
