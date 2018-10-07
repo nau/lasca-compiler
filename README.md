@@ -95,16 +95,9 @@ data JValue
 
 -- function argument type annotations are optional, compiler infers those
 def jsonToString(js: JValue) = match js {
-    JNull -> "null"
-    JNum(n) -> toString(n)
-    JBool(v) -> toString(v)
-    JArray(v) -> {
-        values = Array.map(v, jsonToString);
-        toString(values);
-    }
-    JString(v) -> "\"${v}\""
-    JObject(m) -> {
+    JObject(m) ->
         if Map.isEmpty(m) then "{}" else {
+            println(toString(m));
             res = Array.makeArray(m.size, "");
             var idx = 0;
             Map.foreachWithKey(m, { k, v ->
@@ -113,7 +106,14 @@ def jsonToString(js: JValue) = match js {
             });
             s = String.join(", ", res);
             "{ ${s} }"
-        };
+        }
+    JNull -> "null"
+    JNum(n) -> toString(n)
+    JBool(v) -> toString(v)
+    JString(v) -> "\"${v}\""
+    JArray(v) -> {
+        values = Array.map(v, jsonToString);
+        toString(values);
     }
 }
 ```
@@ -200,7 +200,7 @@ Other
 Install on Mac OS using Homebrew
 ---
 
-    brew install cmake llvm@6 boehmgc pcre2
+    brew install boehmgc pcre2
     brew install nau/lasca/lasca-compiler
 
 Setup LASCAPATH environment variable. Add this to your .bash_profile
@@ -222,7 +222,9 @@ Build on Mac OS
 
 You need LLVM 6.0 installed, and latest Haskell Stack.
 
-    brew install cmake llvm@6 boehmgc pcre2
+    brew install cmake boehmgc pcre2
+
+    brew install llvm-hs/llvm/llvm-6.0 # this compiles llvm from sources, make take some time
 
     brew install haskell-stack
 
