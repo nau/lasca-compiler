@@ -140,10 +140,13 @@ unary s = Ex.Prefix parser
             reservedOp s
             return (\expr -> Apply meta (Ident meta (Name $ T.append "unary" s)) [expr])
 
-binary s = Ex.InfixL parser
-  where parser = do
-            meta <- getMeta
-            reservedOp s >> return (\lhs rhs -> Apply meta (Ident meta (Name s)) [lhs, rhs])
+binop s = do
+    meta <- getMeta
+    reservedOp s
+    return (\lhs rhs -> Apply meta (Ident meta (Name s)) [lhs, rhs])
+
+infixlOp s = Ex.InfixL $ binop s
+infixnOp  s = Ex.InfixN $ binop s
 
 {-anyOperatorParser :: Parser Text
 anyOperatorParser = do
@@ -216,12 +219,12 @@ binops = [
           [postfixApply],
           [unary "-"],
           [unary "not"],
-          [binary "*", binary "/" ],
-          [binary "+", binary "-" ],
-          [binary "<=", binary ">=", binary "<", binary ">", binary "==" , binary "!="],
-          [binary "and"],
-          [binary "or"],
-          [binary ":="]
+          [infixlOp "*", infixlOp "/" ],
+          [infixlOp "+", infixlOp "-" ],
+          [infixnOp "<=", infixnOp ">=", infixnOp "<", infixnOp ">", infixnOp "==" , infixnOp "!="],
+          [infixlOp "and"],
+          [infixlOp "or"],
+          [infixnOp ":="]
          ]
 
 operatorTable = binops -- ++ [[unop], [binop]]
