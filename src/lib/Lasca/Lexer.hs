@@ -22,7 +22,7 @@ keywords = ["module", "import", "data", "def", "extern",
 
 sc :: Parser () -- ‘sc’ stands for “space consumer”
 sc = L.space (void space1) lineComment blockComment
-  where lineComment  = L.skipLineComment "--"
+  where lineComment = (string "--" <|> string "#") *> void (takeWhileP (Just "character") (/= '\n'))
         blockComment = L.skipBlockComment "{-" "-}"
 
 identChar = alphaNumChar

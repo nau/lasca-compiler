@@ -1,1 +1,2 @@
+#!/usr/bin/env lasca -e
 def main() = println("Вітаю, Світе! Будь Lasca.")
