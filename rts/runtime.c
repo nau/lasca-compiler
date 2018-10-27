@@ -10,7 +10,6 @@
 #include <gc.h>
 #include <ffi.h>
 #include <utf8proc.h>
-
 #include "lasca.h"
 
 #define STR(s) {.type = &String_LaType, .length = sizeof(s) - 1, .bytes = s}
@@ -33,21 +32,21 @@ const LaType _FILE_HANDLE   = { .name = "FileHandle" };
 const LaType _PATTERN = { .name = "Pattern" };
 const LaType _OPTION =  { .name = "Option" };
 const LaType* UNKNOWN = &Unknown_LaType;
-const LaType* UNIT    = &Unit_LaType;
-const LaType* BOOL    = &Bool_LaType;
-const LaType* BYTE    = &Byte_LaType;
-const LaType* INT16   = &Int16_LaType;
-const LaType* INT32   = &Int32_LaType;
-const LaType* INT     = &Int_LaType;
-const LaType* FLOAT64 = &Float_LaType;
-const LaType* STRING  = &String_LaType;
-const LaType* CLOSURE = &Closure_LaType;
-const LaType* ARRAY   = &Array_LaType;
+const LaType* LAUNIT    = &Unit_LaType;
+const LaType* LABOOL    = &Bool_LaType;
+const LaType* LABYTE    = &Byte_LaType;
+const LaType* LAINT16   = &Int16_LaType;
+const LaType* LAINT32   = &Int32_LaType;
+const LaType* LAINT     = &Int_LaType;
+const LaType* LAFLOAT64 = &Float_LaType;
+const LaType* LASTRING  = &String_LaType;
+const LaType* LACLOSURE = &Closure_LaType;
+const LaType* LAARRAY   = &Array_LaType;
 const LaType* VAR     = &_VAR;
-const LaType* BYTEARRAY   = &ByteArray_LaType;
-const LaType* FILE_HANDLE = &_FILE_HANDLE;
-const LaType* PATTERN = &_PATTERN;
-const LaType* OPTION  = &_OPTION;
+const LaType* LABYTEARRAY   = &ByteArray_LaType;
+const LaType* LAFILE_HANDLE = &_FILE_HANDLE;
+const LaType* LAPATTERN = &_PATTERN;
+const LaType* LAOPTION  = &_OPTION;
 
 Bool TRUE_SINGLETON = {
     .type = &Bool_LaType,
@@ -86,7 +85,7 @@ bool eqTypes(const LaType* lhs, const LaType* rhs) {
 Option* some(Box* value) {
     assert(value != NULL);
     DataValue* dv = gcMalloc(sizeof(DataValue) + sizeof(Box*));
-    dv->type = OPTION;
+    dv->type = LAOPTION;
     dv->tag = 1;
     dv->values[0] = value;
     return dv;
@@ -146,7 +145,7 @@ Int* boxInt(int64_t i) {
     if (i >= 0 && i < 100) return &INT_ARRAY[i];
     else {
         Int* ti = gcMallocAtomic(sizeof(Int));
-        ti->type = INT;
+        ti->type = LAINT;
         ti->num = i;
         return ti;
     }
@@ -154,14 +153,14 @@ Int* boxInt(int64_t i) {
 
 Int16* boxInt16(int16_t i) {
     Int16* ti = gcMallocAtomic(sizeof(Int16));
-    ti->type = INT16;
+    ti->type = LAINT16;
     ti->num = i;
     return ti;
 }
 
 Int32* boxInt32(int32_t i) {
     Int32* ti = gcMallocAtomic(sizeof(Int32));
-    ti->type = INT32;
+    ti->type = LAINT32;
     ti->num = i;
     return ti;
 }
@@ -169,7 +168,7 @@ Int32* boxInt32(int32_t i) {
 Float64* __attribute__ ((pure)) boxFloat64(double i) {
     if (i == 0.0) return &FLOAT64_ZERO;
     Float64* ti = gcMallocAtomic(sizeof(Float64));
-    ti->type = FLOAT64;
+    ti->type = LAFLOAT64;
     ti->num = i;
     return ti;
 }
@@ -178,7 +177,7 @@ Closure* boxClosure(int64_t idx, int64_t argc, Box** args) {
     Closure* cl = gcMalloc(sizeof(Closure));
   //  printf("boxClosure(%d, %d, %p)\n", idx, argc, args);
   //  fflush(stdout);
-    cl->type = CLOSURE;
+    cl->type = LACLOSURE;
     cl->funcIdx = idx;
     cl->argc = argc;
     cl->argv = args;
@@ -218,26 +217,26 @@ Box* writeVar(DataValue* var, Box* value) {
 
 static int64_t isBuiltinType(const Box* v) {
     const LaType* t = v->type;
-    return eqTypes(t, UNIT) || eqTypes(t, BOOL) || eqTypes(t, BYTE)
-      || eqTypes(t, INT) || eqTypes(t, INT16) || eqTypes(t, INT32) || eqTypes(t, FLOAT64)
-      || eqTypes(t, STRING) || eqTypes(t, CLOSURE) || eqTypes(t, ARRAY) || eqTypes(t, BYTEARRAY);
+    return eqTypes(t, LAUNIT) || eqTypes(t, LABOOL) || eqTypes(t, LABYTE)
+      || eqTypes(t, LAINT) || eqTypes(t, LAINT16) || eqTypes(t, LAINT32) || eqTypes(t, LAFLOAT64)
+      || eqTypes(t, LASTRING) || eqTypes(t, LACLOSURE) || eqTypes(t, LAARRAY) || eqTypes(t, LABYTEARRAY);
 }
 
 static int64_t isUserType(const Box* v) {
     return !isBuiltinType(v);
 }
 
-#define DO_OP(op) if (eqTypes(lhs->type, INT)) { result = (Box*) boxInt(asInt(lhs)->num op asInt(rhs)->num); } \
-                  else if (eqTypes(lhs->type, BYTE)) { result = (Box*) boxByte(asByte(lhs)->num op asByte(rhs)->num); } \
-                  else if (eqTypes(lhs->type, INT32)) { result = (Box*) boxInt32(asInt32(lhs)->num op asInt32(rhs)->num); } \
-                  else if (eqTypes(lhs->type, INT16)) { result = (Box*) boxInt16(asInt16(lhs)->num op asInt16(rhs)->num); } \
-                  else if (eqTypes(lhs->type, FLOAT64)) { result = (Box*) boxFloat64(asFloat(lhs)->num op asFloat(rhs)->num); } \
+#define DO_OP(op) if (eqTypes(lhs->type, LAINT)) { result = (Box*) boxInt(asInt(lhs)->num op asInt(rhs)->num); } \
+                  else if (eqTypes(lhs->type, LABYTE)) { result = (Box*) boxByte(asByte(lhs)->num op asByte(rhs)->num); } \
+                  else if (eqTypes(lhs->type, LAINT32)) { result = (Box*) boxInt32(asInt32(lhs)->num op asInt32(rhs)->num); } \
+                  else if (eqTypes(lhs->type, LAINT16)) { result = (Box*) boxInt16(asInt16(lhs)->num op asInt16(rhs)->num); } \
+                  else if (eqTypes(lhs->type, LAFLOAT64)) { result = (Box*) boxFloat64(asFloat(lhs)->num op asFloat(rhs)->num); } \
                   else { \
                         printf("AAAA!!! Type mismatch! Expected Int or Float for op but got %s\n", typeIdToName(lhs->type)); exit(1); }
 
 Box* __attribute__ ((pure)) runtimeBinOp(int64_t code, Box* lhs, Box* rhs) {
     if (!eqTypes(lhs->type, rhs->type)) {
-        printf("AAAA!!! Type mismatch! lhs = %s, rhs = %s\n", typeIdToName(lhs->type), typeIdToName(rhs->type));
+        printf("AAAA!!! Type mismatch in binop %"PRId64"! lhs = %s, rhs = %s\n", code, typeIdToName(lhs->type), typeIdToName(rhs->type));
         exit(1);
     }
 
@@ -261,15 +260,15 @@ Box* __attribute__ ((pure)) runtimeUnaryOp(int64_t code, Box* expr) {
     Box* result = NULL;
     switch (code) {
         case 1:
-            if (eqTypes(expr->type, INT)) {
+            if (eqTypes(expr->type, LAINT)) {
                 result = (Box*) boxInt(-asInt(expr)->num);
-            } else if (eqTypes(expr->type, BYTE)) {
+            } else if (eqTypes(expr->type, LABYTE)) {
                 result = (Box*) boxByte(-asByte(expr)->num);
-            } else if (eqTypes(expr->type, INT32)) {
+            } else if (eqTypes(expr->type, LAINT32)) {
                 result = (Box*) boxInt32(-asInt32(expr)->num);
-            } else if (eqTypes(expr->type, INT16)) {
+            } else if (eqTypes(expr->type, LAINT16)) {
                 result = (Box*) boxInt16(-asInt16(expr)->num);
-            } else if (eqTypes(expr->type, FLOAT64)) {
+            } else if (eqTypes(expr->type, LAFLOAT64)) {
                 result = (Box*) boxFloat64(-asFloat(expr)->num);
             } else {
                 printf("AAAA!!! Type mismatch! Expected Int or Float for op but got %s\n", typeIdToName(expr->type));
@@ -290,7 +289,7 @@ String UNIMPLEMENTED_SELECT = {
 
 Box* runtimeApply(Box* val, int64_t argc, Box* argv[], Position pos) {
     Functions* fs = RUNTIME->functions;
-    Closure *closure = unbox(CLOSURE, val);
+    Closure *closure = unbox(LACLOSURE, val);
     if (closure->funcIdx >= fs->size) {
         printf("AAAA!!! No such function with id %"PRId64", max id is %"PRId64" at line: %"PRId64"\n", (int64_t) closure->funcIdx, fs->size, pos.line);
         exit(1);
@@ -354,13 +353,13 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
                 }
             }
             printf("Couldn't find field %s at line: %"PRId64"\n", name->bytes, pos.line);
-        } else if (eqTypes(ident->type, CLOSURE)) {
+        } else if (eqTypes(ident->type, LACLOSURE)) {
               // FIXME fix for closure?  check arity?
               Closure* f = asClosure(ident);
               assert(fs->functions[f->funcIdx].arity == 1);
               return runtimeApply(ident, 1, &tree, pos);
         }
-    } else if (eqTypes(ident->type, CLOSURE)) {
+    } else if (eqTypes(ident->type, LACLOSURE)) {
         // FIXME fix for closure?  check arity?
         Closure* f = asClosure(ident);
         assert(fs->functions[f->funcIdx].arity == 1);
@@ -371,7 +370,7 @@ Box* __attribute__ ((pure)) runtimeSelect(Box* tree, Box* ident, Position pos) {
 
 int8_t runtimeIsConstr(Box* value, Box* constrName) {
     if (isUserType(value)) {
-        String* name = unbox(STRING, constrName);
+        String* name = unbox(LASTRING, constrName);
         Data* data = findDataType(value->type);
         DataValue* dv = asDataValue(value);
         String* realConstrName = data->constructors[dv->tag]->name;
@@ -391,7 +390,7 @@ int8_t runtimeCheckTag(Box* value, int64_t tag) {
 
 Array* createArray(size_t size) {
     Array * array = gcMalloc(sizeof(Array) + sizeof(Box*) * size);
-    array->type = ARRAY;
+    array->type = LAARRAY;
     array->length = size;
     return array;
 }
@@ -405,13 +404,13 @@ Box* boxArray(size_t size, ...) {
         array->data[i] = arg;
     }
     va_end (argp);                  /* Clean up. */
-    return box(ARRAY, array);
+    return box(LAARRAY, array);
 }
 
 String* __attribute__ ((pure)) makeString(const char * str) {
     size_t len = strlen(str);
     String* val = gcMalloc(sizeof(String) + len + 1);  // null terminated
-    val->type = STRING;
+    val->type = LASTRING;
     val->length = len;
     strncpy(val->bytes, str, len);
     return val;
@@ -444,7 +443,7 @@ String* joinValues(int size, Box* values[], char* start, char* end) {
 }
 
 String* __attribute__ ((pure)) arrayToString(const Box* arrayValue)  {
-    Array* array = unbox(ARRAY, arrayValue);
+    Array* array = unbox(LAARRAY, arrayValue);
     if (array->length == 0) {
         return makeString("[]");
     } else {
@@ -457,13 +456,13 @@ String* typeOf(Box* value) {
 }
 
 String* __attribute__ ((pure)) byteArrayToString(const Box* arrayValue)  {
-    String* array = unbox(BYTEARRAY, arrayValue);
+    String* array = unbox(LABYTEARRAY, arrayValue);
     if (array->length == 0) {
         return makeString("[]");
     } else {
         int len = 6 * array->length + 2 + 1; // max (4 + 2 (separator)) symbols per byte + [] + 0
         String* res = gcMalloc(sizeof(String) + len);
-        res->type = STRING;
+        res->type = LASTRING;
         strcpy(res->bytes, "[");
         char buf[7];
         int curPos = 1;
@@ -496,32 +495,32 @@ String* __attribute__ ((pure)) toString(const Box* value) {
     if (value == NULL) return makeString("<NULL>");
 
     const LaType* type = value->type;
-    if (eqTypes(type, UNIT)) {
+    if (eqTypes(type, LAUNIT)) {
         return UNIT_STRING;
-    } else if (eqTypes(type, BOOL)) {
+    } else if (eqTypes(type, LABOOL)) {
         return makeString(asBool(value)->num == 0 ? "false" : "true");
-    } else if (eqTypes(type, INT)) {
+    } else if (eqTypes(type, LAINT)) {
         snprintf(buf, 100, "%"PRId64, asInt(value)->num);
         return makeString(buf);
-    } else if (eqTypes(type, INT16)) {
+    } else if (eqTypes(type, LAINT16)) {
         snprintf(buf, 100, "%"PRId16, asInt16(value)->num);
         return makeString(buf);
-    } else if (eqTypes(type, INT32)) {
+    } else if (eqTypes(type, LAINT32)) {
         snprintf(buf, 100, "%"PRId32, asInt32(value)->num);
         return makeString(buf);
-    } else if (eqTypes(type, BYTE)) {
+    } else if (eqTypes(type, LABYTE)) {
         snprintf(buf, 100, "%"PRId8, asByte(value)->num);
         return makeString(buf);
-    } else if (eqTypes(type, FLOAT64)) {
+    } else if (eqTypes(type, LAFLOAT64)) {
         snprintf(buf, 100, "%12.9lf", asFloat(value)->num);
         return makeString(buf);
-    } else if (eqTypes(type, STRING)) {
+    } else if (eqTypes(type, LASTRING)) {
         return asString(value);
-    } else if (eqTypes(type, CLOSURE)) {
+    } else if (eqTypes(type, LACLOSURE)) {
         return makeString("<func>");
-    } else if (eqTypes(type, ARRAY)) {
+    } else if (eqTypes(type, LAARRAY)) {
         return arrayToString(value);
-    } else if (eqTypes(type, BYTEARRAY)) {
+    } else if (eqTypes(type, LABYTEARRAY)) {
         return byteArrayToString(value);
     } else if (eqTypes(type, VAR)) {
         DataValue* dataValue = asDataValue(value);
@@ -550,20 +549,20 @@ String* __attribute__ ((pure)) toString(const Box* value) {
 }
 
 String* concat(Box* arrayString) {
-    Array* array = unbox(ARRAY, arrayString);
+    Array* array = unbox(LAARRAY, arrayString);
     String* result = &EMPTY_STRING;
     if (array->length > 0) {
         int64_t len = 0;
         for (int64_t i = 0; i < array->length; i++) {
-            String* s = unbox(STRING, array->data[i]);
+            String* s = unbox(LASTRING, array->data[i]);
             len += s->length;
         }
         String* val = gcMalloc(sizeof(String) + len + 1); // +1 for null-termination
-        val->type = STRING;
+        val->type = LASTRING;
         // val->length is 0, because gcMalloc allocates zero-initialized memory
         // it's also zero terminated, because gcMalloc allocates zero-initialized memory
         for (int64_t i = 0; i < array->length; i++) {
-            String* s = unbox(STRING, array->data[i]);
+            String* s = unbox(LASTRING, array->data[i]);
             memcpy(&val->bytes[val->length], s->bytes, s->length);
             val->length += s->length;
         }
@@ -589,7 +588,7 @@ void initEnvironment(int64_t argc, char* argv[]) {
         Box* s = (Box *) makeString(argv[i]);
         array->data[i] = s;
     }
-    ENV.argv = box(ARRAY, array);
+    ENV.argv = box(LAARRAY, array);
 }
 
 Box* getArgs() {
@@ -629,7 +628,7 @@ int64_t float64ToInt(double n) {
 }
 
 int64_t toInt(Box* s) {
-    String* str = unbox(STRING, s);
+    String* str = unbox(LASTRING, s);
   //  println(s);
     char cstr[str->length + 1];
     memcpy(cstr, str->bytes, str->length); // TODO use VLA?
@@ -660,14 +659,17 @@ void onexit() {
 void initLascaRuntime(Runtime* runtime) {
     GC_init();
     GC_expand_hp(4*1024*1024);
+
+    xxHashSeed = 0xe606946923239b1c; // FIXME implement reading /dev/urandom
+
     RUNTIME = runtime;
     UNIT_STRING = makeString("()");
     for (int i = 0; i < 256; i++) {
-        BYTE_ARRAY[i].type = BYTE;
+        BYTE_ARRAY[i].type = LABYTE;
         BYTE_ARRAY[i].num = i - 128;
     }
     for (int i = 0; i < 100; i++) {
-        INT_ARRAY[i].type = INT;
+        INT_ARRAY[i].type = LAINT;
         INT_ARRAY[i].num = i;
     }
     if (runtime->verbose) {
