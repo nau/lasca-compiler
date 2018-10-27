@@ -9,7 +9,7 @@ import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.IO as TIO
 import System.IO
-import           Foreign.Ptr          
+import           Foreign.Ptr
 import           Foreign.C.String
 import           Foreign.C.Types
 import Foreign.Marshal.Array
@@ -51,6 +51,7 @@ withHostTargetMachine f = do
   features <- getHostCPUFeatures
   (target, _) <- lookupTarget Nothing triple
   withTargetOptions $ \options ->
+    -- Make it PIC, otherwise it won't work with shared libraries
     withTargetMachine target triple cpu features options Reloc.PIC CodeModel.Default CodeGenOpt.Default f
 
 
@@ -71,10 +72,10 @@ runJIT opts mod = do
 --    putStrLn $ LT.unpack $ ppllvm mod
     b <- loadLibraryPermanently Nothing
     unless (not b) (error "Couldn’t load library")
-    withOptimizedModule opts mod $ \context m -> do
+    withOptimizedModule opts mod $ \context m ->
         withHostTargetMachine $ \tm ->
             withObjectLinkingLayer $ \linkingLayer ->
-                withIRCompileLayer linkingLayer tm $ \compileLayer -> do
+                withIRCompileLayer linkingLayer tm $ \compileLayer ->
                     withModule compileLayer m
                         (resolver compileLayer) $ \moduleHandle -> do
                             mainSymbol <- mangleSymbol compileLayer "main"
@@ -87,7 +88,7 @@ runJIT opts mod = do
                             result <- mainFun (castPtrToFunPtr (wordPtrToPtr mainFn)) len array
                             return ()
 
-withOptimizedModule opts mod f = withContext $ \context -> do
+withOptimizedModule opts mod f = withContext $ \context ->
     withModuleFromAST context mod $ \m ->
         withPassManager (passes (optimization opts)) $ \pm -> do
             -- Optimization Pass

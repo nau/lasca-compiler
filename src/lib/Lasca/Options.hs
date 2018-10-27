@@ -41,7 +41,7 @@ emptyLascaOpts = LascaOpts {
     printLLVMAsm = False,
     printAst = False,
     printTypes = False,
-    optimization = 0
+    optimization = 1 -- default to O1 to enable tail call optimization
 }
 
 optimizeOpt :: Parser Int

@@ -14,10 +14,14 @@ def map(array, f) = {
     init(len, { idx -> f(array[idx]) });
 }
 
+-- no idea why, but otherwise LLVM doesn't do tail call optimization in foreachgo
+def foreachApply(array, f, i) = f(array[i])
+
 def foreachgo(array, f, i) = {
     len = length(array);
     if i < len then {
-        f(array[i]); foreachgo(array, f, i + 1)
+        foreachApply(array, f, i);
+        foreachgo(array, f, i + 1);
     } else ()
 }
 
