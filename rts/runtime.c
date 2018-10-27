@@ -571,6 +571,74 @@ String* concat(Box* arrayString) {
     return result;
 }
 
+int64_t lascaXXHash(const void* buffer, size_t length, unsigned long long const seed) {
+    return (int64_t) XXH64(buffer, length, seed);
+}
+
+unsigned long long xxHashSeed = 0;
+
+XXH_errorcode lascaGetHashable(Box* value, XXH64_state_t* const state) {
+    if (value == NULL) return XXH64_update(state, NULL, 0);
+
+    const LaType* type = value->type;
+    if (eqTypes(type, LAUNIT)) {
+        return XXH64_update(state, &UNIT_SINGLETON, sizeof(UNIT_SINGLETON));
+    } else if (eqTypes(type, LABOOL)) {
+        return XXH64_update(state, (char*) &asBool(value)->num, sizeof(asBool(value)->num));
+    } else if (eqTypes(type, LAINT)) {
+        return XXH64_update(state, (char*) &asInt(value)->num, sizeof(asInt(value)->num));
+    } else if (eqTypes(type, LAINT16)) {
+        return XXH64_update(state, (char*) &asInt16(value)->num, sizeof(asInt16(value)->num));
+    } else if (eqTypes(type, LAINT32)) {
+        return XXH64_update(state, (char*) &asInt32(value)->num, sizeof(asInt32(value)->num));
+    } else if (eqTypes(type, LABYTE)) {
+        return XXH64_update(state, (char*) &asByte(value)->num, sizeof(asByte(value)->num));
+    } else if (eqTypes(type, LAFLOAT64)) {
+        return XXH64_update(state, (char*) &asFloat(value)->num, sizeof(asFloat(value)->num));
+    } else if (eqTypes(type, LASTRING)) {
+        String* s = asString(value);
+        return XXH64_update(state, s->bytes, s->length);
+    } else if (eqTypes(type, LACLOSURE)) {
+        return XXH64_update(state, (char*) &value, sizeof(Closure));
+    } else if (eqTypes(type, LAARRAY)) {
+        Array* array = asArray(value);
+        for (size_t i = 0; i < array->length; i++) {
+            lascaGetHashable(array->data[i], state);
+        }
+        return XXH_OK;
+    } else if (eqTypes(type, LABYTEARRAY)) {
+        String* s = asString(value);
+        return XXH64_update(state, s->bytes, s->length);
+    } else if (eqTypes(type, VAR)) {
+        DataValue* dataValue = asDataValue(value);
+        return lascaGetHashable(dataValue->values[0], state);
+    } else if (eqTypes(type, UNKNOWN)) {
+        String *name = ((Unknown *) value)->error;
+        printf("AAAA!!! Undefined identifier in toString %s\n", name->bytes);
+        exit(1);
+    } else {
+        if (isUserType(value)) {
+            DataValue* dataValue = asDataValue(value);
+            Data* metaData = findDataType(type);
+            Struct* constr = metaData->constructors[dataValue->tag];
+            for (size_t i = 0; i < constr->numFields; i++) {
+                lascaGetHashable(dataValue->values[i], state);
+            }
+            return XXH_OK;
+        } else {
+            printf("Unsupported type %s", typeIdToName(value->type));
+            exit(1);
+        }
+    }
+}
+
+int64_t lascaHashCode(Box* value) {
+    XXH64_state_t* const state = XXH64_createState();
+    XXH_errorcode const resetResult = XXH64_reset(state, xxHashSeed);
+    lascaGetHashable(value, state);
+    return (int64_t) XXH64_digest(state);
+}
+
 /* ============ System ================ */
 
 void initEnvironment(int64_t argc, char* argv[]) {

@@ -2,6 +2,10 @@
 #define LASCA_H
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
+#define XXH_ACCEPT_NULL_INPUT_POINTER 1
+#define XXH_INLINE_ALL
+#include "xxhash.h"
+
 
 // Operators
 static const int64_t ADD = 10;
@@ -176,6 +180,7 @@ extern const LaType* LABYTEARRAY;
 extern const LaType* LAFILE_HANDLE;
 extern const LaType* LAPATTERN;
 extern const LaType* LAOPTION;
+extern unsigned long long xxHashSeed;
 
 bool eqTypes(const LaType* lhs, const LaType* rhs);
 void *gcMalloc(size_t s);

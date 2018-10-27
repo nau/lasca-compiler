@@ -28,6 +28,8 @@ extern def floatToInt(i: Float): Int = "float64ToInt"
 
 extern def intRem(a: Int, b: Int): Int = "intRem"
 
+extern def hashCode(value: a): Int = "lascaHashCode"
+
 data Var a = Var(readVar: a)
 
 data FileHandle

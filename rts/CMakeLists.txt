@@ -1,4 +1,4 @@
-add_library(objlib OBJECT runtime.c builtin.c lasca.h utf8proc/utf8proc.c utf8proc/utf8proc.h)
+add_library(objlib OBJECT runtime.c builtin.c lasca.h utf8proc/utf8proc.c utf8proc/utf8proc.h xxhash.h)
 add_library (lascart SHARED $<TARGET_OBJECTS:objlib>)
 add_library (lascartStatic  $<TARGET_OBJECTS:objlib>)
 # set_target_properties(lascartStatic PROPERTIES OUTPUT_NAME lascart)
