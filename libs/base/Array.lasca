@@ -5,7 +5,7 @@ extern def makeArray(size: Int, init: a): Array a = "makeArray"
 extern def append(first: Array a, second: Array a): Array a = "arrayAppend"
 extern def copy(src: Array a, srcPos: Int, dest: Array a, destPos: Int, length: Int): Unit = "arrayCopy"
 extern def getIndex(array: Array a, i: Int): a = "arrayGetIndex"
-extern def setIndex(array: Array a, i: Int, value: a): Array a = "arraySetIndex"
+extern def setIndex(array: Array a, i: Int, value: a): Unit = "arraySetIndex"
 extern def length(array: Array a): Int = "arrayLength"
 extern def init(n: Int, f: Int -> a): Array a = "arrayInit"
 
@@ -17,16 +17,15 @@ def map(array, f) = {
 -- no idea why, but otherwise LLVM doesn't do tail call optimization in foreachgo
 def foreachApply(array, f, i) = f(array[i])
 
-def foreachgo(array, f, i) = {
-    len = length(array);
+def foreachgo(array, f, i, len) = {
     if i < len then {
         foreachApply(array, f, i);
-        foreachgo(array, f, i + 1);
+        foreachgo(array, f, i + 1, len);
     } else ()
 }
 
 def foreach(array: [a], f: a -> b): Unit = {
-    foreachgo(array, f, 0);
+    foreachgo(array, f, 0, length(array));
 }
 
 def range(start: Int, end: Int, step: Int): Array Int = {

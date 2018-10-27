@@ -232,7 +232,7 @@ Box* arraySetIndex(Box* arrayValue, int64_t index, Box* value) {
     Array* array = unbox(ARRAY, arrayValue);
     assert(array->length > index);
     array->data[index] = value;
-    return arrayValue;
+    return &UNIT_SINGLETON;
 }
 
 Box* arrayInit(int64_t size, Box* f) {
@@ -273,7 +273,7 @@ Box* byteArraySetIndex(Box* arrayValue, int64_t index, int8_t value) {
     String* array = unbox(BYTEARRAY, arrayValue);
     assert(array->length > index);
     array->bytes[index] = value;
-    return arrayValue;
+    return &UNIT_SINGLETON;
 }
 
 Box* byteArrayCopy(Box* src, int64_t srcPos, Box* dest, int64_t destPos, int64_t length) {

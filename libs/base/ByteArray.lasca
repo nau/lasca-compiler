@@ -4,7 +4,7 @@ extern def create(size: Int): ByteArray = "createByteArray"
 --extern def make(size: Int, init: Byte): ByteArray = "makeByteArray"
 extern def copy(src: ByteArray, srcPos: Int, dest: ByteArray, destPos: Int, length: Int): Unit = "byteArrayCopy"
 extern def getIndex(array: ByteArray, i: Int): Byte = "byteArrayGetIndex"
-extern def setIndex(array: ByteArray, i: Int, value: Byte): ByteArray = "byteArraySetIndex"
+extern def setIndex(array: ByteArray, i: Int, value: Byte): Unit = "byteArraySetIndex"
 extern def length(array: ByteArray): Int = "byteArrayLength"
 
 def testArray() = {
