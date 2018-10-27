@@ -227,12 +227,12 @@ Operator                       Lasca            Python             Julia       S
 Numeric                        `+` `-` `*` `/`  `+` `-` `*` `/`
 Modulus                        %                %                  mod % rem   %           mod rem     mod         %
 Exponent                                        `**`               ^           pow         ^ ^^ `**`
-Floor division                                  //                 
-                     
+Floor division                                  //
+
 Logical AND                    and              and                &&          &&          &&
 Logical OR                     or               or                 ||          ||          ||
 Logical NOT                    not              not                !           !           not
-                 
+
 Bitwise AND                    &                &                  &           &           .&.
 Bitwise OR                     |                |                  |           |           .|.
 Bitwise XOR                    xor              ^                  $           ^           xor
@@ -240,7 +240,7 @@ Bitwise NOT                    ~                ~                  ~           ~
 Logical shift right                             >>                 >>>         >>>
 Arithmetical shift right                        >>                 >>          >>
 Logical/arithmetic shift left                   <<                 <<          << <<<
-                 
+
 Equality                                        == != <>           == !=       == !=
 Relational                                      < <= > >=          < <= > >=   < <= > >=   < <= > >=   < <= > >=   < <= > >=
 =============================  ===============  ===============    ==========  ==========  ==========  ==========  ==========

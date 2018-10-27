@@ -10,7 +10,7 @@ makeRelease() {
 	mkdir -p dist/{bin,src,lib,bash_completion}
 	cp "$(stack path --dist-dir)/build/lasca/lasca" dist/bin
 
-	LLVM_PATH="$(brew --cellar)/llvm-6.0/6.0.0/lib/llvm-6.0/lib"
+	LLVM_PATH="/usr/local/opt/llvm-6.0/lib/llvm-6.0/lib"
 	echo "${LLVM_PATH}"
 	cp "${LLVM_PATH}/libLLVM.dylib"    dist/lib
 	cp "${LLVM_PATH}/libc++.1.0.dylib" dist/lib
