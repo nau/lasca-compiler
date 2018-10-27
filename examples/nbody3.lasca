@@ -50,13 +50,6 @@ Neptune = body(
 
 Sun = body(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, SolarMass)
 
-def for(start: Int, end: Int, f: Int -> a) = {
-    if start < end then {
-        f(start);
-        for(start + 1, end, f);
-    } else 0;
-}
-
 def offsetMomentum(bodies: [Body]) = {
     var px = 0.0;
     var py = 0.0;

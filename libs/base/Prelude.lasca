@@ -64,3 +64,13 @@ def setEnv(name: String, value: String, replace: Bool): Unit = {
 def unsetEnv(name: String): Unit = {
     if lascaUnsetEnv(name) == -1 then die("unsetEnv: ${libcCurError()}") else ()
 }
+
+def apply(f, arg) = f(arg)
+def apply2(f, arg1, arg2) = f(arg1, arg2)
+
+def for(start: Int, end: Int, f: Int -> a) = {
+    if start < end then {
+        apply(f, start); -- no idea why, but without apply LLVM doesn't do tail call optimization
+        for(start + 1, end, f);
+    } else ();
+}

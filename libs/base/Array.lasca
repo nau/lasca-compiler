@@ -14,17 +14,14 @@ def map(array, f) = {
     init(len, { idx -> f(array[idx]) });
 }
 
--- no idea why, but otherwise LLVM doesn't do tail call optimization in foreachgo
-def foreachApply(array, f, i) = f(array[i])
-
-def foreachgo(array, f, i, len) = {
-    if i < len then {
-        foreachApply(array, f, i);
-        foreachgo(array, f, i + 1, len);
-    } else ()
-}
-
 def foreach(array: [a], f: a -> b): Unit = {
+    def foreachgo(array, f, i, len) = {
+        if i < len then {
+            -- no idea why, but otherwise LLVM doesn't do tail call optimization in foreachgo
+            apply(f, array[i]);
+            foreachgo(array, f, i + 1, len);
+        } else ()
+    };
     foreachgo(array, f, 0, length(array));
 }
 
@@ -32,16 +29,15 @@ def range(start: Int, end: Int, step: Int): Array Int = {
     init((end - start) / step + 1, { i -> start + i * step })
 }
 
-def transformGo(array, f, i) = {
-    len = length(array);
-    if i < len then {
-        setIndex(array, i, f(i, array[i]));
-        transformGo(array, f, i + 1)
-    } else ()
-}
-
 def transform(array: Array a, f: Int -> a -> a): Array a = {
-    transformGo(array, f, 0)
+    len = length(array);
+    def transformGo(array, f, i, len) = {
+        if i < len then {
+            setIndex(array, i, f(i, array[i]));
+            transformGo(array, f, i + 1, len)
+        } else ()
+    };
+    transformGo(array, f, 0, len)
 }
 
 def testArray() = {
