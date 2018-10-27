@@ -92,11 +92,18 @@ Option* some(Box* value) {
     return dv;
 }
 
+static uint64_t Lasca_Allocated = 0;
+static uint64_t Lasca_Nr_gcMalloc = 0;
+
 void *gcMalloc(size_t s) {
+    Lasca_Allocated += s;
+    Lasca_Nr_gcMalloc++;
     return GC_malloc(s);
 }
 
 void *gcMallocAtomic(size_t s) {
+    Lasca_Allocated += s;
+    Lasca_Nr_gcMalloc++;
     return GC_malloc_atomic(s);
 }
 
@@ -629,6 +636,19 @@ int64_t toInt(Box* s) {
     return (int64_t) i;
 }
 
+void onexit() {
+    struct GC_prof_stats_s stats;
+    GC_get_prof_stats(&stats, sizeof(stats));
+
+    printf("GC stats:\n");
+    printf("\tFinal heap size is %lu MiB\n", (unsigned long)GC_get_heap_size() / 1024 / 1024);
+    printf("\tNumber of collections %lu\n", stats.gc_no);
+    printf("\tTotal allocated %zu MiB\n", GC_get_total_bytes()  / 1024 / 1024);
+    printf("\tTotal allocated %"PRIu64" MiB\n", Lasca_Allocated / 1024 / 1024);
+    printf("\tNumber of allocations: %"PRIu64"\n", Lasca_Nr_gcMalloc);
+    printf("\tAverage alloc: %"PRIu64" bytes\n", Lasca_Allocated / Lasca_Nr_gcMalloc);
+}
+
 void initLascaRuntime(Runtime* runtime) {
     GC_init();
     GC_expand_hp(4*1024*1024);
@@ -643,6 +663,7 @@ void initLascaRuntime(Runtime* runtime) {
         INT_ARRAY[i].num = i;
     }
     if (runtime->verbose) {
+        atexit(onexit);
         printf("Init Lasca 0.0.2 runtime. Enjoy :)\n# funcs = %"PRId64
                ", # structs = %"PRId64", utf8proc version %s\n",
           RUNTIME->functions->size, RUNTIME->types->size, utf8proc_version());
