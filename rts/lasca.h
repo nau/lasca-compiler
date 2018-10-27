@@ -154,6 +154,8 @@ typedef struct {
 #define asString(ptr) ((String*)ptr)
 #define asDataValue(ptr) ((DataValue*)ptr)
 #define asClosure(ptr) ((Closure*)ptr)
+#define asArray(ptr) ((Array*)ptr)
+#define asByteArray(ptr) ((String*)ptr)
 
 extern Unit UNIT_SINGLETON;
 extern Bool TRUE_SINGLETON;

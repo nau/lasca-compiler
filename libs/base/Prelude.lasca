@@ -23,6 +23,10 @@ extern def intToInt16(i: Int): Int16 = "intToInt16"
 extern def int16ToInt(i: Int16): Int = "int16ToInt"
 extern def intToInt32(i: Int): Int32 = "intToInt32"
 extern def int32ToInt(i: Int32): Int = "int32ToInt"
+extern def intToFloat(i: Int): Float = "intToFloat64"
+extern def floatToInt(i: Float): Int = "float64ToInt"
+
+extern def intRem(a: Int, b: Int): Int = "intRem"
 
 data Var a = Var(readVar: a)
 

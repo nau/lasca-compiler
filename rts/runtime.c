@@ -620,6 +620,14 @@ int64_t int32ToInt(int32_t n) {
     return (int64_t) n;
 }
 
+double intToFloat64(int64_t n) {
+    return (double) n;
+}
+
+int64_t float64ToInt(double n) {
+    return (int64_t) n;
+}
+
 int64_t toInt(Box* s) {
     String* str = unbox(STRING, s);
   //  println(s);

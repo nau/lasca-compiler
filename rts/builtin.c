@@ -47,6 +47,7 @@ int64_t intNot(int64_t a) { return ~a; }
 int64_t intShiftL(int64_t a, int64_t b) { return a << b; }
 int64_t intShiftR(int64_t a, int64_t b) { return a >> b; }
 int64_t intPopCount(int64_t a) { return __builtin_popcountll(a); }
+int64_t intRem(int64_t a, int64_t b) { return a % b; }
 
 /* Strings / Unicode stuff */
 
